@@ -58,7 +58,8 @@ class BaseModel(ABC):
         # Extract model-specific config if it exists
         model_config = self._extract_model_config(self.config)
         
-        self.training_loss = model_config.get('training_loss', 'mae')
+        # training_loss is optional for statistical models that don't require training
+        self.training_loss = model_config.get('training_loss', None)
         
         # Determine forecast horizon from model configuration keys if present
         # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
@@ -128,7 +129,8 @@ class BaseModel(ABC):
     def predict(
         self,
         y_context: Optional[Union[pd.Series, np.ndarray]] = None,
-        forecast_horizon: Optional[int] = None
+        forecast_horizon: Optional[int] = None,
+        freq: str = None
     ) -> np.ndarray:
         """
         Make predictions using the trained model.
@@ -136,10 +138,16 @@ class BaseModel(ABC):
         Args:
             y_context: Recent/past target values (for sequence models, optional for ARIMA)
             forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
+            freq: Frequency string (e.g., 'H', 'D', 'M') - MUST be provided from CSV data
             
         Returns:
             np.ndarray: Model predictions with shape (n_samples, forecast_horizon)
+            
+        Raises:
+            ValueError: If freq is None or empty - frequency must always be read from CSV data
         """
+        if freq is None or freq == "":
+            raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
         pass
     
     def compute_loss(self, y_true: np.ndarray, y_pred: np.ndarray, loss_function: str = None, y_train: np.ndarray = None) -> Dict[str, float]:

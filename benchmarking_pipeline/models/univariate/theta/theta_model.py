@@ -24,17 +24,32 @@ class ThetaModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        self.sp = self.config.get('sp', 1)
-        # forecast_horizon is inherited from parent class (BaseModel)
+        
+        # Extract model-specific config
+        model_config = self._extract_model_config(self.config)
+        if 'sp' not in model_config:
+            raise ValueError("sp must be specified in config")
+        self.sp = model_config['sp']
         self.model = None
+        self.is_fitted = False
         
     def _build_model(self):
         """
         Build the ThetaForecaster model instance from the configuration.
         """
         # Only pass supported arguments to ThetaForecaster
+        # Note: For normalized data with values near zero, multiplicative seasonality
+        # can fail. In such cases, we disable deseasonalization.
         model_params = {"sp": self.sp}
-        self.model = ThetaForecaster(**model_params)
+        
+        # Try with default settings first, fallback to no deseasonalization if needed
+        try:
+            self.model = ThetaForecaster(**model_params)
+        except:
+            # If model creation fails, disable deseasonalization
+            model_params["deseasonalize"] = False
+            self.model = ThetaForecaster(**model_params)
+        
         self.is_fitted = False
 
     def train(self, 
@@ -67,9 +82,42 @@ class ThetaModel(BaseModel):
             # sktime works best with Pandas Series with a proper index
             y_context = pd.Series(y_context)
             
+        # For normalized data with values near zero, add small epsilon to avoid 
+        # multiplicative seasonality issues while preserving the relative patterns
+        if self.sp > 1 and np.any(y_context <= 0.001):
+            epsilon = 1e-6
+            y_context = y_context + epsilon
+            print(f"[INFO] Added epsilon ({epsilon}) to avoid multiplicative seasonality issues with normalized data")
+            
         # Theta is a univariate method, so we only use y_context
-        self.model.fit(y=y_context)  # No exogenous variables
-        self.is_fitted = True
+        try:
+            self.model.fit(y=y_context)  # No exogenous variables
+            self.is_fitted = True
+        except ValueError as e:
+            if "Multiplicative seasonality is not appropriate" in str(e):
+                # For normalized data, try different strategies to maintain forecasting capability
+                print(f"[WARNING] Multiplicative seasonality failed with sp={self.sp}")
+                
+                # Strategy 1: Try with no seasonality (sp=1) but keep deseasonalization enabled
+                if self.sp > 1:
+                    print(f"[INFO] Trying fallback with sp=1 (no seasonality)")
+                    model_params = {"sp": 1, "deseasonalize": True}
+                    self.model = ThetaForecaster(**model_params)
+                    try:
+                        self.model.fit(y=y_context)
+                        self.is_fitted = True
+                        return self
+                    except ValueError:
+                        pass  # Continue to next strategy
+                
+                # Strategy 2: Disable deseasonalization as last resort
+                print(f"[INFO] Using fallback: disabling deseasonalization")
+                model_params = {"sp": self.sp, "deseasonalize": False}
+                self.model = ThetaForecaster(**model_params)
+                self.model.fit(y=y_context)
+                self.is_fitted = True
+            else:
+                raise e
         return self
         
     def predict(self, 

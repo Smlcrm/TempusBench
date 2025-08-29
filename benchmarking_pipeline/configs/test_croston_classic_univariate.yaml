@@ -2,8 +2,6 @@ test_type: deterministic
 tensorboard: true
 dataset:
   name: extended_web_traffic_with_missing
-  path: benchmarking_pipeline/datasets/extended_web_traffic_with_missing
-  frequency: D
   split_ratio: [0.8, 0.1, 0.1]
   normalize: True
   handle_missing: interpolate

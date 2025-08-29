@@ -44,11 +44,16 @@ class ChronosModel(FoundationModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
+        if 'model_size' not in self.config:
+            raise ValueError("model_size must be specified in config")
+        if 'context_length' not in self.config:
+            raise ValueError("context_length must be specified in config")
+        if 'num_samples' not in self.config:
+            raise ValueError("num_samples must be specified in config")
         
-        # Extract Chronos-specific parameters
-        self.model_size = self.config.get('model_size', 'small')
-        self.context_length = self.config.get('context_length', 8)
-        self.num_samples = self.config.get('num_samples', 5)
+        self.model_size = self.config['model_size']
+        self.context_length = self.config['context_length']
+        self.num_samples = self.config['num_samples']
         
         # Validate model size
         valid_sizes = {'tiny', 'mini', 'small', 'base', 'large'}

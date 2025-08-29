@@ -16,7 +16,10 @@ class TinyTimeMixerModel(FoundationModel):
     """
     
     super().__init__(config, config_file)
-    self.model_name = self.config.get('model_name', 'tiny_time_mixer')
+    if 'model_name' not in self.config:
+        raise ValueError("model_name must be specified in config")
+    
+    self.model_name = self.config['model_name']
     # forecast_horizon is inherited from parent class (FoundationModel)
     self.model = None
   

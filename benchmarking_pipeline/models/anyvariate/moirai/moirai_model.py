@@ -25,14 +25,28 @@ class MoiraiModel(FoundationModel):
     """
     
     super().__init__(config, config_file)
-    self.model_name = self.config.get('model_name', 'moirai')
-    self.size = self.config.get('size', 'small')
-    # Use pdt from config instead of forecast_horizon from parent
-    self.pdt = self.config.get('pdt', 4)
-    self.psz = self.config.get('psz', 8)
-    self.bsz = self.config.get('bsz', 8)
-    self.test = self.config.get('test', 8)
-    self.num_samples = self.config.get('num_samples', 5)
+    if 'model_name' not in self.config:
+        raise ValueError("model_name must be specified in config")
+    if 'size' not in self.config:
+        raise ValueError("size must be specified in config")
+    if 'pdt' not in self.config:
+        raise ValueError("pdt must be specified in config")
+    if 'psz' not in self.config:
+        raise ValueError("psz must be specified in config")
+    if 'bsz' not in self.config:
+        raise ValueError("bsz must be specified in config")
+    if 'test' not in self.config:
+        raise ValueError("test must be specified in config")
+    if 'num_samples' not in self.config:
+        raise ValueError("num_samples must be specified in config")
+    
+    self.model_name = self.config['model_name']
+    self.size = self.config['size']
+    self.pdt = self.config['pdt']
+    self.psz = self.config['psz']
+    self.bsz = self.config['bsz']
+    self.test = self.config['test']
+    self.num_samples = self.config['num_samples']
     self.is_fitted = False
   
   def train(self, 

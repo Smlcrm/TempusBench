@@ -133,13 +133,15 @@ class FoundationModelTuner:
           #print(f"Time series dataset from all datasets\n\n:{time_series_dataset_from_all.metadata}")
           # Handle different model types with different predict method signatures
           
-          model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_context_timestamps=time_series_dataset_from_all.train.timestamps, y_target_timestamps=time_series_dataset_from_all.validation.timestamps)
+          # Get frequency from the dataset
+          freq = time_series_dataset_from_all.metadata['freq']
+          model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_context_timestamps=time_series_dataset_from_all.train.timestamps, y_target_timestamps=time_series_dataset_from_all.validation.timestamps, freq=freq)
           
           # Get validation targets for loss computation
           validationum_targets = self._get_target_data(time_series_dataset_from_all.validation)
           train_targets = self._get_target_data(time_series_dataset_from_all.train)
           train_loss = trained_model.compute_loss(validationum_targets, model_predictions, y_train=train_targets)
-          loss_val = train_loss[self.model_class.training_loss]
+          loss_val = train_loss[trained_model.training_loss]
           # Aggregate per-target arrays to scalar
           if isinstance(loss_val, np.ndarray):
             loss_val = float(np.mean(loss_val))
@@ -204,7 +206,9 @@ class FoundationModelTuner:
             
       # Handle different model types with different predict method signatures
       test_targets = self._get_target_data(time_series_dataset.test)
-      predictions = trained_model.predict(y_context=target, y_target=test_targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps)
+      # Get frequency from the dataset
+      freq = time_series_dataset.metadata['freq']
+      predictions = trained_model.predict(y_context=target, y_target=test_targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps, freq=freq)
 
       train_loss_dict = trained_model.compute_loss(test_targets, predictions, y_train=train_data)
       if results_dict is None:

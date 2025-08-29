@@ -25,12 +25,22 @@ class CrostonClassicModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        # Smoothing parameter, with a common default of 0.1
-        self.alpha = self.config.get('alpha', 0.4)
-        self.beta = self.config.get('beta', 0.1)
-        self.gamma = self.config.get('gamma', 0.1)
-        self.phi = self.config.get('phi', 0.9)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        if 'alpha' not in self.config:
+            raise ValueError("alpha must be specified in config")
+        if 'beta' not in self.config:
+            raise ValueError("beta must be specified in config")
+        if 'gamma' not in self.config:
+            raise ValueError("gamma must be specified in config")
+        if 'phi' not in self.config:
+            raise ValueError("phi must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
+        
+        self.alpha = self.config['alpha']
+        self.beta = self.config['beta']
+        self.gamma = self.config['gamma']
+        self.phi = self.config['phi']
+        self.forecast_horizon = self.config['forecast_horizon']
         
         self.is_fitted = False
         

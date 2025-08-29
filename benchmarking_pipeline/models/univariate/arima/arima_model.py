@@ -55,15 +55,26 @@ class ArimaModel(BaseModel):
         super().__init__(config, config_file)
         
         # Extract ARIMA-specific parameters
-        self.p = int(self.config.get('p', 1))
-        self.d = int(self.config.get('d', 1))
-        self.q = int(self.config.get('q', 1))
-        self.s = int(self.config.get('s', 1))
+        if 'p' not in self.config:
+            raise ValueError("p must be specified in config")
+        if 'd' not in self.config:
+            raise ValueError("d must be specified in config")
+        if 'q' not in self.config:
+            raise ValueError("q must be specified in config")
+        if 's' not in self.config:
+            raise ValueError("s must be specified in config")
+        if 'training_loss' not in self.config:
+            raise ValueError("training_loss must be specified in config")
+        
+        self.p = int(self.config['p'])
+        self.d = int(self.config['d'])
+        self.q = int(self.config['q'])
+        self.s = int(self.config['s'])
         
         # Initialize model state
         self.model_ = None
         self.is_fitted = False
-        self.training_loss = self.config.get('training_loss', 'mae')
+        self.training_loss = self.config['training_loss']
         
         # forecast_horizon is inherited from parent class (BaseModel)
         

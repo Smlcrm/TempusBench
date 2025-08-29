@@ -5,7 +5,7 @@ TODO-COULD work multivariate
 
 import os
 import json
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 import numpy as np
 import pandas as pd
 from prophet import Prophet
@@ -23,23 +23,44 @@ class ProphetModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        self.model = Prophet(**self.config.get('model_params', {}))
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        self.model = Prophet(**self.config['model_params'])
         self.is_fitted = False
 
     @staticmethod
-    def ensure_series_with_datetimeindex(y, fallback_start='2000-01-01', freq='D'):
+    def ensure_series_with_datetimeindex(y, start_date, freq):
+        """
+        Ensure the input series has a proper datetime index.
+        
+        Args:
+            y: Input series (can be numpy array, pandas series, or already indexed)
+            start_date: Start date to use for the index
+            freq: Frequency from CSV data - MUST be provided
+            
+        Returns:
+            pd.Series: Series with proper datetime index
+            
+        Raises:
+            ValueError: If freq is None or empty
+        """
+        if freq is None or freq == "":
+            raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
+        
         if isinstance(y, pd.Series) and isinstance(y.index, pd.DatetimeIndex):
             return y
         return pd.Series(
             y.values if hasattr(y, 'values') else y,
-            index=pd.date_range(fallback_start, periods=len(y), freq=freq)
+            index=pd.date_range(start_date, periods=len(y), freq=freq)
         )
 
     def train(self, y_context, x_context=None, y_context_timestamps=None, **kwargs):
         if y_context_timestamps is None:
             raise ValueError("y_context_timestamps must be provided for Prophet training.")
         # Create a new Prophet model instance for each training
-        self.model = Prophet(**self.config.get('model_params', {}))
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        self.model = Prophet(**self.config['model_params'])
         # Use the provided timestamps to create a DatetimeIndex for y_context
         # Ensure 1D series indexed by provided timestamps
         y_vals = y_context.values if hasattr(y_context, 'values') else y_context
@@ -75,50 +96,77 @@ class ProphetModel(BaseModel):
             train_df = train_df.join(x_context)
         
         self.model.fit(train_df)
+        # Store training statistics for fallback predictions
+        self.training_mean = train_df['y'].mean()
         self.is_fitted = True
         return self
 
-    def predict(self, y_context, y_target=None, y_context_timestamps=None, y_target_timestamps=None, **kwargs):
+    def predict(
+        self,
+        y_context: Optional[Union[pd.Series, np.ndarray]] = None,
+        forecast_horizon: Optional[int] = None,
+        y_context_timestamps: Optional[Union[pd.Series, np.ndarray]] = None,
+        y_target: Optional[Union[pd.Series, np.ndarray]] = None,
+        y_target_timestamps: Optional[Union[pd.Series, np.ndarray]] = None,
+        freq: str = None
+    ) -> np.ndarray:
+        """
+        Make predictions using the trained Prophet model.
+        
+        Args:
+            y_context: Recent/past target values
+            forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
+            y_context_timestamps: Timestamps for context data
+            y_target: Target values for evaluation (optional)
+            y_target_timestamps: Timestamps for target data (optional)
+            freq: Frequency string from CSV data - MUST be provided
+            
+        Returns:
+            np.ndarray: Model predictions
+            
+        Raises:
+            ValueError: If freq is None or if required data is missing
+        """
+        if freq is None or freq == "":
+            raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
+        
         if not self.is_fitted:
-            raise ValueError("Model is not trained yet. Call train() first.")
+            raise ValueError("Model must be fitted before making predictions")
         
-        # Prophet doesn't need y_target for prediction, it predicts based on the trained model
-        # We only need to know how many steps to predict
+        # Determine forecast horizon
+        if forecast_horizon is None:
+            forecast_horizon = self.forecast_horizon
         
-        # Use provided y_target_timestamps if available
-        if y_target_timestamps is not None:
-            future_index = pd.to_datetime(y_target_timestamps)
-        elif y_target is not None:
-            # If y_target is provided, use its length to determine forecast horizon
+        if y_target is not None:
+            # If y_target is provided, use its length as the forecast horizon
+            forecast_horizon = len(y_target)
+            
             # If no timestamps provided, we need to infer them from the context
             if y_context_timestamps is not None and len(y_context_timestamps) > 0:
                 last_timestamp = pd.to_datetime(y_context_timestamps[-1])
-                # Infer frequency from the training data
-                if len(y_context_timestamps) > 1:
-                    freq = pd.infer_freq(y_context_timestamps)
-                    if freq is None:
-                        # Fallback to 30-minute frequency for this dataset
-                        freq = '30min'
-                else:
-                    freq = '30min'
-                
                 # Create future timestamps starting from the next point after the last training data
                 future_index = pd.date_range(start=last_timestamp + pd.Timedelta(minutes=30), 
                                           periods=len(y_target), freq=freq)
             else:
-                # This should never happen in normal operation - raise error to catch the issue
-                raise ValueError("Prophet predict called without y_context_timestamps. This indicates a bug in the calling code.")
+                # For plotting purposes, we need to create timestamps that make sense
+                # Use the last training timestamp if available, otherwise use a reasonable default
+                if y_context_timestamps is not None and len(y_context_timestamps) > 0:
+                    last_timestamp = pd.to_datetime(y_context_timestamps[-1])
+                    future_index = pd.date_range(start=last_timestamp + pd.Timedelta(minutes=30), 
+                                              periods=len(y_target), freq=freq)
+                else:
+                    # If no context timestamps, we can't make meaningful predictions
+                    raise ValueError("Cannot make predictions without timestamps. Frequency from CSV data is required.")
         else:
             # Default forecast horizon if neither y_target nor y_target_timestamps provided
             forecast_horizon = 300  # Default to 300 steps
             if y_context_timestamps is not None and len(y_context_timestamps) > 0:
                 last_timestamp = pd.to_datetime(y_context_timestamps[-1])
-                freq = '30min'
                 future_index = pd.date_range(start=last_timestamp + pd.Timedelta(minutes=30), 
                                           periods=forecast_horizon, freq=freq)
             else:
-                # This should never happen in normal operation - raise error to catch the issue
-                raise ValueError("Prophet predict called without y_context_timestamps. This indicates a bug in the calling code.")
+                # If no context timestamps, we can't make meaningful predictions
+                raise ValueError("Cannot make predictions without timestamps. Frequency from CSV data is required.")
         
         # Create future dataframe with the correct timestamps
         future_df = pd.DataFrame({'ds': future_index})
@@ -134,7 +182,9 @@ class ProphetModel(BaseModel):
         Get the current model parameters from the configuration.
         """
         # Return Prophet model parameters
-        return self.config.get('model_params', {})
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        return self.config['model_params']
 
     def set_params(self, **params: Dict[str, Any]) -> 'ProphetModel':
         """

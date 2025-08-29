@@ -1,7 +1,5 @@
 """
 Seasonal Naive model implementation.
-TODO-(SHOULD work multivariate)
-TO BE CHANGED: This model needs to be updated to match the new interface with y_context, x_context, y_target, x_target parameters.
 """
 
 import os
@@ -23,15 +21,26 @@ class SeasonalNaiveModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        self._build_model()
-        
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        model_params = self.config['model_params']
+        if 'sp' not in model_params:
+            raise ValueError("sp must be specified in model_params")
+        sp = model_params['sp']
+        self.sp = sp
+        self.is_fitted = False
+
     def _build_model(self):
         """
         Build the NaiveForecaster model instance from the configuration.
         """
         # Get hyperparameters from config
-        model_params = self.config.get('model_params', {})
-        sp = model_params.get('sp', 1)
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        model_params = self.config['model_params']
+        if 'sp' not in model_params:
+            raise ValueError("sp must be specified in model_params")
+        sp = model_params['sp']
         
         self.model = NaiveForecaster(strategy="last", sp=sp)
         self.is_fitted = False
@@ -50,16 +59,19 @@ class SeasonalNaiveModel(BaseModel):
         """
         if self.model is None:
             self._build_model()
+        
+        # Handle both 1D and 2D input data
+        if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
+            # Extract the single column from 2D array
+            y_context = y_context[:, 0]
+        elif hasattr(y_context, 'values') and hasattr(y_context.values, 'ndim') and y_context.values.ndim == 2:
+            # Handle pandas DataFrame or similar
+            y_context = y_context.values[:, 0]
+        
         if not isinstance(y_context, pd.Series):
-            # Handle both 1D and 2D input data
-            if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
-                # Extract the single column from 2D array
-                y_context = y_context[:, 0]
-            elif hasattr(y_context, 'values') and hasattr(y_context.values, 'ndim') and y_context.values.ndim == 2:
-                # Handle pandas DataFrame or similar
-                y_context = y_context.values[:, 0]
             # works best with a proper index
             y_context = pd.Series(y_context)
+        
         self.model.fit(y=y_context, X=None)
         self.is_fitted = True
         return self
@@ -79,9 +91,9 @@ class SeasonalNaiveModel(BaseModel):
         """
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
-        
-        # Use the forecast_horizon from config, not the length of y_target
-        forecast_horizon = self.forecast_horizon
+        if y_target is None:
+            raise ValueError("y_target must be provided to determine prediction length.")
+        forecast_horizon = len(y_target)
         fh = np.arange(1, forecast_horizon + 1)
         predictions = self.model.predict(fh=fh)
         return predictions.values.reshape(1, -1)
@@ -93,7 +105,9 @@ class SeasonalNaiveModel(BaseModel):
         if self.model:
             return self.model.get_params()
         # Return config params if model is not yet instantiated
-        return self.config.get('model_params', {})
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        return self.config['model_params']
 
     def set_params(self, **params: Dict[str, Any]) -> 'SeasonalNaiveModel':
         """
@@ -124,7 +138,7 @@ class SeasonalNaiveModel(BaseModel):
         with open(path, 'wb') as f:
             pickle.dump(self.model, f)
             
-    def load(self, path: str) -> 'SeasonalNaiveModel':
+    def load(self, path: str) -> None:
         """
         Load a trained sktime model from disk.
         

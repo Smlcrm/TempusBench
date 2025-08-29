@@ -38,14 +38,21 @@ class LagllamaModel(FoundationModel):
         
         # Initialize base model
         super().__init__(config, config_file)
+        if 'context_length' not in self.config:
+            raise ValueError("context_length must be specified in config")
+        if 'num_samples' not in self.config:
+            raise ValueError("num_samples must be specified in config")
+        if 'batch_size' not in self.config:
+            raise ValueError("batch_size must be specified in config")
+        
+        self.context_length = self.config['context_length']
+        self.num_samples = self.config['num_samples']
+        self.batch_size = self.config['batch_size']
         
         # Set up device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Model-specific attributes
-        self.context_length = self.config.get('context_length', 4)
-        self.num_samples = self.config.get('num_samples', 5)
-        self.batch_size = self.config.get('batch_size', 4)
         # forecast_horizon is inherited from parent class (FoundationModel)
         self.model = None
         self.predictor = None
@@ -203,7 +210,7 @@ class LagllamaModel(FoundationModel):
         self,
         df: pd.DataFrame,
         prediction_length: int,
-        freq: str = "D",
+        freq: str,
         return_samples: bool = False
     ) -> Union[Dict[str, List[float]], Dict[str, Dict[str, List[float]]]]:
         """Internal prediction method - similar to standalone forecaster"""

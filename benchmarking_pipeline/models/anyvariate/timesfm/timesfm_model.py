@@ -8,13 +8,19 @@ from benchmarking_pipeline.models.foundation_model import FoundationModel
 class TimesFMModel(FoundationModel):
     def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
         super().__init__(config, config_file)
-        self.model_path = "google/timesfm-1.0-300m"  # public HF repo id
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.per_core_batch_size = self.config.get("per_core_batch_size", 2)
-        # forecast_horizon is inherited from parent class (FoundationModel)
-        self.num_layers = self.config.get("num_layers", 2)
-        self.context_len = self.config.get("context_len", 2)
-        self.use_positional_embedding = self.config.get("use_positional_embedding", False)
+        if 'per_core_batch_size' not in self.config:
+            raise ValueError("per_core_batch_size must be specified in config")
+        if 'num_layers' not in self.config:
+            raise ValueError("num_layers must be specified in config")
+        if 'context_len' not in self.config:
+            raise ValueError("context_len must be specified in config")
+        if 'use_positional_embedding' not in self.config:
+            raise ValueError("use_positional_embedding must be specified in config")
+        
+        self.per_core_batch_size = self.config["per_core_batch_size"]
+        self.num_layers = self.config["num_layers"]
+        self.context_len = self.config["context_len"]
+        self.use_positional_embedding = self.config["use_positional_embedding"]
         print(f"Loading TimesFM model: {self.model_path} to device '{self.device}'")
         self.is_fitted = True
 

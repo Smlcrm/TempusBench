@@ -29,10 +29,13 @@ class MultivariateXGBoostModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
+        if 'lookback_window' not in self.config:
+            raise ValueError("lookback_window must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
         
-        # Extract model parameters from config
-        self.lookback_window = self.config.get('lookback_window', 10)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        self.lookback_window = self.config['lookback_window']
+        self.forecast_horizon = self.config['forecast_horizon']
         
         self._build_model()
         
@@ -42,7 +45,9 @@ class MultivariateXGBoostModel(BaseModel):
         for direct multi-output forecasting across multiple target variables.
         """
         # Get hyperparameters from config
-        model_params = self.config.get('model_params', {})
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        model_params = self.config['model_params']
         
         # Ensure random_state for reproducibility if not provided
         if 'random_state' not in model_params:

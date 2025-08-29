@@ -136,7 +136,7 @@ def create_train_and_val_datasets_with_dates(
     num_val_windows=None,
     val_start_date=None,
     train_start_date=None,
-    freq=None,
+    freq,
     last_k_percentage=None
 ):
     """
@@ -175,7 +175,7 @@ def create_train_and_val_datasets_with_dates(
     if prediction_length is None:
         prediction_length = raw_dataset.metadata.prediction_length
     if freq is None:
-        freq = raw_dataset.metadata.freq
+        raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
     timestep_delta = pd.tseries.frequencies.to_offset(freq)
     raw_train_dataset = raw_dataset.train
 
@@ -258,7 +258,7 @@ def create_train_and_val_datasets_with_dates(
 
 
 def create_test_dataset(
-    name, dataset_path, history_length, freq=None, data_id=None
+    name, dataset_path, history_length, freq, data_id=None
 ):
     """
     For now, only window per series is used.
@@ -295,7 +295,7 @@ def create_test_dataset(
         dataset = get_dataset(name, path=Path(dataset_path))
 
     if freq is None:
-        freq = dataset.metadata.freq
+        raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
     prediction_length = dataset.metadata.prediction_length
     data = []
     total_points = 0

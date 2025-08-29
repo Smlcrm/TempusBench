@@ -48,18 +48,45 @@ class DeepARModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
-        self.hidden_size = self.config.get('hidden_size', 10)
-        self.rnn_layers = self.config.get('rnn_layers', 2)
-        self.dropout = self.config.get('dropout', 0.1)
-        self.learning_rate = self.config.get('learning_rate', 0.001)
-        self.batch_size = self.config.get('batch_size', 16)
-        self.feature_cols = self.config.get('feature_cols', None)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
-        self.max_encoder_length = self.config.get('max_encoder_length', 6)
-        self.max_prediction_length = self.config.get('max_prediction_length', 6)
-        self.epochs = self.config.get('epochs', 1)
-        self.gradient_clip_val = self.config.get('gradient_clip_val', 0.1)
-        self.num_workers = self.config.get('num_workers', 7)
+        if 'hidden_size' not in self.config:
+            raise ValueError("hidden_size must be specified in config")
+        if 'rnn_layers' not in self.config:
+            raise ValueError("rnn_layers must be specified in config")
+        if 'dropout' not in self.config:
+            raise ValueError("dropout must be specified in config")
+        if 'learning_rate' not in self.config:
+            raise ValueError("learning_rate must be specified in config")
+        if 'batch_size' not in self.config:
+            raise ValueError("batch_size must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
+        if 'max_encoder_length' not in self.config:
+            raise ValueError("max_encoder_length must be specified in config")
+        
+        self.hidden_size = self.config['hidden_size']
+        self.rnn_layers = self.config['rnn_layers']
+        self.dropout = self.config['dropout']
+        self.learning_rate = self.config['learning_rate']
+        self.batch_size = self.config['batch_size']
+        if 'feature_cols' not in self.config:
+            raise ValueError("feature_cols must be specified in config")
+        self.feature_cols = self.config['feature_cols']
+        self.forecast_horizon = self.config['forecast_horizon']
+        self.max_encoder_length = self.config['max_encoder_length']
+        
+        if 'max_prediction_length' not in self.config:
+            raise ValueError("max_prediction_length must be specified in config")
+        if 'epochs' not in self.config:
+            raise ValueError("epochs must be specified in config")
+        if 'gradient_clip_val' not in self.config:
+            raise ValueError("gradient_clip_val must be specified in config")
+        if 'num_workers' not in self.config:
+            raise ValueError("num_workers must be specified in config")
+        
+        self.max_prediction_length = self.config['max_prediction_length']
+        self.epochs = self.config['epochs']
+        self.gradient_clip_val = self.config['gradient_clip_val']
+        self.num_workers = self.config['num_workers']
         self.model = None
     
     def _series_to_TimeSeriesDataset(self, series, train=True):

@@ -22,6 +22,20 @@ class ExponentialSmoothingModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
+        if 'trend' not in self.config:
+            raise ValueError("trend must be specified in config")
+        if 'seasonal' not in self.config:
+            raise ValueError("seasonal must be specified in config")
+        if 'seasonal_periods' not in self.config:
+            raise ValueError("seasonal_periods must be specified in config")
+        if 'damped_trend' not in self.config:
+            raise ValueError("damped_trend must be specified in config")
+        # forecast_horizon is inherited from parent class (FoundationModel)
+        
+        # Get training loss from config
+        if 'training_loss' not in self.config:
+            raise ValueError("training_loss must be specified in config")
+        self.training_loss = self.config['training_loss']
         
         def _cast_param(key, value):
             if key == 'seasonal_periods':
@@ -38,17 +52,17 @@ class ExponentialSmoothingModel(BaseModel):
                 return value
             return value
             
-        self.trend = _cast_param('trend', self.config.get('trend', None))
-        self.seasonal = _cast_param('seasonal', self.config.get('seasonal', None))
-        self.seasonal_periods = _cast_param('seasonal_periods', self.config.get('seasonal_periods', None))
-        self.damped_trend = _cast_param('damped_trend', self.config.get('damped_trend', False))
-        self.forecast_horizon = _cast_param('forecast_horizon', self.config.get('forecast_horizon', 1))
+        self.trend = _cast_param('trend', self.config['trend'])
+        self.seasonal = _cast_param('seasonal', self.config['seasonal'])
+        self.seasonal_periods = _cast_param('seasonal_periods', self.config['seasonal_periods'])
+        self.damped_trend = _cast_param('damped_trend', self.config['damped_trend'])
+        self.forecast_horizon = _cast_param('forecast_horizon', self.config['forecast_horizon'])
         
         self.model_ = None
         self.is_fitted = False
         
         # Adapt for training_loss refactoring
-        self.training_loss = self.config.get('training_loss', 'mae')
+
 
     def train(self, y_context: Union[pd.Series, np.ndarray], y_target: Union[pd.Series, np.ndarray] = None,
               x_context: Union[pd.Series, np.ndarray] = None, x_target: Union[pd.Series, np.ndarray] = None, **kwargs) -> 'ExponentialSmoothingModel':
@@ -209,6 +223,8 @@ class ExponentialSmoothingModel(BaseModel):
         self.seasonal = model_data['seasonal']
         self.seasonal_periods = model_data['seasonal_periods']
         self.damped_trend = model_data['damped_trend']
-        self.training_loss = model_data.get('training_loss', 'mae')
+        if 'training_loss' not in model_data:
+            raise ValueError("training_loss must be specified in model_data")
+        self.training_loss = model_data['training_loss']
         self.forecast_horizon = model_data['forecast_horizon']
         return self

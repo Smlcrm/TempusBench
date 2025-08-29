@@ -56,7 +56,9 @@ class FoundationModel(ABC):
         # Extract model-specific config if it exists
         model_config = self._extract_model_config(self.config)
         
-        self.training_loss = model_config.get('training_loss', 'mae')
+        if 'training_loss' not in model_config:
+            raise ValueError("training_loss must be specified in config")
+        self.training_loss = model_config['training_loss']
         
         # Determine forecast horizon from model configuration keys if present
         # Common names across foundation models: prediction_length, horizon_len, pdt

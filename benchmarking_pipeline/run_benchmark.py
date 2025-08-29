@@ -47,7 +47,9 @@ class BenchmarkRunner:
             timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             
             # Create the exact directory structure we had before
-            runs_dir = "runs"
+            # Use project root (parent of benchmarking_pipeline) for runs directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            runs_dir = os.path.join(project_root, "runs")
             benchmark_dir = f"benchmark_runner_{config_file_name}_{timestamp}"
             benchmark_runs_dir = os.path.join(runs_dir, benchmark_dir)
             
@@ -112,7 +114,6 @@ class BenchmarkRunner:
         
         # Load dataset config
         dataset_cfg = self.config['dataset']
-        dataset_path = dataset_cfg['path']
         dataset_name = dataset_cfg['name']
         split_ratio = dataset_cfg.get('split_ratio', [0.8, 0.1, 0.1])
 
@@ -128,7 +129,6 @@ class BenchmarkRunner:
         # All data is treated as multivariate where univariate is just num_targets == 1
         full_config = {
             "dataset": {
-                "path": dataset_path,
                 "name": dataset_name,
                 "split_ratio": split_ratio,
                 "forecast_horizon": dataset_cfg.get('forecast_horizon'),
@@ -198,7 +198,9 @@ class BenchmarkRunner:
         
         # Run each model we have individually
         # Establish a shared, absolute TensorBoard base directory
-        base_log_dir = full_config_data.get('log_dir', 'logs/tensorboard')
+        # Default to project root (parent of benchmarking_pipeline)
+        default_log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs', 'tensorboard')
+        base_log_dir = full_config_data.get('log_dir', default_log_dir)
         base_log_dir = os.path.abspath(base_log_dir)
         os.makedirs(base_log_dir, exist_ok=True)
 

@@ -2,8 +2,6 @@ test_type: deterministic
 tensorboard: true
 dataset:
   name: china_air_quality
-  path: benchmarking_pipeline/datasets/china_air_quality
-  frequency: 1H
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate

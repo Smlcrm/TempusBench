@@ -237,36 +237,73 @@ class ModelExecutor:
                         y_val = last_chunk.validation.targets
                         y_test = last_chunk.test.targets
                         trained_model = model_hyperparameter_tuner.model_class
+                        # Get frequency from the dataset
+                        freq = last_chunk.metadata['freq']
+                        
+                        # Get timestamps for proper feature creation
+                        y_context_timestamps = last_chunk.train.timestamps
+                        y_val_timestamps = last_chunk.validation.timestamps
+                        y_test_timestamps = last_chunk.test.timestamps
+                        
+                        # Check if this is a RandomForest model that should use rolling_predict
+                        is_random_forest = 'RandomForest' in trained_model.__class__.__name__
+                        
                         # Predict on validation
-                        preds_val = trained_model.predict(y_context=y_context, y_target=y_val)
+                        if is_random_forest:
+                            # For RandomForest, use rolling_predict to get full-length predictions
+                            preds_val = trained_model.rolling_predict(
+                                y_context=y_context[-trained_model.lookback_window:], 
+                                y_target=y_val, 
+                                y_context_timestamps=y_context_timestamps[-trained_model.lookback_window:],
+                                y_target_timestamps=y_val_timestamps,
+                                freq=freq
+                            )
+                        else:
+                            # For other models, use regular predict
+                            preds_val = trained_model.predict(
+                                y_context=y_context, 
+                                y_target=y_val, 
+                                y_context_timestamps=y_context_timestamps,
+                                y_target_timestamps=y_val_timestamps,
+                                freq=freq
+                            )
+                            
                         # Predict on test using train+val as context when applicable
                         import numpy as np
                         y_ctx_plus_val = np.concatenate([y_context, y_val]) if y_context is not None and y_val is not None else y_context
-                        preds_test = trained_model.predict(y_context=y_ctx_plus_val, y_target=y_test)
+                        y_ctx_plus_val_timestamps = np.concatenate([y_context_timestamps, y_val_timestamps]) if y_context_timestamps is not None and y_val_timestamps is not None else y_context_timestamps
+                        
+                        if is_random_forest:
+                            # For RandomForest, use rolling_predict to get full-length predictions
+                            preds_test = trained_model.rolling_predict(
+                                y_context=y_ctx_plus_val[-trained_model.lookback_window:], 
+                                y_target=y_test, 
+                                y_context_timestamps=y_ctx_plus_val_timestamps[-trained_model.lookback_window:],
+                                y_target_timestamps=y_test_timestamps,
+                                freq=freq
+                            )
+                        else:
+                            # For other models, use regular predict
+                            preds_test = trained_model.predict(
+                                y_context=y_ctx_plus_val, 
+                                y_target=y_test, 
+                                y_context_timestamps=y_ctx_plus_val_timestamps,
+                                y_target_timestamps=y_test_timestamps,
+                                freq=freq
+                            )
                         import matplotlib
                         matplotlib.use('Agg')
                         import matplotlib.pyplot as plt
                         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
                                   '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
                         def _save_plot(y_true_arr, preds_arr, title_suffix):
-                            # DEBUG: Print array shapes and values
-                            print(f"[PLOT DEBUG] y_true_arr shape: {y_true_arr.shape if hasattr(y_true_arr, 'shape') else 'no shape'}")
-                            print(f"[PLOT DEBUG] preds_arr shape: {preds_arr.shape if hasattr(preds_arr, 'shape') else 'no shape'}")
-                            print(f"[PLOT DEBUG] y_true_arr first 5 values: {y_true_arr[:5] if hasattr(y_true_arr, '__getitem__') else y_true_arr}")
-                            print(f"[PLOT DEBUG] preds_arr first 5 values: {preds_arr[:5] if hasattr(preds_arr, '__getitem__') else preds_arr}")
-                            
                             y_true_arr = np.asarray(y_true_arr)
                             preds_arr = np.asarray(preds_arr)
-                            
-                            # DEBUG: Print numpy array shapes after conversion
-                            print(f"[PLOT DEBUG] After np.asarray - y_true_arr shape: {y_true_arr.shape}")
-                            print(f"[PLOT DEBUG] After np.asarray - preds_arr shape: {preds_arr.shape}")
                             
                             # Fix: Ensure predictions have the right shape for plotting
                             if preds_arr.ndim == 2 and preds_arr.shape[0] == 1:
                                 # ARIMA returns (1, 300), convert to (300,)
                                 preds_arr = preds_arr.flatten()
-                                print(f"[PLOT DEBUG] Flattened preds_arr shape: {preds_arr.shape}")
                             
                             fig, ax = plt.subplots(figsize=(12, 6))
                             if y_true_arr.ndim == 1:
@@ -389,13 +426,17 @@ class ModelExecutor:
                         y_test = last_chunk.test.targets
                         trained_model = model_hyperparameter_tuner.model_class
                         import numpy as np
+                        # Get frequency from the dataset
+                        freq = last_chunk.metadata['freq']
                         preds_val = trained_model.predict(y_context=y_context, y_target=y_val,
                                                           y_context_timestamps=last_chunk.train.timestamps,
-                                                          y_target_timestamps=last_chunk.validation.timestamps)
+                                                          y_target_timestamps=last_chunk.validation.timestamps,
+                                                          freq=freq)
                         y_ctx_plus_val = np.concatenate([y_context, y_val]) if y_context is not None and y_val is not None else y_context
                         preds_test = trained_model.predict(y_context=y_ctx_plus_val, y_target=y_test,
                                                            y_context_timestamps=np.concatenate([last_chunk.train.timestamps, last_chunk.validation.timestamps]),
-                                                           y_target_timestamps=last_chunk.test.timestamps)
+                                                           y_target_timestamps=last_chunk.test.timestamps,
+                                                           freq=freq)
                         import matplotlib
                         matplotlib.use('Agg')
                         import matplotlib.pyplot as plt

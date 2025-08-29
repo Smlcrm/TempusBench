@@ -122,16 +122,18 @@ class HyperparameterTuner:
               target = time_series_dataset_from_all.train.targets
               validation_series = time_series_dataset_from_all.validation.targets
           #print(f"Time series dataset from all datasets\n\n:{time_series_dataset_from_all.metadata}")
+          # Get frequency from the dataset
+          freq = time_series_dataset_from_all.metadata['freq']
           # Handle different model types with different predict method signatures
           if hasattr(self.model_class, '__class__') and 'DeepAR' in self.model_class.__class__.__name__:
               # DeepAR model doesn't accept timestamp parameters
-              model_predictions = trained_model.predict(y_context=target, y_target=validation_series)
+              model_predictions = trained_model.predict(y_context=target, y_target=validation_series, freq=freq)
           elif hasattr(self.model_class, '__class__') and 'RandomForest' in self.model_class.__class__.__name__:
               # Random Forest model uses timestamp features
-              model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_context_timestamps=time_series_dataset_from_all.train.timestamps, y_target_timestamps=time_series_dataset_from_all.validation.timestamps)
+              model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_context_timestamps=time_series_dataset_from_all.train.timestamps, y_target_timestamps=time_series_dataset_from_all.validation.timestamps, freq=freq)
           else:
               # All other models (including Prophet) use y_target_timestamps
-              model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_target_timestamps=time_series_dataset_from_all.validation.timestamps)
+              model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_target_timestamps=time_series_dataset_from_all.validation.timestamps, freq=freq)
           # Handle multivariate vs univariate loss computation - work with raw arrays
           # Extract only the first forecast_horizon values from validation data for proper comparison
           validation_targets = time_series_dataset_from_all.validation.targets
@@ -157,7 +159,9 @@ class HyperparameterTuner:
           
           # Pass training data for MASE calculation
           train_loss = trained_model.compute_loss(validation_subset, model_predictions, y_train=time_series_dataset.train.targets)
-          current_train_loss += train_loss[self.model_class.training_loss]
+          # Use training_loss if available, otherwise default to 'mae' for statistical models
+          loss_metric = self.model_class.training_loss if self.model_class.training_loss is not None else 'mae'
+          current_train_loss += train_loss[loss_metric]
         # Average validation losses over the chunks
         current_train_loss /= len(list_of_time_series_datasets)
         if current_train_loss < lowest_train_loss:
@@ -244,29 +248,44 @@ class HyperparameterTuner:
           # Default case for other models
           trained_model = self.model_class.train(y_context=target, y_target=time_series_dataset.test.targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps)
             
+      # Get frequency from the dataset
+      freq = time_series_dataset.metadata['freq']
       # Handle different model types with different predict method signatures
       if hasattr(self.model_class, '__class__') and 'DeepAR' in self.model_class.__class__.__name__:
           # DeepAR model doesn't accept timestamp parameters
-          predictions = trained_model.predict(y_context=target, y_target=time_series_dataset.test.targets)
+          predictions = trained_model.predict(y_context=target, y_target=time_series_dataset.test.targets, freq=freq)
       elif hasattr(self.model_class, '__class__') and 'RandomForest' in self.model_class.__class__.__name__:
-          # Random Forest model uses timestamp features
-          predictions = trained_model.predict(y_context=target, y_target=time_series_dataset.test.targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps)
+          # Random Forest model uses timestamp features and should use rolling_predict for full test set
+          # Use rolling_predict to generate predictions for the entire test set
+          predictions = trained_model.rolling_predict(
+              y_context=target[-trained_model.lookback_window:], 
+              y_target=time_series_dataset.test.targets, 
+              y_context_timestamps=train_val_timestamps[-trained_model.lookback_window:], 
+              y_target_timestamps=time_series_dataset.test.timestamps, 
+              freq=freq
+          )
       else:
           # All other models (including Prophet) use both y_context_timestamps and y_target_timestamps
-          predictions = trained_model.predict(y_context=target, y_target=time_series_dataset.test.targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps)
+          predictions = trained_model.predict(y_context=target, y_target=time_series_dataset.test.targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps, freq=freq)
 
       # Handle multivariate vs univariate loss computation for final evaluation - work with raw arrays
-      # Extract only the first forecast_horizon values from test data for proper comparison
+      # For RandomForest with rolling_predict, we get predictions for the full test set
       test_targets = time_series_dataset.test.targets
-      forecast_horizon = predictions.shape[0] if hasattr(predictions, 'shape') and len(predictions.shape) > 1 else len(predictions)
       
-      # Extract only the first forecast_horizon values from test data
-      if hasattr(test_targets, 'shape') and len(test_targets.shape) > 1:
-          # Multivariate case - use first forecast_horizon targets
-          test_subset = test_targets[:forecast_horizon]
+      if hasattr(self.model_class, '__class__') and 'RandomForest' in self.model_class.__class__.__name__:
+          # For RandomForest, we have full test set predictions, so use all test targets
+          test_subset = test_targets
       else:
-          # Univariate case - extract first forecast_horizon values
-          test_subset = test_targets[:forecast_horizon]
+          # For other models, extract only the first forecast_horizon values from test data for proper comparison
+          forecast_horizon = predictions.shape[0] if hasattr(predictions, 'shape') and len(predictions.shape) > 1 else len(predictions)
+          
+          # Extract only the first forecast_horizon values from test data
+          if hasattr(test_targets, 'shape') and len(test_targets.shape) > 1:
+              # Multivariate case - use first forecast_horizon targets
+              test_subset = test_targets[:forecast_horizon]
+          else:
+              # Univariate case - extract first forecast_horizon values
+              test_subset = test_targets[:forecast_horizon]
       
       # Convert to numpy array to ensure compatibility with metrics
       if hasattr(test_subset, 'values'):
