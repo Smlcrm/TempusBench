@@ -23,9 +23,8 @@ class MultivariateXGBoostModel(BaseModel):
         Args:
             config: Configuration dictionary containing model parameters
                 - lookback_window: int, number of past timesteps to use as features
-                - forecast_horizon: int, number of future timesteps to predict
+                - forecast_horizon: int, number of steps to forecast ahead
                 - model_params: dict, parameters for the underlying XGBRegressor model
-                - training_loss: str, primary loss function for training
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
@@ -360,6 +359,9 @@ class MultivariateXGBoostModel(BaseModel):
                 # Update context with new predictions
                 context = np.concatenate([context, pred_steps], axis=0)
                 steps_done += steps
+                
+            except Exception as e:
+                raise RuntimeError(f"Error during prediction step: {str(e)}")
         
         # Concatenate all predictions
         result = np.concatenate(preds, axis=0)
@@ -410,6 +412,7 @@ class MultivariateXGBoostModel(BaseModel):
             Dict[str, Any]: Dictionary of model parameters
         """
         return {
+            'lookback_window': self.lookback_window,
             'n_estimators': self.n_estimators,
             'max_depth': self.max_depth,
             'learning_rate': self.learning_rate,
@@ -418,7 +421,6 @@ class MultivariateXGBoostModel(BaseModel):
             'random_state': self.random_state,
             'n_jobs': self.n_jobs,
             'num_targets': self.num_targets,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon
         }
         
@@ -510,7 +512,7 @@ class MultivariateXGBoostModel(BaseModel):
         Args:
             y_true: True target values with shape (timesteps, num_targets)
             y_pred: Predicted values with shape (timesteps, num_targets)
-            loss_function: Name of the loss function to use (defaults to training_loss)
+            loss_function: Name of the loss function to use (defaults to None)
             
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics

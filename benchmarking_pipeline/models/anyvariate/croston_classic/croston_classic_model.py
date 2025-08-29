@@ -21,7 +21,6 @@ class CrostonClassicModel(BaseModel):
                 - gamma: float, smoothing parameter for interval level (0 < gamma < 1)
                 - phi: float, trend damping parameter (0 < phi < 1)
                 - forecast_horizon: int, number of steps to forecast ahead
-                - training_loss: str, primary loss function for training
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
@@ -150,7 +149,6 @@ class CrostonClassicModel(BaseModel):
         """
         return {
             'alpha': self.alpha,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon,
             'is_fitted': self.is_fitted
         }

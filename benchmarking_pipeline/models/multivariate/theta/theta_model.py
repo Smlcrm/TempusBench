@@ -296,7 +296,6 @@ class MultivariateTheta(BaseModel):
             'num_targets': self.num_targets,
             'use_reduced_rank': self.use_reduced_rank,
             'theta_method': self.theta_method,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon
         }
         
@@ -397,7 +396,7 @@ class MultivariateTheta(BaseModel):
         Args:
             y_true: True target values
             y_pred: Predicted values
-            loss_function: Name of the loss function to use (defaults to training_loss)
+            loss_function: Name of the loss function to use (defaults to None)
             
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics

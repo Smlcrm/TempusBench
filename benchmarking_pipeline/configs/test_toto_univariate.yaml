@@ -9,7 +9,6 @@ dataset:
 
 model:
   toto:
-    training_loss: [mae]
     num_samples: [40]
     samples_per_batch: [40]
     prediction_length: [10]

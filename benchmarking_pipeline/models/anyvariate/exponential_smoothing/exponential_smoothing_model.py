@@ -32,10 +32,7 @@ class ExponentialSmoothingModel(BaseModel):
             raise ValueError("damped_trend must be specified in config")
         # forecast_horizon is inherited from parent class (FoundationModel)
         
-        # Get training loss from config
-        if 'training_loss' not in self.config:
-            raise ValueError("training_loss must be specified in config")
-        self.training_loss = self.config['training_loss']
+        # ExponentialSmoothing doesn't use training_loss - it's a statistical method
         
         def _cast_param(key, value):
             if key == 'seasonal_periods':
@@ -61,8 +58,6 @@ class ExponentialSmoothingModel(BaseModel):
         self.model_ = None
         self.is_fitted = False
         
-        # Adapt for training_loss refactoring
-
 
     def train(self, y_context: Union[pd.Series, np.ndarray], y_target: Union[pd.Series, np.ndarray] = None,
               x_context: Union[pd.Series, np.ndarray] = None, x_target: Union[pd.Series, np.ndarray] = None, **kwargs) -> 'ExponentialSmoothingModel':
@@ -158,7 +153,6 @@ class ExponentialSmoothingModel(BaseModel):
             'seasonal': self.seasonal,
             'seasonal_periods': self.seasonal_periods,
             'damped_trend': self.damped_trend,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon
         }
 
@@ -202,7 +196,6 @@ class ExponentialSmoothingModel(BaseModel):
             'seasonal': self.seasonal,
             'seasonal_periods': self.seasonal_periods,
             'damped_trend': self.damped_trend,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon
         }
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -223,8 +216,5 @@ class ExponentialSmoothingModel(BaseModel):
         self.seasonal = model_data['seasonal']
         self.seasonal_periods = model_data['seasonal_periods']
         self.damped_trend = model_data['damped_trend']
-        if 'training_loss' not in model_data:
-            raise ValueError("training_loss must be specified in model_data")
-        self.training_loss = model_data['training_loss']
         self.forecast_horizon = model_data['forecast_horizon']
         return self

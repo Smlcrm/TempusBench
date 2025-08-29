@@ -9,7 +9,6 @@ dataset:
 
 model:
   tabpfn:
-    training_loss: ["mae"]
     allow_large_cpu_dataset: [True]
     max_sequence_length: [32]
     prediction_length: [10]

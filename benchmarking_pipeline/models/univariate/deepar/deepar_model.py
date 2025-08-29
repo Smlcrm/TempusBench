@@ -38,7 +38,6 @@ class DeepARModel(BaseModel):
                 - learning_rate: float, learning rate for the DeepAR model
                 - batch_size: int, batch size for training
                 - feature_cols: list of str, names of feature columns
-                - training_loss: str, primary loss function for training
                 - forecast_horizon: int, number of steps to forecast ahead
                 - max_encoder_length: int, number of steps to use as input data during autoregressive training
                 - max_prediction_length: int, number of steps to use as output data during autoregressive training

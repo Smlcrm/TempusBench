@@ -58,8 +58,14 @@ class BaseModel(ABC):
         # Extract model-specific config if it exists
         model_config = self._extract_model_config(self.config)
         
-        # training_loss is optional for statistical models that don't require training
-        self.training_loss = model_config.get('training_loss', None)
+        # Only set training_loss for models that actually use it for training
+        # Models that need training_loss: ARIMA, LSTM, SVR
+        # Models that don't need it: Theta, ExponentialSmoothing, SeasonalNaive, Croston, XGBoost, RandomForest, DeepAR
+        self.training_loss = None
+        if self._requires_training_loss():
+            if 'training_loss' not in model_config:
+                raise ValueError("training_loss must be specified in config for this model")
+            self.training_loss = model_config['training_loss']
         
         # Determine forecast horizon from model configuration keys if present
         # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
@@ -105,6 +111,24 @@ class BaseModel(ABC):
         
         # If no nested structure, return the config as-is
         return config
+    
+    def _requires_training_loss(self) -> bool:
+        """
+        Determine if this model requires training_loss parameter.
+        
+        Returns:
+            bool: True if the model needs training_loss, False otherwise
+        """
+        model_name = self.__class__.__name__.lower()
+        
+        # Models that actually perform loss-based optimization and need training_loss
+        models_needing_training_loss = {
+            'arimamodel', 'multivariatearimamodel',
+            'lstmmodel', 'multivariatelstmmodel', 
+            'svrmodel', 'multivariatesvrmodel'
+        }
+        
+        return model_name in models_needing_training_loss
     
     @abstractmethod
     def train(self, 
