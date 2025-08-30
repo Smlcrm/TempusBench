@@ -278,4 +278,8 @@ class Theta(BaseModel):
 
             all_predictions[:, i] = theta_forecast.values + linear_trend
 
-        return all_predictions
+        forecasts = np.asarray(all_predictions)
+        if len(forecasts) == 1:
+            forecasts = np.expand_dims(forecasts, axis=1)
+
+        return forecasts
