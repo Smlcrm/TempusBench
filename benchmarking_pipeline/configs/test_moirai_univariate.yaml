@@ -9,11 +9,13 @@ dataset:
 
 model:
   moirai:
+    model_name: ["moirai"]
     size: ["small"]
     psz: [32]
     bsz: [8]
     num_samples: [5]
     pdt: [900]
+    test: [10]
 
 evaluation:
   type: deterministic
