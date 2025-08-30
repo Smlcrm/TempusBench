@@ -22,17 +22,13 @@ class ExponentialSmoothingModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        if 'trend' not in self.config:
-            raise ValueError("trend must be specified in config")
-        if 'seasonal' not in self.config:
-            raise ValueError("seasonal must be specified in config")
-        if 'seasonal_periods' not in self.config:
-            raise ValueError("seasonal_periods must be specified in config")
-        if 'damped_trend' not in self.config:
-            raise ValueError("damped_trend must be specified in config")
-        # forecast_horizon is inherited from parent class (FoundationModel)
         
-        # ExponentialSmoothing doesn't use training_loss - it's a statistical method
+        # Get the model-specific config from the nested structure
+        # BaseModel keeps the full config, so we need to extract the exponential_smoothing part
+        if 'model' in self.config and 'exponential_smoothing' in self.config['model']:
+            model_config = self.config['model']['exponential_smoothing']
+        else:
+            raise ValueError("Model configuration for 'exponential_smoothing' must be specified in the config file under the 'model' section. Model execution aborted.")
         
         def _cast_param(key, value):
             if key == 'seasonal_periods':
@@ -49,11 +45,22 @@ class ExponentialSmoothingModel(BaseModel):
                 return value
             return value
             
-        self.trend = _cast_param('trend', self.config['trend'])
-        self.seasonal = _cast_param('seasonal', self.config['seasonal'])
-        self.seasonal_periods = _cast_param('seasonal_periods', self.config['seasonal_periods'])
-        self.damped_trend = _cast_param('damped_trend', self.config['damped_trend'])
-        self.forecast_horizon = _cast_param('forecast_horizon', self.config['forecast_horizon'])
+        # Get parameters with defaults
+        self.trend = _cast_param('trend', model_config.get('trend', None))
+        self.seasonal = _cast_param('seasonal', model_config.get('seasonal', None))
+        self.seasonal_periods = _cast_param('seasonal_periods', model_config.get('seasonal_periods', None))
+        self.damped_trend = _cast_param('damped_trend', model_config.get('damped_trend', False))
+        self.forecast_horizon = _cast_param('forecast_horizon', model_config.get('forecast_horizon', 1))
+        
+        # STRICT VALIDATION: Ensure parameters are meaningful
+        if self.trend is None and self.seasonal is None:
+            raise ValueError("At least one of 'trend' or 'seasonal' must be specified")
+        
+        if self.seasonal is not None and self.seasonal_periods is None:
+            raise ValueError("seasonal_periods must be specified when seasonal is specified")
+        
+        if self.damped_trend and self.trend is None:
+            raise ValueError("damped_trend can only be True when trend is specified")
         
         self.model_ = None
         self.is_fitted = False
