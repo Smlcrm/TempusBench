@@ -6,39 +6,30 @@ import pandas as pd
 from .toto.model.toto import Toto
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
-from benchmarking_pipeline.models.foundation_model import FoundationModel
+from benchmarking_pipeline.models.base_model import BaseModel
 from typing import Optional, Union, Dict, Any
 
 
-class TotoModel(FoundationModel):
-    def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
+class TotoModel(BaseModel):
+    def __init__(self, config: Dict[str, Any]):
         """
         Initialize TOTO model with configuration.
         
         Args:
             config: Configuration dictionary containing model parameters
-            config_file: Path to configuration file
         """
-        super().__init__(config, config_file)
+        super().__init__(config)
         
-        # Extract model-specific config
-        model_config = self._extract_model_config(self.config)
-        
-        # Required parameters - no defaults
         if 'num_samples' not in model_config:
             raise ValueError("num_samples must be specified in config")
         if 'samples_per_batch' not in model_config:
             raise ValueError("samples_per_batch must be specified in config")
         
-
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         self.num_samples = model_config['num_samples']
         self.samples_per_batch = model_config['samples_per_batch']
-        # forecast_horizon is inherited from parent class (FoundationModel)
         
-        # Add training_loss attribute for compatibility with tuning code
-        self.training_loss = 'mae'  # Default loss function for TOTO
-
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        
         torch.use_deterministic_algorithms(True)
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -49,42 +40,12 @@ class TotoModel(FoundationModel):
         self.model.compile()  
         self.forecaster = TotoForecaster(self.model.model)
     
-    def get_params(self) -> Dict[str, Any]:
-        """
-        Get the current model parameters.
-        
-        Returns:
-            Dict[str, Any]: Dictionary of model parameters
-        """
-        return {
-            'num_samples': self.num_samples,
-            'samples_per_batch': self.samples_per_batch,
-            'forecast_horizon': self.forecast_horizon,
-            'training_loss': self.training_loss
-        }
-    
-    def set_params(self, **params: Dict[str, Any]) -> 'TotoModel':
-        """
-        Set model parameters.
-        
-        Args:
-            **params: Model parameters to set
-            
-        Returns:
-            self: The model instance with updated parameters
-        """
-        for key, value in params.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            elif key == 'training_loss':
-                # Handle training_loss parameter specifically
-                self.training_loss = value
-        return self
-    
     def train(self, 
-              y_context: Optional[Union[pd.Series, np.ndarray]], 
-              y_target: Optional[Union[pd.Series, np.ndarray]] = None, 
-              y_start_date: Optional[str] = None
+            y_context: Optional[np.ndarray],
+            y_target: Optional[np.ndarray] = None,
+            timestamps_context: Optional[np.ndarray] = None,
+            timestamps_target: Optional[np.ndarray] = None,
+            freq: str = None,
     ) -> 'TotoModel':
         """
         Train/fine-tune the foundation model on given data.
@@ -103,11 +64,10 @@ class TotoModel(FoundationModel):
         return self
     
     def predict(self,
-        y_context: Optional[Union[pd.Series, np.ndarray]] = None,
-        y_target: Optional[Union[pd.Series, np.ndarray]] = None,
-        forecast_horizon: Optional[int] = None,
-        y_context_timestamps = None,
-        y_target_timestamps = None,
+            y_context: Optional[np.ndarray] = None,
+            timestamps_context: Optional[np.ndarray] = None,
+            timestamps_target: Optional[np.ndarray] = None,
+            freq: str = None,
         **kwargs) -> np.ndarray:
         """
         Make predictions using the trained TOTO model.
@@ -122,18 +82,8 @@ class TotoModel(FoundationModel):
         Returns:
             np.ndarray: Model predictions with shape (prediction_length,)
         """
-        # Determine prediction length
-        if y_target is not None:
-            # Use target length as prediction length if provided
-            if isinstance(y_target, pd.Series):
-                prediction_length = len(y_target)
-            else:
-                # For time series, we always want the number of time steps (first dimension)
-                prediction_length = y_target.shape[0]
-        elif forecast_horizon is not None:
-            prediction_length = forecast_horizon
-        else:
-            prediction_length = self.forecast_horizon
+
+        forecast_horizon = timestamps_target.shape[0]
         
         # Update forecast_horizon temporarily
         original_horizon = self.forecast_horizon
