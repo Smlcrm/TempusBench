@@ -80,6 +80,7 @@ model:
   #   daily_seasonality: [false]
 
   # tiny_time_mixer:
+  
   # moment:
 
   # lagllama:
@@ -108,9 +109,6 @@ model:
   #   num_samples: [5]
   #   pdt: [10]
   # toto:
-  #   num_samples: [40]
-  #   samples_per_batch: [40]
-  #   prediction_length: [10]
   
 
 evaluation:

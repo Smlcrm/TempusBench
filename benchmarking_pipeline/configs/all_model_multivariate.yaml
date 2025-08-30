@@ -11,94 +11,93 @@ dataset:
 
 model:
   # Foundation models that support multivariate forecasting
-  tiny_time_mixer:
-    forecast_horizon: [10]
-  moment:
-    model_path: ['AutonLab/MOMENT-1-large']
-    context_length: [512]
-    fine_tune_epochs: [0]
-    batch_size: [8]
-    learning_rate: [0.0001]
-    prediction_length: [10]
-  lagllama:
-    context_length: [4]
-    num_samples: [5]
-    batch_size: [4]
-    prediction_length: [10]
-  timesfm:
-    per_core_batch_size: [2]
-    horizon_len: [10]
-    num_layers: [2]
-    context_len: [2]
-    use_positional_embedding: [False]
-  chronos:
-    model_size: ['small']
-    context_length: [8]
-    num_samples: [5]
-    prediction_length: [10]
-  moirai:
-    size: ["small"]
-    psz: [32]
-    bsz: [8]
-    num_samples: [5]
-    pdt: [10]
-  moirai_moe:
-    size: ["small"]
-    psz: [32]
-    bsz: [8]
-    num_samples: [5]
-    pdt: [10]
-  toto:
-    num_samples: [40]
-    samples_per_batch: [40]
-    prediction_length: [10]
+  # tiny_time_mixer:
+  #   forecast_horizon: [10]
+  # moment:
+  #   model_path: ['AutonLab/MOMENT-1-large']
+  #   context_length: [512]
+  #   fine_tune_epochs: [0]
+  #   batch_size: [8]
+  #   learning_rate: [0.0001]
+  #   prediction_length: [10]
+  # lagllama:
+  #   context_length: [4]
+  #   num_samples: [5]
+  #   batch_size: [4]
+  #   prediction_length: [10]
+  # timesfm:
+  #   per_core_batch_size: [2]
+  #   horizon_len: [10]
+  #   num_layers: [2]
+  #   context_len: [2]
+  #   use_positional_embedding: [False]
+  # chronos:
+  #   model_size: ['small']
+  #   context_length: [8]
+  #   num_samples: [5]
+  #   prediction_length: [10]
+  # moirai:
+  #   size: ["small"]
+  #   psz: [32]
+  #   bsz: [8]
+  #   num_samples: [5]
+  #   pdt: [10]
+  # moirai_moe:
+  #   size: ["small"]
+  #   psz: [32]
+  #   bsz: [8]
+  #   num_samples: [5]
+  #   pdt: [10]
+  # toto:
+  #   num_samples: [40]
+  #   samples_per_batch: [40]
+  #   prediction_length: [10]
   
-  # Traditional multivariate models
-  lstm:
-    units: [32]
-    layers: [1]
-    dropout: [0.1]
-    learning_rate: [0.01, 1.0]
-    batch_size: [32]
-    epochs: [20]
-    sequence_length: [10]
-    training_loss: ["mae"]
-    forecast_horizon: [10]
-    feature_cols: [null]
-  svr:
-    kernel: ["rbf", "linear"]
-    C: [0.1, 1.0, 10.0]
-    epsilon: [0.01, 0.1, 0.2]
-    gamma: ["scale", "auto"]
-    lookback_window: [50, 100]
-    max_iter: [1000]
-    random_state: [42]
-    forecast_horizon: [10]
-    model_params: [{}]
-  arima:
-    p: [0, 1, 2]
-    d: [0, 1]
-    q: [0, 1, 2]
-    s: [2, 4]
-    maxlags: [10]
-    training_loss: ["mae"]
-    forecast_horizon: [10]
-  theta:
-    sp: [1, 2, 3]
-    forecast_horizon: [10]
-    use_reduced_rank: [false]
-    theta_method: ["correlation_optimal"]
+  # # Traditional multivariate models
+  # lstm:
+  #   units: [32]
+  #   layers: [1]
+  #   dropout: [0.1]
+  #   learning_rate: [0.01, 1.0]
+  #   batch_size: [32]
+  #   epochs: [20]
+  #   sequence_length: [10]
+  #   training_loss: ["mae"]
+  #   forecast_horizon: [10]
+  #   feature_cols: [null]
+  # svr:
+  #   kernel: ["rbf", "linear"]
+  #   C: [0.1, 1.0, 10.0]
+  #   epsilon: [0.01, 0.1, 0.2]
+  #   gamma: ["scale", "auto"]
+  #   lookback_window: [50, 100]
+  #   max_iter: [1000]
+  #   random_state: [42]
+  #   forecast_horizon: [10]
+  #   model_params: [{}]
+  # arima:
+  #   p: [0, 1, 2]
+  #   d: [0, 1]
+  #   q: [0, 1, 2]
+  #   s: [2, 4]
+  #   maxlags: [10]
+  #   training_loss: ["mae"]
+  #   forecast_horizon: [10]
+  # theta:
+  #   sp: [1, 2, 3]
+  #   forecast_horizon: [10]
+  #   use_reduced_rank: [false]
+  #   theta_method: ["correlation_optimal"]
   xgboost:
-    lookback_window: [50, 100]
-    n_estimators: [50, 100]
-    max_depth: [5, 6, 10]
-    learning_rate: [0.1, 0.3]
-    subsample: [0.8, 1.0]
-    colsample_bytree: [0.8, 1.0]
+    lookback_window: [20]
+    n_estimators: [10]
+    max_depth: [6]
+    learning_rate: [0.1]
+    subsample: [0.8]
+    colsample_bytree: [0.8]
     random_state: [42]
-    n_jobs: [-1]
+    n_jobs: [1]
     forecast_horizon: [10]
-    model_params: [{}]
 
 evaluation:
   type: deterministic
