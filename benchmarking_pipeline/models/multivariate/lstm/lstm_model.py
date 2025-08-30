@@ -23,7 +23,7 @@ from tensorflow.keras.callbacks import TensorBoard
 
 
 class MultivariateLSTMModel(BaseModel):
-    def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
+    def __init__(self, config: Dict[str, Any):
         """
         Initialize Multivariate LSTM model with given configuration.
         
@@ -41,26 +41,26 @@ class MultivariateLSTMModel(BaseModel):
                 - forecast_horizon: int, number of steps to forecast ahead
             config_file: Path to a JSON configuration file
         """
-        super().__init__(config, config_file)
-        if 'units' not in self.config:
+        super().__init__(config)
+        if 'units' not in self.model_config:
             raise ValueError("units must be specified in config")
-        if 'layers' not in self.config:
+        if 'layers' not in self.model_config:
             raise ValueError("layers must be specified in config")
-        if 'dropout' not in self.config:
+        if 'dropout' not in self.model_config:
             raise ValueError("dropout must be specified in config")
-        if 'learning_rate' not in self.config:
+        if 'learning_rate' not in self.model_config:
             raise ValueError("learning_rate must be specified in config")
-        if 'batch_size' not in self.config:
+        if 'batch_size' not in self.model_config:
             raise ValueError("batch_size must be specified in config")
-        if 'epochs' not in self.config:
+        if 'epochs' not in self.model_config:
             raise ValueError("epochs must be specified in config")
-        if 'sequence_length' not in self.config:
+        if 'sequence_length' not in self.model_config:
             raise ValueError("sequence_length must be specified in config")
-        if 'forecast_horizon' not in self.config:
+        if 'forecast_horizon' not in self.model_config:
             raise ValueError("forecast_horizon must be specified in config")
         
-        self.units = self.config['units']
-        self.layers = self.config['layers']
+        
+        self.model_config['layers'] = self.config['layers']
         self.dropout = self.config['dropout']
         self.learning_rate = self.config['learning_rate']
         self.batch_size = self.config['batch_size']
@@ -84,10 +84,10 @@ class MultivariateLSTMModel(BaseModel):
         self.model = Sequential()
         
         # Add LSTM layers
-        for i in range(self.layers):
-            return_sequences = i < self.layers - 1
+        for i in range(self.model_config['layers'):]
+            return_sequences = i < self.model_config['layers'] - 1
             self.model.add(LSTM(
-                units=self.units,
+                units=self.model_config['units'],
                 return_sequences=return_sequences,
                 input_shape=input_shape if i == 0 else None
             ))
@@ -256,8 +256,8 @@ class MultivariateLSTMModel(BaseModel):
             Dict[str, Any]: Dictionary of model parameters
         """
         return {
-            'units': self.units,
-            'layers': self.layers,
+            'units': self.model_config['units'],
+            'layers': self.model_config['layers',]
             'dropout': self.dropout,
             'learning_rate': self.learning_rate,
             'batch_size': self.batch_size,
