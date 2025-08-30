@@ -5,8 +5,12 @@ from typing import Dict, Any, Union
 """
 Calculates Mean Absolute Error.
 """
+
+
 class MAE:
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> Union[float, np.ndarray]:
+    def __call__(
+        self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs
+    ) -> Union[float, np.ndarray]:
         """
         Computes the MAE.
         """
