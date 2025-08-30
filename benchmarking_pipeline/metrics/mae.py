@@ -10,8 +10,4 @@ class MAE:
         """
         Computes the MAE.
         """
-        if y_true.ndim == 1:
-            return np.mean(np.abs(y_true - y_pred))
-        elif y_true.ndim == 2:
-            return np.mean(np.abs(y_true - y_pred), axis=0)
-        return np.nan
+        return np.mean(np.abs(y_true - y_pred))

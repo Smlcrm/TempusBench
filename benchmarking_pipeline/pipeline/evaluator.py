@@ -50,61 +50,29 @@ class Evaluator:
         Returns:
             Dictionary of evaluation metrics.
         """
-        if isinstance(y_predictions, pd.Series):
-            y_predictions = y_predictions.values
-        if isinstance(y_true, pd.Series):
-            y_true = y_true.values
-        if y_train is not None and isinstance(y_train, pd.Series):
-            y_train = y_train.values
+        # if isinstance(y_predictions, pd.Series):
+        #     y_predictions = y_predictions.values
+        # if isinstance(y_true, pd.Series):
+        #     y_true = y_true.values
+        # if y_train is not None and isinstance(y_train, pd.Series):
+        #     y_train = y_train.values
 
-        # Convert DataFrames to numpy arrays
-        if isinstance(y_predictions, pd.DataFrame):
-            y_predictions = y_predictions.values
-        if isinstance(y_true, pd.DataFrame):
-            y_true = y_true.values
-        if isinstance(y_train, pd.DataFrame):
-            y_train = y_train.values
+        # # Convert DataFrames to numpy arrays
+        # if isinstance(y_predictions, pd.DataFrame):
+        #     y_predictions = y_predictions.values
+        # if isinstance(y_true, pd.DataFrame):
+        #     y_true = y_true.values
+        # if isinstance(y_train, pd.DataFrame):
+        #     y_train = y_train.values
 
-        y_predictions = y_predictions.squeeze()
-        y_true = y_true.squeeze()
-        y_train = y_train.squeeze()
-
-        # Align shapes for multivariate: ensure (num_targets, horizon)
-        def ensure_targets_by_horizon(arr):
-            if arr is None:
-                return arr
-            a = np.asarray(arr)
-            arr = np.squeeze(arr)
-            if a.ndim == 1:
-                return a
-            # If shape is (time, targets), transpose to (targets, time)
-            else:
-                return a.T
-
-        y_predictions = ensure_targets_by_horizon(y_predictions)
-        y_true = ensure_targets_by_horizon(y_true)
-        y_train = ensure_targets_by_horizon(y_train)
-
+        print(
+            f"[DEBUG] y_predictions shape: {y_predictions.shape}, y_true shape: {y_true.shape}, y_train shape: {y_train.shape}"
+        )
         # If predictions longer than true, truncate to match
         if y_predictions is not None and y_true is not None:
-            print(f"+++++++++++++++++++++++++++++++++++++++++++++++")
-            if y_predictions.ndim == 1 and y_true.ndim == 1:
-                print(f"+++++++++++++++++++++++++++++++++++++++++++++++")
-                min_len = min(len(y_predictions), len(y_true))
-                y_predictions = y_predictions[:min_len]
-                y_true = y_true[:min_len]
-            elif y_predictions.ndim == 2 and y_true.ndim == 2:
-                min_len = min(y_predictions.shape[-1], y_true.shape[-1])
-                y_predictions = y_predictions[..., :min_len]
-                y_true = y_true[..., :min_len]
-
-        # Final length check for 1D
-        if (
-            y_predictions.ndim == 1
-            and y_true.ndim == 1
-            and len(y_predictions) != len(y_true)
-        ):
-            raise ValueError("Length of predictions and true values must match.")
+            min_len = min(y_predictions.shape[0], y_true.shape[0])
+            y_predictions = y_predictions[:min_len, :]
+            y_true = y_true[:min_len, :]
 
         results = {}
         for metric_name in self.metrics_to_calculate:

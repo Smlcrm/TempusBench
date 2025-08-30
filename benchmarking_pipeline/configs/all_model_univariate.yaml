@@ -8,25 +8,20 @@ dataset:
   chunks: 2
 
 model:
-  exponential_smoothing:
-    trend: ["add", null]
-    seasonal: [null]
-    seasonal_periods: [null]
-    damped_trend: [false, true]
-    forecast_horizon: [10]
+  # exponential_smoothing:
+  #   trend: ["add", null]
+  #   seasonal: [null]
+  #   seasonal_periods: [null]
+  #   damped_trend: [false, true]
   
   # seasonal_naive:
-  #   model_params:
-  #     sp: [24]
-  #   forecast_horizon: [2]
+  #   sp: [24]
   
   # croston_classic:
   #   alpha: [0.1, 0.3, 0.5]
   #   gamma: [0.1, 0.3, 0.5]
-  #   beta: [0.1, 0.3, 0.5]
-  #   forecast_horizon: [10]
   
-  # # Machine Learning Models
+  # Machine Learning Models
   # xgboost:
   #   lookback_window: [30]
   #   n_estimators: [200]
@@ -35,37 +30,36 @@ model:
   #   subsample: [0.9]
   #   colsample_bytree: [0.9]
   #   random_state: [42]
-  #   n_jobs: [-1]
-  #   forecast_horizon: [10]
+  #   n_jobs: [1]
   
-  # random_forest:
-  #   lookback_window: [50]
-  #   n_estimators: [50]
-  #   max_depth: [7]
-  #   random_state: [42]
-  #   n_jobs: [-1]
-  #   forecast_horizon: [10]
+  random_forest:
+    lookback_window: [50]
+    n_estimators: [10]
+    max_depth: [2]
+    random_state: [42]
+    n_jobs: [1]
+    forecast_horizon: [50]
+
+  svr:
+    training_loss: ["mae"]
+    kernel: ["rbf"]
+    C: [1.0]
+    epsilon: [0.1]
+    gamma: ["scale"]
+    lookback_window: [50]
+    forecast_horizon: [10]
   
-  # svr:
-  #   training_loss: ["mae"]
-  #   kernel: ["rbf"]
-  #   C: [1.0]
-  #   epsilon: [0.1]
-  #   gamma: ["scale"]
-  #   lookback_window: [50]
-  #   forecast_horizon: [10]
-  
-  # # Deep Learning Models
-  # lstm:
-  #   units: [32]
-  #   layers: [1]
-  #   dropout: [0.1]
-  #   learning_rate: [0.01]
-  #   batch_size: [32]
-  #   epochs: [20]
-  #   sequence_length: [10]
-  #   training_loss: ["mae"]
-  #   forecast_horizon: [10]
+  # Deep Learning Models
+  lstm:
+    units: [32]
+    layers: [1]
+    dropout: [0.1]
+    learning_rate: [0.01]
+    batch_size: [32]
+    epochs: [20]
+    sequence_length: [10]
+    training_loss: ["mae"]
+    forecast_horizon: [10]
   
   # deepar:
   #   context_length: [20]

@@ -35,7 +35,7 @@ class BaseModel(ABC):
         evaluator: Evaluator instance for computing metrics
     """
 
-    def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
+    def __init__(self, config: Dict[str, Any] = {}):
         """
         Initialize the base model.
 
@@ -46,38 +46,17 @@ class BaseModel(ABC):
                 - dataset: dict containing dataset configuration
             config_file: Path to a JSON configuration file
         """
-        if config_file is not None:
-            if not os.path.exists(config_file):
-                raise FileNotFoundError(f"Config file not found: {config_file}")
-            with open(config_file, "r") as f:
-                config = json.load(f)
 
-        self.config = config or {}
-
-        # Handle nested model configurations (e.g., config['model']['arima'])
-        # Extract model-specific config if it exists
-        model_config = self._extract_model_config(self.config)
-
-        self.training_loss = model_config.get("training_loss", "mae")
+        self.model_config = config
+        self.training_loss = config.get("training_loss", "mae")
 
         # Determine forecast horizon from model configuration keys if present
         # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
-        horizon = None
-        for key in ("forecast_horizon", "prediction_length", "horizon_len", "pdt"):
-            if key in model_config:
-                horizon = model_config[key]
-                break
-        # If hyperparameter grid provides a list, take the first value for initialization
-        if isinstance(horizon, list) and len(horizon) > 0:
-            horizon = horizon[0]
-        self.forecast_horizon = horizon
 
         self.is_fitted = False
 
         # Initialize evaluator with the full config to access evaluation.metrics
         # We need to pass the original config, not the extracted model config
-        print(f"[DEBUG] BaseModel: Original config parameter: {config}")
-        print(f"[DEBUG] BaseModel: Self.config after extraction: {self.config}")
         self.evaluator = Evaluator(config=config)
 
         # For logging last eval
@@ -108,9 +87,11 @@ class BaseModel(ABC):
     @abstractmethod
     def train(
         self,
-        y_context: Optional[Union[pd.Series, np.ndarray]],
-        y_target: Optional[Union[pd.Series, np.ndarray]] = None,
-        y_start_date: Optional[str] = None,
+        y_context: Optional[np.ndarray],
+        y_target: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
     ) -> "BaseModel":
         """
         Train the model on given data.
@@ -128,8 +109,9 @@ class BaseModel(ABC):
     @abstractmethod
     def predict(
         self,
-        y_context: Optional[Union[pd.Series, np.ndarray]] = None,
-        forecast_horizon: Optional[int] = None,
+        y_context: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
     ) -> np.ndarray:
         """
@@ -225,7 +207,6 @@ class BaseModel(ABC):
         loss = self.compute_loss(y, predictions)
         return loss
 
-    @abstractmethod
     def get_params(self) -> Dict[str, Any]:
         """
         Get the current model parameters.
@@ -233,9 +214,8 @@ class BaseModel(ABC):
         Returns:
             Dict[str, Any]: Dictionary of model parameters
         """
-        pass
+        return self.model_config
 
-    @abstractmethod
     def set_params(self, **params: Dict[str, Any]) -> "BaseModel":
         """
         Set model parameters.
@@ -246,50 +226,53 @@ class BaseModel(ABC):
         Returns:
             self: The model instance with updated parameters
         """
-        pass
+        self.model_config.update(params)
+        self.is_fitted = False  # Mark as unfitted if parameters change
 
-    def save(self, path: str) -> None:
-        """
-        Save the model to disk.
+        return self
 
-        Args:
-            path: Path to save the model
-        """
-        if not self.is_fitted:
-            raise ValueError("Cannot save an unfitted model")
+    # def save(self, path: str) -> None:
+    #     """
+    #     Save the model to disk.
 
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    #     Args:
+    #         path: Path to save the model
+    #     """
+    #     if not self.is_fitted:
+    #         raise ValueError("Cannot save an unfitted model")
 
-        # Save model state
-        model_state = {
-            "config": self.config,
-            "is_fitted": self.is_fitted,
-            "params": self.get_params(),
-        }
+    #     # Create directory if it doesn't exist
+    #     os.makedirs(os.path.dirname(path), exist_ok=True)
 
-        # Save model state to file
-        with open(path, "wb") as f:
-            pickle.dump(model_state, f)
+    #     # Save model state
+    #     model_state = {
+    #         "config": self.config,
+    #         "is_fitted": self.is_fitted,
+    #         "params": self.get_params(),
+    #     }
 
-    def load(self, path: str) -> None:
-        """
-        Load the model from disk.
+    #     # Save model state to file
+    #     with open(path, "wb") as f:
+    #         pickle.dump(model_state, f)
 
-        Args:
-            path: Path to load the model from
-        """
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"No model found at {path}")
+    # def load(self, path: str) -> None:
+    #     """
+    #     Load the model from disk.
 
-        # Load model state from file
-        with open(path, "rb") as f:
-            model_state = pickle.load(f)
+    #     Args:
+    #         path: Path to load the model from
+    #     """
+    #     if not os.path.exists(path):
+    #         raise FileNotFoundError(f"No model found at {path}")
 
-        # Restore model state
-        self.config = model_state["config"]
-        self.is_fitted = model_state["is_fitted"]
-        self.set_params(**model_state["params"])
+    #     # Load model state from file
+    #     with open(path, "rb") as f:
+    #         model_state = pickle.load(f)
+
+    #     # Restore model state
+    #     self.config = model_state["config"]
+    #     self.is_fitted = model_state["is_fitted"]
+    #     self.set_params(**model_state["params"])
 
     def get_model_summary(self) -> Dict[str, Any]:
         """

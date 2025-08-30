@@ -40,14 +40,16 @@ class DataLoader:
                 - dataset.split_ratio: List of train/val/test split ratios
         """
         self.config = config
-        
+
         # Automatically construct dataset path from project root
         dataset_name = config["dataset"]["name"]
         # Get the project root directory (benchmarking_pipeline folder)
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(current_dir)  # Go up from pipeline/ to benchmarking_pipeline/
+        project_root = os.path.dirname(
+            current_dir
+        )  # Go up from pipeline/ to benchmarking_pipeline/
         self.dataset_path = os.path.join(project_root, "datasets", dataset_name)
-        
+
         self.num_targets: Optional[int] = None
 
         # Initialize preprocessor for handling missing values and normalization
