@@ -9,67 +9,8 @@ dataset:
   chunks: 2
 
 model:
-  tiny_time_mixer:
-    forecast_horizon: [10]
-  moment:
-    model_path: ['AutonLab/MOMENT-1-large']
-    context_length: [512]
-    fine_tune_epochs: [0]
-    batch_size: [8]
-    learning_rate: [0.0001]
-    prediction_length: [10]
-  lagllama:
-    context_length: [4]
-    num_samples: [5]
-    batch_size: [4]
-    prediction_length: [10]
-  timesfm:
-    per_core_batch_size: [2]
-    horizon_len: [10]
-    num_layers: [2]
-    context_len: [2]
-    use_positional_embedding: [False]
-  tabpfn:
-    allow_large_cpu_dataset: [True]
-    max_sequence_length: [32]
-    prediction_length: [10]
-  chronos:
-    model_size: ['small']
-    context_length: [8]
-    num_samples: [5]
-    prediction_length: [10]
-  xgboost:
-    lookback_window: [10]
-    n_estimators: [10]
-    max_depth: [5]
-    learning_rate: [0.1]
-    random_state: [42]
-    n_jobs: [-1]
-    forecast_horizon: [10]
-  prophet:
-    seasonality_mode: ["additive"]
-    changepoint_prior_scale: [0.05]
-    seasonality_prior_scale: [10.0]
-    yearly_seasonality: [false]
-    weekly_seasonality: [false]
-    daily_seasonality: [false]
-  lstm:
-    units: [32]
-    layers: [1]
-    dropout: [0.1]
-    learning_rate: [0.01, 1.0]
-    batch_size: [32]
-    epochs: [20]
-    sequence_length: [10]
-    training_loss: ["mae"]
-    forecast_horizon: [10]
-  random_forest:
-    lookback_window: [50, 100]
-    n_estimators: [10, 50]
-    max_depth: [3, 7]
-    random_state: [42]
-    n_jobs: [-1]
-    forecast_horizon: [10]
+  
+
   exponential_smoothing:
     trend: ["none", "add"]
     seasonal: ["none", "add", "mul"]
@@ -124,3 +65,4 @@ model:
 evaluation:
   type: deterministic
   metrics: [mae, mase, rmse]
+  tensorboard: true

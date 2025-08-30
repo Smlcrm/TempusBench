@@ -11,11 +11,12 @@ dataset:
 
 model:
   lagllama:
-    context_length: [4]
+    context_length: [128]
     num_samples: [5]
     batch_size: [4]
-    prediction_length: [10]
+    prediction_length: [300]
 
 evaluation:
   type: deterministic
   metrics: [mae, mase, rmse]
+  tensorboard: true
