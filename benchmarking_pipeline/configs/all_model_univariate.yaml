@@ -40,26 +40,26 @@ model:
   #   n_jobs: [1]
   #   forecast_horizon: [50]
 
-  svr:
-    training_loss: ["mae"]
-    kernel: ["rbf"]
-    C: [1.0]
-    epsilon: [0.1]
-    gamma: ["scale"]
-    lookback_window: [50]
-    forecast_horizon: [10]
+  # svr:
+  #   training_loss: ["mae"]
+  #   kernel: ["rbf"]
+  #   C: [1.0]
+  #   epsilon: [0.1]
+  #   gamma: ["scale"]
+  #   lookback_window: [50]
+  #   forecast_horizon: [10]
   
   # Deep Learning Models
-  lstm:
-    units: [32]
-    layers: [1]
-    dropout: [0.1]
-    learning_rate: [0.01]
-    batch_size: [32]
-    epochs: [20]
-    sequence_length: [10]
-    training_loss: ["mae"]
-    forecast_horizon: [10]
+  # lstm:
+  #   units: [32]
+  #   layers: [1]
+  #   dropout: [0.1]
+  #   learning_rate: [0.01]
+  #   batch_size: [32]
+  #   epochs: [1000]
+  #   sequence_length: [10]
+  #   training_loss: ["mae"]
+  #   forecast_horizon: [10]
   
   # deepar:
   #   context_length: [20]
@@ -78,7 +78,40 @@ model:
   #   yearly_seasonality: [true]
   #   weekly_seasonality: [true]
   #   daily_seasonality: [false]
-  #   forecast_horizon: [10]
+
+  # tiny_time_mixer:
+  # moment:
+
+  # lagllama:
+
+  timesfm:
+  #   per_core_batch_size: [2]
+  #   horizon_len: [10]
+  #   num_layers: [2]
+  #   context_len: [2]
+  #   use_positional_embedding: [False]
+  # chronos:
+  #   model_size: ['small']
+  #   context_length: [8]
+  #   num_samples: [5]
+  #   prediction_length: [10]
+  # moirai:
+  #   size: ["small"]
+  #   psz: [32]
+  #   bsz: [8]
+  #   num_samples: [5]
+  #   pdt: [10]
+  # moirai_moe:
+  #   size: ["small"]
+  #   psz: [32]
+  #   bsz: [8]
+  #   num_samples: [5]
+  #   pdt: [10]
+  # toto:
+  #   num_samples: [40]
+  #   samples_per_batch: [40]
+  #   prediction_length: [10]
+  
 
 evaluation:
   type: deterministic

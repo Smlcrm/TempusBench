@@ -1,4 +1,5 @@
 """
+<<<<<<< HEAD
 Multivariate LSTM model for time series forecasting.
 
 Features:
@@ -6,6 +7,17 @@ Features:
 - Concatenate all targets into a single input sequence (sequence_length, num_targets)
 - Handles both univariate and multivariate data automatically
 - Supports variable sequence lengths and forecast horizons
+=======
+Multivariate LSTM model implementation.
+
+This model extends the univariate LSTM to handle multiple target variables simultaneously.
+Design choices (all Option A):
+- Single output layer that predicts forecast_horizon * n_targets values (flattened)
+- Concatenate all targets into a single input sequence (sequence_length, n_targets)
+- Sum/average losses across all targets
+- Predict all targets simultaneously in one forward pass
+- Keep same LSTM architecture, just change input/output dimensions
+>>>>>>> origin
 """
 import numpy as np
 import math
@@ -23,7 +35,7 @@ from tensorflow.keras.callbacks import TensorBoard
 
 
 class MultivariateLSTMModel(BaseModel):
-    def __init__(self, config: Dict[str, Any):
+    def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
         """
         Initialize Multivariate LSTM model with given configuration.
         
@@ -36,30 +48,40 @@ class MultivariateLSTMModel(BaseModel):
                 - batch_size: int, batch size for training
                 - epochs: int, number of training epochs
                 - sequence_length: int, length of input sequences
+<<<<<<< HEAD
                 - feature_cols: list of str, names of feature columns
                 - training_loss: str, primary loss function for training
+=======
+                - target_cols: list of str, names of target columns (for multivariate)
+                - feature_cols: list of str, names of feature columns
+                - loss_functions: List[str], list of loss function names to use
+                - primary_loss: str, primary loss function for training
+>>>>>>> origin
                 - forecast_horizon: int, number of steps to forecast ahead
             config_file: Path to a JSON configuration file
         """
-        super().__init__(config)
-        if 'units' not in self.model_config:
+        super().__init__(config, config_file)
+<<<<<<< HEAD
+        if 'units' not in self.config:
             raise ValueError("units must be specified in config")
-        if 'layers' not in self.model_config:
+        if 'layers' not in self.config:
             raise ValueError("layers must be specified in config")
-        if 'dropout' not in self.model_config:
+        if 'dropout' not in self.config:
             raise ValueError("dropout must be specified in config")
-        if 'learning_rate' not in self.model_config:
+        if 'learning_rate' not in self.config:
             raise ValueError("learning_rate must be specified in config")
-        if 'batch_size' not in self.model_config:
+        if 'batch_size' not in self.config:
             raise ValueError("batch_size must be specified in config")
-        if 'epochs' not in self.model_config:
+        if 'epochs' not in self.config:
             raise ValueError("epochs must be specified in config")
-        if 'sequence_length' not in self.model_config:
+        if 'sequence_length' not in self.config:
             raise ValueError("sequence_length must be specified in config")
-        if 'forecast_horizon' not in self.model_config:
+        if 'forecast_horizon' not in self.config:
             raise ValueError("forecast_horizon must be specified in config")
         
-        
+        self.units = self.config['units']
+        self.layers = self.config['layers']
+        self.dropout = self.config['dropout']
         self.learning_rate = self.config['learning_rate']
         self.batch_size = self.config['batch_size']
         self.epochs = self.config['epochs']
@@ -70,32 +92,63 @@ class MultivariateLSTMModel(BaseModel):
         self.forecast_horizon = self.config['forecast_horizon']
         self.model = None
         # num_targets will be calculated from data during training
+=======
+        self.units = self.config.get('units', 50)
+        self.layers = self.config.get('layers', 1)
+        self.dropout = self.config.get('dropout', 0.2)
+        self.learning_rate = self.config.get('learning_rate', 0.001)
+        self.batch_size = self.config.get('batch_size', 32)
+        self.epochs = self.config.get('epochs', 100)
+        self.sequence_length = self.config.get('sequence_length', 10)
+        self.target_cols = self.config.get('target_cols')  # Default for multivariate
+        self.feature_cols = self.config.get('feature_cols', None)
+        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        self.model = None
+        self.n_targets = len(self.target_cols)  # Number of target variables
+>>>>>>> origin
         
     def _build_model(self, input_shape: Tuple[int, int]) -> None:
         """
         Build the Multivariate LSTM model architecture.
         
         Args:
+<<<<<<< HEAD
             input_shape: Shape of input data (sequence_length, num_targets)
         """
         
+=======
+            input_shape: Shape of input data (sequence_length, n_targets)
+        """
+>>>>>>> origin
         self.model = Sequential()
         
         # Add LSTM layers
-        for i in range(self.model_config['layers'):]
-            return_sequences = i < self.model_config['layers'] - 1
+        for i in range(self.layers):
+            return_sequences = i < self.layers - 1
             self.model.add(LSTM(
-                units=self.model_config['units'],
+                units=self.units,
                 return_sequences=return_sequences,
-                input_shape=input_shape if i == 
+                input_shape=input_shape if i == 0 else None
+            ))
+            if self.dropout > 0:
+                self.model.add(Dropout(self.dropout))
                 
+<<<<<<< HEAD
         # Add output layer - predicts forecast_horizon * num_targets values (flattened)
         self.model.add(Dense(self.forecast_horizon * self.num_targets))
+=======
+        # Add output layer - predicts forecast_horizon * n_targets values (flattened)
+        self.model.add(Dense(self.forecast_horizon * self.n_targets))
+>>>>>>> origin
         
         # Compile model
         self.model.compile(
             optimizer=Adam(learning_rate=self.learning_rate),
+<<<<<<< HEAD
             loss=self.training_loss
+=======
+            loss=self.primary_loss
+>>>>>>> origin
         )
         
     def _prepare_sequences(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -103,12 +156,20 @@ class MultivariateLSTMModel(BaseModel):
         Prepare input sequences for Multivariate LSTM.
         
         Args:
+<<<<<<< HEAD
             X: Input features (2D array with shape (num_timesteps, num_targets))
+=======
+            X: Input features (2D array with shape (num_timesteps, n_targets))
+>>>>>>> origin
             
         Returns:
             Tuple[np.ndarray, np.ndarray]: Prepared sequences and targets
         """
+<<<<<<< HEAD
         # Ensure X is 2D: (num_timesteps, num_targets) for multivariate
+=======
+        # Ensure X is 2D: (num_timesteps, n_targets) for multivariate
+>>>>>>> origin
         if X.ndim == 1:
             # If univariate input, reshape to (num_timesteps, 1)
             X = X.reshape(-1, 1)
@@ -119,12 +180,20 @@ class MultivariateLSTMModel(BaseModel):
         X_seq, y_seq = [], []
         for i in range(len(X) - self.sequence_length - self.forecast_horizon + 1):
             X_seq.append(X[i:(i + self.sequence_length)])
+<<<<<<< HEAD
             # y_seq: flatten to 1D array of length forecast_horizon * num_targets
+=======
+            # y_seq: flatten to 1D array of length forecast_horizon * n_targets
+>>>>>>> origin
             future_values = X[i + self.sequence_length:i + self.sequence_length + self.forecast_horizon]
             y_seq.append(future_values.flatten())
         return np.array(X_seq), np.array(y_seq)
         
+<<<<<<< HEAD
     def train(self, y_context: Union[pd.Series, np.ndarray, pd.DataFrame], y_target: Union[pd.Series, np.ndarray, pd.DataFrame] = None, y_start_date: pd.Timestamp = None, **kwargs) -> 'MultivariateLSTMModel':
+=======
+    def train(self, y_context: Union[pd.Series, np.ndarray, pd.DataFrame], y_target: Union[pd.Series, np.ndarray, pd.DataFrame] = None, x_context: Union[pd.Series, np.ndarray] = None, x_target: Union[pd.Series, np.ndarray] = None, y_start_date: pd.Timestamp = None, x_start_date: pd.Timestamp = None, **kwargs) -> 'MultivariateLSTMModel':
+>>>>>>> origin
         """
         Train the Multivariate LSTM model on given data.
         
@@ -138,12 +207,20 @@ class MultivariateLSTMModel(BaseModel):
         Args:
             y_context: Past target values (time series) - used for training (can be DataFrame for multivariate)
             y_target: Future target values (optional, for validation)
+<<<<<<< HEAD
             y_start_date: The start date timestamp for y_context and y_target in string form
+=======
+            x_context: Past exogenous variables (optional, ignored for now)
+            x_target: Future exogenous variables (optional, ignored for now)
+            y_start_date: The start date timestamp for y_context and y_target in string form
+            x_start_date: The start date timestamp for x_context and x_target in string form
+>>>>>>> origin
             **kwargs: Additional keyword arguments
 
         Returns:
             self: The fitted model instance
         """
+<<<<<<< HEAD
         # Convert input to numpy array and handle multivariate data
         if isinstance(y_context, pd.DataFrame):
             # Multivariate case - use all columns
@@ -170,6 +247,40 @@ class MultivariateLSTMModel(BaseModel):
         # Build model if not already built
         if self.model is None:
             self._build_model(input_shape=(self.sequence_length, self.num_targets))
+=======
+        # Convert input to numpy array
+        if isinstance(y_context, pd.DataFrame):
+            # Multivariate case - use all columns
+            target = y_context.values
+            # target_cols should already be set from config, validate consistency
+            if self.target_cols and len(y_context.columns) > 0:
+                expected_cols = set(self.target_cols)
+                actual_cols = set(y_context.columns)
+                if expected_cols != actual_cols:
+                    raise ValueError(f"Data columns {actual_cols} don't match configured target_cols {expected_cols}")
+        elif isinstance(y_context, pd.Series):
+            # Univariate case - reshape to 2D
+            target = y_context.values.reshape(-1, 1)
+            # For univariate case, validate against config
+            if len(self.target_cols) != 1:
+                raise ValueError(f"Expected 1 target column for univariate data, but config has {len(self.target_cols)}: {self.target_cols}")
+            self.n_targets = 1
+        else:
+            # Numpy array case
+            target = y_context
+            if target.ndim == 1:
+                target = target.reshape(-1, 1)
+                self.n_targets = 1
+            else:
+                self.n_targets = target.shape[1]
+        
+        # Prepare sequences
+        X_seq, y_seq = self._prepare_sequences(target)
+        
+        # Build model if not already built
+        if self.model is None:
+            self._build_model(input_shape=(self.sequence_length, self.n_targets))
+>>>>>>> origin
             
         # TensorBoard logging is handled by the main benchmark runner
         # No need for separate logging here
@@ -185,7 +296,11 @@ class MultivariateLSTMModel(BaseModel):
         self.is_fitted = True
         return self
         
+<<<<<<< HEAD
     def predict(self, y_context: Union[pd.Series, np.ndarray, pd.DataFrame] = None, y_target: Union[pd.Series, np.ndarray, pd.DataFrame] = None, **kwargs) -> np.ndarray:
+=======
+    def predict(self, y_context: Union[pd.Series, np.ndarray, pd.DataFrame] = None, y_target: Union[pd.Series, np.ndarray, pd.DataFrame] = None, x_context: Union[pd.Series, pd.DataFrame, np.ndarray] = None, x_target: Union[pd.Series, pd.DataFrame, np.ndarray] = None, **kwargs) -> np.ndarray:
+>>>>>>> origin
         """
         Make predictions using the trained Multivariate LSTM model.
         Predicts len(y_target) steps ahead for all targets using non-overlapping windows.
@@ -199,7 +314,11 @@ class MultivariateLSTMModel(BaseModel):
         - No data leakage from using own predictions as input
         
         Returns:
+<<<<<<< HEAD
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
+=======
+            np.ndarray: Model predictions with shape (forecast_steps, n_targets)
+>>>>>>> origin
         """
         if self.model is None:
             raise ValueError("Model not initialized. Call train first.")
@@ -216,19 +335,32 @@ class MultivariateLSTMModel(BaseModel):
             if input_data.ndim == 1:
                 input_data = input_data.reshape(-1, 1)
                 
+<<<<<<< HEAD
         forecast_steps = len(y_target)
+=======
+        forecast_steps = len(y_target) if hasattr(y_target, '__len__') else self.forecast_horizon
+>>>>>>> origin
 
         # Calculate how many prediction windows we need
         num_windows = math.ceil(forecast_steps / self.forecast_horizon)
         
         all_predictions = []
+<<<<<<< HEAD
         current_sequence = input_data[-self.sequence_length:].reshape(1, self.sequence_length, self.num_targets)
+=======
+        current_sequence = input_data[-self.sequence_length:].reshape(1, self.sequence_length, self.n_targets)
+>>>>>>> origin
         
         for window in range(num_windows):
             # Predict forecast_horizon steps at once for all targets
             predictions = self.model.predict(current_sequence, verbose=0)
+<<<<<<< HEAD
             # Reshape predictions from (1, forecast_horizon * num_targets) to (forecast_horizon, num_targets)
             predictions_reshaped = predictions[0].reshape(self.forecast_horizon, self.num_targets)
+=======
+            # Reshape predictions from (1, forecast_horizon * n_targets) to (forecast_horizon, n_targets)
+            predictions_reshaped = predictions[0].reshape(self.forecast_horizon, self.n_targets)
+>>>>>>> origin
             all_predictions.extend(predictions_reshaped)
             
             # Advance window by forecast_horizon steps and use predictions as input
@@ -251,14 +383,24 @@ class MultivariateLSTMModel(BaseModel):
             Dict[str, Any]: Dictionary of model parameters
         """
         return {
-            'units': self.model_config['units'],
+            'units': self.units,
+            'layers': self.layers,
+            'dropout': self.dropout,
             'learning_rate': self.learning_rate,
             'batch_size': self.batch_size,
             'epochs': self.epochs,
             'sequence_length': self.sequence_length,
+<<<<<<< HEAD
             'num_targets': self.num_targets,
             'feature_cols': self.feature_cols,
             'training_loss': self.training_loss,
+=======
+            'target_cols': self.target_cols,
+            'n_targets': self.n_targets,
+            'feature_cols': self.feature_cols,
+            'loss_functions': self.loss_functions,
+            'primary_loss': self.primary_loss,
+>>>>>>> origin
             'forecast_horizon': self.forecast_horizon
         }
         
@@ -275,6 +417,12 @@ class MultivariateLSTMModel(BaseModel):
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+<<<<<<< HEAD
+=======
+        # Update n_targets if target_cols changed
+        if 'target_cols' in params:
+            self.n_targets = len(self.target_cols)
+>>>>>>> origin
         return self
         
     def save(self, path: str) -> None:
@@ -335,7 +483,11 @@ class MultivariateLSTMModel(BaseModel):
         Args:
             y_true: True target values
             y_pred: Predicted values
+<<<<<<< HEAD
             loss_function: Name of the loss function to use (defaults to training_loss)
+=======
+            loss_function: Name of the loss function to use (defaults to primary_loss)
+>>>>>>> origin
             
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics
