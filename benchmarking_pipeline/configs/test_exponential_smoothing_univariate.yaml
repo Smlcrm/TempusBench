@@ -9,10 +9,10 @@ dataset:
 
 model:
   exponential_smoothing:
-    trend: ["add", null]
-    seasonal: [null]
-    seasonal_periods: [null]
-    damped_trend: [false, true]
+    trend: ["add"]
+    seasonal: ["add"]
+    seasonal_periods: [24]
+    damped_trend: [false]
     forecast_horizon: [10]
 
 evaluation:

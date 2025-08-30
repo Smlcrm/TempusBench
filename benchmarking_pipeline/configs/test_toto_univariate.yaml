@@ -9,8 +9,8 @@ dataset:
 
 model:
   toto:
-    num_samples: [40]
-    samples_per_batch: [40]
+    num_samples: [10]
+    samples_per_batch: [5]
     prediction_length: [10]
 
 evaluation:
