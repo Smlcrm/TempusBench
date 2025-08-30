@@ -46,10 +46,10 @@ class ChronosModel(BaseModel):
         super().__init__(config)
 
         self.model_config["model_size"] = (
-            "tiny"  # Validate model size valid_sizes = {'tiny', 'mini', 'small', 'base', 'large'}
+            "tiny"  # Valid model sizes = {'tiny', 'mini', 'small', 'base', 'large'}
         )
-        self.model_config["context_length"] = 100
-        self.model_config["num_samples"] = 5
+        self.model_config["context_length"] = 512
+        self.model_config["num_samples"] = 10
 
         # Initialize model state
         self.is_fitted = False
@@ -138,18 +138,16 @@ class ChronosModel(BaseModel):
                 constant_values=torch.nan,
             )
 
-        y_context = torch.tensor(y_context)
+        y_context = torch.tensor(y_context.T)
         # Generate forecasts
         forecasts = self.model.predict(
             context=y_context,
             prediction_length=forecast_horizon,
             num_samples=self.model_config["num_samples"],
         )
+        forecasts = np.squeeze(np.asarray(forecasts))
+        forecasts = np.mean(forecasts, axis=0, keepdims=True).T
 
-        print(type(forecasts))
-        print(forecasts)
-
-        exit()
         return forecasts
 
         # y_context =

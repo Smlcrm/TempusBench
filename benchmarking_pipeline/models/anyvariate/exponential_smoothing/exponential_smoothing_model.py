@@ -151,10 +151,10 @@ class ExponentialSmoothingModel(BaseModel):
 
     def predict(
         self,
-        y_context: np.ndarray = None,
-        timestamps_context: np.ndarray = None,
-        timestamps_target: np.ndarray = None,
-        freq: str = None,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
         **kwargs,
     ) -> np.ndarray:
 
