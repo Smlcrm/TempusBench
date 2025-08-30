@@ -84,7 +84,7 @@ model:
 
   # lagllama:
 
-  timesfm:
+  # timesfm:
   #   per_core_batch_size: [2]
   #   horizon_len: [10]
   #   num_layers: [2]
