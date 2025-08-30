@@ -209,11 +209,10 @@ evaluation:
 2. **Install dependencies**:
    ```bash
    # Create conda environment
-   conda create -n sim.benchmarks python=3.9
+   conda create -n sim.benchmarks python=3.11.13
    conda activate sim.benchmarks
    
-   # Install the package
-   pip install -e .
+   ./install.sh
    ```
 
 3. **Verify installation**:
