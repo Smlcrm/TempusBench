@@ -34,6 +34,9 @@ class TotoModel(FoundationModel):
         self.num_samples = model_config['num_samples']
         self.samples_per_batch = model_config['samples_per_batch']
         # forecast_horizon is inherited from parent class (FoundationModel)
+        
+        # Add training_loss attribute for compatibility with tuning code
+        self.training_loss = 'mae'  # Default loss function for TOTO
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.use_deterministic_algorithms(True)
@@ -56,7 +59,8 @@ class TotoModel(FoundationModel):
         return {
             'num_samples': self.num_samples,
             'samples_per_batch': self.samples_per_batch,
-            'forecast_horizon': self.forecast_horizon
+            'forecast_horizon': self.forecast_horizon,
+            'training_loss': self.training_loss
         }
     
     def set_params(self, **params: Dict[str, Any]) -> 'TotoModel':
@@ -72,6 +76,9 @@ class TotoModel(FoundationModel):
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+            elif key == 'training_loss':
+                # Handle training_loss parameter specifically
+                self.training_loss = value
         return self
     
     def train(self, 
@@ -203,8 +210,74 @@ class TotoModel(FoundationModel):
             # If forecasts is a tensor/array of samples, compute median
             median_forecast = np.median(forecasts, axis=0)
         
-        # For univariate case, return only the first series forecast
+        # Ensure we have the correct shape for univariate forecasting
+        # The expected output should be (prediction_length,) for univariate
         if median_forecast.ndim > 1:
-            median_forecast = median_forecast[0]
+            # If we have multiple dimensions, take the first series
+            if median_forecast.shape[0] == 1:
+                # If first dimension is 1, squeeze it
+                median_forecast = median_forecast.squeeze(0)
+            else:
+                # Take the first series
+                median_forecast = median_forecast[0]
+        
+        # Ensure the output has the correct length
+        if len(median_forecast) != self.forecast_horizon:
+            print(f"Warning: Expected forecast length {self.forecast_horizon}, got {len(median_forecast)}")
+            # Truncate or pad if necessary
+            if len(median_forecast) > self.forecast_horizon:
+                median_forecast = median_forecast[:self.forecast_horizon]
+            else:
+                # Pad with the last value if too short
+                last_val = median_forecast[-1] if len(median_forecast) > 0 else 0
+                median_forecast = np.pad(median_forecast, (0, self.forecast_horizon - len(median_forecast)), mode='constant', constant_values=last_val)
+        
+        # Clean up tensors to free memory
+        del inputs, forecasts
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
             
         return median_forecast
+    
+    def compute_loss(self, y_true: np.ndarray, y_pred: np.ndarray, y_train: np.ndarray = None) -> Dict[str, float]:
+        """
+        Compute loss metrics for the model predictions.
+        
+        Args:
+            y_true: True target values
+            y_pred: Predicted values
+            y_train: Training data (used for MASE calculation)
+            
+        Returns:
+            Dict[str, float]: Dictionary containing loss metrics
+        """
+        from benchmarking_pipeline.metrics.mae import MAE
+        from benchmarking_pipeline.metrics.rmse import RMSE
+        from benchmarking_pipeline.metrics.mase import MASE
+        
+        # Ensure inputs are numpy arrays
+        y_true = np.asarray(y_true)
+        y_pred = np.asarray(y_pred)
+        
+        # Initialize metric instances
+        mae_calculator = MAE()
+        rmse_calculator = RMSE()
+        mase_calculator = MASE()
+        
+        # Calculate MAE
+        mae_val = mae_calculator(y_true, y_pred)
+        
+        # Calculate RMSE
+        rmse_val = rmse_calculator(y_true, y_pred)
+        
+        # Calculate MASE if training data is provided
+        if y_train is not None:
+            mase_val = mase_calculator(y_true, y_pred, y_train=y_train)
+        else:
+            mase_val = np.nan
+        
+        return {
+            'mae': mae_val,
+            'rmse': rmse_val,
+            'mase': mase_val
+        }
