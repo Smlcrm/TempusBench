@@ -60,8 +60,6 @@ class MultivariateLSTMModel(BaseModel):
             raise ValueError("forecast_horizon must be specified in config")
         
         
-        self.model_config['layers'] = self.config['layers']
-        self.dropout = self.config['dropout']
         self.learning_rate = self.config['learning_rate']
         self.batch_size = self.config['batch_size']
         self.epochs = self.config['epochs']
@@ -89,10 +87,7 @@ class MultivariateLSTMModel(BaseModel):
             self.model.add(LSTM(
                 units=self.model_config['units'],
                 return_sequences=return_sequences,
-                input_shape=input_shape if i == 0 else None
-            ))
-            if self.dropout > 0:
-                self.model.add(Dropout(self.dropout))
+                input_shape=input_shape if i == 
                 
         # Add output layer - predicts forecast_horizon * num_targets values (flattened)
         self.model.add(Dense(self.forecast_horizon * self.num_targets))
@@ -257,8 +252,6 @@ class MultivariateLSTMModel(BaseModel):
         """
         return {
             'units': self.model_config['units'],
-            'layers': self.model_config['layers',]
-            'dropout': self.dropout,
             'learning_rate': self.learning_rate,
             'batch_size': self.batch_size,
             'epochs': self.epochs,
