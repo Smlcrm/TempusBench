@@ -2,10 +2,8 @@ test_type: deterministic
 tensorboard: true
 dataset:
   name: bdg-2_bear
-  path: benchmarking_pipeline/datasets/bdg-2_bear
-  frequency: 30T
   split_ratio: [0.8, 0.1, 0.1]
-  normalize: true
+  normalize: false
   handle_missing: interpolate
   chunks: 3
 
@@ -16,7 +14,7 @@ model:
     fine_tune_epochs: [0]
     batch_size: [8]
     learning_rate: [0.0001]
-    prediction_length: [10]
+    prediction_length: [40]
 
 evaluation:
   type: deterministic

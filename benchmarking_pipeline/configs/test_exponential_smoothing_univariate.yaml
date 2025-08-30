@@ -2,8 +2,6 @@ test_type: deterministic
 tensorboard: true
 dataset:
   name: bdg-2_bear
-  path: benchmarking_pipeline/datasets/bdg-2_bear
-  frequency: 30T
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate
@@ -13,7 +11,7 @@ model:
   exponential_smoothing:
     trend: ["add"]
     seasonal: ["add"]
-    seasonal_periods: [7]
+    seasonal_periods: [24]
     damped_trend: [false]
     forecast_horizon: [10]
 

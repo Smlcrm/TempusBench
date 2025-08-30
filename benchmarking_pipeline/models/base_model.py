@@ -58,7 +58,14 @@ class BaseModel(ABC):
         # Extract model-specific config if it exists
         model_config = self._extract_model_config(self.config)
         
-        self.training_loss = model_config.get('training_loss', 'mae')
+        # Only set training_loss for models that actually use it for training
+        # Models that need training_loss: ARIMA, LSTM, SVR
+        # Models that don't need it: Theta, ExponentialSmoothing, SeasonalNaive, Croston, XGBoost, RandomForest, DeepAR
+        self.training_loss = None
+        if self._requires_training_loss():
+            if 'training_loss' not in model_config:
+                raise ValueError("training_loss must be specified in config for this model")
+            self.training_loss = model_config['training_loss']
         
         # Determine forecast horizon from model configuration keys if present
         # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
@@ -105,6 +112,24 @@ class BaseModel(ABC):
         # If no nested structure, return the config as-is
         return config
     
+    def _requires_training_loss(self) -> bool:
+        """
+        Determine if this model requires training_loss parameter.
+        
+        Returns:
+            bool: True if the model needs training_loss, False otherwise
+        """
+        model_name = self.__class__.__name__.lower()
+        
+        # Models that actually perform loss-based optimization and need training_loss
+        models_needing_training_loss = {
+            'arimamodel', 'multivariatearimamodel',
+            'lstmmodel', 'multivariatelstmmodel', 
+            'svrmodel', 'multivariatesvrmodel'
+        }
+        
+        return model_name in models_needing_training_loss
+    
     @abstractmethod
     def train(self, 
               y_context: Optional[Union[pd.Series, np.ndarray]], 
@@ -128,7 +153,8 @@ class BaseModel(ABC):
     def predict(
         self,
         y_context: Optional[Union[pd.Series, np.ndarray]] = None,
-        forecast_horizon: Optional[int] = None
+        forecast_horizon: Optional[int] = None,
+        freq: str = None
     ) -> np.ndarray:
         """
         Make predictions using the trained model.
@@ -136,10 +162,16 @@ class BaseModel(ABC):
         Args:
             y_context: Recent/past target values (for sequence models, optional for ARIMA)
             forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
+            freq: Frequency string (e.g., 'H', 'D', 'M') - MUST be provided from CSV data
             
         Returns:
             np.ndarray: Model predictions with shape (n_samples, forecast_horizon)
+            
+        Raises:
+            ValueError: If freq is None or empty - frequency must always be read from CSV data
         """
+        if freq is None or freq == "":
+            raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
         pass
     
     def compute_loss(self, y_true: np.ndarray, y_pred: np.ndarray, loss_function: str = None, y_train: np.ndarray = None) -> Dict[str, float]:

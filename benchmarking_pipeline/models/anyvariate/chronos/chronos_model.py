@@ -44,11 +44,16 @@ class ChronosModel(FoundationModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
+        if 'model_size' not in self.config:
+            raise ValueError("model_size must be specified in config")
+        if 'context_length' not in self.config:
+            raise ValueError("context_length must be specified in config")
+        if 'num_samples' not in self.config:
+            raise ValueError("num_samples must be specified in config")
         
-        # Extract Chronos-specific parameters
-        self.model_size = self.config.get('model_size', 'small')
-        self.context_length = self.config.get('context_length', 8)
-        self.num_samples = self.config.get('num_samples', 5)
+        self.model_size = self.config['model_size']
+        self.context_length = self.config['context_length']
+        self.num_samples = self.config['num_samples']
         
         # Validate model size
         valid_sizes = {'tiny', 'mini', 'small', 'base', 'large'}
@@ -138,26 +143,37 @@ class ChronosModel(FoundationModel):
             else:
                 raise ValueError("Unsupported y_target dimensionality for prediction length inference.")
         
-        # Handle univariate vs multivariate data
-        if len(y_context.shape) == 1:
-            # Univariate data
+        # Simplified univariate vs multivariate handling
+        if len(y_context.shape) == 1 or (y_context.ndim == 2 and y_context.shape[1] == 1):
+            # Univariate: shape (N,) or (N,1)
             columns = ['1']
-            y_context_reshaped = y_context.reshape(-1, 1)
+            y_context_reshaped = y_context.reshape(-1, 1) if len(y_context.shape) == 1 else y_context
         else:
-            # Multivariate data
+            # Multivariate: shape (N, num_targets)
             columns = list(range(y_context.shape[1]))
             y_context_reshaped = y_context
         
         # Create DataFrame with proper timestamps
         df = pd.DataFrame(y_context_reshaped, index=y_context_timestamps, columns=columns)
         
+        # DEBUG: Print DataFrame info
+        print(f"[CHRONOS DEBUG] DataFrame shape: {df.shape}")
+        print(f"[CHRONOS DEBUG] DataFrame columns: {list(df.columns)}")
+        print(f"[CHRONOS DEBUG] DataFrame first few values: {df.iloc[:3, :].values}")
+        
         # Use the working approach: load model fresh and convert to proper format
         results = self._sub_predict(df, prediction_length)
         
+        # DEBUG: Print what results actually contains
+        print(f"[CHRONOS DEBUG] Results keys: {list(results.keys())}")
+        print(f"[CHRONOS DEBUG] Results type: {type(results)}")
+        print(f"[CHRONOS DEBUG] Results content: {results}")
+        
         # Process results based on data dimensionality
         if len(list(results.keys())) == 1:
-            # Univariate result
+            # Univariate result - always expect '1' as per working commit 434d3b0e
             series_vals = np.array(results["1"])  # shape (pred_len,)
+            
             if series_vals.ndim > 1:
                 series_vals = series_vals.squeeze()
             if series_vals.shape[0] > prediction_length:
@@ -210,8 +226,23 @@ class ChronosModel(FoundationModel):
         all_contexts = []
         for series_name in df.columns:
             series_data = df[series_name].values
-            # Ensure we don't take more data than available
-            context_data = series_data[-self.context_length:]
+            
+            # Intelligent context selection: use more recent data for better predictions
+            if len(series_data) >= self.context_length:
+                # Use the most recent context_length data points
+                context_data = series_data[-self.context_length:]
+            else:
+                # If not enough data, pad with the last available value
+                context_data = np.full(self.context_length, series_data[-1])
+                context_data[-len(series_data):] = series_data
+            
+            # Ensure data is properly formatted for Chronos
+            context_data = np.asarray(context_data, dtype=np.float32)
+            
+            # Handle any NaN values
+            if np.any(np.isnan(context_data)):
+                context_data = np.nan_to_num(context_data, nan=0.0)
+            
             all_contexts.append(torch.tensor(context_data, dtype=torch.float32))
         
         # Generate forecasts
@@ -224,9 +255,43 @@ class ChronosModel(FoundationModel):
         # Process results
         results = {}
         for i, series_name in enumerate(df.columns):
-            # For each series, take the median of the prediction samples
-            median_forecast = np.median(all_forecasts[i], axis=0)
-            results[series_name] = median_forecast.tolist()
+            # For each series, aggregate the prediction samples intelligently
+            forecasts = all_forecasts[i]  # shape: (num_samples, prediction_length)
+            
+            # Convert PyTorch tensor to numpy array
+            if hasattr(forecasts, 'cpu'):
+                forecasts = forecasts.cpu().numpy()
+            elif hasattr(forecasts, 'numpy'):
+                forecasts = forecasts.numpy()
+            else:
+                forecasts = np.array(forecasts)
+            
+            if self.num_samples > 1:
+                # Use weighted average: give more weight to more recent predictions
+                weights = np.linspace(0.5, 1.0, self.num_samples)
+                weights = weights / np.sum(weights)
+                
+                # Weighted average across samples
+                weighted_forecast = np.average(forecasts, axis=0, weights=weights)
+                
+                # Also compute median as fallback
+                median_forecast = np.median(forecasts, axis=0)
+                
+                # Use the better of the two (lower variance)
+                # Calculate variance manually to avoid numpy version issues
+                forecast_variance = np.mean((forecasts - np.mean(forecasts, axis=0))**2, axis=0)
+                if np.mean(forecast_variance) < 0.1:  # Low variance = use weighted avg
+                    final_forecast = weighted_forecast
+                else:  # High variance = use median (more robust)
+                    final_forecast = median_forecast
+            else:
+                final_forecast = forecasts[0]  # Single sample
+            
+            results[series_name] = final_forecast.tolist()
+            
+        # DEBUG: Print what we're returning
+        print(f"[CHRONOS DEBUG] _sub_predict returning keys: {list(results.keys())}")
+        print(f"[CHRONOS DEBUG] _sub_predict returning content: {results}")
             
         return results
     

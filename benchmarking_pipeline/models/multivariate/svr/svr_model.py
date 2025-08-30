@@ -34,8 +34,12 @@ class MultivariateSVRModel(BaseModel):
         self.scaler = StandardScaler()  # SVR is sensitive to feature scaling
         
         # Extract model parameters from config
-        self.lookback_window = self.config.get('lookback_window', 10)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        if 'lookback_window' not in self.config:
+            raise ValueError("lookback_window must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
+        self.lookback_window = self.config['lookback_window']
+        self.forecast_horizon = self.config['forecast_horizon']
         # num_targets will be calculated from data during training
         
         self._build_model()
@@ -45,7 +49,9 @@ class MultivariateSVRModel(BaseModel):
         Build the Multivariate SVR model instance from the configuration using MultiOutputRegressor 
         for direct multi-output forecasting across multiple target variables.
         """
-        model_params = self.config.get('model_params', {})
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        model_params = self.config['model_params']
         base_svr = SVR(**model_params)
         self.model = MultiOutputRegressor(base_svr)
         self.is_fitted = False

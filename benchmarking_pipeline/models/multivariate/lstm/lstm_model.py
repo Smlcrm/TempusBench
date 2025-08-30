@@ -42,16 +42,34 @@ class MultivariateLSTMModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
-        self.units = self.config.get('units', 50)
-        self.layers = self.config.get('layers', 1)
-        self.dropout = self.config.get('dropout', 0.2)
-        self.learning_rate = self.config.get('learning_rate', 0.001)
-        self.batch_size = self.config.get('batch_size', 32)
-        self.epochs = self.config.get('epochs', 100)
-        self.sequence_length = self.config.get('sequence_length', 10)
+        if 'units' not in self.config:
+            raise ValueError("units must be specified in config")
+        if 'layers' not in self.config:
+            raise ValueError("layers must be specified in config")
+        if 'dropout' not in self.config:
+            raise ValueError("dropout must be specified in config")
+        if 'learning_rate' not in self.config:
+            raise ValueError("learning_rate must be specified in config")
+        if 'batch_size' not in self.config:
+            raise ValueError("batch_size must be specified in config")
+        if 'epochs' not in self.config:
+            raise ValueError("epochs must be specified in config")
+        if 'sequence_length' not in self.config:
+            raise ValueError("sequence_length must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
         
-        self.feature_cols = self.config.get('feature_cols', None)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        self.units = self.config['units']
+        self.layers = self.config['layers']
+        self.dropout = self.config['dropout']
+        self.learning_rate = self.config['learning_rate']
+        self.batch_size = self.config['batch_size']
+        self.epochs = self.config['epochs']
+        self.sequence_length = self.config['sequence_length']
+        if 'feature_cols' not in self.config:
+            raise ValueError("feature_cols must be specified in config")
+        self.feature_cols = self.config['feature_cols']
+        self.forecast_horizon = self.config['forecast_horizon']
         self.model = None
         # num_targets will be calculated from data during training
         

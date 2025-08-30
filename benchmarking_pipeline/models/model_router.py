@@ -156,13 +156,16 @@ class ModelRouter:
             - num_targets == 1: univariate variant (fails if not available)
             - num_targets > 1: multivariate variant
         """
+        # Get the absolute path to the models directory
+        models_dir = Path(__file__).parent
+        
         # Validate num_targets
         if num_targets < 1:
             raise ValueError(f"num_targets must be >= 1, got {num_targets}")
         
         # Handle anyvariate models (can handle both univariate and multivariate)
         if model_name in self.anyvariate_models:
-            folder_path = f"benchmarking_pipeline/models/anyvariate/{model_name}"
+            folder_path = str(models_dir / "anyvariate" / model_name)
             file_name = f"{model_name}_model"
             class_name = self._generate_class_name(model_name, 'anyvariate')
             return folder_path, file_name, class_name
@@ -172,9 +175,9 @@ class ModelRouter:
             # Automatically detect variant based on num_targets
             if num_targets == 1:
                 # Check if univariate implementation exists
-                univariate_path = Path(f"benchmarking_pipeline/models/univariate/{model_name}")
+                univariate_path = models_dir / "univariate" / model_name
                 if univariate_path.exists() and (univariate_path / f"{model_name}_model.py").exists():
-                    folder_path = f"benchmarking_pipeline/models/univariate/{model_name}"
+                    folder_path = str(models_dir / "univariate" / model_name)
                     class_name = self._generate_class_name(model_name, 'univariate')
                     print(f"[ROUTER] Routing {model_name} with {num_targets} target(s) -> univariate variant")
                 else:
@@ -182,7 +185,7 @@ class ModelRouter:
                     raise ValueError(f"Model '{model_name}' requested for univariate data (num_targets=1) but univariate implementation not found at {univariate_path}")
             else:
                 # Use multivariate for actual multivariate data
-                folder_path = f"benchmarking_pipeline/models/multivariate/{model_name}"
+                folder_path = str(models_dir / "multivariate" / model_name)
                 class_name = self._generate_class_name(model_name, 'multivariate')
                 print(f"[ROUTER] Routing {model_name} with {num_targets} target(s) -> multivariate variant")
             
@@ -196,7 +199,7 @@ class ModelRouter:
                 raise ValueError(f"Model '{model_name}' does not support multivariate variant. "
                                f"Available variants: univariate")
             
-            folder_path = f"benchmarking_pipeline/models/univariate/{model_name}"
+            folder_path = str(models_dir / "univariate" / model_name)
             file_name = f"{model_name}_model"
             class_name = self._generate_class_name(model_name, 'univariate')
             return folder_path, file_name, class_name
@@ -311,6 +314,9 @@ class ModelRouter:
         Returns:
             Dictionary with model information
         """
+        # Get the absolute path to the models directory
+        models_dir = Path(__file__).parent
+        
         info = {
             'name': model_name,
             'category': None,
@@ -322,20 +328,20 @@ class ModelRouter:
             info['category'] = 'anyvariate'
             info['supported_variants'] = ['univariate', 'multivariate']
             info['folder_paths'] = {
-                'anyvariate': f"benchmarking_pipeline/models/anyvariate/{model_name}"
+                'anyvariate': str(models_dir / "anyvariate" / model_name)
             }
         elif model_name in self.multivariate_models:
             info['category'] = 'multivariate'
             info['supported_variants'] = ['univariate', 'multivariate']
             info['folder_paths'] = {
-                'univariate': f"benchmarking_pipeline/models/univariate/{model_name}",
-                'multivariate': f"benchmarking_pipeline/models/multivariate/{model_name}"
+                'univariate': str(models_dir / "univariate" / model_name),
+                'multivariate': str(models_dir / "multivariate" / model_name)
             }
         elif model_name in self.univariate_models:
             info['category'] = 'univariate_only'
             info['supported_variants'] = ['univariate']
             info['folder_paths'] = {
-                'univariate': f"benchmarking_pipeline/models/univariate/{model_name}"
+                'univariate': str(models_dir / "univariate" / model_name)
             }
 
         return info

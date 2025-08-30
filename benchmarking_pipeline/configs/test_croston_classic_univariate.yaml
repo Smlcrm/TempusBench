@@ -1,9 +1,7 @@
 test_type: deterministic
 tensorboard: true
 dataset:
-  name: bdg-2_bear
-  path: benchmarking_pipeline/datasets/bdg-2_bear
-  frequency: 30T
+  name: extended_web_traffic_with_missing
   split_ratio: [0.8, 0.1, 0.1]
   normalize: True
   handle_missing: interpolate
@@ -12,7 +10,9 @@ dataset:
 
 model:
   croston_classic:
-    alpha: [0.5]
+    alpha: [0.1, 0.3, 0.5]
+    gamma: [0.1, 0.3, 0.5]
+    beta: [0.1, 0.3, 0.5]
 
 evaluation:
   type: deterministic

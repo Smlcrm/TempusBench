@@ -30,15 +30,34 @@ class MoiraiMoeModel(FoundationModel):
     """
     
     super().__init__(config, config_file)
-    self.model_name = self.config.get('model_name', 'moirai_moe')
-    self.size = self.config.get('size', 'small')
-    self.pdt = int(self.config.get('pdt', '4'))
-    self.ctx = int(self.config.get('ctx', '10'))
-    self.psz = int(self.config.get('psz', '8'))
-    self.bsz = int(self.config.get('bsz', '8'))
-    self.test = int(self.config.get('test', '8'))
-    self.num_samples = int(self.config.get('num_samples', '5'))
-    self.target_col = self.config.get('target_col', 'y')
+    if 'model_name' not in self.config:
+        raise ValueError("model_name must be specified in config")
+    if 'size' not in self.config:
+        raise ValueError("size must be specified in config")
+    if 'pdt' not in self.config:
+        raise ValueError("pdt must be specified in config")
+    if 'ctx' not in self.config:
+        raise ValueError("ctx must be specified in config")
+    if 'psz' not in self.config:
+        raise ValueError("psz must be specified in config")
+    if 'bsz' not in self.config:
+        raise ValueError("bsz must be specified in config")
+    if 'test' not in self.config:
+        raise ValueError("test must be specified in config")
+    if 'num_samples' not in self.config:
+        raise ValueError("num_samples must be specified in config")
+    if 'target_col' not in self.config:
+        raise ValueError("target_col must be specified in config")
+    
+    self.model_name = self.config['model_name']
+    self.size = self.config['size']
+    self.pdt = int(self.config['pdt'])
+    self.ctx = int(self.config['ctx'])
+    self.psz = int(self.config['psz'])
+    self.bsz = int(self.config['bsz'])
+    self.test = int(self.config['test'])
+    self.num_samples = int(self.config['num_samples'])
+    self.target_col = self.config['target_col']
   
   def set_params(self, **params: Dict[str, Any]) -> 'MoiraiMoeModel':
     for key, value in params.items():
@@ -112,7 +131,7 @@ class MoiraiMoeModel(FoundationModel):
     if len(y_context.shape) == 1:
       columns = ['1']
     else:
-      columns = list(range(y_context.shape[0])) 
+      columns = [str(i+1) for i in range(y_context.shape[1])]  # Use '1', '2', '3', etc.
     df = pd.DataFrame(y_context, index=y_context_timestamps, columns=columns)
     self.ctx = len(df)
 

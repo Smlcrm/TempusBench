@@ -23,8 +23,13 @@ class RandomForestModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        self.lookback_window = self.config.get('lookback_window', 10)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        if 'lookback_window' not in self.config:
+            raise ValueError("lookback_window must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
+        
+        self.lookback_window = self.config['lookback_window']
+        self.forecast_horizon = self.config['forecast_horizon']
         self._build_model()
         
     def _build_model(self):
@@ -195,7 +200,7 @@ class RandomForestModel(BaseModel):
         self.is_fitted = True
         return self
         
-    def predict(self, y_context: Union[pd.Series, np.ndarray] = None, y_target: Union[pd.Series, np.ndarray] = None, x_context: Union[pd.Series, pd.DataFrame, np.ndarray] = None, x_target: Union[pd.Series, pd.DataFrame, np.ndarray] = None, y_context_timestamps: np.ndarray = None, y_target_timestamps: np.ndarray = None, **kwargs) -> np.ndarray:
+    def predict(self, y_context: Union[pd.Series, np.ndarray] = None, y_target: Union[pd.Series, np.ndarray] = None, x_context: Union[pd.Series, pd.DataFrame, np.ndarray] = None, x_target: Union[pd.Series, pd.DataFrame, np.ndarray] = None, y_context_timestamps: np.ndarray = None, y_target_timestamps: np.ndarray = None, freq: str = None, **kwargs) -> np.ndarray:
         """
         Make predictions using the trained Random Forest model.
         
@@ -209,6 +214,7 @@ class RandomForestModel(BaseModel):
             y_target: Future target values - used to determine prediction length
             y_context_timestamps: Timestamps for y_context (optional)
             y_target_timestamps: Timestamps for y_target (optional)
+            freq: Frequency string (ignored for random_forest, kept for compatibility)
             
         Returns:
             np.ndarray: Model predictions with shape (1, forecast_steps)
@@ -255,11 +261,19 @@ class RandomForestModel(BaseModel):
             )
             X_last = feature_row[-1:].reshape(1, -1)
         
+        # Check feature dimensions match what the model expects
+        expected_features = self.model.n_features_in_
+        actual_features = X_last.shape[1]
+        
+        if expected_features != actual_features:
+            raise ValueError(f"Feature dimension mismatch! Model expects {expected_features} features, but got {actual_features}. "
+                           f"This usually happens when the data structure used for prediction differs from training data.")
+        
         # Predict all steps at once
         preds = self.model.predict(X_last)
         return preds
     
-    def rolling_predict(self, y_context: Union[pd.Series, np.ndarray], y_target: Union[pd.Series, np.ndarray], x_context: Union[pd.Series, pd.DataFrame, np.ndarray] = None, x_target: Union[pd.Series, pd.DataFrame, np.ndarray] = None, y_context_timestamps: np.ndarray = None, y_target_timestamps: np.ndarray = None, **kwargs) -> np.ndarray:
+    def rolling_predict(self, y_context: Union[pd.Series, np.ndarray], y_target: Union[pd.Series, np.ndarray], x_context: Union[pd.Series, pd.DataFrame, np.ndarray] = None, x_target: Union[pd.Series, pd.DataFrame, np.ndarray] = None, y_context_timestamps: np.ndarray = None, y_target_timestamps: np.ndarray = None, freq: str = None, **kwargs) -> np.ndarray:
         """
         Generate full-length predictions for the test set using a rolling window approach.
         This method repeatedly calls the model's predict method, each time advancing the context by forecast_horizon steps,
@@ -270,31 +284,79 @@ class RandomForestModel(BaseModel):
             y_target: The full test set (used to determine total prediction length)
             x_context, x_target: Exogenous variables (optional)
             y_context_timestamps, y_target_timestamps: Timestamps (optional)
+            freq: Frequency string (ignored for random_forest, kept for compatibility)
             **kwargs: Additional keyword arguments
         Returns:
             np.ndarray: Full-length predictions matching the length of y_target
         """
-        context = np.copy(y_context)
+        # Convert inputs to numpy arrays if needed
+        if isinstance(y_context, pd.Series):
+            y_context = y_context.values
+        elif isinstance(y_context, pd.DataFrame):
+            y_context = y_context.values
+        if isinstance(y_target, pd.Series):
+            y_target = y_target.values
+        elif isinstance(y_target, pd.DataFrame):
+            y_target = y_target.values
+            
+        # Initialize context with the last lookback_window values from y_context
+        # Ensure context is 1D for consistent handling
+        if y_context.ndim == 2:
+            context = y_context[-self.lookback_window:].flatten()
+        else:
+            context = y_context[-self.lookback_window:].copy()
+            
+        context_timestamps = None
+        if y_context_timestamps is not None:
+            context_timestamps = y_context_timestamps[-self.lookback_window:].copy()
+        
         preds = []
         steps_remaining = len(y_target)
-        idx = 0
+        
         while steps_remaining > 0:
+            # Determine how many steps to predict in this iteration
             steps = min(self.forecast_horizon, steps_remaining)
-            dummy_y_target = np.zeros(steps)
+            
+            # Create a dummy target array for this prediction step
+            # The actual target values don't matter for prediction, we just need the right shape
+            target_for_prediction = np.zeros(steps)
+            
+            # Get the current target timestamps for this prediction window
+            if y_target_timestamps is not None:
+                current_target_start = len(preds)
+                current_target_end = current_target_start + steps
+                current_target_timestamps = y_target_timestamps[current_target_start:current_target_end]
+            else:
+                current_target_timestamps = None
+            
+            # Make prediction for this window
             pred = self.predict(
                 y_context=context,
-                y_target=dummy_y_target,
+                y_target=target_for_prediction,
                 x_context=x_context,
                 x_target=x_target,
-                y_context_timestamps=y_context_timestamps,
-                y_target_timestamps=y_target_timestamps,
+                y_context_timestamps=context_timestamps,
+                y_target_timestamps=current_target_timestamps,
+                freq=freq,
                 **kwargs
             )
+            
+            # Extract the predictions for this window and ensure they're 1D
             pred = pred.flatten()[:steps]
             preds.extend(pred)
-            context = np.concatenate([context, pred])
+            
+            # Update context by removing oldest values and adding new predictions
+            # This maintains a fixed-size context equal to lookback_window
+            # Ensure pred is 1D before concatenating
+            context = np.concatenate([context, pred])[-self.lookback_window:]
+            
+            # Update context timestamps if available
+            if context_timestamps is not None and current_target_timestamps is not None:
+                context_timestamps = np.concatenate([context_timestamps, current_target_timestamps])[-self.lookback_window:]
+            
+            # Update remaining steps
             steps_remaining -= steps
-            idx += steps
+        
         return np.array(preds)
 
     def _create_step_features(self, y_data: np.ndarray, x_data: np.ndarray = None, context_timestamps: np.ndarray = None, target_timestamp: np.ndarray = None) -> np.ndarray:
@@ -370,7 +432,9 @@ class RandomForestModel(BaseModel):
         """
         if self.model:
             return self.model.get_params()
-        return self.config.get('model_params', {})
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        return self.config['model_params']
 
     def set_params(self, **params: Dict[str, Any]) -> 'RandomForestModel':
         """

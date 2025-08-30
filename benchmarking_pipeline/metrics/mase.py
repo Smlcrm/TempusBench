@@ -33,7 +33,9 @@ class MASE:
                 forecast_errors = np.abs(y_t_series - y_p_series)
                 naive_errors = np.abs(y_tr_series[seasonal_period:] - y_tr_series[:-seasonal_period])
                 scaler = np.mean(naive_errors)
-                mase_scores.append(np.mean(forecast_errors) / scaler if scaler != 0 else 0.0)
+                # Add small epsilon to prevent division by very small numbers
+                epsilon = 1e-10
+                mase_scores.append(np.mean(forecast_errors) / (scaler + epsilon) if scaler >= 0 else np.nan)
             return np.array(mase_scores)
 
         # Univariate
@@ -41,4 +43,6 @@ class MASE:
         if len(y_tr_eval) <= seasonal_period: return np.nan
         naive_errors = np.abs(y_tr_eval[seasonal_period:] - y_tr_eval[:-seasonal_period])
         scaler = np.mean(naive_errors)
-        return np.mean(forecast_errors) / scaler if scaler != 0 else 0.0
+        # Add small epsilon to prevent division by very small numbers
+        epsilon = 1e-10
+        return np.mean(forecast_errors) / (scaler + epsilon) if scaler >= 0 else np.nan

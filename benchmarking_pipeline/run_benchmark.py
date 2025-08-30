@@ -7,6 +7,7 @@ import yaml
 import json
 import pickle
 import tempfile
+import pathlib
 
 # Save to temp file
 
@@ -46,7 +47,9 @@ class BenchmarkRunner:
             timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             
             # Create the exact directory structure we had before
-            runs_dir = "runs"
+            # Use project root (parent of benchmarking_pipeline) for runs directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            runs_dir = os.path.join(project_root, "runs")
             benchmark_dir = f"benchmark_runner_{config_file_name}_{timestamp}"
             benchmark_runs_dir = os.path.join(runs_dir, benchmark_dir)
             
@@ -111,7 +114,6 @@ class BenchmarkRunner:
         
         # Load dataset config
         dataset_cfg = self.config['dataset']
-        dataset_path = dataset_cfg['path']
         dataset_name = dataset_cfg['name']
         split_ratio = dataset_cfg.get('split_ratio', [0.8, 0.1, 0.1])
 
@@ -127,7 +129,6 @@ class BenchmarkRunner:
         # All data is treated as multivariate where univariate is just num_targets == 1
         full_config = {
             "dataset": {
-                "path": dataset_path,
                 "name": dataset_name,
                 "split_ratio": split_ratio,
                 "forecast_horizon": dataset_cfg.get('forecast_horizon'),
@@ -190,16 +191,16 @@ class BenchmarkRunner:
         model_names = list(full_config_data['model'].keys())
         
         # Import the model router
-        import sys
-        sys.path.append('benchmarking_pipeline')
-        from models.model_router import ModelRouter
+        from benchmarking_pipeline.models.model_router import ModelRouter
         
         # Initialize model router
         model_router = ModelRouter()
         
         # Run each model we have individually
         # Establish a shared, absolute TensorBoard base directory
-        base_log_dir = full_config_data.get('log_dir', 'logs/tensorboard')
+        # Default to project root (parent of benchmarking_pipeline)
+        default_log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs', 'tensorboard')
+        base_log_dir = full_config_data.get('log_dir', default_log_dir)
         base_log_dir = os.path.abspath(base_log_dir)
         os.makedirs(base_log_dir, exist_ok=True)
 
@@ -293,7 +294,10 @@ class BenchmarkRunner:
             print(f"[SUCCESS] Dependencies for {conda_env_name} have been installed in the proper conda environment!")
 
             # Install the benchmarking_pipeline package in the model environment
-            subprocess.run(["conda", "run", "-n", conda_env_name, "pip", "install", "-e", "."], check=True)
+            # Install from the root directory of the package where pyproject.toml is located
+            # This file is benchmarking_pipeline/run_benchmark.py, so root is parent of 'benchmarking_pipeline'
+            root_dir = pathlib.Path(__file__).resolve().parent.parent
+            subprocess.run(["conda", "run", "-n", conda_env_name, "pip", "install", "-e", root_dir], check=True)
             print(f"[SUCCESS] Benchmarking pipeline package installed in {conda_env_name} environment!")
 
             # Temp file for model results to be written by subprocess

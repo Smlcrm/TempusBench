@@ -45,11 +45,22 @@ class MomentModel(FoundationModel):
     """MOMENT model wrapper for time series forecasting, extending FoundationModel."""
     def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
         super().__init__(config, config_file)
-        self.model_path = self.config.get('model_path', 'AutonLab/MOMENT-1-large')
-        self.context_length = self.config.get('context_length', 512)
-        self.fine_tune_epochs = self.config.get('fine_tune_epochs', 0)
-        self.batch_size = self.config.get('batch_size', 8)
-        self.learning_rate = self.config.get('learning_rate', 0.0001)
+        if 'model_path' not in self.config:
+            raise ValueError("model_path must be specified in config")
+        if 'context_length' not in self.config:
+            raise ValueError("context_length must be specified in config")
+        if 'fine_tune_epochs' not in self.config:
+            raise ValueError("fine_tune_epochs must be specified in config")
+        if 'batch_size' not in self.config:
+            raise ValueError("batch_size must be specified in config")
+        if 'learning_rate' not in self.config:
+            raise ValueError("learning_rate must be specified in config")
+        
+        self.model_path = self.config['model_path']
+        self.context_length = self.config['context_length']
+        self.fine_tune_epochs = self.config['fine_tune_epochs']
+        self.batch_size = self.config['batch_size']
+        self.learning_rate = self.config['learning_rate']
         # forecast_horizon is inherited from parent class (FoundationModel)
         self.is_fitted = False
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -109,6 +120,10 @@ class MomentModel(FoundationModel):
         if y_context is None:
             raise ValueError("y_context is required for MOMENT")
         
+        print(f"DEBUG: y_context type: {type(y_context)}")
+        print(f"DEBUG: y_context shape: {y_context.shape if hasattr(y_context, 'shape') else 'no shape'}")
+        print(f"DEBUG: y_context: {y_context}")
+        
         # Convert to DataFrame format
         if isinstance(y_context, np.ndarray):
             if y_context.ndim == 1:
@@ -118,12 +133,24 @@ class MomentModel(FoundationModel):
         else:
             df = y_context
         
+        print(f"DEBUG: df shape: {df.shape}")
+        print(f"DEBUG: df head:\n{df.head()}")
+        
         # Use the existing fit method
         return self.fit(df, self.forecast_horizon, verbose=True)
 
     def fit(self, df: pd.DataFrame, forecast_horizon: int, verbose: bool = True):
         self._load_model(forecast_horizon)
-        data = df.values.T  # Shape: [n_series, time_steps]
+        print(f"DEBUG: df in fit: {df.shape}")
+        print(f"DEBUG: df head in fit:\n{df.head()}")
+        
+        # The data comes in as (n_targets, time_steps) from DataFrame
+        # We need to convert it to (n_series, time_steps) format for MomentDataset
+        # where each row is a different time series
+        data = df.values  # Shape: [n_targets, time_steps]
+        print(f"DEBUG: data before processing: {data.shape}")
+        print(f"DEBUG: data sample: {data[:, :5] if data.shape[1] >= 5 else data}")
+        
         min_required = self.context_length + forecast_horizon
         if data.shape[1] < min_required:
             raise ValueError(
@@ -278,7 +305,8 @@ class MomentModel(FoundationModel):
 """
 if __name__ == "__main__":
     # Create sample data similar to your TimesFM example
-    dates = pd.date_range('2023-01-01', periods=1000, freq='D')
+            # Use frequency from CSV data - this should be passed in as a parameter
+        raise ValueError("Frequency must be provided from CSV data. Cannot use hardcoded defaults.")
     np.random.seed(42)
     # Generate synthetic time series
     series1 = 100 + np.arange(1000) * 0.1 + 10 * np.sin(2 * np.pi * np.arange(1000) / 30) + np.random.normal(0, 2, 1000)

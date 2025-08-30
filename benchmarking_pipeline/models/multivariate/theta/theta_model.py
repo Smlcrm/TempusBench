@@ -40,10 +40,16 @@ class MultivariateTheta(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        # Extract model parameters from config
-        self.sp = self.config.get('sp', 1)  # Seasonality period
-        self.use_reduced_rank = self.config.get('use_reduced_rank', False)
-        self.theta_method = self.config.get('theta_method', 'correlation_optimal')
+        if 'sp' not in self.config:
+            raise ValueError("sp must be specified in config")
+        if 'use_reduced_rank' not in self.config:
+            raise ValueError("use_reduced_rank must be specified in config")
+        if 'theta_method' not in self.config:
+            raise ValueError("theta_method must be specified in config")
+        
+        self.sp = self.config['sp']  # Seasonality period
+        self.use_reduced_rank = self.config['use_reduced_rank']
+        self.theta_method = self.config['theta_method']
         self.univariate_models = {}
         self.theta_matrix = None
         self.drift_vector = None
@@ -290,7 +296,6 @@ class MultivariateTheta(BaseModel):
             'num_targets': self.num_targets,
             'use_reduced_rank': self.use_reduced_rank,
             'theta_method': self.theta_method,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon
         }
         
@@ -391,7 +396,7 @@ class MultivariateTheta(BaseModel):
         Args:
             y_true: True target values
             y_pred: Predicted values
-            loss_function: Name of the loss function to use (defaults to training_loss)
+            loss_function: Name of the loss function to use (defaults to None)
             
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics

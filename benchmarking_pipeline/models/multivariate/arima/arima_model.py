@@ -37,14 +37,23 @@ class MultivariateARIMAModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
-        # Extract model parameters from config
-        self.p = self.config.get('p', 1)  # AR order
-        self.d = self.config.get('d', 1)  # Differencing order
-        self.q = self.config.get('q', 1)  # MA order
-        self.s = self.config.get('s', 1)  # Seasonal period
+        if 'p' not in self.config:
+            raise ValueError("p must be specified in config")
+        if 'd' not in self.config:
+            raise ValueError("d must be specified in config")
+        if 'q' not in self.config:
+            raise ValueError("q must be specified in config")
+        if 's' not in self.config:
+            raise ValueError("s must be specified in config")
+        if 'maxlags' not in self.config:
+            raise ValueError("maxlags must be specified in config")
         
-        # Optional maximum lags for auto order selection
-        self.maxlags = self.config.get('maxlags', 12)
+        self.p = self.config['p']  # AR order
+        self.d = self.config['d']  # Differencing order
+        self.q = self.config['q']  # MA order
+        self.s = self.config['s']  # Seasonal period
+        self.maxlags = self.config['maxlags']
+        self.model = None
         
     def _check_stationarity(self, data: pd.DataFrame) -> Dict[str, bool]:
         """

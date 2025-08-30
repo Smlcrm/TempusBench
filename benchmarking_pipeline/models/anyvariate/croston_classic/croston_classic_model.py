@@ -21,16 +21,25 @@ class CrostonClassicModel(BaseModel):
                 - gamma: float, smoothing parameter for interval level (0 < gamma < 1)
                 - phi: float, trend damping parameter (0 < phi < 1)
                 - forecast_horizon: int, number of steps to forecast ahead
-                - training_loss: str, primary loss function for training
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config, config_file)
-        # Smoothing parameter, with a common default of 0.1
-        self.alpha = self.config.get('alpha', 0.4)
-        self.beta = self.config.get('beta', 0.1)
-        self.gamma = self.config.get('gamma', 0.1)
-        self.phi = self.config.get('phi', 0.9)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        if 'alpha' not in self.config:
+            raise ValueError("alpha must be specified in config")
+        if 'beta' not in self.config:
+            raise ValueError("beta must be specified in config")
+        if 'gamma' not in self.config:
+            raise ValueError("gamma must be specified in config")
+        if 'phi' not in self.config:
+            raise ValueError("phi must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
+        
+        self.alpha = self.config['alpha']
+        self.beta = self.config['beta']
+        self.gamma = self.config['gamma']
+        self.phi = self.config['phi']
+        self.forecast_horizon = self.config['forecast_horizon']
         
         self.is_fitted = False
         
@@ -39,7 +48,6 @@ class CrostonClassicModel(BaseModel):
         self.interval_level_ = None
         
     def train(self, y_context: Union[pd.Series, np.ndarray], y_target: Union[pd.Series, np.ndarray] = None, **kwargs) -> 'CrostonClassicModel':
-        print(f"[Croston train] y_context type: {type(y_context)}, shape: {getattr(y_context, 'shape', 'N/A')}")
         """
         Train the Croston's Classic model on the given time series data.
         
@@ -57,8 +65,12 @@ class CrostonClassicModel(BaseModel):
         # Convert y_context to a 1D numpy array of numbers
         if isinstance(y_context, pd.Series):
             series = y_context.values
+        elif isinstance(y_context, pd.DataFrame):
+            series = y_context.values.flatten()
         elif isinstance(y_context, np.ndarray):
             series = np.asarray(y_context).flatten()
+        else:
+            raise ValueError(f"Unsupported input type: {type(y_context)}")
     
         series = np.atleast_1d(series)
 
@@ -81,14 +93,14 @@ class CrostonClassicModel(BaseModel):
         # Demand level starts with the first non-zero demand
         current_demand_level = demands[0]
         # Interval level starts with the first interval
-        current_interval_level = intervals[0]
+        current_interval_level = intervals[0] if len(intervals) > 0 else 1
         
         # Apply SES to the rest of the demands and intervals
         for i in range(1, len(demands)):
             current_demand_level = self.alpha * demands[i] + (1 - self.alpha) * current_demand_level
         
         for i in range(1, len(intervals)):
-            current_interval_level = self.alpha * intervals[i] + (1 - self.alpha) * current_interval_level
+            current_interval_level = self.gamma * intervals[i] + (1 - self.gamma) * current_interval_level
             
         self.demand_level_ = current_demand_level
         self.interval_level_ = current_interval_level
@@ -97,8 +109,6 @@ class CrostonClassicModel(BaseModel):
         return self
 
     def predict(self, y_context, y_target=None, y_context_timestamps=None, y_target_timestamps=None, **kwargs):
-        print(f"[Croston predict] y_context type: {type(y_context)}, shape: {getattr(y_context, 'shape', 'N/A')}")
-        print(f"[Croston predict] y_target type: {type(y_target)}, shape: {getattr(y_target, 'shape', 'N/A')}")
         """
         Make predictions using the trained Croston's Classic model.
         
@@ -121,7 +131,9 @@ class CrostonClassicModel(BaseModel):
         if self.interval_level_ is None or self.interval_level_ == 0:
             forecast_value = 0
         else:
-            forecast_value = self.demand_level_ / self.interval_level_
+            # For Croston's method, forecast is the demand level
+            # The interval level is used for timing predictions, not demand magnitude
+            forecast_value = self.demand_level_
             
         # Croston's forecast is a constant value for all future steps
         forecast = np.full(forecast_steps, forecast_value)
@@ -137,7 +149,6 @@ class CrostonClassicModel(BaseModel):
         """
         return {
             'alpha': self.alpha,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon,
             'is_fitted': self.is_fitted
         }

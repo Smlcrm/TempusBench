@@ -38,7 +38,6 @@ class LagllamaModel(FoundationModel):
 
         # Initialize base model
         super().__init__(config, config_file)
-
         # Set up device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -215,8 +214,8 @@ class LagllamaModel(FoundationModel):
         self,
         df: pd.DataFrame,
         prediction_length: int,
-        freq: str = "D",
-        return_samples: bool = False,
+        freq: str,
+        return_samples: bool = False
     ) -> Union[Dict[str, List[float]], Dict[str, Dict[str, List[float]]]]:
         """Internal prediction method - similar to standalone forecaster"""
 
@@ -310,6 +309,12 @@ class LagllamaModel(FoundationModel):
                 setattr(self, key, value)
             if key in self.config:
                 self.config[key] = value
+        
+        # Reset predictor when parameters change to ensure new values are used
+        if any(key in ['context_length', 'num_samples', 'batch_size'] for key in params.keys()):
+            self.predictor = None
+            self.is_fitted = False
+        
         return self
 
     # TimesFM-style convenience methods

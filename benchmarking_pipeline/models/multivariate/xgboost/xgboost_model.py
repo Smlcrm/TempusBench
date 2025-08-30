@@ -23,16 +23,18 @@ class MultivariateXGBoostModel(BaseModel):
         Args:
             config: Configuration dictionary containing model parameters
                 - lookback_window: int, number of past timesteps to use as features
-                - forecast_horizon: int, number of future timesteps to predict
+                - forecast_horizon: int, number of steps to forecast ahead
                 - model_params: dict, parameters for the underlying XGBRegressor model
-                - training_loss: str, primary loss function for training
             config_file: Path to a JSON configuration file
         """
         super().__init__(config, config_file)
+        if 'lookback_window' not in self.config:
+            raise ValueError("lookback_window must be specified in config")
+        if 'forecast_horizon' not in self.config:
+            raise ValueError("forecast_horizon must be specified in config")
         
-        # Extract model parameters from config
-        self.lookback_window = self.config.get('lookback_window', 10)
-        self.forecast_horizon = self.config.get('forecast_horizon', 1)
+        self.lookback_window = self.config['lookback_window']
+        self.forecast_horizon = self.config['forecast_horizon']
         
         self._build_model()
         
@@ -42,7 +44,9 @@ class MultivariateXGBoostModel(BaseModel):
         for direct multi-output forecasting across multiple target variables.
         """
         # Get hyperparameters from config
-        model_params = self.config.get('model_params', {})
+        if 'model_params' not in self.config:
+            raise ValueError("model_params must be specified in config")
+        model_params = self.config['model_params']
         
         # Ensure random_state for reproducibility if not provided
         if 'random_state' not in model_params:
@@ -355,6 +359,9 @@ class MultivariateXGBoostModel(BaseModel):
                 # Update context with new predictions
                 context = np.concatenate([context, pred_steps], axis=0)
                 steps_done += steps
+                
+            except Exception as e:
+                raise RuntimeError(f"Error during prediction step: {str(e)}")
         
         # Concatenate all predictions
         result = np.concatenate(preds, axis=0)
@@ -405,6 +412,7 @@ class MultivariateXGBoostModel(BaseModel):
             Dict[str, Any]: Dictionary of model parameters
         """
         return {
+            'lookback_window': self.lookback_window,
             'n_estimators': self.n_estimators,
             'max_depth': self.max_depth,
             'learning_rate': self.learning_rate,
@@ -413,7 +421,6 @@ class MultivariateXGBoostModel(BaseModel):
             'random_state': self.random_state,
             'n_jobs': self.n_jobs,
             'num_targets': self.num_targets,
-            'training_loss': self.training_loss,
             'forecast_horizon': self.forecast_horizon
         }
         
@@ -505,7 +512,7 @@ class MultivariateXGBoostModel(BaseModel):
         Args:
             y_true: True target values with shape (timesteps, num_targets)
             y_pred: Predicted values with shape (timesteps, num_targets)
-            loss_function: Name of the loss function to use (defaults to training_loss)
+            loss_function: Name of the loss function to use (defaults to None)
             
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics

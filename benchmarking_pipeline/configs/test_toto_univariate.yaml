@@ -2,8 +2,6 @@ test_type: deterministic
 tensorboard: true
 dataset:
   name: bdg-2_bear
-  path: datasets/bdg-2_bear
-  frequency: 30T
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate
@@ -11,8 +9,8 @@ dataset:
 
 model:
   toto:
-    num_samples: [40]
-    samples_per_batch: [40]
+    num_samples: [10]
+    samples_per_batch: [5]
     prediction_length: [10]
 
 evaluation:

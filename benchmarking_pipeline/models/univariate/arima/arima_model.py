@@ -55,15 +55,26 @@ class ArimaModel(BaseModel):
         super().__init__(config, config_file)
         
         # Extract ARIMA-specific parameters
-        self.p = int(self.config.get('p', 1))
-        self.d = int(self.config.get('d', 1))
-        self.q = int(self.config.get('q', 1))
-        self.s = int(self.config.get('s', 1))
+        if 'p' not in self.config:
+            raise ValueError("p must be specified in config")
+        if 'd' not in self.config:
+            raise ValueError("d must be specified in config")
+        if 'q' not in self.config:
+            raise ValueError("q must be specified in config")
+        if 's' not in self.config:
+            raise ValueError("s must be specified in config")
+        if 'training_loss' not in self.config:
+            raise ValueError("training_loss must be specified in config")
+        
+        self.p = int(self.config['p'])
+        self.d = int(self.config['d'])
+        self.q = int(self.config['q'])
+        self.s = int(self.config['s'])
         
         # Initialize model state
         self.model_ = None
         self.is_fitted = False
-        self.training_loss = self.config.get('training_loss', 'mae')
+        self.training_loss = self.config['training_loss']
         
         # forecast_horizon is inherited from parent class (BaseModel)
         
@@ -100,12 +111,8 @@ class ArimaModel(BaseModel):
         
         # Use seasonal_order only if seasonal period is greater than 1
         if self.s > 1:
-            model = ARIMA(
-                endog=endog, 
-                order=(self.p, self.d, self.q), 
-                seasonal_order=(0, 0, 0, self.s), 
-                exog=exog
-            )
+            model = ARIMA(endog=endog, order=(self.p, self.d, self.q), 
+                         seasonal_order=(0, 0, 0, self.s), exog=exog)
         else:
             # Non-seasonal ARIMA
             model = ARIMA(endog=endog, order=(self.p, self.d, self.q), exog=exog)
@@ -144,6 +151,13 @@ class ArimaModel(BaseModel):
         if y_target is None:
             raise ValueError("y_target is required to determine prediction length. No forecast_horizon fallback allowed.")
         
+        # DEBUG: See what y_target actually contains
+        print(f"[ARIMA DEBUG] y_target type: {type(y_target)}")
+        print(f"[ARIMA DEBUG] y_target length: {len(y_target)}")
+        print(f"[ARIMA DEBUG] y_target shape: {y_target.shape if hasattr(y_target, 'shape') else 'no shape'}")
+        print(f"[ARIMA DEBUG] y_target first 5 values: {y_target[:5] if hasattr(y_target, '__getitem__') else y_target}")
+        
+        # Use y_target length to determine forecast steps (like working version from commit 912fceba)
         forecast_steps = len(y_target)
         
         if forecast_steps <= 0:
@@ -155,15 +169,28 @@ class ArimaModel(BaseModel):
         # Generate forecast
         forecast = self.model_.forecast(steps=forecast_steps, exog=exog)
         
-        # Store predictions and true values for evaluation
-        # Convert forecast to numpy array and reshape
+        # DEBUG: Show actual forecast values and compare with true values
+        print(f"[ARIMA DEBUG] Forecast type: {type(forecast)}")
+        print(f"[ARIMA DEBUG] Forecast length: {len(forecast) if hasattr(forecast, '__len__') else 'no len'}")
+        print(f"[ARIMA DEBUG] Forecast first 10 values: {forecast[:10] if hasattr(forecast, '__getitem__') else forecast}")
+        print(f"[ARIMA DEBUG] y_target first 10 values: {y_target[:10] if hasattr(y_target, '__getitem__') else y_target}")
+        
+        # Store predictions and true values for evaluation (simplified like working version)
+        # Convert forecast to numpy array if it's a pandas Series
         if hasattr(forecast, 'values'):
             forecast_array = forecast.values
         else:
             forecast_array = np.array(forecast)
+            
         self._last_y_pred = forecast_array.reshape(1, -1)
         if y_target is not None:
             self._last_y_true = y_target.reshape(1, -1) if hasattr(y_target, 'reshape') else np.array(y_target).reshape(1, -1)
+        
+        # DEBUG: Show final stored values
+        print(f"[ARIMA DEBUG] Final _last_y_pred shape: {self._last_y_pred.shape}")
+        print(f"[ARIMA DEBUG] Final _last_y_true shape: {self._last_y_true.shape}")
+        print(f"[ARIMA DEBUG] Final _last_y_pred first 5 values: {self._last_y_pred.flatten()[:5]}")
+        print(f"[ARIMA DEBUG] Final _last_y_true first 5 values: {self._last_y_true.flatten()[:5]}")
         
         return self._last_y_pred
         

@@ -25,13 +25,28 @@ class MoiraiModel(FoundationModel):
     """
     
     super().__init__(config, config_file)
-    self.model_name = self.config.get('model_name', 'moirai')
-    self.size = self.config.get('size', 'small')
-    # forecast_horizon is inherited from parent class (FoundationModel)
-    self.psz = self.config.get('psz', 32)
-    self.bsz = self.config.get('bsz', 8)
-    self.num_samples = self.config.get('num_samples', 5)
+    if 'model_name' not in self.config:
+        raise ValueError("model_name must be specified in config")
+    if 'size' not in self.config:
+        raise ValueError("size must be specified in config")
+    if 'pdt' not in self.config:
+        raise ValueError("pdt must be specified in config")
+    if 'psz' not in self.config:
+        raise ValueError("psz must be specified in config")
+    if 'bsz' not in self.config:
+        raise ValueError("bsz must be specified in config")
+    if 'test' not in self.config:
+        raise ValueError("test must be specified in config")
+    if 'num_samples' not in self.config:
+        raise ValueError("num_samples must be specified in config")
     
+    self.model_name = self.config['model_name']
+    self.size = self.config['size']
+    self.pdt = self.config['pdt']
+    self.psz = self.config['psz']
+    self.bsz = self.config['bsz']
+    self.test = self.config['test']
+    self.num_samples = self.config['num_samples']
     self.is_fitted = False
   
   def train(self, 
@@ -68,10 +83,11 @@ class MoiraiModel(FoundationModel):
     return {
         'model_name': self.model_name,
         'size': self.size,
+        'pdt': self.pdt,
         'psz': self.psz,
         'bsz': self.bsz,
-        'num_samples': self.num_samples,
-        'forecast_horizon': self.forecast_horizon
+        'test': self.test,
+        'num_samples': self.num_samples
     }
          
   def set_params(self, **params: Dict[str, Any]) -> 'MoiraiModel':
@@ -83,30 +99,55 @@ class MoiraiModel(FoundationModel):
   def predict(self,
         y_context: Optional[Union[pd.Series, np.ndarray]] = None,
         y_target: Union[pd.Series, np.ndarray] = None,
+        y_context_timestamps = None,
         y_target_timestamps = None,
         **kwargs):
-    #print("HUH")
-    #print(y_target)
-    #print("YUHUHU?")
-    #print(y_target_timestamps[0].strftime('%Y-%m-%d %X'))
-    #raise Exception("UNgas")
-    #timestamp_strings = [ts.strftime('%Y-%m-%d %X') for ts in y_target_timestamps]
     
-    # Construct DataFrame
+    # Handle univariate vs multivariate data properly
     if len(y_context.shape) == 1:
-      columns = ['1']
+        # Univariate case: reshape to (n_samples, 1)
+        y_context_reshaped = y_context.reshape(-1, 1)
+        columns = ['1']  # Use '1' as column name for univariate
+        is_univariate = True
+    elif y_context.shape[1] == 1:
+        # Single target column case: treat as univariate
+        y_context_reshaped = y_context
+        columns = ['1']  # Use '1' as column name for univariate
+        is_univariate = True
     else:
-      columns = list(range(y_context.shape[0])) 
-    df = pd.DataFrame(y_context, index=y_target_timestamps, columns=columns)
+        # Multivariate case: keep as (n_samples, n_features)
+        y_context_reshaped = y_context
+        # Use string column names starting from '1' for consistency
+        columns = [str(i+1) for i in range(y_context.shape[1])]
+        is_univariate = False
+    
+    # Create DataFrame without index first
+    df = pd.DataFrame(y_context_reshaped, columns=columns)
+    
+    # Now add a simple index
+    df.index = range(len(df))
+    
     self.ctx = len(df)
     results = self._sub_predict(df)
-    if len(list(results.keys())) == 1:
-      return np.array(results["1"])
+    
+    # Handle results based on univariate vs multivariate
+    if is_univariate:
+        # Univariate case: return single array
+        if len(list(results.keys())) == 1:
+            forecast_values = np.array(results["1"])
+            print(f"FORECAST DEBUG: Univariate forecast shape: {forecast_values.shape}")
+            print(f"FORECAST DEBUG: First 10 forecast values: {forecast_values[:10]}")
+            print(f"FORECAST DEBUG: Forecast range: [{forecast_values.min():.4f}, {forecast_values.max():.4f}]")
+            return forecast_values
+        else:
+            # Multiple columns but univariate input - take first
+            return np.array(results["1"])
     else:
-      multivariate_values = []
-      for key in results.keys():
-        multivariate_values.append(results[key])
-      return np.array(multivariate_values)
+        # Multivariate case: return array of arrays
+        multivariate_values = []
+        for key in results.keys():
+            multivariate_values.append(results[key])
+        return np.array(multivariate_values)
   
 
       
@@ -133,7 +174,7 @@ class MoiraiModel(FoundationModel):
     if self.model_name == "moirai":
       model = MoiraiForecast(
             module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.1-R-{self.size}"),
-            prediction_length=self.forecast_horizon,
+            prediction_length=self.pdt,
             context_length=self.ctx,
             patch_size=self.psz,
             num_samples=self.num_samples,
@@ -144,7 +185,7 @@ class MoiraiModel(FoundationModel):
     elif self.model_name == "moirai_moe":
       model = MoiraiMoEForecast(
             module=MoiraiMoEModule.from_pretrained(f"Salesforce/moirai-moe-1.0-R-{self.size}"),
-            prediction_length=self.forecast_horizon,
+            prediction_length=self.pdt,
             context_length=self.ctx,
             patch_size=self.psz,
             num_samples=self.num_samples,

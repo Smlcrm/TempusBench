@@ -31,21 +31,17 @@ class TestConfigValidator:
                 'name': 'test_dataset',
                 'path': 'test/path',
                 'frequency': 'D',
-                'forecast_horizon': 10,
                 'split_ratio': [0.8, 0.1, 0.1],
                 'normalize': True,
                 'handle_missing': 'interpolate'
             },
             'model': {
-                'name': ['arima'],
-                'parameters': {
-                    'arima': {
-                        'p': [1],
-                        'd': [1],
-                        'q': [1],
-                        'training_loss': ['mae'],
-                        'forecast_horizon': [10]
-                    }
+                'arima': {
+                    'p': [1],
+                    'd': [1],
+                    'q': [1],
+                    'training_loss': ['mae'],
+                    'forecast_horizon': [10]
                 }
             },
             'evaluation': {
@@ -92,12 +88,13 @@ class TestConfigValidator:
     @pytest.mark.unit
     def test_invalid_model_name(self, validator, valid_config):
         """Test that invalid model names cause validation errors."""
-        valid_config['model']['name'] = ['invalid_model']
+        # Add an invalid model to the model section
+        valid_config['model']['invalid_model'] = {'some_param': [1]}
         
         with pytest.raises(ConfigValidationError) as exc_info:
             validator.validate_config(valid_config)
         
-        assert "Unknown models" in str(exc_info.value)
+        assert "Unknown model" in str(exc_info.value)
     
     @pytest.mark.unit
     def test_forbidden_unknown_fields(self, validator, valid_config):
@@ -109,13 +106,13 @@ class TestConfigValidator:
     
     @pytest.mark.unit
     def test_invalid_forecast_horizon(self, validator, valid_config):
-        """Test that invalid forecast_horizon values cause validation errors."""
-        valid_config['dataset']['forecast_horizon'] = 0  # Must be >= 1
+        """Test that invalid forecast_horizon types cause validation errors."""
+        valid_config['model']['arima']['forecast_horizon'] = "invalid"  # Must be a list
         
         with pytest.raises(ConfigValidationError) as exc_info:
             validator.validate_config(valid_config)
         
-        assert "must be >=" in str(exc_info.value)
+        assert "Expected list" in str(exc_info.value)
     
     @pytest.mark.unit
     def test_invalid_handle_missing(self, validator, valid_config):
@@ -160,21 +157,17 @@ class TestConfigValidationFunctions:
                 'name': 'test_dataset',
                 'path': 'test/path',
                 'frequency': 'D',
-                'forecast_horizon': 10,
                 'split_ratio': [0.8, 0.1, 0.1],
                 'normalize': True,
                 'handle_missing': 'interpolate'
             },
             'model': {
-                'name': ['arima'],
-                'parameters': {
-                    'arima': {
-                        'p': [1],
-                        'd': [1],
-                        'q': [1],
-                        'training_loss': ['mae'],
-                        'forecast_horizon': [10]
-                    }
+                'arima': {
+                    'p': [1],
+                    'd': [1],
+                    'q': [1],
+                    'training_loss': ['mae'],
+                    'forecast_horizon': [10]
                 }
             },
             'evaluation': {

@@ -2,8 +2,6 @@ test_type: deterministic
 tensorboard: true
 dataset:
   name: bdg-2_bear
-  path: benchmarking_pipeline/datasets/bdg-2_bear
-  frequency: 30T
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate
@@ -11,8 +9,9 @@ dataset:
 
 model:
   seasonal_naive:
-    sp: [7]
-    forecast_horizon: [10]
+    model_params:
+      sp: [24]
+    forecast_horizon: [2]
 
 evaluation:
   type: deterministic

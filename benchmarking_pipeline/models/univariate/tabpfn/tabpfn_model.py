@@ -40,17 +40,23 @@ class TabpfnModel(FoundationModel):
                 setting ignore_pretraining_limits=True. Otherwise will error if >1000 samples.
         """
         super().__init__(config, config_file)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.allow_large_cpu_dataset = self.config.get('allow_large_cpu_dataset', True)
-        self.max_sequence_length = self.config.get('max_sequence_length', 32)
-        # forecast_horizon is inherited from parent class (BaseModel)
-
-        if self.device == "cpu" and self.allow_large_cpu_dataset:
-            # optional convenience: set env var to mirror behavior
-            os.environ["TABPFN_ALLOW_CPU_LARGE_DATASET"] = "1"
-
-        print(f"Initialized TabPFN-TS-style forecaster on device '{self.device}' "
-              f"(allow_large_cpu_dataset={self.allow_large_cpu_dataset})...")
+        
+        # Extract model-specific config
+        model_config = self._extract_model_config(self.config)
+        
+        if 'allow_large_cpu_dataset' not in model_config:
+            raise ValueError("allow_large_cpu_dataset must be specified in config")
+        if 'max_sequence_length' not in model_config:
+            raise ValueError("max_sequence_length must be specified in config")
+        
+        self.allow_large_cpu_dataset = model_config['allow_large_cpu_dataset']
+        self.max_sequence_length = model_config['max_sequence_length']
+        
+        # Set device - default to CPU for TabPFN
+        self.device = model_config.get('device', 'cpu')
+        
+        self.model = None
+        self.is_fitted = False
 
     def _build_tabular(self, y_history: np.ndarray, X_history: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """

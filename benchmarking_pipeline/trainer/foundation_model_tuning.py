@@ -31,35 +31,32 @@ class FoundationModelTuner:
     else:
         raise ValueError(f"Invalid frequency string: {freq_str}")
 
-  def _get_target_data(self, dataset_split, target_index=0):
-    """
-    Get target data from targets, handling raw target arrays.
-    
-    Args:
-        dataset_split: Train, validation, or test split from dataset
-        target_index: Target index (0 for univariate, 0-N for multivariate)
+  def _get_target_data(self, dataset_split):
+        """
+        Extract target data from a dataset split.
         
-    Returns:
-        Target data as numpy array
-    """
-    if dataset_split.targets is not None:
-        # Handle raw target arrays (no column names)
-        if isinstance(dataset_split.targets, list):
-            # targets is a list of arrays, each array represents a time series
-            if len(dataset_split.targets) > 0:
-                target_array = dataset_split.targets[0]  # Get first target series
-                if isinstance(target_array, list):
-                    # Convert list to numpy array
-                    return np.array(target_array)
-                else:
-                    return target_array
+        Args:
+            dataset_split: Dataset split containing targets and timestamps
+            
+        Returns:
+            numpy.ndarray: Target data as a 2D array with shape (time_steps, num_targets)
+        """
+        if dataset_split.targets is not None:
+            # In the new structure, targets is a pandas DataFrame
+            # with rows as time steps and columns as target series
+            if hasattr(dataset_split.targets, 'values'):
+                # Convert DataFrame to numpy array
+                return dataset_split.targets.values
+            elif isinstance(dataset_split.targets, np.ndarray):
+                # Already a numpy array
+                return dataset_split.targets
+            elif isinstance(dataset_split.targets, list):
+                # Convert list to numpy array
+                return np.array(dataset_split.targets)
             else:
-                raise ValueError("No target data available")
+                raise ValueError(f"Unexpected targets format: {type(dataset_split.targets)}")
         else:
-            # Handle case where targets might be a different format
-            return dataset_split.targets
-    else:
-        raise ValueError("No targets available in dataset split")
+            raise ValueError("No targets available in dataset split")
 
   def hyperparameter_grid_search_several_time_series(self, list_of_time_series_datasets):
     """
@@ -123,7 +120,9 @@ class FoundationModelTuner:
         y_target_timestamps = time_series_dataset.validation.timestamps
         
         # For foundation models, we need to call train() to initialize the model
+        # First update the model parameters for this hyperparameter setting
         trained_model = self.model_class
+        trained_model.set_params(**current_hyperparameter_dict)
         trained_model.train(y_context=target, y_target=validation_series, y_start_date=y_start_date)
         
         # Get validation losses over every chunk
@@ -134,13 +133,15 @@ class FoundationModelTuner:
           #print(f"Time series dataset from all datasets\n\n:{time_series_dataset_from_all.metadata}")
           # Handle different model types with different predict method signatures
           
-          model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_context_timestamps=time_series_dataset_from_all.train.timestamps, y_target_timestamps=time_series_dataset_from_all.validation.timestamps)
+          # Get frequency from the dataset
+          freq = time_series_dataset_from_all.metadata['freq']
+          model_predictions = trained_model.predict(y_context=target, y_target=validation_series, y_context_timestamps=time_series_dataset_from_all.train.timestamps, y_target_timestamps=time_series_dataset_from_all.validation.timestamps, freq=freq)
           
           # Get validation targets for loss computation
           validationum_targets = self._get_target_data(time_series_dataset_from_all.validation)
           train_targets = self._get_target_data(time_series_dataset_from_all.train)
           train_loss = trained_model.compute_loss(validationum_targets, model_predictions, y_train=train_targets)
-          loss_val = train_loss[self.model_class.training_loss]
+          loss_val = train_loss[trained_model.training_loss]
           # Aggregate per-target arrays to scalar
           if isinstance(loss_val, np.ndarray):
             loss_val = float(np.mean(loss_val))
@@ -205,7 +206,9 @@ class FoundationModelTuner:
             
       # Handle different model types with different predict method signatures
       test_targets = self._get_target_data(time_series_dataset.test)
-      predictions = trained_model.predict(y_context=target, y_target=test_targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps)
+      # Get frequency from the dataset
+      freq = time_series_dataset.metadata['freq']
+      predictions = trained_model.predict(y_context=target, y_target=test_targets, y_context_timestamps=train_val_timestamps, y_target_timestamps=time_series_dataset.test.timestamps, freq=freq)
 
       train_loss_dict = trained_model.compute_loss(test_targets, predictions, y_train=train_data)
       if results_dict is None:
