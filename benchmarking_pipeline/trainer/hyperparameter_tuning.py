@@ -115,6 +115,9 @@ class HyperparameterTuner:
                 freq=freq,
             )
 
+            # Debug: Print prediction shape after call
+            print("[DEBUG] y_pred shape:", y_pred.shape if hasattr(y_pred, "shape") else type(y_pred))
+
             # Ensure predictions align with requested validation horizon via timestamps
             # Predictions should already match the provided `timestamps_valid` length.
 

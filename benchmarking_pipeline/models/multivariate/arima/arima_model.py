@@ -301,18 +301,19 @@ class MultivariateARIMAModel(BaseModel):
     def set_params(self, **params: Dict[str, Any]) -> 'MultivariateARIMAModel':
         """
         Set model parameters.
-        
+
         Args:
             **params: Model parameters to set
-            
+
         Returns:
             self: The model instance with updated parameters
         """
         for key, value in params.items():
+            if key in ['p', 'd', 'maxlags', 'forecast_horizon']:
+                value = int(value)
+            self.model_config[key] = value
+            # Also update the attribute if it exists
             if hasattr(self, key):
-                # Ensure proper type conversion for numeric parameters
-                if key in ['p', 'd', 'maxlags', 'forecast_horizon']:
-                    value = int(value)
                 setattr(self, key, value)
         return self
         

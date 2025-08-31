@@ -72,59 +72,77 @@ class ArimaModel(BaseModel):
         
         # forecast_horizon is inherited from parent class (BaseModel)
         
-    def train(self, 
-              y_context: Union[pd.Series, np.ndarray], 
-              y_target: Union[pd.Series, np.ndarray] = None, 
-              y_start_date: Optional[str] = None, 
-              **kwargs
-    ) -> 'ArimaModel':
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+    ) -> "ArimaModel":
         """
         Train the ARIMA model on given data.
-        
+
         Args:
-            y_context: Past target values - training data
+            y_context: Past target values - training data (required)
             y_target: Future target values (not used in training, for compatibility)
-            y_start_date: Start date for y_context (not used in ARIMA)
-            **kwargs: Additional keyword arguments
-            
+            timestamps_context: Timestamps for y_context (not used in ARIMA)
+            timestamps_target: Timestamps for y_target (not used in ARIMA)
+            freq: Frequency string (required by interface, not used in ARIMA)
+
         Returns:
             self: The fitted model instance
-            
+
         Note:
             ARIMA models only use y_context for training.
-            y_target is ignored to prevent data leakage.
+            y_target, timestamps_context, timestamps_target, and freq are ignored to prevent data leakage.
         """
         # Convert y_context to numpy array if needed
         if isinstance(y_context, pd.Series):
             endog = y_context.values
         else:
             endog = y_context
-        
+
         # No exogenous variables supported
         exog = None
-        
+
         # Use seasonal_order only if seasonal period is greater than 1
         if self.model_config['s'] > 1:
-            model = ARIMA(endog=endog, order=(self.model_config['p'], self.model_config['d'], self.model_config['q']), 
-                         seasonal_order=(0, 0, 0, self.model_config['s']), exog=exog)
+            model = ARIMA(
+                endog=endog,
+                order=(
+                    self.model_config['p'],
+                    self.model_config['d'],
+                    self.model_config['q'],
+                ),
+                seasonal_order=(0, 0, 0, self.model_config['s']),
+                exog=exog,
+            )
         else:
             # Non-seasonal ARIMA
-            model = ARIMA(endog=endog, order=(self.model_config['p'], self.model_config['d'], self.model_config['q']), exog=exog)
-        
+            model = ARIMA(
+                endog=endog,
+                order=(
+                    self.model_config['p'],
+                    self.model_config['d'],
+                    self.model_config['q'],
+                ),
+                exog=exog,
+            )
+
         self.model_ = model.fit()
         self.is_fitted = True
         return self
         
     def predict(
         self,
-        y_context: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
     ) -> np.ndarray:
         """
         Make predictions using the trained ARIMA model, rolling forward using the fitted model.
-        The model is trained once and reused for forecasting multiple steps ahead.
 
         Args:
             y_context: Recent/past target values (not used for ARIMA prediction)
@@ -133,7 +151,7 @@ class ArimaModel(BaseModel):
             freq: Frequency string (must be provided from CSV data, required)
 
         Returns:
-            np.ndarray: Model predictions with shape (1, forecast_horizon)
+            np.ndarray: Model predictions with shape (forecast_horizon, 1)
 
         Raises:
             ValueError: If model is not fitted, freq is not provided, or forecast length cannot be determined
@@ -142,15 +160,12 @@ class ArimaModel(BaseModel):
             raise ValueError("Model not fitted. Call train() first.")
         if freq is None or freq == "":
             raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
-
         if timestamps_target is None:
             raise ValueError("timestamps_target must be provided to determine forecast horizon for ARIMA.")
         forecast_steps = len(timestamps_target)
         if forecast_steps <= 0:
             raise ValueError("Forecast horizon must be positive (timestamps_target must be non-empty).")
 
-        # Use the fitted model's forecast method to predict the next forecast_steps
-        # This uses the model's internal state to roll forward without retraining
         forecast = self.model_.forecast(steps=forecast_steps, exog=None)
         forecast_array = np.asarray(forecast)
 

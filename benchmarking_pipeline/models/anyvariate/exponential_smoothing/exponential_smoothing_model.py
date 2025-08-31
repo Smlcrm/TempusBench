@@ -75,7 +75,7 @@ class ExponentialSmoothingModel(BaseModel):
         if self.model_config["damped_trend"] and self.model_config["trend"] is None:
             raise ValueError("damped_trend can only be True when trend is specified")
 
-        self.model_ = None
+        self.model = None
 
     def train(
         self,
@@ -134,7 +134,7 @@ class ExponentialSmoothingModel(BaseModel):
         )
 
         try:
-            self.model_ = ExponentialSmoothing(
+            self.model = ExponentialSmoothing(
                 endog,
                 trend=trend,
                 seasonal=seasonal,
@@ -165,7 +165,7 @@ class ExponentialSmoothingModel(BaseModel):
         print(f"[ExponentialSmoothing predict] Forecasting {forecast_steps} steps")
 
         try:
-            forecast = self.model_.forecast(steps=forecast_steps)
+            forecast = self.model.forecast(steps=forecast_steps)
 
             forecast = np.asarray(forecast)
 

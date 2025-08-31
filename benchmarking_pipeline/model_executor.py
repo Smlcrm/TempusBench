@@ -5,7 +5,7 @@ This module provides the ModelExecutor class that runs individual models
 in isolated conda environments to avoid dependency conflicts.
 It handles model loading, hyperparameter tuning, and evaluation.
 """
-
+import pdb
 import argparse
 import yaml
 import pickle
@@ -14,12 +14,9 @@ import os
 from datetime import datetime
 import numpy as np
 from benchmarking_pipeline.models.base_model import BaseModel
-from benchmarking_pipeline.models.foundation_model import FoundationModel
 import json
 
 from benchmarking_pipeline.trainer.hyperparameter_tuning import HyperparameterTuner
-from benchmarking_pipeline.trainer.foundation_model_tuning import FoundationModelTuner
-
 
 class ModelExecutor:
 
@@ -353,7 +350,6 @@ class ModelExecutor:
 
         print(f"[INFO] Hyperparameter grid for {model_name}: {hyper_grid}")
 
-        
         print(f"{model_name} is a Base Model!")
         # Handle case where model has no parameters (empty model)
         if not hyper_grid:
@@ -364,6 +360,7 @@ class ModelExecutor:
         model_params = {
             k: v[0] if isinstance(v, list) else v for k, v in hyper_grid.items()
         }
+        
         # Include dataset configuration for other parameters
         print(f"{model_name} initial model_params: {model_params}")
 
@@ -413,7 +410,6 @@ class ModelExecutor:
                 )
             except Exception as e:
                 print(f"[WARNING] Failed to close TensorBoard writer: {e}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
