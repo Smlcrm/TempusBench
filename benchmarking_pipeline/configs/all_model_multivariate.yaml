@@ -1,13 +1,11 @@
 test_type: deterministic
 tensorboard: true
 dataset:
-  name: china_air_quality
-  frequency: H
+  name: *
   split_ratio: [0.8, 0.1, 0.1]
   normalize: false
   handle_missing: interpolate
-  chunks: 2
-
+  chunks: 1
 
 model:
   # Foundation models that support multivariate forecasting

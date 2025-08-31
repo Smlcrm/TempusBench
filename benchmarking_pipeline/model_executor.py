@@ -5,7 +5,10 @@ This module provides the ModelExecutor class that runs individual models
 in isolated conda environments to avoid dependency conflicts.
 It handles model loading, hyperparameter tuning, and evaluation.
 """
+
+import csv
 import pdb
+from pathlib import Path
 import argparse
 import yaml
 import pickle
@@ -28,6 +31,7 @@ class ModelExecutor:
         model_file_name,
         model_class_name,
         result_path=None,
+        dataset_name=None
     ):
         self.config = config
         self.chunk_path = chunk_path
@@ -36,6 +40,7 @@ class ModelExecutor:
         self.model_class_name = model_class_name
         # Prepare a results output path if provided via config
         self.result_path = result_path or self.config.get("result_path")
+        self.dataset_name = dataset_name
 
         # Setup TensorBoard logging like we had before
         self.setup_tensorboard_logging()
@@ -165,9 +170,9 @@ class ModelExecutor:
                         preds_arr = np.asarray(preds_arr)
 
                         # Fix: Ensure predictions have the right shape for plotting
-                        if preds_arr.ndim == 2 and preds_arr.shape[0] == 1:
-                            # ARIMA returns (1, 300), convert to (300,)
-                            preds_arr = preds_arr.flatten()
+                        # if preds_arr.ndim == 2 and preds_arr.shape[0] == 1:
+                        #     # ARIMA returns (1, 300), convert to (300,)
+                        #     preds_arr = preds_arr.flatten()
 
                         fig, ax = plt.subplots(figsize=(12, 6))
                         if y_true_arr.ndim == 1:
@@ -256,7 +261,9 @@ class ModelExecutor:
         # Extract the model name from the folder path for parameter lookup
         # The folder path is now an absolute path like '/path/to/benchmarking_pipeline/models/multivariate/arima'
         # We need to extract just 'arima' for parameter lookup
+        
         model_name = self.model_folder_name.split("/")[-1]
+        self.model_name = model_name
         print(f"[INFO] Preparing to run model: {model_name}")
         # Build the module path for import
         # The model_folder_name is now an absolute path, so we need to extract the relative part
@@ -396,10 +403,33 @@ class ModelExecutor:
         self.log_final_results(
             model_name, opt_hyperparams, y_context, y_test, y_pred, final_metrics
         )
-
+        self.log_final_metrics_in_csv(final_metrics = final_metrics, num_targets = y_test.shape[1])
+        
         # Cleanup TensorBoard writer to ensure all logs are flushed
         self.cleanup()
 
+    def log_final_metrics_in_csv(self, final_metrics, num_targets):
+        folder_type = 'multivariate' if num_targets > 1 else 'univariate'
+        model_name = os.path.basename(self.model_folder_name)
+
+        if not self.dataset_name:
+            raise ValueError("dataset_name is not set. Cannot write metrics CSV.")
+
+        # Write all metrics as columns in the CSV, converting numpy types to Python scalars
+        metrics_dir = Path(__file__).resolve().parent.parent
+        csv_path = metrics_dir / "metrics" / folder_type / self.dataset_name / model_name
+        csv_path.mkdir(parents=True, exist_ok=True)
+        csv_file = csv_path / 'metrics.csv'
+
+        # Convert all values to Python float for CSV compatibility
+        metrics_for_csv = {k: float(v) if isinstance(v, np.floating) else v for k, v in final_metrics.items()}
+
+        with open(csv_file, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(metrics_for_csv.keys()))
+            writer.writeheader()
+            writer.writerow(metrics_for_csv)
+        print(f"[INFO] Final metrics written to {csv_file}")
+        
     def cleanup(self):
         """Cleanup TensorBoard writer and ensure all logs are flushed."""
         if self.writer:
@@ -435,6 +465,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--result_path", type=str, help="Path to write JSON results for host logging."
     )
+    parser.add_argument(
+        "--dataset_name", type=str, help="Name of the dataset being processed."
+    )
     args = parser.parse_args()
     config_path = args.config
     with open(config_path, "r") as f:
@@ -446,10 +479,12 @@ if __name__ == "__main__":
         model_file_name=args.model_file_name,
         model_class_name=args.model_class_name,
         result_path=args.result_path,
+        dataset_name=args.dataset_name
     )
     print(f"[INFO] Config: {args.config}")
     print(f"[INFO] Chunk Path: {args.chunk_path}")
     print(f"[INFO] Model Folder: {args.model_folder_name}")
     print(f"[INFO] Model File: {args.model_file_name}")
     print(f"[INFO] Model Class: {args.model_class_name}")
+    
     model_executor.run()

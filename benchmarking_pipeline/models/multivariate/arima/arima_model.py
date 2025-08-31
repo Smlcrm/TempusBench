@@ -151,6 +151,213 @@ class MultivariateARIMAModel(BaseModel):
             else:
                 timestamps = pd.to_datetime(timestamps)
         else:
+<<<<<<< HEAD
+            differenced_context = context_data.copy()
+        
+        forecast_steps = len(y_target)
+        
+        # Calculate how many prediction windows we need
+        num_windows = math.ceil(forecast_steps / self.forecast_horizon)
+        
+        all_predictions = []
+        current_data = differenced_context.copy()
+        
+        for window in range(num_windows):
+            # Predict using VAR model
+            steps_to_predict = min(self.forecast_horizon, forecast_steps - len(all_predictions))
+            
+            # VAR forecast
+            forecast_result = self.fitted_model.forecast(
+                current_data.values[-self.p:], 
+                steps=steps_to_predict
+            )
+            
+            # Add predictions to list
+            all_predictions.extend(forecast_result)
+            
+            # Update data for next window if needed
+            if window < num_windows - 1:
+                # Add predictions to current_data for next iteration
+                pred_df = pd.DataFrame(forecast_result, columns=current_data.columns)
+                current_data = pd.concat([current_data, pred_df], ignore_index=True)
+        
+        # Convert to numpy array
+        predictions = np.array(all_predictions[:forecast_steps])
+        
+        # Reverse differencing if it was applied
+        if self.d > 0:
+            # Create DataFrame for integration (no column names needed)
+            pred_df = pd.DataFrame(predictions)
+            integrated_predictions = self._integrate_data(pred_df, self.original_data, self.d)
+            predictions = integrated_predictions.values
+        
+        return predictions
+        
+    def get_params(self) -> Dict[str, Any]:
+        """
+        Get the current model parameters.
+        
+        Returns:
+            Dict[str, Any]: Dictionary of model parameters
+        """
+        return {
+            'p': self.p,
+            'd': self.d,
+            'maxlags': self.maxlags,
+            'num_targets': self.num_targets,
+            'training_loss': self.training_loss,
+            'forecast_horizon': self.forecast_horizon
+        }
+        
+    def set_params(self, **params: Dict[str, Any]) -> 'MultivariateARIMAModel':
+        """
+        Set model parameters.
+
+        Args:
+            **params: Model parameters to set
+
+        Returns:
+            self: The model instance with updated parameters
+        """
+        for key, value in params.items():
+            if key in ['p', 'd', 'maxlags', 'forecast_horizon']:
+                value = int(value)
+            self.model_config[key] = value
+            # Also update the attribute if it exists
+            if hasattr(self, key):
+                setattr(self, key, value)
+        return self
+        
+    def save(self, path: str) -> None:
+        """
+        Save the Multivariate ARIMA model to disk.
+        
+        Args:
+            path: Path to save the model
+        """
+        if not self.is_fitted:
+            raise ValueError("Cannot save an unfitted model")
+            
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        
+        # Save model state
+        model_state = {
+            'config': self.config,
+            'is_fitted': self.is_fitted,
+            'params': self.get_params(),
+            'fitted_model': self.fitted_model,
+            'original_data': self.original_data,
+            'differenced_data': self.differenced_data
+        }
+        
+        # Save model state to file
+        with open(path, 'wb') as f:
+            pickle.dump(model_state, f)
+        
+    def load(self, path: str) -> None:
+        """
+        Load the Multivariate ARIMA model from disk.
+        
+        Args:
+            path: Path to load the model from
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"No model found at {path}")
+            
+        # Load model state from file
+        with open(path, 'rb') as f:
+            model_state = pickle.load(f)
+            
+        # Restore model state
+        self.config = model_state['config']
+        self.is_fitted = model_state['is_fitted']
+        self.fitted_model = model_state['fitted_model']
+        self.original_data = model_state['original_data']
+        self.differenced_data = model_state['differenced_data']
+        self.set_params(**model_state['params'])
+        
+    def compute_loss(self, y_true: np.ndarray, y_pred: np.ndarray, y_train: np.ndarray = None, loss_function: str = None) -> Dict[str, float]:
+        """
+        Compute all loss metrics between true and predicted values using the Evaluator class.
+        
+        Args:
+            y_true: True target values
+            y_pred: Predicted values
+            loss_function: Name of the loss function to use (defaults to training_loss)
+            
+        Returns:
+            Dict[str, float]: Dictionary of computed loss metrics
+        """
+        # Convert inputs to numpy arrays if needed
+        if isinstance(y_true, pd.DataFrame):
+            y_true = y_true.values
+        elif isinstance(y_true, pd.Series):
+            y_true = y_true.values
+        if isinstance(y_pred, pd.Series):
+            y_pred = y_pred.values
+        if y_train is not None:
+            if isinstance(y_train, pd.DataFrame):
+                y_train = y_train.values
+            elif isinstance(y_train, pd.Series):
+                y_train = y_train.values
+            
+        # Store for logging
+        self._last_y_true = y_true
+        self._last_y_pred = y_pred
+        
+        # For multivariate data, compute loss for each target and average
+        if y_true.ndim == 2 and y_pred.ndim == 2:
+            # Multivariate case - compute loss for each target and average
+            all_metrics = {}
+            for i in range(y_true.shape[1]):
+                target_true = y_true[:, i]
+                target_pred = y_pred[:, i]
+                target_train = None
+                if y_train is not None:
+                    target_train = y_train[:, i] if y_train.ndim == 2 else y_train
+                
+                # Ensure both arrays have the same length
+                min_length = min(len(target_true), len(target_pred))
+                target_true = target_true[:min_length]
+                target_pred = target_pred[:min_length]
+                
+                # Compute metrics for this target (pass y_train for MASE when available)
+                target_metrics = self.evaluator.evaluate(target_pred, target_true, y_train=target_train)
+                
+                # Store metrics for this target
+                for metric_name, metric_value in target_metrics.items():
+                    if metric_name not in all_metrics:
+                        all_metrics[metric_name] = []
+                    all_metrics[metric_name].append(metric_value)
+            
+            # Average metrics across all targets
+            averaged_metrics = {}
+            for metric_name, metric_values in all_metrics.items():
+                averaged_metrics[metric_name] = np.mean(metric_values)
+            
+            return averaged_metrics
+        else:
+            # Univariate case - use original logic
+            # Handle shape mismatches
+            if y_pred.ndim == 2 and y_true.ndim == 1:
+                # If predictions are 2D and true values are 1D, flatten predictions
+                if y_pred.shape[0] == 1:
+                    y_pred = y_pred.flatten()
+                elif y_pred.shape[1] == 1:
+                    y_pred = y_pred.flatten()
+                else:
+                    y_pred = y_pred[0]
+            
+            # Ensure both arrays have the same length
+            min_length = min(len(y_true), len(y_pred))
+            y_true = y_true[:min_length]
+            y_pred = y_pred[:min_length]
+            
+            # Use evaluator to compute all metrics
+            return self.evaluator.evaluate(y_pred, y_true, y_train=y_train)
+=======
             timestamps = timestamps
 
         return timestamps
+>>>>>>> f9638005dd4aa8d75af6b035677ec1f02bd24115

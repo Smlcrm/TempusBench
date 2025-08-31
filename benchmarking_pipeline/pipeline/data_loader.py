@@ -42,7 +42,7 @@ class DataLoader:
         self.config = config
 
         # Automatically construct dataset path from project root
-        dataset_name = config["dataset"]["name"]
+        dataset_name = config["name"]
         # Get the project root directory (benchmarking_pipeline folder)
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(
@@ -243,7 +243,7 @@ class DataLoader:
         timestamps = pd.date_range(start=start_date, periods=target_length, freq=freq)
 
         # Split data into train/validation/test
-        split_ratio = self.config["dataset"].get("split_ratio", [0.8, 0.1, 0.1])
+        split_ratio = self.config.get("split_ratio", [0.8, 0.1, 0.1])
         train_size = int(target_length * split_ratio[0])
         val_size = int(target_length * split_ratio[1])
 
@@ -302,7 +302,7 @@ class DataLoader:
             This method is a convenience method that loads a single chunk by default.
             For multiple chunks, use load_several_chunks() directly.
         """
-        chunks_to_load = self.config["dataset"].get("chunks", 1)
+        chunks_to_load = self.config.get("chunks", 1)
         if chunks_to_load == 1:
             return self.load_single_chunk(1)
         else:

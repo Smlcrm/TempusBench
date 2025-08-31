@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "wind_farm_power_generation",
-      "units": "MW",
-      "target_index": 0
-    }
-  ]
-}

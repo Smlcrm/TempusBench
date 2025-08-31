@@ -1,11 +1,10 @@
 test_type: deterministic
 dataset:
-  name: australian_electricity_demand
-  frequency: D
+  name: "m1_yearly"
   split_ratio: [0.8, 0.1, 0.1]
   normalize: false
   handle_missing: interpolate
-  chunks: 2
+  chunks: 1
 
 model:
   # exponential_smoothing:
@@ -14,8 +13,8 @@ model:
   #   seasonal_periods: [null]
   #   damped_trend: [false, true]
   
-  # seasonal_naive:
-  #   sp: [24]
+  seasonal_naive:
+    sp: [24]
   
   # croston_classic:
   #   alpha: [0.1, 0.3, 0.5]
