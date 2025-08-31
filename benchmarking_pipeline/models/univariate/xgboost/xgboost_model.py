@@ -29,27 +29,6 @@ class XgboostModel(BaseModel):
         # forecast_horizon is inherited from parent class (BaseModel)
         self._build_model()
 
-    def _extract_model_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Extract model-specific configuration from nested config structure.
-
-        Args:
-            config: Full configuration dictionary
-
-        Returns:
-            Dict[str, Any]: Model-specific configuration
-        """
-        # If config has a 'model' section, look for the specific model type
-        if "model" in config:
-            model_section = config["model"]
-            # Find the first model configuration (e.g., 'arima', 'lstm', etc.)
-            for model_name, model_config in model_section.items():
-                if isinstance(model_config, dict):
-                    return model_config
-
-        # If no nested structure, return the config as-is
-        return config
-
     def _build_model(self):
         """
         Build the XGBRegressor model instance from the configuration.

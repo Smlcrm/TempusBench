@@ -6,6 +6,7 @@ from ..metrics.mase import MASE
 from ..metrics.crps import CRPS
 from ..metrics.quantile_loss import QuantileLoss
 from ..metrics.interval_score import IntervalScore
+from ..metrics.mape import MAPE
 
 """
 Model evaluation.
@@ -21,7 +22,9 @@ class Evaluator:
 
         # Get evaluation metrics from the evaluation section of config
         evaluation_cfg = self.config.get("evaluation", {})
-        self.metrics_to_calculate = evaluation_cfg.get("metrics", ["mae", "rmse"])
+        self.metrics_to_calculate = evaluation_cfg.get(
+            "metrics", ["mae", "rmse", "mase", "mape"]
+        )
 
         print(f"[DEBUG] Evaluator initialized with config: {self.config}")
         print(f"[DEBUG] Evaluation config: {evaluation_cfg}")
@@ -32,6 +35,7 @@ class Evaluator:
             "rmse": RMSE(),
             "mae": MAE(),
             "mase": MASE(),
+            "mape": MAPE(),
             "crps": CRPS(),
             "quantile_loss": QuantileLoss(),
             "interval_score": IntervalScore(),

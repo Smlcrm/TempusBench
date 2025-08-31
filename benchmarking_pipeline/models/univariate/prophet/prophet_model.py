@@ -1,8 +1,3 @@
-"""
-Prophet model implementation.
-TODO-COULD work multivariate
-"""
-
 import os
 import json
 from typing import Dict, Any, Union, Optional
@@ -24,7 +19,6 @@ class ProphetModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        print(self.model_config)
         self._build_model()
 
     def _build_model(self):
