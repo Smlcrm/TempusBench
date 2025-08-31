@@ -1,8 +1,3 @@
-"""
-Prophet model implementation.
-TODO-COULD work multivariate
-"""
-
 import os
 import json
 from typing import Dict, Any, Union, Optional
