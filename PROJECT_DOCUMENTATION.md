@@ -307,6 +307,8 @@ def load_single_chunk(self, chunk_id):
     chunk_file = f"chunk{chunk_id:03d}.csv"
     chunk_path = os.path.join(self.dataset_path, chunk_file)
     
+    print(f"[DEBUG] Loading chunk file: {chunk_file}")
+    exit()
     if not os.path.exists(chunk_path):
         raise FileNotFoundError(f"Chunk file not found: {chunk_path}")
     

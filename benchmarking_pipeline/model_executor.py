@@ -479,7 +479,7 @@ if __name__ == "__main__":
         model_file_name=args.model_file_name,
         model_class_name=args.model_class_name,
         result_path=args.result_path,
-        dataset_name=args.dataset_name
+        dataset_name=os.path.basename(args.dataset_name)
     )
     print(f"[INFO] Config: {args.config}")
     print(f"[INFO] Chunk Path: {args.chunk_path}")

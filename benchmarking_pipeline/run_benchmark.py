@@ -135,8 +135,9 @@ class BenchmarkRunner:
         # Load dataset config
         dataset_cfg = self.config["dataset"]
         
-        dataset_paths = [] # Relative paths in dataset root dir containing csvs
-        if dataset_cfg['name'] == "*":
+        dataset_paths = []  # Relative paths in dataset root dir containing csvs
+        dataset_name = dataset_cfg['name']
+        if dataset_name == "*":
             # Recursively find all subdirectories under datasets_dir that contain at least one CSV file
             for root, dirs, files in os.walk(datasets_dir):
                 if any(f.endswith(".csv") for f in files):
@@ -144,18 +145,32 @@ class BenchmarkRunner:
                     dataset_paths.append(rel_path)
             if not dataset_paths:
                 raise ValueError(f"No dataset directories containing CSV files found in {datasets_dir}")
+        elif dataset_name.endswith("/*"):
+            # Support for subdirectory wildcard, e.g., "subdir/*"
+            subdir = dataset_name[:-2]
+            subdir_path = datasets_dir / subdir
+            if not os.path.exists(subdir_path) or not os.path.isdir(subdir_path):
+                raise ValueError(f"Subdirectory {subdir_path} does not exist or is not a directory")
+            # Find all subdirectories under subdir_path that contain at least one CSV file
+            for root, dirs, files in os.walk(subdir_path):
+                if any(f.endswith(".csv") for f in files):
+                    rel_path = os.path.relpath(root, datasets_dir)
+                    dataset_paths.append(rel_path)
+            if not dataset_paths:
+                raise ValueError(f"No dataset directories containing CSV files found in {subdir_path}")
         else:
-            dataset_dir_path = datasets_dir / dataset_cfg['name']
+            dataset_dir_path = datasets_dir / dataset_name
             if not os.path.exists(dataset_dir_path):
                 raise ValueError(f"Dataset in path {dataset_dir_path} does not exist")
             # Only add the dataset directory if it directly contains at least one CSV file
             if any(f.endswith(".csv") for f in os.listdir(dataset_dir_path)):
-                dataset_paths.append(dataset_cfg['name'])
+                dataset_paths.append(dataset_name)
             else:
                 raise ValueError(f"No CSV files found in dataset directory {dataset_dir_path}")
         print(f"[DEBUG] dataset_paths: {dataset_paths}")
         
-        for dataset_name in tqdm(dataset_paths):
+        for dd, dataset_name in enumerate(tqdm(dataset_paths)):
+            if 18 < dd < 20: continue
             tqdm.write(f"Processing dataset: {dataset_name}")
             split_ratio = dataset_cfg.get("split_ratio", [0.8, 0.1, 0.1])
             num_chunks = dataset_cfg.get("chunks", 1)
