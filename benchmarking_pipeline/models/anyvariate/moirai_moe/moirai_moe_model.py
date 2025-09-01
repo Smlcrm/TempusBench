@@ -30,7 +30,7 @@ class MoiraiMoeModel(BaseModel):
         self.model_config["model_name"] = "moirai-moe"
         self.model_config["size"] = self.model_config.get("size", "small")
         self.model_config["ctx"] = None
-        self.model_config["psz"] = "auto"
+        self.model_config["psz"] = 16
         self.model_config["bsz"] = 32
         self.model_config["test"] = 100
         self.model_config["num_samples"] = 100
@@ -64,10 +64,10 @@ class MoiraiMoeModel(BaseModel):
         if not self.is_fitted:
             self.model_config["pdt"] = y_target.shape[0]
             self.model_config["ctx"] = y_context.shape[0]
-            print(f"[DEBUG] pdt: {self.model_config['pdt']}")
+            print(f"[DEBUG TRAINING] pdt: {self.model_config['pdt']}")
             self.model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
-                    pretrained_model_name_or_path = f"Salesforce/{self.model_config['model_name']}-1.0-R-{self.model_config['size']}"
+                    pretrained_model_name_or_path=f"Salesforce/{self.model_config['model_name']}-1.0-R-{self.model_config['size']}"
                 ),
                 prediction_length=self.model_config["pdt"],
                 context_length=self.model_config["ctx"],
@@ -75,7 +75,7 @@ class MoiraiMoeModel(BaseModel):
                 num_samples=self.model_config["num_samples"],
                 target_dim=y_context.shape[1],
                 feat_dynamic_real_dim=0,
-                past_feat_dynamic_real_dim=0
+                past_feat_dynamic_real_dim=0,
             )
         self.is_fitted = True
         return self
@@ -106,6 +106,7 @@ class MoiraiMoeModel(BaseModel):
             raise ValueError("Model not fitted. Call train() first.")
 
         prediction_length = timestamps_target.shape[0]
+        print("prediction length", prediction_length)
         # y_context is always (context_steps, num_targets)
 
         context_steps, num_targets = y_context.shape
@@ -145,55 +146,29 @@ class MoiraiMoeModel(BaseModel):
             past_is_pad=past_is_pad,
         )
 
-        # forecast[0] shape: (num_samples, prediction_length, num_targets)
+        # forecast[0] shape: (num_targets, num_samples, prediction_length)
         # Ensure forecast[0] is a numpy array before taking mean
         forecast_np = (
-            forecast[0].cpu().numpy()
-            if hasattr(forecast[0], "cpu")
-            else np.array(forecast[0])
+            forecast.cpu().numpy() if hasattr(forecast, "cpu") else np.array(forecast)
         )
+
+        print("forecast_np shape", forecast_np.shape)
 
         # The error is: IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed
         # This is because forecasted_values is 1D, but the code tries to index it as 2D: forecasted_values[:prediction_length, :]
 
-        forecasted_values = np.round(np.mean(forecast_np, axis=0), decimals=4)
+        forecasted_values = np.round(np.mean(forecast_np, axis=1), decimals=4)
 
+        print("AFTER forecast_np shape", forecasted_values.shape)
         pdt = self.model_config["pdt"]
 
-        print(f"[DEBUG] forecasted_values shape before any reshape: {forecasted_values.shape}")
+        print(
+            f"[DEBUG] forecasted_values shape before any reshape: {forecasted_values.shape}"
+        )
         print(f"[DEBUG] prediction_length: {prediction_length}")
         print(f"[DEBUG] pdt from model_config: {pdt}")
         print(f"[DEBUG] num_targets: {num_targets}")
         print(f"[DEBUG] forecasted_values.size: {forecasted_values.size}")
 
-        # If forecasted_values is 1D, try to reshape to (pdt, num_targets) if possible
-        if forecasted_values.ndim == 1:
-            print(f"[DEBUG] forecasted_values is 1D, attempting to reshape to ({pdt}, {num_targets})")
-            if forecasted_values.size == pdt * num_targets:
-                forecasted_values = forecasted_values.reshape((pdt, num_targets))
-                print(f"[DEBUG] Reshaped forecasted_values to {forecasted_values.shape}")
-            else:
-                print(f"[DEBUG] Cannot reshape: forecasted_values.size={forecasted_values.size}, expected={pdt * num_targets}")
-                # Fallback: expand dims to (pdt, 1) if num_targets==1 and forecasted_values.size==pdt
-                if num_targets == 1 and forecasted_values.size == pdt:
-                    forecasted_values = forecasted_values.reshape((pdt, 1))
-                    print(f"[DEBUG] Reshaped forecasted_values to {forecasted_values.shape} (single target)")
-                else:
-                    raise ValueError(
-                        f"forecasted_values shape {forecasted_values.shape} is incompatible with expected ({pdt}, {num_targets})"
-                    )
-
-        if forecasted_values.ndim == 2:
-            print(f"[DEBUG] forecasted_values is 2D, shape: {forecasted_values.shape}")
-            if forecasted_values.shape[0] != pdt or forecasted_values.shape[1] != num_targets:
-                print(f"[DEBUG] forecasted_values shape mismatch: {forecasted_values.shape} (expected: ({pdt}, {num_targets}))")
-
-        if forecasted_values.shape[0] < prediction_length:
-            print(f"[DEBUG] Model returned fewer forecast steps ({forecasted_values.shape[0]}) than requested ({prediction_length}).")
-
         forecast_matrix = forecasted_values[:prediction_length, :]
-        print(forecast_matrix)
-        print(forecast_matrix.shape)
-
-        # self._last_y_pred = forecast_matrix
-        return forecast_matrix
+        return forecast_matrix.T

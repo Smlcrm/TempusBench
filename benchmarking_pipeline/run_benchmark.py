@@ -446,24 +446,6 @@ class BenchmarkRunner:
                     f"[SUCCESS] Benchmarking pipeline package installed in {conda_env_name} environment!"
                 )
 
-                
-                # If the model is moirai_moe, also install uni2ts from its directory
-                if model_name == "moirai_moe":
-                    moirai_moe_dir = pathlib.Path(__file__).resolve().parent / "models" / "anyvariate" / "moirai_moe" / "uni2ts"
-                    subprocess.run(
-                        [
-                            "conda",
-                            "run",
-                            "-n",
-                            conda_env_name,
-                            "pip",
-                            "install",
-                            "-e",
-                            str(moirai_moe_dir),
-                        ],
-                        check=True,
-                    )
-                
                 # Temp file for model results to be written by subprocess
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_res:
                     result_path = tmp_res.name

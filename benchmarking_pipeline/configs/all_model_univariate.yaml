@@ -97,21 +97,21 @@ model:
   #   num_samples: [5]
   #   prediction_length: [10]
 
-  # moirai:
+  moirai:
+    # size: ["small"]
+    # psz: [32]
+    # bsz: [8]
+    # num_samples: [5]
+    # pdt: [10]
+
+  # moirai_moe:
   #   size: ["small"]
   #   psz: [32]
   #   bsz: [8]
   #   num_samples: [5]
   #   pdt: [10]
-
-  moirai_moe:
-    size: ["small"]
-    psz: [32]
-    bsz: [8]
-    num_samples: [5]
-    pdt: [10]
     
-  toto:
+  # toto:
   
 evaluation:
   type: deterministic
