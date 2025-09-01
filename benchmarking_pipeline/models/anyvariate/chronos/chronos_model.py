@@ -133,8 +133,7 @@ class ChronosModel(BaseModel):
             y_context = np.pad(
                 y_context,
                 ((padding_length, 0), (0, 0)),
-                mode="constant",
-                constant_values=torch.nan,
+                mode="constant"
             )
 
         y_context = torch.tensor(y_context.T)
