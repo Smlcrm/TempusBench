@@ -63,16 +63,13 @@ class ArimaModel(BaseModel):
             raise ValueError("q must be specified in config")
         if "s" not in self.model_config:
             raise ValueError("s must be specified in config")
-        if "training_loss" not in self.model_config:
-            raise ValueError("training_loss must be specified in config")
 
         # Initialize model state
         self.model_ = None
         self.is_fitted = False
 
         # forecast_horizon is inherited from parent class (BaseModel)
-<<<<<<< HEAD
-        
+
     def train(
         self,
         y_context: np.ndarray,
@@ -80,15 +77,6 @@ class ArimaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
-=======
-
-    def train(
-        self,
-        y_context: Union[pd.Series, np.ndarray],
-        y_target: Union[pd.Series, np.ndarray] = None,
-        y_start_date: Optional[str] = None,
-        **kwargs,
->>>>>>> f9638005dd4aa8d75af6b035677ec1f02bd24115
     ) -> "ArimaModel":
         """
         Train the ARIMA model on given data.
@@ -96,14 +84,9 @@ class ArimaModel(BaseModel):
         Args:
             y_context: Past target values - training data (required)
             y_target: Future target values (not used in training, for compatibility)
-<<<<<<< HEAD
             timestamps_context: Timestamps for y_context (not used in ARIMA)
             timestamps_target: Timestamps for y_target (not used in ARIMA)
             freq: Frequency string (required by interface, not used in ARIMA)
-=======
-            y_start_date: Start date for y_context (not used in ARIMA)
-            **kwargs: Additional keyword arguments
->>>>>>> f9638005dd4aa8d75af6b035677ec1f02bd24115
 
         Returns:
             self: The fitted model instance
@@ -174,14 +157,10 @@ class ArimaModel(BaseModel):
         if not self.is_fitted:
             raise ValueError("Model not fitted. Call train() first.")
         if freq is None or freq == "":
-<<<<<<< HEAD
-            raise ValueError("Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks.")
-=======
             raise ValueError(
                 "Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks."
             )
 
->>>>>>> f9638005dd4aa8d75af6b035677ec1f02bd24115
         if timestamps_target is None:
             raise ValueError(
                 "timestamps_target must be provided to determine forecast horizon for ARIMA."

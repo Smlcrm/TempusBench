@@ -1,119 +1,96 @@
 test_type: deterministic
 dataset:
-  name: "univariate/*"
+  name: "univariate/absent_binary_univariate"
   split_ratio: [0.8, 0.1, 0.1]
   normalize: false
   handle_missing: interpolate
   chunks: 1
 
 model:
-  # exponential_smoothing:
-  #   trend: ["add", null]
-  #   seasonal: [null]
-  #   seasonal_periods: [null]
-  #   damped_trend: [false, true]
-  
-  # seasonal_naive:
-  #   sp: [24]
-  
-  # croston_classic:
-  #   alpha: [0.1, 0.3, 0.5]
-  #   gamma: [0.1, 0.3, 0.5]
-  
-  # # Machine Learning Models
-  # xgboost:
-  #   lookback_window: [30]
-  #   n_estimators: [200]
-  #   max_depth: [4]
-  #   learning_rate: [0.05]
-  #   subsample: [0.9]
-  #   colsample_bytree: [0.9]
-  #   random_state: [42]
-  #   n_jobs: [1]
-  
-  # random_forest:
-  #   lookback_window: [50]
-  #   n_estimators: [10]
-  #   max_depth: [2]
-  #   random_state: [42]
-  #   n_jobs: [1]
-  #   forecast_horizon: [50]
 
-  # svr:
-  #   training_loss: ["mae"]
-  #   kernel: ["rbf"]
-  #   C: [1.0]
-  #   epsilon: [0.1]
-  #   gamma: ["scale"]
-  #   lookback_window: [50]
-  #   forecast_horizon: [10]
+  ############## Statistical Models ##############
+  exponential_smoothing:
+    trend: ["add", null]
+    seasonal: [null]
+    seasonal_periods: [null]
+    damped_trend: [false, true]
   
-  # # # Deep Learning Models
-  # lstm:
-  #   units: [32]
-  #   layers: [1]
-  #   dropout: [0.1]
-  #   learning_rate: [0.01]
-  #   batch_size: [32]
-  #   epochs: [1000]
-  #   sequence_length: [10]
-  #   training_loss: ["mae"]
-  #   forecast_horizon: [10]
+  seasonal_naive:
+    sp: [24]
   
-  # deepar:
-  #   context_length: [20]
-  #   num_samples: [5]
-  #   batch_size: [8]
-  #   epochs: [1]
-  #   learning_rate: [0.001]
-  #   max_prediction_length: [10]
-  #   forecast_horizon: [10]
+  croston_classic:
+    alpha: [0.1, 0.3, 0.5]
+    gamma: [0.1, 0.3, 0.5]
+  
+  theta: 
+    sp: [12]
+
+  arima:
+    p: [1, 2]
+    d: [1]
+    q: [1, 2]
+    s: [2]
+  ############## Machine Learning Models ##############
+  xgboost:
+    lookback_window: [30]
+    n_estimators: [200]
+    max_depth: [4]
+    learning_rate: [0.05]
+    subsample: [0.9]
+    colsample_bytree: [0.9]
+    random_state: [42]
+    n_jobs: [1]
+  
+  random_forest:
+    lookback_window: [50]
+    n_estimators: [10]
+    max_depth: [2]
+    random_state: [42]
+    n_jobs: [1]
+    forecast_horizon: [50]
+
+  svr:
+    training_loss: ["mae"]
+    kernel: ["rbf"]
+    C: [1.0]
+    epsilon: [0.1]
+    gamma: ["scale"]
+    lookback_window: [50]
+    forecast_horizon: [10]
+  
+  ############## Deep Learning Models ##############
+  lstm:
+    units: [32]
+    layers: [1]
+    dropout: [0.1]
+    learning_rate: [0.01]
+    batch_size: [32]
+    epochs: [100]
+    sequence_length: [10]
+    training_loss: ["mae"]
+    forecast_horizon: [10]
   
   # Prophet
-  # prophet:
-  #   seasonality_mode: ["additive"]
-  #   changepoint_prior_scale: [0.05]
-  #   seasonality_prior_scale: [10.0]
-  #   yearly_seasonality: [true]
-  #   weekly_seasonality: [true]
-  #   daily_seasonality: [false]
+  prophet:
+    seasonality_mode: ["additive"]
+    changepoint_prior_scale: [0.05]
+    seasonality_prior_scale: [10.0]
+    yearly_seasonality: [true]
+    weekly_seasonality: [true]
+    daily_seasonality: [false]
 
-  # tiny_time_mixer:
-  
-  # moment:
-
-  # lagllama:
-
-  # timesfm:
-  #   per_core_batch_size: [2]
-  #   horizon_len: [10]
-  #   num_layers: [2]
-  #   context_len: [2]
-  #   use_positional_embedding: [False]
-
-  # chronos:
-  #   model_size: ['small']
-  #   context_length: [8]
-  #   num_samples: [5]
-  #   prediction_length: [10]
-
+# Foundation Models
+  chronos:
+  tiny_time_mixer:
   moirai:
-    # size: ["small"]
-    # psz: [32]
-    # bsz: [8]
-    # num_samples: [5]
-    # pdt: [10]
+  moirai_moe:
+  moment:
+  timesfm:
+  lagllama:
+  toto:
+  tabfpn:
 
-  # moirai_moe:
-  #   size: ["small"]
-  #   psz: [32]
-  #   bsz: [8]
-  #   num_samples: [5]
-  #   pdt: [10]
-    
-  # toto:
-  
 evaluation:
   type: deterministic
-  metrics: [mae, mase, rmse]
+  metrics: [mae, mase, rmse, mape]
   tensorboard: True

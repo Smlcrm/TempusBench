@@ -191,7 +191,7 @@ class Theta(BaseModel):
 
         # Calculate num_targets from data
         num_targets = y_context.shape[1]
-
+        print(f"y_context shape: {y_context.shape}")
         print(f"Training Multivariate Theta with {num_targets} targets...")
 
         # Step 1: Estimate drift vector μ
