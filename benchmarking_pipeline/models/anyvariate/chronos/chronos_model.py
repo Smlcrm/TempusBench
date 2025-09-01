@@ -132,8 +132,7 @@ class ChronosModel(BaseModel):
             # If not enough data, pad with the last available value
             y_context = np.pad(
                 y_context,
-                (padding_length, 0),
-                (0, 0),
+                ((padding_length, 0), (0, 0)),
                 mode="constant",
                 constant_values=torch.nan,
             )

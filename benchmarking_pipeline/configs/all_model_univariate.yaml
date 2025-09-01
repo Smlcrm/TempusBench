@@ -1,6 +1,6 @@
 test_type: deterministic
 dataset:
-  name: "univariate/absent_binary_univariate"
+  name: "univariate/*"
   split_ratio: [0.8, 0.1, 0.1]
   normalize: false
   handle_missing: interpolate
@@ -30,6 +30,7 @@ model:
     d: [1]
     q: [1, 2]
     s: [2]
+
   ############## Machine Learning Models ##############
   xgboost:
     lookback_window: [30]
@@ -58,7 +59,6 @@ model:
     lookback_window: [50]
     forecast_horizon: [10]
 
-  # Prophet
   prophet:
     seasonality_mode: ["additive"]
     changepoint_prior_scale: [0.05]
@@ -79,9 +79,7 @@ model:
     training_loss: ["mae"]
     forecast_horizon: [10]
   
-
-
-# Foundation Models
+  # Foundation Models
   chronos:
   tiny_time_mixer:
   moirai:
