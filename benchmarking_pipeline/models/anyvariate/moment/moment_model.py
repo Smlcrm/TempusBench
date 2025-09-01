@@ -124,7 +124,7 @@ class MomentModel(BaseModel):
 
     def predict(
         self,
-        y_context:np.ndarray,
+        y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str = None,
@@ -162,11 +162,9 @@ class MomentModel(BaseModel):
             if y_context.shape[0] >= self.model_config["context_length"]:
                 y_context = y_context[-self.model_config["context_length"] :, :]
             else:
-                padding = np.zeros(
-                    self.model_config["context_length"] - len(y_context)
-                )
+                padding = np.zeros(self.model_config["context_length"] - len(y_context))
                 padding = np.expand_dims(padding, axis=1)
-                y_context = np.concatenate([padding, y_context], axis=0).T
+                y_context = np.concatenate([padding, y_context], axis=0)
                 warnings.warn(
                     f"Time Series is shorter than context_length {self.model_config['context_length']}. "
                     "Padded with zeros.",
@@ -175,17 +173,23 @@ class MomentModel(BaseModel):
 
             # Create proper 3D tensor: [batch_size=1, sequence_length=1, features=1]
             y_context = torch.FloatTensor(y_context.T).unsqueeze(0).to(self.device)
-
+            print("[BEFORE] y_context shape:", y_context.shape)
             # Create input mask
             input_mask = torch.ones(1, self.model_config["context_length"]).to(
                 self.device
             )
 
             # Debug shapes and contents before passing to model
-            print(f"y_context shape: {y_context.shape}, dtype: {y_context.dtype}")
+            print(
+                f"[AFTER y_context shape: {y_context.shape}, dtype: {y_context.dtype}"
+            )
             print(f"input_mask shape: {input_mask.shape}, dtype: {input_mask.dtype}")
-            print(f"y_context (sample): {y_context[0, :5, :].cpu().numpy() if y_context.shape[1] >= 5 else y_context[0, :, :].cpu().numpy()}")
-            print(f"input_mask (sample): {input_mask[0, :5].cpu().numpy() if input_mask.shape[1] >= 5 else input_mask[0, :].cpu().numpy()}")
+            print(
+                f"y_context (sample): {y_context[0, :5, :].cpu().numpy() if y_context.shape[1] >= 5 else y_context[0, :, :].cpu().numpy()}"
+            )
+            print(
+                f"input_mask (sample): {input_mask[0, :5].cpu().numpy() if input_mask.shape[1] >= 5 else input_mask[0, :].cpu().numpy()}"
+            )
             output = self.model(x_enc=y_context, input_mask=input_mask)
 
             # Inverse scale the forecast
