@@ -1,232 +1,199 @@
+import torch
 import pandas as pd
 import numpy as np
-import torch
-import matplotlib.pyplot as plt
-import pandas as pd
-from gluonts.dataset.pandas import PandasDataset
-from gluonts.dataset.split import split
-from huggingface_hub import hf_hub_download
-
-from uni2ts.eval_util.plot import plot_single
-from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
-from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 from typing import Dict, Any
-from benchmarking_pipeline.models.foundation_model import FoundationModel
 from typing import Optional, List, Union
+from einops import rearrange
+from benchmarking_pipeline.models.base_model import BaseModel
+from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 
-class MoiraiMoeModel(FoundationModel):
 
-  def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
-    """
-    Args:
-      model_name: the type of moirai model you want to use - choose from {'moirai', 'moirai-moe'}
-      size: the model size - choose from {'small', 'base', 'large'}
-      pdt: prediction length - any positive integer
-      ctz: context length - any positive integer
-      psz: patch size - choose from {"auto", 8, 16, 32, 64, 128}
-      bsz: batch size - any positive integer
-      test: test set length - any positive integer
-      num_samples: number of samples to generate during prediction time - any positive integer
-    """
-    
-    super().__init__(config, config_file)
-    if 'model_name' not in self.config:
-        raise ValueError("model_name must be specified in config")
-    if 'size' not in self.config:
-        raise ValueError("size must be specified in config")
-    if 'pdt' not in self.config:
-        raise ValueError("pdt must be specified in config")
-    if 'ctx' not in self.config:
-        raise ValueError("ctx must be specified in config")
-    if 'psz' not in self.config:
-        raise ValueError("psz must be specified in config")
-    if 'bsz' not in self.config:
-        raise ValueError("bsz must be specified in config")
-    if 'test' not in self.config:
-        raise ValueError("test must be specified in config")
-    if 'num_samples' not in self.config:
-        raise ValueError("num_samples must be specified in config")
-    if 'target_col' not in self.config:
-        raise ValueError("target_col must be specified in config")
-    
-    self.model_name = self.config['model_name']
-    self.size = self.config['size']
-    self.pdt = int(self.config['pdt'])
-    self.ctx = int(self.config['ctx'])
-    self.psz = int(self.config['psz'])
-    self.bsz = int(self.config['bsz'])
-    self.test = int(self.config['test'])
-    self.num_samples = int(self.config['num_samples'])
-    self.target_col = self.config['target_col']
-  
-  def set_params(self, **params: Dict[str, Any]) -> 'MoiraiMoeModel':
-    for key, value in params.items():
-      if hasattr(self, key):
-        setattr(self, key, value)
-    return self
+class MoiraiMoeModel(BaseModel):
 
-  def train(self, 
-            y_context: Optional[Union[pd.Series, np.ndarray]], 
-            y_target: Optional[Union[pd.Series, np.ndarray]] = None, 
-            y_start_date: Optional[str] = None
-  ) -> 'MoiraiMoeModel':
-    """
-    Initialize the Moirai MoE model (no training required for foundation models).
-    
-    Args:
-        y_context: Past target values (not used for training, for compatibility)
-        y_target: Future target values (not used for training, for compatibility)
-        y_start_date: Start date for y_context (not used)
-        
-    Returns:
-        self: The model instance
-        
-    Note:
-        Moirai MoE is a pre-trained foundation model that doesn't require training.
-        This method initializes the model for inference.
-    """
-    # Mark as fitted since Moirai MoE is pre-trained
-    self.is_fitted = True
-    return self
-         
-  def get_params(self) -> Dict[str, Any]:
-    """
-    Get the current model parameters.
-    
-    Returns:
-        Dict[str, Any]: Dictionary of model parameters
-    """
-    return {
-        'model_name': self.model_name,
-        'size': self.size,
-        'pdt': self.pdt,
-        'ctx': self.ctx,
-        'psz': self.psz,
-        'bsz': self.bsz,
-        'test': self.test,
-        'num_samples': self.num_samples,
-        'forecast_horizon': self.forecast_horizon
-    }
-         
-  def predict(self,
-        y_context: Optional[Union[pd.Series, np.ndarray]] = None,
-        y_target: Union[pd.Series, np.ndarray] = None,
-        y_context_timestamps = None,
-        y_target_timestamps = None,
-        **kwargs):
-    #print("HUH")
-    #print(y_target)
-    #print("YUHUHU?")
-    #print(y_target_timestamps[0].strftime('%Y-%m-%d %X'))
-    #raise Exception("UNgas")
-    #timestamp_strings = [ts.strftime('%Y-%m-%d %X') for ts in y_target_timestamps]
+    def __init__(self, config: Dict[str, Any] = None):
+        """
+        Args:
+          model_name: the type of moirai model you want to use - choose from {'moirai', 'moirai_moe'}
+          size: the model size - choose from {'small', 'base', 'large'}
+          pdt: prediction length - any positive integer
+          ctz: context length - any positive integer
+          psz: patch size - choose from {"auto", 8, 16, 32, 64, 128}
+          bsz: batch size - any positive integer
+          test: test set length - any positive integer
+          num_samples: number of samples to generate during prediction time - any positive integer
+        """
 
-    # Convert timestamps to datetime if they're integers
-    if y_context_timestamps is not None and not isinstance(y_context_timestamps[0], pd.Timestamp):
-        # Convert integer timestamps to datetime
-        start_date = pd.Timestamp('2021-01-01')  # Use a reasonable start date
-        y_context_timestamps = [start_date + pd.Timedelta(minutes=30*i) for i in range(len(y_context_timestamps))]
-    
-    # Construct DataFrame
-    if len(y_context.shape) == 1:
-      columns = ['1']
-    else:
-      columns = [str(i+1) for i in range(y_context.shape[1])]  # Use '1', '2', '3', etc.
-    df = pd.DataFrame(y_context, index=y_context_timestamps, columns=columns)
-    self.ctx = len(df)
+        super().__init__(config)
 
-    results = self._sub_predict(df)
-    if len(list(results.keys())) == 1:
-      return np.array(results["1"])
-    else:
-      multivariate_values = []
-      for key in results.keys():
-        multivariate_values.append(results[key])
-      return np.array(multivariate_values)
-  
+        # Set reasonable defaults for all model-specific parameters if not provided in config
+        # As in https://arxiv.org/pdf/2402.02592
+        self.model_config["model_name"] = "moirai-moe"
+        self.model_config["size"] = self.model_config.get("size", "small")
+        self.model_config["ctx"] = None
+        self.model_config["psz"] = "auto"
+        self.model_config["bsz"] = 32
+        self.model_config["test"] = 100
+        self.model_config["num_samples"] = 100
 
-      
-  
-  def _sub_predict(self, dataframe: pd.DataFrame):
-    """
-    We assume dataframe is in the following format:
-    Its index column is a bunch of date timestamps.
-    We assume each of the rest of its columns are a different time series.
-    The header of these columns should be some identifying mark distinguishing 
-    the time series from each other. The actual name chosen does not matter.
-    """
+        self.model = None
+        self.is_fitted = False
 
-    all_time_series_names = dataframe.columns.values
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+    ) -> "MoiraiMoeModel":
+        """
+        "Train" the Moirai model (no training required for foundation models).
 
-    past_target_data = None
-    if dataframe.shape[1] == 1:
-      # Univariate
-      past_target_data = dataframe["1"].to_numpy()
-    else:
-      past_target_data = dataframe[all_time_series_names].to_numpy().T
+        Args:
+            y_context: Past target values (not used for training, for compatibility)
+            y_target: Future target values (not used for training, for compatibility)
+            timestamps_context: Timestamps for y_context (not used)
+            timestamps_target: Timestamps for y_target (not used)
+            freq: Frequency string (required by interface, not used)
 
-    # Create either a Moirai or Moirai-MoE model.
-    if self.model_name == "moirai":
-      model = MoiraiForecast(
-            module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.1-R-{self.size}"),
-            prediction_length=self.pdt,
-            context_length=self.ctx,
-            patch_size=self.psz,
-            num_samples=self.num_samples,
-            target_dim=1,
-            feat_dynamic_real_dim=0,
-            past_feat_dynamic_real_dim=0,
+        Returns:
+            self: The fitted model instance (for compatibility)
+        """
+        # Prepare MoiraiForecast model with target_dim equal to num_targets
+
+        if not self.is_fitted:
+            self.model_config["pdt"] = y_target.shape[0]
+            self.model_config["ctx"] = y_context.shape[0]
+            print(f"[DEBUG] pdt: {self.model_config['pdt']}")
+            self.model = MoiraiMoEForecast(
+                module=MoiraiMoEModule.from_pretrained(
+                    pretrained_model_name_or_path = f"Salesforce/{self.model_config['model_name']}-1.0-R-{self.model_config['size']}"
+                ),
+                prediction_length=self.model_config["pdt"],
+                context_length=self.model_config["ctx"],
+                patch_size=self.model_config["psz"],
+                num_samples=self.model_config["num_samples"],
+                target_dim=y_context.shape[1],
+                feat_dynamic_real_dim=0,
+                past_feat_dynamic_real_dim=0
+            )
+        self.is_fitted = True
+        return self
+
+    def predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+    ) -> np.ndarray:
+        """
+        Make predictions using the Moirai model.
+
+        Args:
+            y_context: Recent/past target values, shape (context_steps, num_targets)
+            timestamps_context: Timestamps for y_context (not used for prediction)
+            timestamps_target: Timestamps for the prediction horizon (used to determine forecast length)
+            freq: Frequency string (must be provided from CSV data, required)
+
+        Returns:
+            np.ndarray: Model predictions with shape (prediction_length, num_targets)
+
+        Raises:
+            ValueError: If model is not fitted, freq is not provided, or forecast length cannot be determined
+        """
+        if not self.is_fitted:
+            raise ValueError("Model not fitted. Call train() first.")
+
+        prediction_length = timestamps_target.shape[0]
+        # y_context is always (context_steps, num_targets)
+
+        context_steps, num_targets = y_context.shape
+
+        ctx = self.model_config["ctx"]
+        # Create mask with the padded size (ctx, num_targets)
+        observed_mask = np.ones((ctx, num_targets), dtype=bool)
+
+        # Prepare past_target tensor: shape (1, ctx, num_targets)
+        past_target = torch.tensor(y_context, dtype=torch.float32).unsqueeze(0)
+
+        # past_observed_target: True where value is observed, False where padded (1, ctx, num_targets)
+        past_observed_target = torch.tensor(observed_mask, dtype=torch.bool).unsqueeze(
+            0
         )
-    elif self.model_name == "moirai_moe":
-      model = MoiraiMoEForecast(
-            module=MoiraiMoEModule.from_pretrained(f"Salesforce/moirai-moe-1.0-R-{self.size}"),
-            prediction_length=self.pdt,
-            context_length=self.ctx,
-            patch_size=self.psz,
-            num_samples=self.num_samples,
-            target_dim=1,
-            feat_dynamic_real_dim=0,
-            past_feat_dynamic_real_dim=0,
+        # past_is_pad: True where ANY variate at a timestep is padded, False otherwise (1, ctx)
+        past_is_pad = (
+            (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
-    else:
-      raise ValueError("self.model_name must have the value 'moirai' or 'moirai_moe'.")
 
-    # Convert to torch tensor and reshape
-    past_target = torch.as_tensor(past_target_data, dtype=torch.float32)
-    if len(past_target.shape) == 1:
-        past_target = past_target.unsqueeze(0).unsqueeze(-1)  # (1, time, 1)
-    else:
-        past_target = past_target.unsqueeze(0)  # (1, time, features)
-    
-    # 1s if the value is observed, 0s otherwise. Shape: (batch, time, variate)
-    past_observed_target = torch.ones_like(past_target, dtype=torch.bool)
-    # 1s if the value is padding, 0s otherwise. Shape: (batch, time)
-    past_is_pad = torch.zeros_like(past_target, dtype=torch.bool).squeeze(-1)
+        # Debug: Print tensor shapes
+        print(f"[DEBUG] past_target shape: {past_target.shape}")
+        print(f"[DEBUG] past_observed_target shape: {past_observed_target.shape}")
+        print(f"[DEBUG] past_is_pad shape: {past_is_pad.shape}")
+        print(f"[DEBUG] ctx: {ctx}, num_targets: {num_targets}")
+        print(f"[DEBUG] y_context original shape: {y_context.shape}")
+        print(f"[DEBUG] y_context_padded shape: {y_context.shape}")
 
-    forecast = model(
-        past_target=past_target,
-        past_observed_target=past_observed_target,
-        past_is_pad=past_is_pad,
-    )
-    
-    forecasted_values = np.round(np.median(forecast[0], axis=0), decimals=4)
+        # Debug: Print actual values
+        print(f"[DEBUG] past_target non-zero values: {(past_target != 0).sum()}")
+        print(f"[DEBUG] past_observed_target True values: {past_observed_target.sum()}")
+        print(f"[DEBUG] past_is_pad True values: {past_is_pad.sum()}")
 
-    results_dict = dict()
-    for time_series_name in all_time_series_names:
-        results_dict[time_series_name] = []
-        
-    if len(forecasted_values.shape) == 1:
-      results_dict[all_time_series_names[0]].extend(forecasted_values)
-    else:
-      # This is just an index that tracks which forecast we want to add to which mapping in our results dict.
-      current_forecasted_timeseries_idx = 0
-      while current_forecasted_timeseries_idx < len(all_time_series_names):
-        current_time_series_name = all_time_series_names[current_forecasted_timeseries_idx]
-        current_forecast = forecasted_values[current_forecasted_timeseries_idx]
+        forecast = self.model(
+            past_target=past_target,
+            past_observed_target=past_observed_target,
+            past_is_pad=past_is_pad,
+        )
 
-        results_dict[current_time_series_name].extend(current_forecast)
-        current_forecasted_timeseries_idx += 1
-    
-    return results_dict
+        # forecast[0] shape: (num_samples, prediction_length, num_targets)
+        # Ensure forecast[0] is a numpy array before taking mean
+        forecast_np = (
+            forecast[0].cpu().numpy()
+            if hasattr(forecast[0], "cpu")
+            else np.array(forecast[0])
+        )
 
-    
+        # The error is: IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed
+        # This is because forecasted_values is 1D, but the code tries to index it as 2D: forecasted_values[:prediction_length, :]
+
+        forecasted_values = np.round(np.mean(forecast_np, axis=0), decimals=4)
+
+        pdt = self.model_config["pdt"]
+
+        print(f"[DEBUG] forecasted_values shape before any reshape: {forecasted_values.shape}")
+        print(f"[DEBUG] prediction_length: {prediction_length}")
+        print(f"[DEBUG] pdt from model_config: {pdt}")
+        print(f"[DEBUG] num_targets: {num_targets}")
+        print(f"[DEBUG] forecasted_values.size: {forecasted_values.size}")
+
+        # If forecasted_values is 1D, try to reshape to (pdt, num_targets) if possible
+        if forecasted_values.ndim == 1:
+            print(f"[DEBUG] forecasted_values is 1D, attempting to reshape to ({pdt}, {num_targets})")
+            if forecasted_values.size == pdt * num_targets:
+                forecasted_values = forecasted_values.reshape((pdt, num_targets))
+                print(f"[DEBUG] Reshaped forecasted_values to {forecasted_values.shape}")
+            else:
+                print(f"[DEBUG] Cannot reshape: forecasted_values.size={forecasted_values.size}, expected={pdt * num_targets}")
+                # Fallback: expand dims to (pdt, 1) if num_targets==1 and forecasted_values.size==pdt
+                if num_targets == 1 and forecasted_values.size == pdt:
+                    forecasted_values = forecasted_values.reshape((pdt, 1))
+                    print(f"[DEBUG] Reshaped forecasted_values to {forecasted_values.shape} (single target)")
+                else:
+                    raise ValueError(
+                        f"forecasted_values shape {forecasted_values.shape} is incompatible with expected ({pdt}, {num_targets})"
+                    )
+
+        if forecasted_values.ndim == 2:
+            print(f"[DEBUG] forecasted_values is 2D, shape: {forecasted_values.shape}")
+            if forecasted_values.shape[0] != pdt or forecasted_values.shape[1] != num_targets:
+                print(f"[DEBUG] forecasted_values shape mismatch: {forecasted_values.shape} (expected: ({pdt}, {num_targets}))")
+
+        if forecasted_values.shape[0] < prediction_length:
+            print(f"[DEBUG] Model returned fewer forecast steps ({forecasted_values.shape[0]}) than requested ({prediction_length}).")
+
+        forecast_matrix = forecasted_values[:prediction_length, :]
+        print(forecast_matrix)
+        print(forecast_matrix.shape)
+
+        # self._last_y_pred = forecast_matrix
+        return forecast_matrix

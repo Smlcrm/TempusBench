@@ -58,3 +58,6 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# Model checkpoints
+*.ckpt

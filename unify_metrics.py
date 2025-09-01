@@ -3,7 +3,7 @@
 Script to unify all metrics from nested folder structure into a single CSV file.
 
 The script reads metrics from the structure: metrics/model_type/task_type/model/metrics.csv
-and aggregates them into a single CSV with headers: task_type, model, MAE, RMSE, MASE
+and aggregates them into a single CSV with headers: task_type, model, MASE, MSE, RMSE
 """
 
 import os
@@ -76,20 +76,24 @@ def extract_metrics_from_file(file_path, model_type, task_type, model_name):
         metrics = {
             'task_type': task_type,
             'model': model_name,
-            'MAE': None,
-            'RMSE': None,
-            'MASE': None
+            'MASE': None,
+            'MSE': None,
+            'RMSE': None
         }
         
         # Check if the required columns exist and extract values
-        if 'mae' in df.columns:
-            metrics['MAE'] = df['mae'].iloc[0] if len(df) > 0 else None
+        if 'mase' in df.columns:
+            metrics['MASE'] = df['mase'].iloc[0] if len(df) > 0 else None
+            
+        if 'mse' in df.columns:
+            metrics['MSE'] = df['mse'].iloc[0] if len(df) > 0 else None
+        elif 'rmse' in df.columns:
+            # If MSE is not available, we can't calculate it from RMSE without additional data
+            # So we'll leave it as None
+            pass
             
         if 'rmse' in df.columns:
             metrics['RMSE'] = df['rmse'].iloc[0] if len(df) > 0 else None
-            
-        if 'mase' in df.columns:
-            metrics['MASE'] = df['mase'].iloc[0] if len(df) > 0 else None
             
         return metrics
         
@@ -134,7 +138,7 @@ def unify_metrics(metrics_dir, output_file):
     df = pd.DataFrame(all_metrics)
     
     # Reorder columns to match the required format
-    df = df[['task_type', 'model', 'MAE', 'RMSE', 'MASE']]
+    df = df[['task_type', 'model', 'MASE', 'MSE', 'RMSE']]
     
     # Save to CSV
     df.to_csv(output_file, index=False)
@@ -145,9 +149,9 @@ def unify_metrics(metrics_dir, output_file):
     print("\nSummary:")
     print(f"Unique task types: {df['task_type'].nunique()}")
     print(f"Unique models: {df['model'].nunique()}")
-    print(f"Records with MAE: {df['MAE'].notna().sum()}")
-    print(f"Records with RMSE: {df['RMSE'].notna().sum()}")
     print(f"Records with MASE: {df['MASE'].notna().sum()}")
+    print(f"Records with MSE: {df['MSE'].notna().sum()}")
+    print(f"Records with RMSE: {df['RMSE'].notna().sum()}")
 
 
 def main():

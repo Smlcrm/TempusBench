@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -29,7 +30,7 @@ class TimesFMModel(BaseModel):
                 path=None,
                 version="jax",
                 huggingface_repo_id="google/timesfm-1.0-200m-pytorch",
-                local_dir="/Users/denizalp/Documents/Projects/Github/Simulacrum/benchmark/benchmarking_pipeline/models/anyvariate/timesfm/checkpoints",
+                local_dir=os.path.abspath(os.path.join(os.path.dirname(__file__), "checkpoints")),
             ),
         )
 

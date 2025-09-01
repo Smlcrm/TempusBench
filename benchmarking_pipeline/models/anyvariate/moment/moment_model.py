@@ -163,12 +163,12 @@ class MomentModel(BaseModel):
                 y_context = y_context[-self.model_config["context_length"] :, :]
             else:
                 padding = np.zeros(
-                    self.model_config["context_length"] - len(series_data)
+                    self.model_config["context_length"] - len(y_context)
                 )
                 padding = np.expand_dims(padding, axis=1)
                 y_context = np.concatenate([padding, y_context], axis=0).T
                 warnings.warn(
-                    f"Series '{col}' is shorter than context_length {self.model_config['context_length']}. "
+                    f"Time Series is shorter than context_length {self.model_config['context_length']}. "
                     "Padded with zeros.",
                     UserWarning,
                 )
@@ -181,7 +181,11 @@ class MomentModel(BaseModel):
                 self.device
             )
 
-            # Get prediction
+            # Debug shapes and contents before passing to model
+            print(f"y_context shape: {y_context.shape}, dtype: {y_context.dtype}")
+            print(f"input_mask shape: {input_mask.shape}, dtype: {input_mask.dtype}")
+            print(f"y_context (sample): {y_context[0, :5, :].cpu().numpy() if y_context.shape[1] >= 5 else y_context[0, :, :].cpu().numpy()}")
+            print(f"input_mask (sample): {input_mask[0, :5].cpu().numpy() if input_mask.shape[1] >= 5 else input_mask[0, :].cpu().numpy()}")
             output = self.model(x_enc=y_context, input_mask=input_mask)
 
             # Inverse scale the forecast
@@ -190,75 +194,3 @@ class MomentModel(BaseModel):
             # forecast = forecast_scaled[0, :, :].T
 
         return forecast
-
-        # Return as numpy array for single series
-        # if "series" in results:
-        #     return np.array(results["series"])
-        # elif len(results) == 1:
-        #     # Return first series as numpy array
-        #     first_series = list(results.values())[0]
-        #     return np.array(first_series)
-        # else:
-        #     # Fallback: return zeros
-        #     return np.zeros(forecast_horizon)
-
-    # def fit(self, df: pd.DataFrame, forecast_horizon: int, verbose: bool = True):
-    #     self._load_model(forecast_horizon)
-
-    #     # The data comes in as (n_targets, time_steps) from DataFrame
-    #     # We need to convert it to (n_series, time_steps) format for MomentDataset
-    #     # where each row is a different time series
-    #     data = df.values  # Shape: [n_targets, time_steps]
-
-    #     min_required = self.model_config["context_length"] + forecast_horizon
-    #     if data.shape[1] < min_required:
-    #         raise ValueError(
-    #             f"Time series too short! Need at least {min_required} timesteps, "
-    #             f"got {data.shape[1]}. Consider reducing context_length or forecast_horizon."
-    #         )
-    #     dataset = MomentDataset(
-    #         data, self.model_config["context_length"], forecast_horizon
-    #     )
-    #     self.scaler = dataset.scaler  # Store scaler for inference
-    #     if len(dataset) == 0:
-    #         raise ValueError(
-    #             "No valid training samples created. Check your data length and parameters."
-    #         )
-    #     dataloader = DataLoader(
-    #         dataset, batch_size=self.model_config["batch_size"], shuffle=True
-    #     )
-    #     criterion = torch.nn.MSELoss()
-    #     optimizer = torch.optim.Adam(
-    #         self.model.parameters(), lr=float(self.model_config["learning_rate"])
-    #     )
-    #     self.model.train()
-
-    #     if verbose:
-    #         print(f"Fine-tuning MOMENT on {len(dataset)} samples...")
-    #     for epoch in range(self.model_config["fine_tune_epochs"]):
-    #         epoch_losses = []
-    #         pbar = (
-    #             tqdm(
-    #                 dataloader,
-    #                 desc=f"Epoch {epoch+1}/{self.model_config['fine_tune_epochs']}",
-    #             )
-    #             if verbose
-    #             else dataloader
-    #         )
-    #         for context, target, input_mask in pbar:
-    #             context = context.to(self.device)
-    #             target = target.to(self.device)
-    #             input_mask = input_mask.to(self.device)
-    #             optimizer.zero_grad()
-    #             output = self.model(x_enc=context, input_mask=input_mask)
-    #             loss = criterion(output.forecast, target)
-    #             loss.backward()
-    #             optimizer.step()
-    #             epoch_losses.append(loss.item())
-    #             if verbose and hasattr(pbar, "set_postfix"):
-    #                 pbar.set_postfix(loss=f"{loss.item():.4f}")
-    #         avg_loss = np.mean(epoch_losses)
-    #         if verbose:
-    #             print(f"Epoch {epoch+1}: Average loss = {avg_loss:.4f}")
-    #     self.is_fitted = True
-    # print("MOMENT fine-tuning completed!")

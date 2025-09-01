@@ -26,19 +26,46 @@ class TinyTimeMixerModel(BaseModel):
         if not isinstance(timestamps, pd.DatetimeIndex):
             # Handle different timestamp formats
             if isinstance(timestamps[0], (int, np.integer)):
-                # Convert from nanoseconds to datetime
-                if timestamps[0] > 1e18:  # Likely nanoseconds
-                    timestamps = pd.to_datetime(timestamps, unit="ns")
-                elif timestamps[0] > 1e15:  # Likely microseconds
-                    timestamps = pd.to_datetime(timestamps, unit="us")
-                elif timestamps[0] > 1e12:  # Likely milliseconds
-                    timestamps = pd.to_datetime(timestamps, unit="ms")
-                else:  # Likely seconds
-                    timestamps = pd.to_datetime(timestamps, unit="s")
-            else:
-                timestamps = pd.to_datetime(timestamps)
-        else:
-            timestamps = timestamps
+                min_ts = np.min(timestamps)
+                max_ts = np.max(timestamps)
+
+                # Pandas datetime bounds for 64-bit ns: 1677-09-21 to 2262-04-11
+                # 1677-09-21T00:12:43.145224192Z = -9223372036854775808 ns
+                # 2262-04-11T23:47:16.854775807Z = 9223372036854775807 ns
+                NS_LOWER = -9223372036854775808
+                NS_UPPER = 9223372036854775807
+                US_LOWER = NS_LOWER // 1000
+                US_UPPER = NS_UPPER // 1000
+                MS_LOWER = NS_LOWER // 1_000_000
+                MS_UPPER = NS_UPPER // 1_000_000
+                S_LOWER = NS_LOWER // 1_000_000_000
+                S_UPPER = NS_UPPER // 1_000_000_000
+
+                def in_bounds(val, lower, upper):
+                    return lower <= val <= upper
+
+                # Try to classify the likely unit and check bounds
+                unit = None
+                if isinstance(min_ts, (int, np.integer)):
+                    # Try nanoseconds
+                    if in_bounds(min_ts, NS_LOWER, NS_UPPER) and in_bounds(max_ts, NS_LOWER, NS_UPPER):
+                        unit = "ns"
+                    # Try microseconds
+                    elif in_bounds(min_ts, US_LOWER, US_UPPER) and in_bounds(max_ts, US_LOWER, US_UPPER):
+                        unit = "us"
+                    # Try milliseconds
+                    elif in_bounds(min_ts, MS_LOWER, MS_UPPER) and in_bounds(max_ts, MS_LOWER, MS_UPPER):
+                        unit = "ms"
+                    # Try seconds
+                    elif in_bounds(min_ts, S_LOWER, S_UPPER) and in_bounds(max_ts, S_LOWER, S_UPPER):
+                        unit = "s"
+                    else:
+                        raise ValueError(
+                            f"Timestamps are out of bounds for pandas datetime64[ns] (min={min_ts}, max={max_ts})."
+                        )
+                    timestamps = pd.to_datetime(timestamps, unit=unit)
+                else:
+                    timestamps = pd.to_datetime(timestamps)
 
         return timestamps
 

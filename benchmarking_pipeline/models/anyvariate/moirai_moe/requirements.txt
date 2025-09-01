@@ -97,7 +97,6 @@ traitlets==5.14.3
 typing-inspection==0.4.1
 typing_extensions==4.14.1
 tzdata==2025.2
-uni2ts==1.2.0
 urllib3==2.5.0
 wadler_lindig==0.1.7
 wcwidth==0.2.13
