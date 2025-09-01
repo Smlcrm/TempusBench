@@ -57,7 +57,16 @@ model:
     gamma: ["scale"]
     lookback_window: [50]
     forecast_horizon: [10]
-  
+
+  # Prophet
+  prophet:
+    seasonality_mode: ["additive"]
+    changepoint_prior_scale: [0.05]
+    seasonality_prior_scale: [10.0]
+    yearly_seasonality: [true]
+    weekly_seasonality: [true]
+    daily_seasonality: [false]
+
   ############## Deep Learning Models ##############
   lstm:
     units: [32]
@@ -70,14 +79,7 @@ model:
     training_loss: ["mae"]
     forecast_horizon: [10]
   
-  # Prophet
-  prophet:
-    seasonality_mode: ["additive"]
-    changepoint_prior_scale: [0.05]
-    seasonality_prior_scale: [10.0]
-    yearly_seasonality: [true]
-    weekly_seasonality: [true]
-    daily_seasonality: [false]
+
 
 # Foundation Models
   chronos:
@@ -88,7 +90,9 @@ model:
   timesfm:
   lagllama:
   toto:
-  tabfpn:
+  tabpfn:
+    context_window: [10]
+    forecast_window: [10]
 
 evaluation:
   type: deterministic
