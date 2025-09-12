@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "taxi_demand_30min",
-      "units": "rides",
-      "target_index": 0
-    }
-  ]
-}

@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "australian_electricity_demand",
-      "units": "MW",
-      "target_index": 0
-    }
-  ]
-}

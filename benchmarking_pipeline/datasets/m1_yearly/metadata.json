@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "m1_yearly_forecasting",
-      "units": "forecast_metric",
-      "target_index": 0
-    }
-  ]
-}
