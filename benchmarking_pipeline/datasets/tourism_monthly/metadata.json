@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "monthly_tourism_visitors",
-      "units": "visitors",
-      "target_index": 0
-    }
-  ]
-}

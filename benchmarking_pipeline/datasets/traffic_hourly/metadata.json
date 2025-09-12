@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "hourly_traffic_volume",
-      "units": "vehicles_per_hour",
-      "target_index": 0
-    }
-  ]
-}
