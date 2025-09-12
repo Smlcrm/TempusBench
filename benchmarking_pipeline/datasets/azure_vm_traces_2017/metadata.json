@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "azure_vm_cpu_utilization",
-      "units": "percentage",
-      "target_index": 0
-    }
-  ]
-}

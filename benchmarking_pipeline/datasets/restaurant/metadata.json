@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "restaurant_daily_sales",
-      "units": "sales_volume",
-      "target_index": 0
-    }
-  ]
-}
