@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "retail_sales_volume",
-      "units": "units_sold",
-      "target_index": 0
-    }
-  ]
-}

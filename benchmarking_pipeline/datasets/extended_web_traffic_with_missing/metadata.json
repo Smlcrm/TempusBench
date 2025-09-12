@@ -1,9 +1,0 @@
-{
-  "variables": [
-    {
-      "var_name": "extended_web_traffic",
-      "units": "page_views",
-      "target_index": 0
-    }
-  ]
-}
