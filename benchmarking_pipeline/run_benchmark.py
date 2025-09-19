@@ -178,7 +178,7 @@ class BenchmarkRunner:
             data_loader = DataLoader(dataset_cfg)
 
             # Preprocess all dataset chunks
-            all_dataset_chunks = data_loader.load_several_chunks(num_chunks)
+            all_dataset_chunks = data_loader.load_dataset()
             preprocessor = Preprocessor(
                 {"dataset": {"normalize": dataset_cfg.get("normalize", False)}}
             )
