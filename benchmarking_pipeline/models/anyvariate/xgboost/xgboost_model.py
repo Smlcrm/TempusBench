@@ -15,7 +15,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from benchmarking_pipeline.models.base_model import BaseModel
 
 
-class MultivariateXGBoostModel(BaseModel):
+class XGBoostModel(BaseModel):
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize XGBoost model with a given configuration.
