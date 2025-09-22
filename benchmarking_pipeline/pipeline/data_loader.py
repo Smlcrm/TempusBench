@@ -236,11 +236,15 @@ class DataLoader:
         target_length = targets_df.shape[0]
 
         # Create timestamps based on frequency
-        start_date = pd.to_datetime(start)
-        # Handle deprecated frequency 'T' -> 'min'
-        if freq == "T":
-            freq = "min"
-        timestamps = pd.date_range(start=start_date, periods=target_length, freq=freq)
+        try:
+            start_date = pd.to_datetime(start)
+            # Handle deprecated frequency 'T' -> 'min'
+            if freq == "T":
+                freq = "min"
+            timestamps = pd.date_range(start=start_date, periods=target_length, freq=freq)
+        except:
+            # For unknown/irregular frequencies, create placeholder - preprocessor will handle it
+            timestamps = pd.date_range(start="2000-01-01", periods=target_length, freq="1D")
 
         # Split data into train/validation/test
         split_ratio = self.config.get("split_ratio", [0.8, 0.1, 0.1])
