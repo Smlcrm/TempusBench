@@ -1,0 +1,24 @@
+test_type: deterministic
+tensorboard: true
+dataset:
+  name: multivariate/baggage_months_multivariate
+  split_ratio: [0.8, 0.1, 0.1]
+  normalize: true
+  handle_missing: interpolate
+  chunks: 1
+
+model:
+  svr:
+    kernel: ["rbf", "linear"]
+    C: [0.1, 1.0, 10.0]
+    epsilon: [0.01, 0.1, 0.2]
+    gamma: ["scale", "auto"]
+    lookback_window: [50]
+    max_iter: [1000]
+    random_state: [42]
+    forecast_horizon: [8]
+    model_params: [{}]
+
+evaluation:
+  type: deterministic
+  metrics: [mae, mase, rmse]
