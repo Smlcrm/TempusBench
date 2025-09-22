@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import io
 
 
-class SvrModel(BaseModel):
+class SVRModel(BaseModel):
     def __init__(self, config: Dict[str, Any] = None):
         """
         Initialize Support Vector Regression (SVR) model with a given configuration.
@@ -64,11 +64,18 @@ class SvrModel(BaseModel):
         forecast_horizon = self.model_config["forecast_horizon"]
 
         for i in range(len(y_series) - lookback_window - forecast_horizon + 1):
-            X.append(y_series[i : i + lookback_window])
-            y.append(
-                y_series[i + lookback_window : i + lookback_window + forecast_horizon]
-            )
-        return np.array(X), np.array(y)
+            curr_X = y_series[i : i + lookback_window].flatten()
+            X.append(curr_X)
+
+            curr_y = y_series[
+                i + lookback_window : i + lookback_window + forecast_horizon
+            ].flatten()
+            y.append(curr_y)
+
+        # print(f"X: {curr_X.shape}, y: {curr_y.shape}")
+        X, y = np.array(X), np.array(y)
+
+        return X, y
 
     def train(
         self,
@@ -89,16 +96,14 @@ class SvrModel(BaseModel):
         # Ensure both arrays are 1D before concatenation
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
-        y_context = y_context.squeeze()
-        y_target = y_target.squeeze()
-        y_series = np.concatenate([y_context, y_target])
+        y_series = np.concatenate([y_context, y_target], axis=0)
 
         X, y = self._create_features_targets(y_series)
-        print(f"[DEBUG][SVR] Training X shape: {X.shape}, y shape: {y.shape}")
 
         # Scale features (time index is not used; features are lagged values)
-        self.scaler.fit(X)
-        X_scaled = self.scaler.transform(X)
+        # self.scaler.fit(X)
+        # X_scaled = self.scaler.transform(X)
+        X_scaled = X
         self.model.fit(X_scaled, y)
         self.is_fitted = True
 
@@ -125,6 +130,8 @@ class SvrModel(BaseModel):
                 f"y_context too short: {len(y_context)} < lookback_window {self.model_config['lookback_window']}"
             )
 
+        total_steps = len(timestamps_target)
+        num_targets = y_context.shape[1]
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
 
@@ -132,23 +139,30 @@ class SvrModel(BaseModel):
 
         preds = []
         context = np.array(y_context).flatten().tolist()
-        total_steps = len(timestamps_target)
+
         steps = forecast_horizon
         steps_done = 0
 
         while steps_done < total_steps:
 
-            y_context = y_context.squeeze()[-lookback_window:]
-            y_context_scaled = self.scaler.transform(np.expand_dims(y_context, axis=0))
-            y_context_scaled = y_context_scaled
-            pred = self.model.predict(y_context_scaled).squeeze()
-
+            y_context = y_context[-lookback_window:]
+            # y_context_scaled = self.scaler.transform(y_context.flatten())
+            y_flat = np.expand_dims(y_context.flatten(), axis=0)
+            pred = self.model.predict(y_flat)
+            # print("pred", pred.shape)
+            # print("forecast_horizon", forecast_horizon)
+            # print("num_targets", num_targets)
+            pred = np.reshape(pred, (forecast_horizon, num_targets))
+            # print("pred AFTER", pred.shape)
             preds.extend(pred)
 
-            y_context = np.concatenate([y_context, pred])
+            y_context = np.concatenate([y_context, pred], axis=0)
             steps_done += steps
 
         preds = np.array(preds)
-        preds = np.expand_dims(preds, axis=1)
+        if len(preds.shape) == 1:
+            preds = np.expand_dims(preds, axis=1)
+        else:
+            pred = np.concatenate(preds, axis=0)
 
         return preds

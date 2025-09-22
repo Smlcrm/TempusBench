@@ -290,6 +290,15 @@ class DataLoader:
         for chunk_index in range(1, upper_chunk_index + 1):
             list_of_chunks.append(self.load_single_chunk(chunk_index))
         return list_of_chunks
+    
+    def load_dataset(self) -> List[Dataset]:
+        """
+        Loads datasets using the new data chunk format.
+
+        Returns:
+            Returns a list containing a single Dataset.
+        """
+        return [self.load_single_chunk(1)]
 
     def load_data(self) -> Dataset:
         """

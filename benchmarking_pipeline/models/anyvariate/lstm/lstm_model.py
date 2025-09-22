@@ -25,7 +25,7 @@ import time
 from tensorflow.keras.callbacks import TensorBoard
 
 
-class MultivariateLSTMModel(BaseModel):
+class LSTMModel(BaseModel):
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize Multivariate LSTM model with given configuration.

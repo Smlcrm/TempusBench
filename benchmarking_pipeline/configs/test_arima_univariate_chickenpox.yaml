@@ -1,0 +1,24 @@
+test_type: deterministic
+tensorboard: true
+dataset:
+  name: univariate/chickenpox_dense_univariate
+  split_ratio: [0.8, 0.1, 0.1]
+  normalize: true
+  handle_missing: interpolate
+  chunks: 1
+
+model:
+  arima:
+    p: [1, 2]
+    d: [1]
+    q: [1, 2]
+    s: [1]
+    training_loss: ["mae"]
+    forecast_horizon: [10]
+    ic: ["aic"]
+    maxlags: [10]
+    trend: ["c"]
+
+evaluation:
+  type: deterministic
+  metrics: [mae, mase, rmse]
