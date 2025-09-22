@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, Optional, Union, List
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from datetime import datetime
+import random
 from .data_types import Dataset, DatasetSplit, PreprocessedData
 
 
@@ -131,9 +133,34 @@ class Preprocessor:
 
         return df_clean
 
+    def _generate_artificial_timestamps(self, split: DatasetSplit, metadata: Dict[str, Any]) -> DatasetSplit:
+        """Generate artificial timestamps for unknown/irregular frequency data."""
+        freq = str(metadata.get("freq", "unknown")).lower()
+        
+        # Check if we need artificial timestamps
+        if freq not in ["unknown", "irregular", "none", ""]:
+            return split
+            
+        # Get data length
+        data_length = len(split.targets) if hasattr(split.targets, '__len__') else split.targets.shape[0]
+        
+        # Random frequency >= 1 minute
+        frequencies = ["1min", "5min", "15min", "1h", "3h", "1D", "1W"]
+        freq = random.choice(frequencies)
+        
+        # Generate timestamps from current time
+        timestamps = pd.date_range(start=datetime.now(), periods=data_length, freq=freq)
+        
+        return DatasetSplit(
+            targets=split.targets,
+            features=split.features, 
+            metadata=split.metadata,
+            timestamps=timestamps.values
+        )
+
     def preprocess(self, data: Dataset) -> PreprocessedData:
         """
-        Apply missing value handling, outlier removal, and normalization to all splits.
+        Apply missing value handling, outlier removal, normalization, and timestamp generation to all splits.
 
         Args:
             data: Dataset with train/validation/test splits
@@ -142,8 +169,11 @@ class Preprocessor:
             PreprocessedData: Transformed dataset and preprocessing metadata
         """
         def process_split(split: DatasetSplit, is_training: bool) -> DatasetSplit:
+            # Generate artificial timestamps if needed
+            processed_split = self._generate_artificial_timestamps(split, data.metadata or {})
+            
             # Process targets
-            targets_df = split.targets.copy() if isinstance(split.targets, pd.DataFrame) else pd.DataFrame(split.targets)
+            targets_df = processed_split.targets.copy() if isinstance(processed_split.targets, pd.DataFrame) else pd.DataFrame(processed_split.targets)
             targets_df = self._handle_missing_values(targets_df)
             if is_training:
                 targets_df = self._remove_outliers(targets_df)
@@ -151,8 +181,8 @@ class Preprocessor:
             
             # Process features (exogenous variables) if present
             features_df = None
-            if split.features is not None:
-                features_df = split.features.copy() if isinstance(split.features, pd.DataFrame) else pd.DataFrame(split.features)
+            if processed_split.features is not None:
+                features_df = processed_split.features.copy() if isinstance(processed_split.features, pd.DataFrame) else pd.DataFrame(processed_split.features)
                 features_df = self._handle_missing_values(features_df)
                 if is_training:
                     features_df = self._remove_outliers(features_df)
@@ -161,8 +191,8 @@ class Preprocessor:
             return DatasetSplit(
                 targets=targets_df, 
                 features=features_df, 
-                metadata=split.metadata, 
-                timestamps=split.timestamps
+                metadata=processed_split.metadata, 
+                timestamps=processed_split.timestamps
             )
 
         train_split = process_split(data.train, is_training=True)
