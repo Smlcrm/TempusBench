@@ -66,7 +66,6 @@ benchmarking_pipeline/
 │   ├── visualizer.py        # Plots and visualizations
 │   └── ... (other components)
 ├── trainer/                   # Training utilities
-│   ├── foundation_model_tuning.py
 │   └── hyperparameter_tuning.py
 └── utils/                     # Utility functions
     ├── __init__.py
@@ -118,15 +117,6 @@ class MyModel(BaseModel):
         # Implementation
         pass
 
-# Foundation model
-class MyFoundationModel(FoundationModel):
-    def train(self, y_context, **kwargs):
-        # Initialize pre-trained model
-        pass
-    
-    def predict(self, y_context, **kwargs):
-        # Generate predictions
-        pass
 ```
 
 ### 3. Comprehensive Data Handling
@@ -246,13 +236,13 @@ results = trainer.run_benchmark(datasets)
 
 ```bash
 # Run benchmark with default configuration
-python -m benchmarking_pipeline.cli
+python -m run_benchmark
 
 # Run with custom configuration
-python -m benchmarking_pipeline.cli --config configs/my_config.yaml
+python -m run_benchmark --config configs/my_config.yaml
 
 # Specify output directory
-python -m benchmarking_pipeline.cli --output-dir results/
+python -m run_benchmark --output-dir results/
 ```
 
 ### Adding New Models
