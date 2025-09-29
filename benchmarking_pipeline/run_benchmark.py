@@ -319,10 +319,10 @@ class BenchmarkRunner:
                     f"Note: All data is treated as multivariate where univariate is just num_targets == 1"
                 )
 
-                # Get model path based on inferred target count
+                # Get model path based on inferred target count and config filename
                 # The model router now treats univariate as a special case of multivariate
                 model_path, model_file, model_class = (
-                    model_router.get_model_path_by_target_count(model_name, num_targets)
+                    model_router.get_model_path_by_target_count(model_name, num_targets, self.config_path)
                 )
 
                 print(f"[INFO] Processing model: {model_spec}")
@@ -360,6 +360,7 @@ class BenchmarkRunner:
                 temp_config = config.copy()
                 temp_config["log_dir"] = base_log_dir
                 temp_config["run_name"] = model_name
+                temp_config["original_config_path"] = self.config_path
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=".yaml", mode="w"
                 ) as tmp_cfg:

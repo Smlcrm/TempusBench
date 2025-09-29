@@ -31,7 +31,8 @@ class ModelExecutor:
         model_file_name,
         model_class_name,
         result_path=None,
-        dataset_name=None
+        dataset_name=None,
+        config_path=None
     ):
         self.config = config
         self.chunk_path = chunk_path
@@ -41,6 +42,7 @@ class ModelExecutor:
         # Prepare a results output path if provided via config
         self.result_path = result_path or self.config.get("result_path")
         self.dataset_name = dataset_name
+        self.config_path = config_path
 
         # Setup TensorBoard logging like we had before
         self.setup_tensorboard_logging()
@@ -262,16 +264,18 @@ class ModelExecutor:
         # The folder path is now an absolute path like '/path/to/benchmarking_pipeline/models/multivariate/arima'
         # We need to extract just 'arima' for parameter lookup
         
-        model_name = self.model_folder_name.split("/")[-1]
+        model_name = self.model_folder_name.replace("\\", "/").split("/")[-1]
         self.model_name = model_name
         print(f"[INFO] Preparing to run model: {model_name}")
         # Build the module path for import
         # The model_folder_name is now an absolute path, so we need to extract the relative part
         # from the models directory to construct the module path
-        if "/models/" in self.model_folder_name:
+        # Normalize path separators to work on both Unix and Windows
+        normalized_path = self.model_folder_name.replace("\\", "/")
+        if "/models/" in normalized_path or "\\models\\" in self.model_folder_name:
             # Extract the part after 'models/' to get the relative path
-            models_index = self.model_folder_name.find("/models/")
-            relative_path = self.model_folder_name[
+            models_index = normalized_path.find("/models/")
+            relative_path = normalized_path[
                 models_index + 8 :
             ]  # +8 to skip '/models/'
             # Replace forward slashes with dots for proper Python module path
@@ -281,7 +285,7 @@ class ModelExecutor:
             )
         else:
             raise ValueError(
-                f"Invalid model folder path: {self.model_folder_name}. Must contain '/models/'"
+                f"Invalid model folder path: {self.model_folder_name}. Must contain '/models/' or '\\models\\'"
             )
 
         print(f"[INFO] Importing module: {module_path}")
@@ -379,7 +383,7 @@ class ModelExecutor:
         full_config["model"][model_name] = model_params
         full_config["dataset"] = self.config["dataset"]
 
-        base_model = model_class(model_params)
+        base_model = model_class(full_config)
 
         model_hyperparameter_tuner = HyperparameterTuner(
             base_model, hyper_grid, False
@@ -409,26 +413,81 @@ class ModelExecutor:
         self.cleanup()
 
     def log_final_metrics_in_csv(self, final_metrics, num_targets):
-        folder_type = 'multivariate' if num_targets > 1 else 'univariate'
+        # Determine folder type based on config filename if available
+        if self.config_path:
+            from pathlib import Path
+            config_filename = Path(self.config_path).name.lower()
+            if "multivariate" in config_filename:
+                folder_type = 'multivariate'
+            elif "univariate" in config_filename:
+                folder_type = 'univariate'
+            else:
+                # Fallback to original logic if no keyword found
+                folder_type = 'multivariate' if num_targets > 1 else 'univariate'
+        else:
+            # Fallback to original logic if no config_path
+            folder_type = 'multivariate' if num_targets > 1 else 'univariate'
+        
         model_name = os.path.basename(self.model_folder_name)
 
         if not self.dataset_name:
             raise ValueError("dataset_name is not set. Cannot write metrics CSV.")
 
-        # Write all metrics as columns in the CSV, converting numpy types to Python scalars
         metrics_dir = Path(__file__).resolve().parent.parent
         csv_path = metrics_dir / "metrics" / folder_type / self.dataset_name / model_name
         csv_path.mkdir(parents=True, exist_ok=True)
         csv_file = csv_path / 'metrics.csv'
 
-        # Convert all values to Python float for CSV compatibility
-        metrics_for_csv = {k: float(v) if isinstance(v, np.floating) else v for k, v in final_metrics.items()}
+        # Check if we have per-variate metrics (indicated by '_variate_' in metric names)
+        has_per_variate_metrics = any('_variate_' in key for key in final_metrics.keys())
 
-        with open(csv_file, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=list(metrics_for_csv.keys()))
-            writer.writeheader()
-            writer.writerow(metrics_for_csv)
-        print(f"[INFO] Final metrics written to {csv_file}")
+        if has_per_variate_metrics and num_targets > 1:
+            # Extract per-variate metrics and organize by variate
+            variate_metrics = {}
+            aggregated_metrics = {}
+            
+            for key, value in final_metrics.items():
+                if '_variate_' in key:
+                    # Extract metric name and variate number
+                    parts = key.split('_variate_')
+                    metric_name = parts[0]
+                    variate_num = int(parts[1])
+                    
+                    if variate_num not in variate_metrics:
+                        variate_metrics[variate_num] = {'variate': variate_num}
+                    
+                    variate_metrics[variate_num][metric_name] = float(value) if isinstance(value, np.floating) else value
+                else:
+                    # These are aggregated metrics
+                    aggregated_metrics[key] = float(value) if isinstance(value, np.floating) else value
+
+            # Determine column order: variate, then metric columns, then aggregated columns if any
+            all_metric_names = set()
+            for variate_data in variate_metrics.values():
+                all_metric_names.update(k for k in variate_data.keys() if k != 'variate')
+            
+            columns = ['variate'] + sorted(all_metric_names)
+            
+            # Write per-variate metrics (one row per variate)
+            with open(csv_file, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=columns)
+                writer.writeheader()
+                
+                # Write each variate as a separate row
+                for variate_num in sorted(variate_metrics.keys()):
+                    writer.writerow(variate_metrics[variate_num])
+                
+            print(f"[INFO] Per-variate metrics written to {csv_file} ({len(variate_metrics)} variates)")
+        
+        else:
+            # Original behavior for univariate or models without per-variate metrics
+            metrics_for_csv = {k: float(v) if isinstance(v, np.floating) else v for k, v in final_metrics.items()}
+
+            with open(csv_file, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=list(metrics_for_csv.keys()))
+                writer.writeheader()
+                writer.writerow(metrics_for_csv)
+            print(f"[INFO] Final metrics written to {csv_file}")
         
     def cleanup(self):
         """Cleanup TensorBoard writer and ensure all logs are flushed."""
@@ -479,7 +538,8 @@ if __name__ == "__main__":
         model_file_name=args.model_file_name,
         model_class_name=args.model_class_name,
         result_path=args.result_path,
-        dataset_name=os.path.basename(args.dataset_name)
+        dataset_name=os.path.basename(args.dataset_name),
+        config_path=config.get("original_config_path", config_path),
     )
     print(f"[INFO] Config: {args.config}")
     print(f"[INFO] Chunk Path: {args.chunk_path}")

@@ -39,11 +39,24 @@ class MultivariateARIMAModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config)
-        if "trend" not in self.model_config:
+        
+        # Extract ARIMA-specific parameters from the model config section
+        # Get the actual arima model config (either from model_config for hyperparameter tuning or from full config)
+        if hasattr(self, 'model_config') and isinstance(self.model_config, dict) and 'trend' in self.model_config:
+            arima_config = self.model_config
+        elif 'model' in config and 'arima' in config['model']:
+            arima_config = config['model']['arima']
+        else:
+            arima_config = self.model_config
+        
+        # Store the arima config for model building
+        self.arima_config = arima_config
+        
+        if "trend" not in arima_config:
             raise ValueError("trend must be specified in config")
-        if "maxlags" not in self.model_config:
-            self.model_config["maxlags"] = 20
-        if "ic" not in self.model_config:
+        if "maxlags" not in arima_config:
+            arima_config["maxlags"] = 20
+        if "ic" not in arima_config:
             raise ValueError("ic must be specified in config")
 
         self.model = None
@@ -83,9 +96,9 @@ class MultivariateARIMAModel(BaseModel):
             )
 
         self.results = self.model.fit(
-            maxlags=self.model_config["maxlags"],
-            ic=self.model_config["ic"],
-            trend=self.model_config["trend"],
+            maxlags=self.arima_config["maxlags"],
+            ic=self.arima_config["ic"],
+            trend=self.arima_config["trend"],
         )
 
         return self

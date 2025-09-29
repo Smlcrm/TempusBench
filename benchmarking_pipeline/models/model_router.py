@@ -170,7 +170,7 @@ class ModelRouter:
         return model_spec.strip()
 
     def get_model_path_by_target_count(
-        self, model_name: str, num_targets: int
+        self, model_name: str, num_targets: int, config_path: str = None
     ) -> Tuple[str, str, str]:
         """
         Get the model path, file name, and class name based on target count.
@@ -178,6 +178,7 @@ class ModelRouter:
         Args:
             model_name: Name of the model
             num_targets: Number of targets (1 for univariate, >1 for multivariate)
+            config_path: Path to config file for filename-based routing
 
         Returns:
             Tuple of (folder_path, file_name, class_name)
@@ -194,6 +195,29 @@ class ModelRouter:
         # Validate num_targets
         if num_targets < 1:
             raise ValueError(f"num_targets must be >= 1, got {num_targets}")
+
+        # Filename-based routing for specific models
+        if config_path and model_name in ["prophet", "arima", "lagllama", "random_forest", "tabpfn"]:
+            config_filename = Path(config_path).name.lower()
+            
+            if "multivariate" in config_filename:
+                # Force regular multivariate implementation if it exists
+                print(f"[ROUTER] Config filename contains 'multivariate' - using regular multivariate implementation for {model_name}")
+                if model_name in self.multivariate_models:
+                    folder_path = str(models_dir / "multivariate" / model_name)
+                    file_name = f"{model_name}_model"
+                    class_name = self._generate_class_name(model_name, "multivariate")
+                    return folder_path, file_name, class_name
+                else:
+                    print(f"[ROUTER] {model_name} does not have a multivariate implementation, falling back to anyvariate")
+            
+            elif "univariate" in config_filename:
+                # Force anyvariate univariate implementation (per-variate rows)
+                print(f"[ROUTER] Config filename contains 'univariate' - using anyvariate univariate implementation for {model_name}")
+                folder_path = str(models_dir / "univariate" / model_name)
+                file_name = f"{model_name}_model"
+                class_name = self._generate_class_name(model_name, "univariate")
+                return folder_path, file_name, class_name
 
         # Handle anyvariate models (can handle both univariate and multivariate)
         if model_name in self.anyvariate_models:
@@ -235,7 +259,15 @@ class ModelRouter:
 
         # Handle univariate-only models
         elif model_name in self.univariate_models:
-            # Univariate models only support univariate data
+            # Special cases: Prophet, ARIMA, LagLlama, Random Forest, and TabPFN can handle multivariate data even though they're in univariate folder
+            if model_name in ["prophet", "arima", "lagllama", "random_forest", "tabpfn"]:
+                print(f"[ROUTER] Routing {model_name} with {num_targets} target(s) -> univariate implementation (anyvariate capable)")
+                folder_path = str(models_dir / "univariate" / model_name)
+                file_name = f"{model_name}_model"
+                class_name = self._generate_class_name(model_name, "univariate")
+                return folder_path, file_name, class_name
+            
+            # Other univariate models only support univariate data
             if num_targets > 1:
                 raise ValueError(
                     f"Model '{model_name}' does not support multivariate variant. "
