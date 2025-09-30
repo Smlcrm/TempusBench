@@ -1,20 +1,12 @@
 """
-Multivariate ARIMA model implementation.
-
-This model extends the univariate ARIMA to handle multiple target variables simultaneously.
-Uses Vector Autoregression (VAR) which is the multivariate extension of ARIMA models.
-Design choices (similar to multivariate LSTM):
-- Uses VAR from statsmodels for multivariate time series modeling
-- Handles multiple targets simultaneously in one model
-- Predicts all targets in a single forward pass
-- Supports differencing for non-stationary series
+Multivariate VARMAX model.
 """
 
 import os
 import numpy as np
 import math
 import pandas as pd
-from statsmodels.tsa.vector_ar.var_model import VAR
+from statsmodels.tsa.statespace.varmax import VARMAX
 from statsmodels.tsa.stattools import adfuller
 from typing import Dict, Any, Union, Tuple, Optional
 import pickle
@@ -24,16 +16,21 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-class MultivariateARIMAModel(BaseModel):
+class VARMAXModel(BaseModel):
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize Multivariate ARIMA model with given configuration.
+        Initialize VARMAX model with given configuration.
 
         Args:
             config: Configuration dictionary containing model parameters
-                - p: int, VAR order (autoregressive order)
-                - d: int, differencing order for stationarity
-                - maxlags: int, maximum number of lags to consider
+                - p: int, the number of AR parameters to use
+                - d: int, the number of MA parameters to use
+                - trend: string or iterable of ints, handles the deterministic trend
+                         polynomail  (can be one of the following: 'c' - constant trend;
+                         't' - linear trend with time; 'ct' - both 'c' and 't'; 
+                         iterable of ints - represents the coefficients of each 
+                         term of a polynomial that goes in increasing order. For example,
+                         [1, 0, 1, 1] gives us a trend polynomial of a + ct^2 + dt^3).
                 - training_loss: str, primary loss function for training
                 - forecast_horizon: int, number of steps to forecast ahead
             config_file: Path to a JSON configuration file
@@ -41,10 +38,10 @@ class MultivariateARIMAModel(BaseModel):
         super().__init__(config)
         if "trend" not in self.model_config:
             raise ValueError("trend must be specified in config")
-        if "maxlags" not in self.model_config:
-            self.model_config["maxlags"] = 20
-        if "ic" not in self.model_config:
-            raise ValueError("ic must be specified in config")
+        if "p" not in self.model_config:
+            raise ValueError("p must be specified in config")
+        if "q" not in self.model_config:
+            raise ValueError("q must be specified in config")
 
         self.model = None
 
@@ -56,13 +53,11 @@ class MultivariateARIMAModel(BaseModel):
         timestamps_target: np.ndarray,
         freq: str,
         **kwargs,
-    ) -> "MultivariateARIMAModel":
+    ) -> "VARMAXModel":
         """
-        Train the Multivariate ARIMA model on given data.
+        Train the Multivariate VARMAX model on given data.
 
         TECHNIQUE: Vector Autoregression (VAR) for Multiple Time Series
-        - Extends ARIMA to handle multiple interdependent time series
-        - Each variable depends on its own lags and lags of other variables
         - Captures cross-dependencies between multiple targets
         - Applies differencing if needed to achieve stationarity
         - Uses Maximum Likelihood Estimation for parameter fitting
@@ -78,15 +73,13 @@ class MultivariateARIMAModel(BaseModel):
         """
         timestamps_context = self.convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
-            self.model = VAR(
-                endog=y_context, exog=None, dates=timestamps_context, freq=freq
+            self.model = VARMAX(
+                endog=y_context, exog=None, 
+                order=(self.model_config["p"], self.model_config["q"]), 
+                trend=self.model_config["trend"]
             )
 
-        self.results = self.model.fit(
-            maxlags=self.model_config["maxlags"],
-            ic=self.model_config["ic"],
-            trend=self.model_config["trend"],
-        )
+        self.results = self.model.fit()
 
         return self
 
@@ -120,12 +113,12 @@ class MultivariateARIMAModel(BaseModel):
         if self.model is None:
             raise ValueError("Model not fitted. Call train first.")
 
-        forecast_horizon = timestamps_target.shape[0]
-        lag_order = self.results.k_ar
-        forecast_steps = len(timestamps_target)
+        #forecast_horizon = timestamps_target.shape[0]
+        #lag_order = self.results.k_ar
+        #forecast_steps = len(timestamps_target)
 
-        y_context = y_context[-lag_order:, :]
-        forecasts = self.results.forecast(y_context, steps=forecast_steps)
+        #y_context = y_context[-lag_order:, :]
+        forecasts = self.results.forecast(steps=self.model_config["forecast_horizon"])
 
         forecasts = np.array(forecasts)
         if len(forecasts.shape) == 1:
