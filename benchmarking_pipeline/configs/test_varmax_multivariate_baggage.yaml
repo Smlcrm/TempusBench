@@ -8,15 +8,11 @@ dataset:
   chunks: 1
 
 model:
-  arima:
-    p: [1, 2]
-    d: [1]
-    q: [1, 2]
-    s: [1]
+  varmax:
+    p: [1]
+    q: [1]
     training_loss: ["mae"]
-    forecast_horizon: [10]
-    ic: ["aic"]
-    maxlags: [10]
+    forecast_horizon: [50]
     trend: ["c"]
 
 evaluation:
