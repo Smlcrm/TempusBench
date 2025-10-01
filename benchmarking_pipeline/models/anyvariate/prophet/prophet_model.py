@@ -110,7 +110,7 @@ class ProphetModel(BaseModel):
 
         return timestamps
 
-    def train(
+    def _train(
         self,
         y_context: Optional[np.ndarray],
         y_target: Optional[np.ndarray] = None,
@@ -137,7 +137,7 @@ class ProphetModel(BaseModel):
         self.is_fitted = True
         return self
 
-    def predict(
+    def _predict(
         self,
         y_context: Optional[np.ndarray] = None,
         timestamps_context: Optional[np.ndarray] = None,
@@ -179,3 +179,124 @@ class ProphetModel(BaseModel):
         # Return the predicted values
 
         return forecast
+
+    def train(
+        self,
+        y_context: Optional[np.ndarray],
+        y_target: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
+        **kwargs,
+    ):
+        """
+        Train the Prophet model on multivariate time series data.
+        For multivariate data, this method applies the univariate Prophet model
+        to each variate separately.
+
+        Args:
+            y_context: Training target values (shape: [n_samples, n_variates])
+            y_target: Target values for evaluation (optional)
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
+            freq: Frequency string from CSV data
+            **kwargs: Additional arguments
+
+        Returns:
+            self: Trained model instance
+        """
+        # Handle multivariate data by training separate Prophet models for each variate
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
+            # Multivariate case: train separate models for each variate
+            self.models = []  # Store list of Prophet models for each variate
+            
+            for variate_idx in range(y_context.shape[1]):
+                # Extract single variate data
+                y_context_variate = y_context[:, variate_idx]
+                y_target_variate = y_target[:, variate_idx] if y_target is not None else None
+                
+                # Create a temporary model instance for this variate
+                # Use the model-specific configuration already stored in the base class
+                temp_model = ProphetModel(self.model_config)
+                
+                # Train on this variate using the univariate method
+                temp_model._train(
+                    y_context=y_context_variate,
+                    y_target=y_target_variate,
+                    timestamps_context=timestamps_context,
+                    timestamps_target=timestamps_target,
+                    freq=freq,
+                    **kwargs
+                )
+                
+                self.models.append(temp_model)
+            
+            # Set the main model to the first variate for compatibility
+            self.model = self.models[0].model
+            self.is_fitted = True
+            
+        else:
+            # Univariate case: use the original univariate method
+            self._train(
+                y_context=y_context,
+                y_target=y_target,
+                timestamps_context=timestamps_context,
+                timestamps_target=timestamps_target,
+                freq=freq,
+                **kwargs
+            )
+        
+        return self
+
+    def predict(
+        self,
+        y_context: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
+    ) -> np.ndarray:
+        """
+        Make predictions using the trained Prophet model(s).
+        For multivariate data, this method applies the univariate Prophet model
+        to each variate separately and combines the results.
+
+        Args:
+            y_context: Recent/past target values
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
+            freq: Frequency string from CSV data
+
+        Returns:
+            np.ndarray: Model predictions (shape: [n_forecast_steps, n_variates])
+        """
+        # Handle multivariate data by predicting with separate Prophet models for each variate
+        if hasattr(self, 'models') and self.models:
+            # Multivariate case: predict with each variate model and combine
+            predictions = []
+            
+            for variate_idx, model in enumerate(self.models):
+                # Extract single variate context if provided
+                y_context_variate = y_context[:, variate_idx] if y_context is not None else None
+                
+                # Predict for this variate
+                variate_pred = model._predict(
+                    y_context=y_context_variate,
+                    timestamps_context=timestamps_context,
+                    timestamps_target=timestamps_target,
+                    freq=freq
+                )
+                
+                predictions.append(variate_pred)
+            
+            # Combine predictions from all variates
+            combined_predictions = np.column_stack(predictions)
+            return combined_predictions
+            
+        else:
+            # Univariate case: use the original univariate method
+            return self._predict(
+                y_context=y_context,
+                timestamps_context=timestamps_context,
+                timestamps_target=timestamps_target,
+                freq=freq
+            )
