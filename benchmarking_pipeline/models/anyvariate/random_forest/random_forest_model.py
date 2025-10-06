@@ -176,7 +176,7 @@ class RandomForestModel(BaseModel):
 
         return np.array(features), np.array(targets)
 
-    def train(
+    def _train(
         self,
         y_context: Optional[np.ndarray],
         y_target: Optional[np.ndarray] = None,
@@ -315,11 +315,25 @@ class RandomForestModel(BaseModel):
         # Initialize context with the last lookback_window values from y_context
         # Ensure context is 1D for consistent handling
 
-        y_context = y_context[-self.model_config["lookback_window"] :, 0]
-        timestamps_context = timestamps_context[
-            -self.model_config["lookback_window"] :, 0
-        ]
-        timestamps_target = timestamps_target[:, 0]
+        # If multivariate, predict each variate separately and stack
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
+            preds = []
+            for k in range(y_context.shape[1]):
+                yc = y_context[:, k]
+                tc = timestamps_context[:, k] if timestamps_context is not None and timestamps_context.ndim > 1 else timestamps_context
+                tt = timestamps_target[:, k] if timestamps_target is not None and timestamps_target.ndim > 1 else timestamps_target
+                pk = self._predict(
+                    y_context=yc,
+                    timestamps_context=tc,
+                    timestamps_target=tt,
+                    freq=freq,
+                    **kwargs,
+                )
+                preds.append(pk.reshape(-1, 1) if pk.ndim == 1 else pk)
+            return np.concatenate(preds, axis=1)
+
+        y_context = y_context[-self.model_config["lookback_window"] :]
+        timestamps_context = timestamps_context[-self.model_config["lookback_window"] :]
 
         preds = []
         steps = self.model_config["forecast_horizon"]
