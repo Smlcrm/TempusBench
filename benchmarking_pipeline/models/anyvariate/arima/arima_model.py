@@ -70,7 +70,7 @@ class ArimaModel(BaseModel):
 
         # forecast_horizon is inherited from parent class (BaseModel)
 
-    def train(
+    def _train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
@@ -132,7 +132,7 @@ class ArimaModel(BaseModel):
         self.is_fitted = True
         return self
 
-    def predict(
+    def _predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
@@ -177,3 +177,75 @@ class ArimaModel(BaseModel):
         self._last_y_pred = forecast_array.reshape(-1, 1)
 
         return self._last_y_pred
+
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+    ) -> "ArimaModel":
+        """
+        Anyvariate wrapper: trains a separate ARIMA per variate if multivariate.
+        """
+        # Multivariate: shape (T, K)
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
+            self.models = []
+            num_variates = y_context.shape[1]
+            for k in range(num_variates):
+                yc = y_context[:, k]
+                yt = y_target[:, k] if y_target is not None and y_target.ndim > 1 else y_target
+                # Instantiate per-variate model with same config
+                m = ArimaModel(self.model_config)
+                m._train(
+                    y_context=yc,
+                    y_target=yt,
+                    timestamps_context=timestamps_context,
+                    timestamps_target=timestamps_target,
+                    freq=freq,
+                )
+                self.models.append(m)
+            # For compatibility, mirror first model state
+            self.model_ = self.models[0].model_
+            self.is_fitted = True
+            return self
+        # Univariate
+        return self._train(
+            y_context=y_context,
+            y_target=y_target,
+            timestamps_context=timestamps_context,
+            timestamps_target=timestamps_target,
+            freq=freq,
+        )
+
+    def predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+    ) -> np.ndarray:
+        """
+        Anyvariate wrapper: predicts per variate and stacks columns.
+        """
+        if hasattr(self, "models") and self.models:
+            preds = []
+            num_variates = len(self.models)
+            for k, m in enumerate(self.models):
+                yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
+                pk = m._predict(
+                    y_context=yc,
+                    timestamps_context=timestamps_context,
+                    timestamps_target=timestamps_target,
+                    freq=freq,
+                )
+                preds.append(pk.reshape(-1, 1))
+            return np.concatenate(preds, axis=1)
+        # Univariate
+        return self._predict(
+            y_context=y_context,
+            timestamps_context=timestamps_context,
+            timestamps_target=timestamps_target,
+            freq=freq,
+        )
