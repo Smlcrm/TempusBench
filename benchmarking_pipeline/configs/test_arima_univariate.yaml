@@ -1,21 +1,23 @@
 test_type: deterministic
 tensorboard: true
 dataset:
-  name: bdg-2_bear
+  name: multivariate/goldindia_continuous_multivariate
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate
-  chunks: 3
-  target_cols: ['bdg2_bear_metric']
+  chunks: 1
 
 model:
   arima:
-    p: [1, 2, 3]        # AR order: 1, 2, 3 (exclude 0 for more informative models)
-    d: [1, 2]           # Differencing: 1 (standard), 2 (for possible strong trends)
-    q: [0, 1, 2]        # MA order: 0, 1, 2 (include 0 for possible pure AR)
-    s: [4, 12]          # Seasonality period: 4 (quarterly), 12 (yearly, if applicable)
+    p: [1, 2]
+    d: [1]
+    q: [1, 2]
+    s: [1]
     training_loss: ["mae"]
-    forecast_horizon: [50]
+    forecast_horizon: [10]
+    ic: ["aic"]
+    maxlags: [10]
+    trend: ["c"]
 
 evaluation:
   type: deterministic
