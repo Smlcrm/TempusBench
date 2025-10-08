@@ -171,4 +171,4 @@ class MoiraiMoeModel(BaseModel):
         print(f"[DEBUG] forecasted_values.size: {forecasted_values.size}")
 
         forecast_matrix = forecasted_values[:prediction_length, :]
-        return forecast_matrix.T
+        return np.squeeze(forecast_matrix)
