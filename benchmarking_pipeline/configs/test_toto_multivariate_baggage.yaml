@@ -1,14 +1,14 @@
 test_type: deterministic
 tensorboard: true
 dataset:
-  name: china_air_quality
+  name: multivariate/baggage_sales_multivariate
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate
-  chunks: 3
+  chunks: 1
 
 model:
-  chronos:
+  toto:
     forecast_horizon: [10]
 
 evaluation:

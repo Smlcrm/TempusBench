@@ -9,7 +9,7 @@ dataset:
 
 model:
   moirai:
-    pdt: [10]
+    pdt: [6]
     ctx: [48]
     size: ["small"]
 

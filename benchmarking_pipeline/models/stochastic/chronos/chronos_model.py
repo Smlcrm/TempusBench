@@ -144,7 +144,7 @@ class ChronosModel(BaseModel):
             num_samples=self.model_config["num_samples"],
         )
         forecasts = np.squeeze(np.asarray(forecasts))
-        forecasts = np.mean(forecasts, axis=0, keepdims=True).T
+        forecasts = np.squeeze(np.mean(forecasts, axis=0, keepdims=True).T)
 
         return forecasts
 

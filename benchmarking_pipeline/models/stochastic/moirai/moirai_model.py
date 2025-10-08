@@ -106,6 +106,9 @@ class MoiraiModel(BaseModel):
             raise ValueError("Model not fitted. Call train() first.")
 
         prediction_length = timestamps_target.shape[0]
+        #print("[DEBUG] timestamp targets shape", timestamps_target.shape)
+        #print("[DEBUG] timestamp targets", timestamps_target)
+        #print("[DEBUG] timestamp context shape", timestamps_context.shape)
         print("prediction length", prediction_length)
         # y_context is always (context_steps, num_targets)
 
@@ -171,4 +174,5 @@ class MoiraiModel(BaseModel):
         print(f"[DEBUG] forecasted_values.size: {forecasted_values.size}")
 
         forecast_matrix = forecasted_values[:prediction_length, :]
-        return forecast_matrix.T
+        print(f"[DEBUG] forecast matrix {forecast_matrix.shape}")
+        return np.squeeze(forecast_matrix)

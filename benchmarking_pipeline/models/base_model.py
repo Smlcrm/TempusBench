@@ -156,6 +156,7 @@ class BaseModel(ABC):
             Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
         """
         # Convert inputs to numpy arrays if needed
+        print(f"[DEBUG] in base_model compute loss y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
         if isinstance(y_true, pd.Series):
             y_true = y_true.values
         if isinstance(y_pred, pd.Series):

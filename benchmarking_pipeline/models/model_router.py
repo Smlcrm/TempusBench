@@ -32,9 +32,10 @@ class ModelRouter:
 
     def __init__(self):
         """Initialize the router and discover available models."""
-        self.anyvariate_models: Set[str] = set()
         self.multivariate_models: Set[str] = set()
         self.univariate_models: Set[str] = set()
+        self.deterministic_models: Set[str] = set()
+        self.stochastic_models: Set[str] = set()
 
         self._discover_models()
         self._validate_model_categorization()
@@ -43,12 +44,19 @@ class ModelRouter:
         """Discover available models by examining the folder structure."""
         models_dir = Path(__file__).parent
 
-        # Discover anyvariate models
-        anyvariate_dir = models_dir / "anyvariate"
-        if anyvariate_dir.exists():
-            for item in anyvariate_dir.iterdir():
+        # Discover deterministic models
+        deterministic_dir = models_dir / "deterministic"
+        if deterministic_dir.exists():
+            for item in deterministic_dir.iterdir():
                 if item.is_dir() and (item / f"{item.name}_model.py").exists():
-                    self.anyvariate_models.add(item.name)
+                    self.deterministic_models.add(item.name)
+        
+        # Discover stochastic models
+        stochastic_dir = models_dir / "stochastic"
+        if stochastic_dir.exists():
+            for item in stochastic_dir.iterdir():
+                if item.is_dir() and (item / f"{item.name}_model.py").exists():
+                    self.stochastic_models.add(item.name)
 
         # Discover models that have separate multivariate implementations
         multivariate_dir = models_dir / "multivariate"
@@ -69,6 +77,8 @@ class ModelRouter:
     def _validate_model_categorization(self):
         """Validate that all models are properly categorized and raise errors for inconsistencies."""
         # Check for models that appear in multiple categories
+
+        """
         anyvariate_multivariate_overlap = (
             self.anyvariate_models & self.multivariate_models
         )
@@ -82,7 +92,7 @@ class ModelRouter:
         if anyvariate_univariate_overlap:
             raise ValueError(
                 f"Models cannot be both anyvariate and univariate: {anyvariate_univariate_overlap}"
-            )
+            )"""
 
         # Note: multivariate_models and univariate_models can overlap because:
         # - multivariate_models = models that have separate multivariate implementations
@@ -91,14 +101,15 @@ class ModelRouter:
 
         # Check for models that are not in any category
         all_models = (
-            self.anyvariate_models | self.multivariate_models | self.univariate_models
+            self.deterministic_models | self.stochastic_models | self.multivariate_models | self.univariate_models
         )
         models_dir = Path(__file__).parent
 
         # Find all model folders
         all_model_folders = set()
         for category_dir in [
-            models_dir / "anyvariate",
+            models_dir / "deterministic",
+            models_dir / "stochastic",
             models_dir / "multivariate",
             models_dir / "univariate",
         ]:
@@ -111,19 +122,29 @@ class ModelRouter:
         if uncategorized_models:
             raise ValueError(
                 f"Found models that are not properly categorized: {uncategorized_models}. "
-                f"Each model must be in exactly one of: anyvariate, multivariate, or univariate folders."
+                f"Each model must be in exactly one of: deterministic, stochastic, multivariate, or univariate folders."
             )
 
         # Check for models that are in categories but don't have proper structure
         for model_name in all_models:
-            if model_name in self.anyvariate_models:
+            if model_name in self.deterministic_models:
                 model_path = (
-                    models_dir / "anyvariate" / model_name / f"{model_name}_model.py"
+                    models_dir / "deterministic" / model_name / f"{model_name}_model.py"
                 )
                 if not model_path.exists():
                     raise ValueError(
-                        f"Anyvariate model '{model_name}' missing required file: {model_path}"
+                        f"Deterministic model '{model_name}' missing required file: {model_path}"
                     )
+            
+            elif model_name in self.stochastic_models:
+                model_path = (
+                    models_dir / "stochastic" / model_name / f"{model_name}_model.py"
+                )
+                if not model_path.exists():
+                    raise ValueError(
+                        f"Stochastic model '{model_name}' missing required file: {model_path}"
+                    )
+            
             elif model_name in self.multivariate_models:
                 # Check both multivariate and univariate implementations
                 multivariate_path = (
@@ -195,11 +216,18 @@ class ModelRouter:
         if num_targets < 1:
             raise ValueError(f"num_targets must be >= 1, got {num_targets}")
 
-        # Handle anyvariate models (can handle both univariate and multivariate)
-        if model_name in self.anyvariate_models:
-            folder_path = str(models_dir / "anyvariate" / model_name)
+        # Handle deterministic models (can handle both univariate and multivariate)
+        if model_name in self.deterministic_models:
+            folder_path = str(models_dir / "deterministic" / model_name)
             file_name = f"{model_name}_model"
-            class_name = self._generate_class_name(model_name, "anyvariate")
+            class_name = self._generate_class_name(model_name, "deterministic")
+            return folder_path, file_name, class_name
+
+        # Handle stochastic models (can handle both univariate and multivariate)
+        if model_name in self.stochastic_models:
+            folder_path = str(models_dir / "stochastic" / model_name)
+            file_name = f"{model_name}_model"
+            class_name = self._generate_class_name(model_name, "stochastic")
             return folder_path, file_name, class_name
 
         # Handle models with separate multivariate implementations
@@ -249,7 +277,8 @@ class ModelRouter:
 
         else:
             available_models = sorted(
-                self.anyvariate_models
+                self.deterministic_models
+                | self.stochastic_models
                 | self.multivariate_models
                 | self.univariate_models
             )
@@ -271,9 +300,13 @@ class ModelRouter:
         models_dir = Path(__file__).parent
 
         # Determine which file to read based on variant
-        if variant == "anyvariate" or model_name in self.anyvariate_models:
+        if variant == "deterministic" or model_name in self.deterministic_models:
             model_file = (
-                models_dir / "anyvariate" / model_name / f"{model_name}_model.py"
+                models_dir / "deterministic" / model_name / f"{model_name}_model.py"
+            )
+        elif variant == "stochastic" or model_name in self.stochastic_models:
+            model_file = (
+                models_dir / "stochastic" / model_name / f"{model_name}_model.py"
             )
         elif variant == "multivariate":
             # Always read from multivariate folder when variant is explicitly multivariate
@@ -340,7 +373,8 @@ class ModelRouter:
 
             # Check if model exists in any category
             if model_name not in (
-                self.anyvariate_models
+                self.deterministic_models
+                | self.stochastic_models
                 | self.multivariate_models
                 | self.univariate_models
             ):
@@ -361,7 +395,8 @@ class ModelRouter:
             Dictionary mapping model categories to lists of models
         """
         return {
-            "anyvariate": sorted(self.anyvariate_models),
+            "deterministic": sorted(self.deterministic_models),
+            "stochastic": sorted(self.stochastic_models),
             "multivariate": sorted(self.multivariate_models),
             "univariate_only": sorted(self.univariate_models),
         }
@@ -386,11 +421,17 @@ class ModelRouter:
             "folder_paths": {},
         }
 
-        if model_name in self.anyvariate_models:
-            info["category"] = "anyvariate"
+        if model_name in self.deterministic_models:
+            info["category"] = "deterministic"
             info["supported_variants"] = ["univariate", "multivariate"]
             info["folder_paths"] = {
-                "anyvariate": str(models_dir / "anyvariate" / model_name)
+                "deterministic": str(models_dir / "deterministic" / model_name)
+            }
+        elif model_name in self.stochastic_models:
+            info["category"] = "stochastic"
+            info["supported_variants"] = ["univariate", "multivariate"]
+            info["folder_paths"] = {
+                "stochastic": str(models_dir / "stochastic" / model_name)
             }
         elif model_name in self.multivariate_models:
             info["category"] = "multivariate"
