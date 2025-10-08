@@ -69,41 +69,48 @@ class TabpfnModel(BaseModel):
         freq: str,
         **kwargs,
     ):
-        forecast_horizon = timestamps_target.shape[0]
-        context_window = self.model_config["context_window"]
-        forecast_window = self.model_config["forecast_window"]
+        # Map legacy keys to expected ones for backward compatibility
+        context_window = (
+            int(self.model_config.get("context_window")
+                if self.model_config.get("context_window") is not None
+                else self.model_config.get("max_sequence_length", 128))
+        )
+        forecast_window = (
+            int(self.model_config.get("forecast_window")
+                if self.model_config.get("forecast_window") is not None
+                else self.model_config.get("prediction_length", 10))
+        )
 
-        # Fit the model on the current context window
+        # Determine total horizon from target timestamps
+        forecast_horizon = int(getattr(timestamps_target, "shape", [0])[0])
+
+        # Ensure 1D arrays for context/targets
+        y_context = np.squeeze(y_context).astype(np.float32)
+
+        # Use last context_window points
+        y_hist = y_context[-context_window:]
+
+        # Build time features and fit TabPFN on the context window
+        X_hist = make_time_features(len(y_hist)).values
         regressor = TabPFNRegressor()
+        print("Fitting TabPFN")
+        regressor.fit(X_hist, y_hist)
 
-        timestamps_context = timestamps_context[-context_window:]
-        y_context = y_context[-context_window:]
+        # Roll out forecasts in chunks
+        preds: list[np.ndarray] = []
+        remaining = forecast_horizon
+        while remaining > 0:
+            step = min(forecast_window, remaining)
+            # Generate future feature positions immediately following history
+            X_future = make_time_features(len(y_hist) + step).values[-step:]
+            y_step = regressor.predict(X_future)
+            y_step = np.asarray(y_step, dtype=np.float32)
+            preds.append(y_step.reshape(-1, 1))
+            # Autoregressively extend history
+            y_hist = np.concatenate([y_hist, y_step])
+            remaining -= step
 
-        print("Fitting TabFPN")
-        regressor.fit(timestamps_context, y_context)
-
-        y_pred = []
-        steps_left = forecast_horizon
-
-        for step in range(math.ceil(forecast_horizon / forecast_window)):
-
-            timestamps_curr = timestamps_target[
-                forecast_window * step : forecast_window * (step + 1), :
-            ]
-
-            y_pred_curr = regressor.predict(timestamps_curr)
-            y_pred_curr = np.expand_dims(y_pred_curr, axis=1)
-            y_pred.append(y_pred_curr)
-
-            # Update the context and target for the next iteration
-            timestamps_context = np.concatenate(
-                [timestamps_context, timestamps_curr], axis=0
-            )
-            y_context = np.concatenate([y_context, y_pred_curr], axis=0)
-
-        forecasts = np.concatenate(y_pred, axis=0)
-
-        return forecasts
+        return np.concatenate(preds, axis=0)
 
     def train(
         self,

@@ -1,7 +1,7 @@
 test_type: deterministic
 tensorboard: true
 dataset:
-  name: bdg-2_bear
+  name: multivariate/goldindia_continuous_multivariate
   split_ratio: [0.8, 0.1, 0.1]
   normalize: true
   handle_missing: interpolate
@@ -10,7 +10,7 @@ dataset:
 model:
   tabpfn:
     allow_large_cpu_dataset: [True]
-    max_sequence_length: [32]
+    max_sequence_length: [128]
     prediction_length: [10]
 
 evaluation:
