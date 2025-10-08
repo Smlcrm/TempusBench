@@ -378,6 +378,7 @@ class ModelExecutor:
             full_config["model"] = {}
         full_config["model"][model_name] = model_params
         full_config["dataset"] = self.config["dataset"]
+        model_params["evaluation"] = self.config["evaluation"]
 
         base_model = model_class(model_params)
 

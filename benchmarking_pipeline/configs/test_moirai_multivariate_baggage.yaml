@@ -15,4 +15,5 @@ model:
 
 evaluation:
   type: deterministic
-  metrics: [crps]
+  metrics: [crps, interval_score]
+  #metrics: [mae, mase, rmse]
