@@ -68,6 +68,13 @@ class RandomForestModel(BaseModel):
         Returns:
             Tuple[np.ndarray, np.ndarray]: Features and targets
         """
+        # Ensure univariate series for feature generation
+        y_series = np.squeeze(y_series)
+        if getattr(y_series, "ndim", 1) > 1:
+            y_series = y_series[:, 0]
+        if timestamps is not None:
+            timestamps = np.squeeze(timestamps)
+
         forecast_horizon = self.model_config["forecast_horizon"]
 
         n_samples = (
@@ -176,7 +183,7 @@ class RandomForestModel(BaseModel):
 
         return np.array(features), np.array(targets)
 
-    def train(
+    def _train(
         self,
         y_context: Optional[np.ndarray],
         y_target: Optional[np.ndarray] = None,
@@ -209,7 +216,8 @@ class RandomForestModel(BaseModel):
             self._build_model()
 
         # Combine context and target data for training
-        forecast_horizon = timestamps_target.shape[0]
+        # Train the model to predict the configured forecast horizon
+        forecast_horizon = int(self.model_config.get("forecast_horizon", 1))
 
         full_y_data = np.concatenate([y_context, y_target], axis=0)
         full_y_data = np.squeeze(full_y_data)
@@ -229,6 +237,24 @@ class RandomForestModel(BaseModel):
         print("Ended training random forest")
         self.is_fitted = True
         return self
+
+    def train(
+        self,
+        y_context: Optional[np.ndarray],
+        y_target: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
+        **kwargs,
+    ) -> "RandomForestModel":
+        return self._train(
+            y_context=y_context,
+            y_target=y_target,
+            timestamps_context=timestamps_context,
+            timestamps_target=timestamps_target,
+            freq=freq,
+            **kwargs,
+        )
 
     def _predict(
         self,
@@ -315,22 +341,41 @@ class RandomForestModel(BaseModel):
         # Initialize context with the last lookback_window values from y_context
         # Ensure context is 1D for consistent handling
 
-        y_context = y_context[-self.model_config["lookback_window"] :, 0]
-        timestamps_context = timestamps_context[
-            -self.model_config["lookback_window"] :, 0
-        ]
-        timestamps_target = timestamps_target[:, 0]
+        # If multivariate, predict each variate separately and stack
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
+            # Multivariate: predict each variate, then assemble as (horizon, num_targets)
+            per_var_preds = []
+            for k in range(y_context.shape[1]):
+                yc = y_context[:, k]
+                # Timestamps are shared across variates; pass as 1D arrays
+                tc = timestamps_context
+                tt = timestamps_target
+                pk = self._predict(
+                    y_context=yc,
+                    timestamps_context=tc,
+                    timestamps_target=tt,
+                    freq=freq,
+                    **kwargs,
+                )  # pk shape (1, horizon)
+                pk = np.squeeze(pk)  # -> (horizon,)
+                per_var_preds.append(pk)
+            # Shape (num_targets, horizon) -> transpose to (horizon, num_targets)
+            pred_matrix = np.stack(per_var_preds, axis=0).T
+            # Return only the last-step prediction to match evaluator (shape (1, num_targets))
+            return pred_matrix[-1:, :]
+
+        # Ensure 1D context for univariate flow to avoid shape mismatches during concat
+        y_context = np.squeeze(y_context)
+        y_context = y_context[-self.model_config["lookback_window"] :]
+        timestamps_context = timestamps_context[-self.model_config["lookback_window"] :]
 
         preds = []
-        steps = self.model_config["forecast_horizon"]
+        default_steps = self.model_config["forecast_horizon"]
         steps_remaining = len(timestamps_target)
 
         while steps_remaining > 0:
             # Determine how many steps to predict in this iteration
-
-            # Create a dummy target array for this prediction step
-            # The actual target values don't matter for prediction, we just need the right shape
-            target_for_prediction = np.zeros(steps)
+            steps = min(default_steps, steps_remaining)
 
             # Get the current target timestamps for this prediction window
 
@@ -369,6 +414,5 @@ class RandomForestModel(BaseModel):
             steps_remaining -= steps
 
         preds = np.array(preds)
-        preds = np.expand_dims(preds, axis=1)
-
-        return preds
+        # Return last-step only to match evaluator expectations (shape (1, 1))
+        return preds.reshape(1, -1)[:, -1:]
