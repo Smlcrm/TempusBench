@@ -121,7 +121,7 @@ class LagllamaModel(BaseModel):
 
         return timestamps
 
-    def train(
+    def _train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
@@ -148,7 +148,7 @@ class LagllamaModel(BaseModel):
 
         return self
 
-    def predict(
+    def _predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
@@ -229,6 +229,46 @@ class LagllamaModel(BaseModel):
                 results = np.expand_dims(results, axis=1)
 
         return results
+
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+    ) -> "LagllamaModel":
+        """
+        Anyvariate wrapper: for multivariate, no separate fitting is needed; we keep separate handles.
+        """
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
+            self.models = []
+            for k in range(y_context.shape[1]):
+                m = LagllamaModel(self.model_config)
+                m._train(y_context[:, k], y_target[:, k] if y_target is not None and y_target.ndim > 1 else y_target,
+                         timestamps_context, timestamps_target, freq)
+                self.models.append(m)
+            self.is_fitted = True
+            return self
+        return self._train(y_context, y_target, timestamps_context, timestamps_target, freq)
+
+    def predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
+        **kwargs,
+    ) -> np.ndarray:
+        if hasattr(self, "models") and self.models:
+            preds = []
+            for k, m in enumerate(self.models):
+                yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
+                pk = m._predict(y_context=yc, timestamps_context=timestamps_context,
+                                timestamps_target=timestamps_target, freq=freq, **kwargs)
+                preds.append(pk.reshape(-1, 1) if pk.ndim == 1 else pk)
+            return np.concatenate(preds, axis=1)
+        return self._predict(y_context, timestamps_context, timestamps_target, freq, **kwargs)
 
     # def _predict_internal(
     #     self,
