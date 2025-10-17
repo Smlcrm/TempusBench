@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from benchmarking_pipeline.models.base_model import BaseModel
+from benchmarking_pipeline.utils.logger import Logger
 
 
 class ExponentialSmoothingModel(BaseModel):
@@ -22,6 +23,7 @@ class ExponentialSmoothingModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
+        self.logger = Logger(log_dir='logs', name='ExponentialSmoothingModel')
 
         # Get the model-specific config from the nested structure
         # BaseModel keeps the full config, so we need to extract the exponential_smoothing part
@@ -87,9 +89,7 @@ class ExponentialSmoothingModel(BaseModel):
         **kwargs,
     ) -> "ExponentialSmoothingModel":
 
-        print(
-            f"[ExponentialSmoothing train] y_context type: {type(y_context)}, shape: {getattr(y_context, 'shape', 'N/A')}"
-        )
+        self.logger.debug(f"y_context type: {type(y_context)}, shape: {getattr(y_context, 'shape', 'N/A')}")
 
         # Ensure correct types for model parameters
         trend = self.model_config["trend"]
@@ -126,12 +126,8 @@ class ExponentialSmoothingModel(BaseModel):
         if endog.ndim > 1:
             endog = endog.flatten()
 
-        print(
-            f"[ExponentialSmoothing train] endog shape: {endog.shape}, first 5 values: {endog[:5]}"
-        )
-        print(
-            f"[ExponentialSmoothing train] parameters: trend={trend}, seasonal={seasonal}, seasonal_periods={seasonal_periods}, damped_trend={damped_trend}"
-        )
+        self.logger.debug(f"endog shape: {endog.shape}, first 5 values: {endog[:5]}")
+        self.logger.debug(f"parameters: trend={trend}, seasonal={seasonal}, seasonal_periods={seasonal_periods}, damped_trend={damped_trend}")
 
         try:
             self.model = ExponentialSmoothing(
@@ -142,9 +138,9 @@ class ExponentialSmoothingModel(BaseModel):
                 damped_trend=damped_trend,
             ).fit()
             self.is_fitted = True
-            print(f"[ExponentialSmoothing train] Model fitted successfully")
+            self.logger.info("Model fitted successfully")
         except Exception as e:
-            print(f"[ExponentialSmoothing train] Error fitting model: {e}")
+            self.logger.error(f"Error fitting model: {e}")
             raise
 
         return self
@@ -162,7 +158,7 @@ class ExponentialSmoothingModel(BaseModel):
             raise ValueError("Model not initialized. Call train first.")
 
         forecast_steps = len(timestamps_target)
-        print(f"[ExponentialSmoothing predict] Forecasting {forecast_steps} steps")
+        self.logger.debug(f"Forecasting {forecast_steps} steps")
 
         try:
             forecast = self.model.forecast(steps=forecast_steps)
@@ -172,9 +168,9 @@ class ExponentialSmoothingModel(BaseModel):
             if len(forecast.shape) == 1:
                 forecast = np.expand_dims(forecast, axis=1)
 
-            print(f"[ExponentialSmoothing predict] result shape: {forecast.shape}")
+            self.logger.debug(f"result shape: {forecast.shape}")
             return forecast
 
         except Exception as e:
-            print(f"[ExponentialSmoothing predict] Error during forecast: {e}")
+            self.logger.error(f"Error during forecast: {e}")
             raise

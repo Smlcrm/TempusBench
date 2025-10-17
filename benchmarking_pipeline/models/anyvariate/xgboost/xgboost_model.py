@@ -13,6 +13,7 @@ import pandas as pd
 from xgboost import XGBRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from benchmarking_pipeline.models.base_model import BaseModel
+from benchmarking_pipeline.utils.logger import Logger
 
 
 class XGBoostModel(BaseModel):
@@ -26,6 +27,7 @@ class XGBoostModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
+        self.logger = Logger(log_dir='logs', name='XGBoostModel')
 
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
@@ -347,8 +349,8 @@ class XGBoostModel(BaseModel):
                     self.model_config["forecast_horizon"], num_targets
                 )
 
-                print(
-                    f"[DEBUG][MultivariateXGBoost] Rolling predict X_pred shape: {X_pred.shape}, pred_reshaped shape: {pred_reshaped.shape}"
+                self.logger.debug(
+                    f"Rolling predict X_pred shape: {X_pred.shape}, pred_reshaped shape: {pred_reshaped.shape}"
                 )
 
                 # Only take as many steps as needed
@@ -397,5 +399,5 @@ class XGBoostModel(BaseModel):
         preds = self.rolling_predict(
             y_context, timestamps_context, timestamps_target, freq
         )
-        print(f"[DEBUG][MultivariateXGBoost] Final rolling preds shape: {preds.shape}")
+        self.logger.debug(f"Final rolling preds shape: {preds.shape}")
         return preds

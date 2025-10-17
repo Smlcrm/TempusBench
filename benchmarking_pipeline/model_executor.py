@@ -20,6 +20,7 @@ from benchmarking_pipeline.models.base_model import BaseModel
 import json
 
 from benchmarking_pipeline.trainer.hyperparameter_tuning import HyperparameterTuner
+from benchmarking_pipeline.utils.logger import Logger
 
 class ModelExecutor:
 
@@ -42,6 +43,9 @@ class ModelExecutor:
         self.result_path = result_path or self.config.get("result_path")
         self.dataset_name = dataset_name
 
+        # Setup Python logger for status messages
+        self.logger = Logger(logs_dir='logs', name='ModelExecutor')
+        
         # Setup TensorBoard logging like we had before
         self.setup_tensorboard_logging()
 
@@ -49,7 +53,7 @@ class ModelExecutor:
         """Setup TensorBoard logging with the exact structure we had before."""
         # Only enable TensorBoard if config specifies tensorboard: true
         if not self.config.get("tensorboard", False):
-            print("[INFO] TensorBoard logging disabled (tensorboard: false in config)")
+            self.logger.info("TensorBoard logging disabled (tensorboard: false in config)")
             self.writer = None
             self.log_dir = None
 
@@ -74,14 +78,14 @@ class ModelExecutor:
             # Create TensorBoard writer
             self.writer = SummaryWriter(train_dir)
             self.log_dir = train_dir
-            print(f"[INFO] TensorBoard logging enabled at: {train_dir}")
+            self.logger.info(f"TensorBoard logging enabled at: {train_dir}")
 
         except ImportError:
-            print("[WARNING] TensorBoard not available, logging disabled")
+            self.logger.warning("TensorBoard not available, logging disabled")
             self.writer = None
             self.log_dir = None
         except Exception as e:
-            print(f"[WARNING] Failed to setup TensorBoard logging: {e}")
+            self.logger.warning(f"Failed to setup TensorBoard logging: {e}")
             self.writer = None
             self.log_dir = None
 
@@ -105,11 +109,9 @@ class ModelExecutor:
                             f"hyperparameters/{param_name}", str(param_value), 0
                         )
 
-                print(f"[INFO] Logged hyperparameter search results to TensorBoard")
+                self.logger.info("Logged hyperparameter search results to TensorBoard")
             except Exception as e:
-                print(
-                    f"[WARNING] Failed to log hyperparameter results to TensorBoard: {e}"
-                )
+                self.logger.warning(f"Failed to log hyperparameter results to TensorBoard: {e}")
 
     def log_final_results(
         self, model_name, opt_hyperparams, y_context, y_test, y_pred, final_metrics
@@ -132,9 +134,9 @@ class ModelExecutor:
                 self.writer.add_text("model/config", str(self.config), 0)
                 self.writer.add_text("model/name", model_name, 0)
 
-                print(f"[INFO] Logged final evaluation results to TensorBoard")
+                self.logger.info("Logged final evaluation results to TensorBoard")
             except Exception as e:
-                print(f"[WARNING] Failed to log evaluation results to TensorBoard: {e}")
+                self.logger.warning(f"Failed to log evaluation results to TensorBoard: {e}")
 
         # Persist results for host process to log to TensorBoard
         if self.result_path:
@@ -248,7 +250,7 @@ class ModelExecutor:
 
                     payload["forecast_plot_test_path"] = plot_test
                 except Exception as e:
-                    print(f"[WARNING] Failed to create forecast plots: {e}")
+                    self.logger.warning(f"Failed to create forecast plots: {e}")
 
                 with open(self.result_path, "w") as rf:
                     json.dump(payload, rf)
@@ -264,7 +266,7 @@ class ModelExecutor:
         
         model_name = self.model_folder_name.split("/")[-1]
         self.model_name = model_name
-        print(f"[INFO] Preparing to run model: {model_name}")
+        self.logger.info(f"Preparing to run model: {model_name}")
         # Build the module path for import
         # The model_folder_name is now an absolute path, so we need to extract the relative part
         # from the models directory to construct the module path
@@ -284,10 +286,10 @@ class ModelExecutor:
                 f"Invalid model folder path: {self.model_folder_name}. Must contain '/models/'"
             )
 
-        print(f"[INFO] Importing module: {module_path}")
+        self.logger.info(f"Importing module: {module_path}")
         module = importlib.import_module(module_path)
         model_class = getattr(module, self.model_class_name)
-        print(f"[INFO] Executing {model_name} model...")
+        self.logger.info(f"Executing {model_name} model...")
 
         with open(self.chunk_path, "rb") as f:
             serializable_chunks = pickle.load(f)
@@ -355,21 +357,21 @@ class ModelExecutor:
         # Get the hyperparameter grid for this model (no auto-injection)
         hyper_grid = self.config["model"][model_name] or {}
 
-        print(f"[INFO] Hyperparameter grid for {model_name}: {hyper_grid}")
+        self.logger.info(f"Hyperparameter grid for {model_name}: {hyper_grid}")
 
-        print(f"{model_name} is a Base Model!")
+        self.logger.info(f"{model_name} is a Base Model!")
         # Handle case where model has no parameters (empty model)
         if not hyper_grid:
-            print(f"[INFO] {model_name} has no parameters, using empty hyper_grid")
+            self.logger.info(f"{model_name} has no parameters, using empty hyper_grid")
 
-        print(f"{model_name} hyper grid: {hyper_grid}")
+        self.logger.info(f"{model_name} hyper grid: {hyper_grid}")
 
         model_params = {
             k: v[0] if isinstance(v, list) else v for k, v in hyper_grid.items()
         }
         
         # Include dataset configuration for other parameters
-        print(f"{model_name} initial model_params: {model_params}")
+        self.logger.info(f"{model_name} initial model_params: {model_params}")
 
         # Create a full config that includes evaluation metrics
         full_config = self.config.copy()
@@ -388,7 +390,7 @@ class ModelExecutor:
         opt_valid_loss, opt_hyperparams = (
             model_hyperparameter_tuner.hyperparameter_grid_search(dataset)
         )
-        print(
+        self.logger.info(
             f"{model_name} - optimal validation score {opt_valid_loss} achieved for hyperparameter:\n {opt_hyperparams}"
         )
 
@@ -396,8 +398,8 @@ class ModelExecutor:
             model_hyperparameter_tuner.final_evaluation(opt_hyperparams, dataset)
         )
 
-        print(f"{model_name} results: {final_metrics}")
-        print(f"[SUCCESS] {model_name} execution completed successfully!")
+        self.logger.info(f"{model_name} results: {final_metrics}")
+        self.logger.success(f"{model_name} execution completed successfully!")
 
         self.log_validation_results(opt_valid_loss, opt_hyperparams)
         self.log_final_results(
@@ -428,18 +430,16 @@ class ModelExecutor:
             writer = csv.DictWriter(f, fieldnames=list(metrics_for_csv.keys()))
             writer.writeheader()
             writer.writerow(metrics_for_csv)
-        print(f"[INFO] Final metrics written to {csv_file}")
+        self.logger.info(f"Final metrics written to {csv_file}")
         
     def cleanup(self):
         """Cleanup TensorBoard writer and ensure all logs are flushed."""
         if self.writer:
             try:
                 self.writer.close()
-                print(
-                    f"[INFO] TensorBoard writer closed, logs saved to: {self.log_dir}"
-                )
+                self.logger.info(f"TensorBoard writer closed, logs saved to: {self.log_dir}")
             except Exception as e:
-                print(f"[WARNING] Failed to close TensorBoard writer: {e}")
+                self.logger.warning(f"Failed to close TensorBoard writer: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -481,6 +481,7 @@ if __name__ == "__main__":
         result_path=args.result_path,
         dataset_name=os.path.basename(args.dataset_name)
     )
+    # These print statements are in the main section and will be handled by the ModelExecutor's logger
     print(f"[INFO] Config: {args.config}")
     print(f"[INFO] Chunk Path: {args.chunk_path}")
     print(f"[INFO] Model Folder: {args.model_folder_name}")
