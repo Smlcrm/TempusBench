@@ -3,7 +3,6 @@ Data preprocessing utilities.
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict, Any, Optional, Union, List
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from datetime import datetime
@@ -24,14 +23,14 @@ class MinMaxScalerSafe:
     def inverse_transform(self, X_scaled):
         return self.scaler.inverse_transform(X_scaled)
 
-
 class Preprocessor:
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize preprocessor with configuration.
-        
+
         Args:
             config: Configuration dictionary. Preprocessing-related keys are under 'dataset'.
+                Supports: normalize, normalization_method, handle_missing.
         """
         self.config = config
         self.scalers = {}
@@ -45,122 +44,220 @@ class Preprocessor:
         return {
             "normalize": dataset_cfg.get("normalize", True),
             "normalization_method": dataset_cfg.get("normalization_method", "minmax"),
-            "handle_missing": dataset_cfg.get("handle_missing", "interpolate"),
-            "remove_outliers": dataset_cfg.get("remove_outliers", False),
-            "outlier_threshold": dataset_cfg.get("outlier_threshold", 3)
+            "handle_missing": dataset_cfg.get("handle_missing", "interpolate")
         }
 
-    def _handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _handle_missing_values(self, arr: np.ndarray) -> np.ndarray:
         """
-        Handle missing values in the dataframe.
+        Handle missing values in the ndarray.
         """
         strategy = self.preprocessing_config.get('handle_missing', 'interpolate')
 
-        if strategy == 'drop':
-            return df.dropna()
-        elif strategy == 'mean':
-            return df.fillna(df.mean(numeric_only=True))
-        elif strategy == 'median':
-            return df.fillna(df.median(numeric_only=True))
-        elif strategy == 'interpolate':
-            # Fill NaNs over time per target (rows are time, columns are targets)
-            return df.interpolate(axis=0).ffill(axis=0).bfill(axis=0)
-        elif strategy == 'forward_fill':
-            return df.fillna(method='ffill')
-        elif strategy == 'backward_fill':
-            return df.fillna(method='bfill')
-        else:
-            return df.fillna(method='ffill').fillna(method='bfill')
+        if arr.size == 0:
+            return arr
 
-    def _normalize_features(self, df: pd.DataFrame, is_training: bool = True) -> pd.DataFrame:
+        # Ensure we have a 2D array for consistent processing
+        is_1d = arr.ndim == 1
+        if is_1d:
+            arr = arr.reshape(-1, 1)
+
+        result = arr.copy()
+
+        if strategy == 'drop':
+            # Remove rows with any NaN values
+            valid_rows = ~np.isnan(result).any(axis=1)
+            result = result[valid_rows]
+        elif strategy == 'mean':
+            # Fill NaN with column means
+            for col_idx in range(result.shape[1]):
+                col_data = result[:, col_idx]
+                mean_val = np.nanmean(col_data)
+                if not np.isnan(mean_val):
+                    col_data[np.isnan(col_data)] = mean_val
+                    result[:, col_idx] = col_data
+        elif strategy == 'median':
+            # Fill NaN with column medians
+            for col_idx in range(result.shape[1]):
+                col_data = result[:, col_idx]
+                median_val = np.nanmedian(col_data)
+                if not np.isnan(median_val):
+                    col_data[np.isnan(col_data)] = median_val
+                    result[:, col_idx] = col_data
+        elif strategy == 'interpolate':
+            # Interpolate missing values for each column
+            for col_idx in range(result.shape[1]):
+                result[:, col_idx] = self._interpolate_column(result[:, col_idx])
+        elif strategy == 'forward_fill':
+            # Forward fill missing values
+            for col_idx in range(result.shape[1]):
+                result[:, col_idx] = self._forward_fill_column(result[:, col_idx])
+        elif strategy == 'backward_fill':
+            # Backward fill missing values
+            for col_idx in range(result.shape[1]):
+                result[:, col_idx] = self._backward_fill_column(result[:, col_idx])
+        else:
+            # Default: forward fill then backward fill
+            for col_idx in range(result.shape[1]):
+                col_data = self._forward_fill_column(result[:, col_idx])
+                result[:, col_idx] = self._backward_fill_column(col_data)
+
+        # Return to original shape if input was 1D
+        if is_1d:
+            result = result.flatten()
+        return result
+
+    def _interpolate_column(self, col_data: np.ndarray) -> np.ndarray:
+        """Interpolate missing values in a single column."""
+        if not np.isnan(col_data).any():
+            return col_data
+
+        # Get valid indices and values
+        valid_mask = ~np.isnan(col_data)
+        if not valid_mask.any():
+            # All values are NaN, fill with 0
+            return np.zeros_like(col_data)
+
+        valid_indices = np.where(valid_mask)[0]
+        valid_values = col_data[valid_mask]
+
+        if len(valid_indices) == 1:
+            # Only one valid value, fill all with that value
+            return np.full_like(col_data, valid_values[0])
+
+        # Create interpolation indices for all positions
+        all_indices = np.arange(len(col_data))
+
+        # Interpolate using numpy
+        interpolated = np.interp(all_indices, valid_indices, valid_values)
+
+        return interpolated
+
+    def _forward_fill_column(self, col_data: np.ndarray) -> np.ndarray:
+        """Forward fill missing values in a single column."""
+        result = col_data.copy()
+        last_valid = None
+
+        for i in range(len(result)):
+            if not np.isnan(result[i]):
+                last_valid = result[i]
+            elif last_valid is not None:
+                result[i] = last_valid
+        return result
+
+    def _backward_fill_column(self, col_data: np.ndarray) -> np.ndarray:
+        """Backward fill missing values in a single column."""
+        result = col_data.copy()
+        next_valid = None
+
+        for i in range(len(result) - 1, -1, -1):
+            if not np.isnan(result[i]):
+                next_valid = result[i]
+            elif next_valid is not None:
+                result[i] = next_valid
+        return result
+
+    def _normalize_features(self, arr: np.ndarray, is_training: bool = True) -> np.ndarray:
         """
         Normalize numerical features using standard or min-max scaling.
         """
         if not self.preprocessing_config.get('normalize', True):
-            return df
+            return arr
 
-        # Handle empty DataFrames
-        if df.empty:
-            return df
+        # Handle empty arrays
+        if arr.size == 0:
+            return arr
 
         method = self.preprocessing_config.get('normalization_method', 'standard')
-        df_normalized = df.copy()
+        arr_normalized = arr.copy()
 
-        numerical_cols = df.select_dtypes(include=[np.number]).columns
+        # Ensure we have a 2D array for consistent processing
+        is_1d = arr.ndim == 1
+        if is_1d:
+            arr_normalized = arr_normalized.reshape(-1, 1)
 
-        for col in numerical_cols:
+        # Process each column
+        for col_idx in range(arr_normalized.shape[1]):
+            col_data = arr_normalized[:, col_idx]
+
             # Skip columns with no valid data
-            if df[col].isna().all() or len(df[col].dropna()) == 0:
+            if np.isnan(col_data).all() or len(col_data[~np.isnan(col_data)]) == 0:
                 continue
-                
+
             # Handle columns with some NaN values by filling them before scaling
-            col_data = df[col].fillna(df[col].mean())  # Fill NaN with mean for scaling
-            
+            col_mean = np.nanmean(col_data)
+            if not np.isnan(col_mean):
+                col_data = np.where(np.isnan(col_data), col_mean, col_data)
+            else:
+                # All values are NaN, skip this column
+                continue
+
             if is_training:
                 if method == 'standard':
                     scaler = StandardScaler()
                 else:
                     scaler = MinMaxScalerSafe()
-                df_normalized[col] = scaler.fit_transform(col_data.values.reshape(-1, 1)).flatten()
-                self.scalers[col] = scaler
+                arr_normalized[:, col_idx] = scaler.fit_transform(col_data.reshape(-1, 1)).flatten()
+                self.scalers[col_idx] = scaler
             else:
-                scaler = self.scalers.get(col)
+                scaler = self.scalers.get(col_idx)
                 if scaler:
-                    df_normalized[col] = scaler.transform(col_data.values.reshape(-1, 1)).flatten()
+                    arr_normalized[:, col_idx] = scaler.transform(col_data.reshape(-1, 1)).flatten()
 
-        return df_normalized
+        # Return to original shape if input was 1D
+        if is_1d:
+            arr_normalized = arr_normalized.flatten()
 
-    def _remove_outliers(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Remove outliers using the z-score method.
-        """
-        if not self.preprocessing_config.get('remove_outliers', False):
-            return df
+        return arr_normalized
 
-        threshold = self.preprocessing_config.get('outlier_threshold', 3)
-        df_clean = df.copy()
-
-        for col in df.select_dtypes(include=[np.number]).columns:
-            # Only calculate z-scores on non-null values
-            non_null_mask = df[col].notna()
-            if non_null_mask.sum() > 0:  # Only process if we have non-null values
-                non_null_data = df[col][non_null_mask]
-                z_scores = np.abs((non_null_data - non_null_data.mean()) / non_null_data.std())
-                outlier_mask = z_scores >= threshold
-                
-                # Replace outliers with NaN (they will be handled by interpolation later)
-                df_clean.loc[non_null_mask, col] = non_null_data.mask(outlier_mask)
-
-        return df_clean
 
     def _generate_artificial_timestamps(self, split: DatasetSplit, metadata: Dict[str, Any]) -> DatasetSplit:
         """Generate artificial timestamps for unknown/irregular frequency data."""
         freq = str(metadata.get("freq", "unknown")).lower()
-        
+
         # Check if we need artificial timestamps
         if freq not in ["unknown", "irregular", "none", ""]:
             return split
-            
+
         # Get data length
-        data_length = len(split.targets) if hasattr(split.targets, '__len__') else split.targets.shape[0]
-        
+        data_length = split.targets.shape[0]
+
         # Random frequency >= 1 minute
         frequencies = ["1min", "5min", "15min", "1h", "3h", "1D", "1W"]
         freq = random.choice(frequencies)
-        
+
         # Generate timestamps from current time
-        timestamps = pd.date_range(start=datetime.now(), periods=data_length, freq=freq)
-        
+        # Since we removed pandas, we'll create a simple numeric timestamp array
+        # representing seconds since epoch
+        start_time = datetime.now().timestamp()
+        if freq == "1min":
+            step = 60
+        elif freq == "5min":
+            step = 300
+        elif freq == "15min":
+            step = 900
+        elif freq == "1h":
+            step = 3600
+        elif freq == "3h":
+            step = 10800
+        elif freq == "1D":
+            step = 86400
+        elif freq == "1W":
+            step = 604800
+        else:
+            step = 3600  # Default to 1 hour
+
+        timestamps = np.array([start_time + i * step for i in range(data_length)])
+
         return DatasetSplit(
             targets=split.targets,
-            features=split.features, 
+            features=split.features,
             metadata=split.metadata,
-            timestamps=timestamps.values
+            timestamps=timestamps
         )
 
     def preprocess(self, data: Dataset) -> PreprocessedData:
         """
-        Apply missing value handling, outlier removal, normalization, and timestamp generation to all splits.
+        Apply missing value handling, normalization, and timestamp generation to all splits.
 
         Args:
             data: Dataset with train/validation/test splits
@@ -171,27 +268,23 @@ class Preprocessor:
         def process_split(split: DatasetSplit, is_training: bool) -> DatasetSplit:
             # Generate artificial timestamps if needed
             processed_split = self._generate_artificial_timestamps(split, data.metadata or {})
-            
-            # Process targets
-            targets_df = processed_split.targets.copy() if isinstance(processed_split.targets, pd.DataFrame) else pd.DataFrame(processed_split.targets)
-            targets_df = self._handle_missing_values(targets_df)
-            if is_training:
-                targets_df = self._remove_outliers(targets_df)
-            targets_df = self._normalize_features(targets_df, is_training=is_training)
-            
+
+            # Process targets - ensure it's an ndarray
+            targets_arr = np.array(processed_split.targets) if not isinstance(processed_split.targets, np.ndarray) else processed_split.targets.copy()
+            targets_arr = self._handle_missing_values(targets_arr)
+            targets_arr = self._normalize_features(targets_arr, is_training=is_training)
+
             # Process features (exogenous variables) if present
-            features_df = None
+            features_arr = None
             if processed_split.features is not None:
-                features_df = processed_split.features.copy() if isinstance(processed_split.features, pd.DataFrame) else pd.DataFrame(processed_split.features)
-                features_df = self._handle_missing_values(features_df)
-                if is_training:
-                    features_df = self._remove_outliers(features_df)
-                features_df = self._normalize_features(features_df, is_training=is_training)
-            
+                features_arr = np.array(processed_split.features) if not isinstance(processed_split.features, np.ndarray) else processed_split.features.copy()
+                features_arr = self._handle_missing_values(features_arr)
+                features_arr = self._normalize_features(features_arr, is_training=is_training)
+
             return DatasetSplit(
-                targets=targets_df, 
-                features=features_df, 
-                metadata=processed_split.metadata, 
+                targets=targets_arr,
+                features=features_arr,
+                metadata=processed_split.metadata,
                 timestamps=processed_split.timestamps
             )
 
@@ -210,18 +303,39 @@ class Preprocessor:
         preprocessing_info = {
             'normalize': self.preprocessing_config.get('normalize', True),
             'normalization_method': self.preprocessing_config.get('normalization_method', 'standard'),
-            'remove_outliers': self.preprocessing_config.get('remove_outliers', False),
-            'outlier_threshold': self.preprocessing_config.get('outlier_threshold', 3),
             'handle_missing': self.preprocessing_config.get('handle_missing', 'interpolate'),
             'scalers': {
-                col: {
+                col_idx: {
                     'type': type(scaler).__name__,
                     'mean': getattr(scaler, 'mean_', None),
                     'scale': getattr(scaler, 'scale_', None)
-                } for col, scaler in self.scalers.items()
+                } for col_idx, scaler in self.scalers.items()
             },
-            'target_columns': list(train_split.targets.columns) if hasattr(train_split.targets, 'columns') else None,
-            'feature_columns': list(train_split.features.columns) if train_split.features is not None and hasattr(train_split.features, 'columns') else None
+            'target_shape': train_split.targets.shape,
+            'feature_shape': train_split.features.shape if train_split.features is not None else None
         }
 
         return PreprocessedData(data=preprocessed_dataset, preprocessing_info=preprocessing_info)
+
+    def clean(self, arr: np.ndarray) -> np.ndarray:
+        """
+        Clean a single array by handling missing values and normalization.
+        This method is used for individual target arrays in the data loader.
+        
+        Args:
+            arr: Input array to clean
+            
+        Returns:
+            Cleaned array with missing values handled and optionally normalized
+        """
+        if arr.size == 0:
+            return arr
+            
+        # Handle missing values
+        cleaned_arr = self._handle_missing_values(arr)
+        
+        # Normalize if configured
+        if self.preprocessing_config.get('normalize', True):
+            cleaned_arr = self._normalize_features(cleaned_arr, is_training=True)
+            
+        return cleaned_arr
