@@ -14,6 +14,7 @@ The router automatically discovers models from the folder structure and categori
 import os
 from typing import Tuple, Dict, Any, Optional, Set
 from pathlib import Path
+from ..utils.logger import Logger
 
 
 class ModelRouter:
@@ -32,6 +33,7 @@ class ModelRouter:
 
     def __init__(self):
         """Initialize the router and discover available models."""
+        self.logger = Logger(log_dir='logs', name='ModelRouter')
         self.anyvariate_models: Set[str] = set()
         self.multivariate_models: Set[str] = set()
         self.univariate_models: Set[str] = set()
@@ -214,9 +216,7 @@ class ModelRouter:
                 ):
                     folder_path = str(models_dir / "univariate" / model_name)
                     class_name = self._generate_class_name(model_name, "univariate")
-                    print(
-                        f"[ROUTER] Routing {model_name} with {num_targets} target(s) -> univariate variant"
-                    )
+                    self.logger.info(f"Routing {model_name} with {num_targets} target(s) -> univariate variant")
                 else:
                     # Fail fast: no fallback to multivariate
                     raise ValueError(
@@ -226,9 +226,7 @@ class ModelRouter:
                 # Use multivariate for actual multivariate data
                 folder_path = str(models_dir / "multivariate" / model_name)
                 class_name = self._generate_class_name(model_name, "multivariate")
-                print(
-                    f"[ROUTER] Routing {model_name} with {num_targets} target(s) -> multivariate variant"
-                )
+                self.logger.info(f"Routing {model_name} with {num_targets} target(s) -> multivariate variant")
 
             file_name = f"{model_name}_model"
             return folder_path, file_name, class_name

@@ -11,6 +11,7 @@ import os
 import pickle
 from benchmarking_pipeline.models.base_model import BaseModel
 from sklearn.ensemble import RandomForestRegressor
+from benchmarking_pipeline.utils.logger import Logger
 
 
 class RandomForestModel(BaseModel):
@@ -24,6 +25,7 @@ class RandomForestModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
+        self.logger = Logger(log_dir='logs', name='RandomForestModel')
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
 
@@ -34,7 +36,7 @@ class RandomForestModel(BaseModel):
         Build the RandomForestRegressor model instance from the configuration.
         """
 
-        print("building model")
+        self.logger.debug("building model")
         # Get hyperparameters from config, excluding model-level parameters
         model_params = {}
         for key, value in self.model_config.items():
@@ -81,9 +83,9 @@ class RandomForestModel(BaseModel):
             len(y_series) - self.model_config["lookback_window"] - forecast_horizon + 1
         )
 
-        print("len y_series:", len(y_series))
-        print("len timestamps:", len(timestamps))
-        print("forecast_horizon:", forecast_horizon)
+        self.logger.debug(f"len y_series: {len(y_series)}")
+        self.logger.debug(f"len timestamps: {len(timestamps)}")
+        self.logger.debug(f"forecast_horizon: {forecast_horizon}")
 
         if n_samples <= 0:
             raise ValueError(
@@ -228,13 +230,13 @@ class RandomForestModel(BaseModel):
         )
         full_timestamps = np.squeeze(full_timestamps)
 
-        print("Creating features")
+        self.logger.debug("Creating features")
         # Create features and targets (no exogenous variables)
         X, y = self._create_features(full_y_data, full_timestamps)
-        print("Started training random forest")
+        self.logger.info("Started training random forest")
         # y is shape (n_samples, forecast_horizon)
         self.model.fit(X, y)
-        print("Ended training random forest")
+        self.logger.info("Ended training random forest")
         self.is_fitted = True
         return self
 
@@ -308,7 +310,7 @@ class RandomForestModel(BaseModel):
 
         X_last = feature_row[-1:].reshape(1, -1)
 
-        print("X_last shape:", X_last.shape)
+        self.logger.debug(f"X_last shape: {X_last.shape}")
 
         # Predict all steps at once
         preds = self.model.predict(X_last)

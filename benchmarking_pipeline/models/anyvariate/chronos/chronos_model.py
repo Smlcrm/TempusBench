@@ -14,6 +14,7 @@ import numpy as np
 import torch
 from typing import Dict, Any, Union, Tuple, List, Optional
 from benchmarking_pipeline.models.base_model import BaseModel
+from benchmarking_pipeline.utils.logger import Logger
 from chronos import ChronosPipeline as BaseChronosPipeline
 from einops import rearrange
 
@@ -44,6 +45,7 @@ class ChronosModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config)
+        self.logger = Logger(log_dir='logs', name='ChronosModel')
 
         self.model_config["model_size"] = (
             "tiny"  # Valid model sizes = {'tiny', 'mini', 'small', 'base', 'large'}
@@ -85,13 +87,13 @@ class ChronosModel(BaseModel):
         hf_model_name = f"amazon/chronos-t5-{self.model_config['model_size']}"
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        print(f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
+        self.logger.info(f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
         self.model = BaseChronosPipeline.from_pretrained(
             hf_model_name,
             device_map="auto",
             torch_dtype=torch.bfloat16,
         )
-        print("Chronos model loaded successfully!")
+        self.logger.info("Chronos model loaded successfully!")
 
         self.is_fitted = True
         return self
