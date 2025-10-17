@@ -14,7 +14,14 @@ class MASE:
         """
         Computes the MASE.
         Requires 'y_train' and optionally 'seasonal_period' in kwargs.
+        Also accepts optional 'task_type' with value 'deterministic'.
         """
+
+        task_type = kwargs.get('task_type', 'deterministic')
+
+        if task_type != 'deterministic':
+            raise ValueError(f"MASE can only be used with 'deterministic' task_type, got '{task_type}'.")
+
         y_train = kwargs.get("y_train")
         seasonal_period = kwargs.get("seasonal_period", 1)
 
