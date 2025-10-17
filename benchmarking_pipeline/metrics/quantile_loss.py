@@ -10,7 +10,13 @@ class QuantileLoss:
         """
         Computes Quantile Loss.
         Requires 'y_pred_quantiles' and 'quantiles_q_values' in kwargs. y_pred is ignored.
+        Also accepts optional 'task_type' with value 'stochastic'.
         """
+        task_type = kwargs.get('task_type', 'stochastic')
+
+        if task_type != 'stochastic':
+            raise ValueError(f"QuantileLoss can only be used with 'stochastic' task_type, got '{task_type}'.")
+
         y_pred_quantiles = kwargs.get('y_pred_quantiles')
         q_values = kwargs.get('quantiles_q_values')
         if y_pred_quantiles is None or q_values is None:

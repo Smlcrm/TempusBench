@@ -11,7 +11,6 @@ task:
     tensorboard: True
 
 model:
-
   ############## Statistical Models ##############
   exponential_smoothing:
     trend: ["add", null]

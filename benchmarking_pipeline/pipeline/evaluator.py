@@ -26,9 +26,13 @@ class Evaluator:
             "metrics", ["mae", "rmse", "mase", "mape"]
         )
 
+        # Get task type from config (default to deterministic for backward compatibility)
+        self.task_type = self.config.get("task", {}).get("type")
+
         print(f"[DEBUG] Evaluator initialized with config: {self.config}")
         print(f"[DEBUG] Evaluation config: {evaluation_cfg}")
         print(f"[DEBUG] Metrics to calculate: {self.metrics_to_calculate}")
+        print(f"[DEBUG] Task type: {self.task_type}")
 
         # maps string names to metric class instances
         self.metric_registry = {
@@ -87,6 +91,9 @@ class Evaluator:
 
             metric = self.metric_registry[metric_name]
             try:
+                # Add task_type to metric calls only if available in config
+                metric_kwargs = {**metric_kwargs, 'task_type': self.task_type}
+
                 if metric_name == "mase":
                     if y_train is None:
                         raise ValueError(
@@ -95,7 +102,7 @@ class Evaluator:
                     print(
                         f"[DEBUG] Calculating MASE with y_true shape: {y_true.shape}, y_pred shape: {y_predictions.shape}, y_train shape: {y_train.shape}"
                     )
-                    metric_value = metric(y_true, y_predictions, y_train=y_train)
+                    metric_value = metric(y_true, y_predictions, y_train=y_train, **metric_kwargs)
                     print(f"[DEBUG] MASE result: {metric_value}")
                 elif metric_name == "crps":
                     if "y_pred_dist_samples" not in metric_kwargs:
@@ -122,7 +129,7 @@ class Evaluator:
                         )
                     metric_value = metric(y_true, y_predictions, **metric_kwargs)
                 else:
-                    metric_value = metric(y_true, y_predictions)
+                    metric_value = metric(y_true, y_predictions, **metric_kwargs)
 
                 # If the metric returns a dict, merge it into results
                 if isinstance(metric_value, dict):
