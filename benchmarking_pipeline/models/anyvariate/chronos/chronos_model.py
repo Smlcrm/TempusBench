@@ -18,7 +18,6 @@ from benchmarking_pipeline.utils.logger import Logger
 from chronos import ChronosPipeline as BaseChronosPipeline
 from einops import rearrange
 
-
 class ChronosModel(BaseModel):
     """
     Chronos foundation model wrapper for time series forecasting.
