@@ -6,486 +6,134 @@ in isolated conda environments to avoid dependency conflicts.
 It handles model loading, hyperparameter tuning, and evaluation.
 """
 
-import csv
-import pdb
-from pathlib import Path
-import argparse
-import yaml
-import pickle
-import importlib
 import os
-from datetime import datetime
+import pdb
+import textwrap
+import argparse
+import importlib
+import subprocess
 import numpy as np
-from benchmarking_pipeline.models.base_model import BaseModel
-import json
+import pickle, csv, json, yaml
 
-from benchmarking_pipeline.trainer.hyperparameter_tuning import HyperparameterTuner
+from pathlib import Path
+from typing import Dict, Any
+from datetime import datetime
+
 from benchmarking_pipeline.utils.logger import Logger
+from benchmarking_pipeline.models.base_model import BaseModel
+from benchmarking_pipeline.models.model_router import ModelRouter
+from benchmarking_pipeline.utils.config_validator import load_config
+from benchmarking_pipeline.pipeline.hyperparameter_tuning import HyperparameterTuner
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class ModelExecutor:
+    def __init__(self, config_path: str, run_dir: str, datasets_dir: str, logger=None, tf_logger=None):
+        self.config = load_config(config_path)
+        self.config_path = config_path
+        self.run_dir = run_dir
+        self.datasets_dir = datasets_dir
+        self.logger = logger
+        self.tf_logger = tf_logger
 
-    def __init__(
-        self,
-        config,
-        chunk_path,
-        model_folder_name,
-        model_file_name,
-        model_class_name,
-        result_path=None,
-        dataset_name=None
-    ):
-        self.config = config
-        self.chunk_path = chunk_path
-        self.model_folder_name = model_folder_name
-        self.model_file_name = model_file_name
-        self.model_class_name = model_class_name
-        # Prepare a results output path if provided via config
-        self.result_path = result_path or self.config.get("result_path")
-        self.dataset_name = dataset_name
+    def _generate_hyperparameter_tuning_script(self,
+            model_name: str,
+            context_steps: int,
+            train_steps: int,
+            validate_steps: int,
+            hyper_grid: list[dict]):
 
-        # Setup Python logger for status messages
-        self.logger = Logger(logs_dir='logs', name='ModelExecutor')
-        
-        # Setup TensorBoard logging like we had before
-        self.setup_tensorboard_logging()
+        script = textwrap.dedent(f"""
+            from benchmarking_pipeline.models.model_router import ModelRouter
+            from benchmarking_pipeline.pipeline.data_loader import DataLoader
 
-    def setup_tensorboard_logging(self):
-        """Setup TensorBoard logging with the exact structure we had before."""
-        # Only enable TensorBoard if config specifies tensorboard: true
-        if not self.config.get("tensorboard", False):
-            self.logger.info("TensorBoard logging disabled (tensorboard: false in config)")
-            self.writer = None
-            self.log_dir = None
+            data_loader = DataLoader(
+                config_path={self.config_path},
+                datasets_dir={self.datasets_dir},
+                run_dir={run_dir}
+            )
 
-            return
+            config = data_loader.config
+            model_config = config['model'][{model_name}]
 
-        try:
-            from torch.utils.tensorboard import SummaryWriter
+            for dataset in data_loader.generate_dataset_split(
+                {context_steps},{train_steps},{validate_steps}):
+                timestamps = dataset.timestamps
+                target = dataset.target
 
-            # Create runs directory structure like before: runs/MODEL_NAME/TIMESTAMP/train/
-            model_name = self.model_folder_name.split("/")[-1]
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                # Extract start and end indices for context, train, and validate from dataset
+                cstart = dataset.context.start;    cend = dataset.context.end
+                tstart = dataset.train.start;      tend = dataset.train.end
+                vstart = dataset.validation.start; vend = dataset.validation.end
+                freq = dataset.metadata.freq
 
-            # Create the exact directory structure we had before
-            runs_dir = "runs"
-            model_runs_dir = os.path.join(runs_dir, model_name)
-            timestamp_dir = os.path.join(model_runs_dir, timestamp)
-            train_dir = os.path.join(timestamp_dir, "train")
+                model = ModelRouter(name={model_name}, ndim=context_set.ndim)
 
-            # Ensure directories exist
-            os.makedirs(train_dir, exist_ok=True)
-
-            # Create TensorBoard writer
-            self.writer = SummaryWriter(train_dir)
-            self.log_dir = train_dir
-            self.logger.info(f"TensorBoard logging enabled at: {train_dir}")
-
-        except ImportError:
-            self.logger.warning("TensorBoard not available, logging disabled")
-            self.writer = None
-            self.log_dir = None
-        except Exception as e:
-            self.logger.warning(f"Failed to setup TensorBoard logging: {e}")
-            self.writer = None
-            self.log_dir = None
-
-    def log_validation_results(self, opt_valid_loss, opt_hyperparams):
-        # Log hyperparameter search results to TensorBoard like we had before
-        if self.writer:
-            try:
-                # Log the best validation score
-                self.writer.add_scalar(
-                    "hyperparameter_search/best_validation_score", opt_valid_loss, 0
-                )
-
-                # Log each hyperparameter value
-                for param_name, param_value in opt_hyperparams.items():
-                    if isinstance(param_value, (int, float)):
-                        self.writer.add_scalar(
-                            f"hyperparameters/{param_name}", param_value, 0
-                        )
-                    else:
-                        self.writer.add_text(
-                            f"hyperparameters/{param_name}", str(param_value), 0
-                        )
-
-                self.logger.info("Logged hyperparameter search results to TensorBoard")
-            except Exception as e:
-                self.logger.warning(f"Failed to log hyperparameter results to TensorBoard: {e}")
-
-    def log_final_results(
-        self, model_name, opt_hyperparams, y_context, y_test, y_pred, final_metrics
-    ):
-        # Log final evaluation results to TensorBoard like we had before
-        if self.writer:
-            try:
-                # Log each metric
-                for metric_name, metric_value in final_metrics.items():
-                    if isinstance(metric_value, (int, float)):
-                        self.writer.add_scalar(
-                            f"evaluation/{metric_name}", metric_value, 0
-                        )
-                    else:
-                        self.writer.add_text(
-                            f"evaluation/{metric_name}", str(metric_value), 0
-                        )
-
-                # Log model configuration
-                self.writer.add_text("model/config", str(self.config), 0)
-                self.writer.add_text("model/name", model_name, 0)
-
-                self.logger.info("Logged final evaluation results to TensorBoard")
-            except Exception as e:
-                self.logger.warning(f"Failed to log evaluation results to TensorBoard: {e}")
-
-        # Persist results for host process to log to TensorBoard
-        if self.result_path:
-            try:
-                payload = {
-                    "model": model_name,
-                    "best_hyperparameters": opt_hyperparams,
-                    "metrics": final_metrics,
-                }
-                # Try to create forecast plots for validation and test from last chunk
-                try:
-
-                    import matplotlib
-
-                    matplotlib.use("Agg")
-                    import matplotlib.pyplot as plt
-
-                    colors = [
-                        "#1f77b4",
-                        "#ff7f0e",
-                        "#2ca02c",
-                        "#d62728",
-                        "#9467bd",
-                        "#8c564b",
-                        "#e377c2",
-                        "#7f7f7f",
-                        "#bcbd22",
-                        "#17becf",
-                    ]
-
-                    def _save_plot(y_true_arr, preds_arr, title_suffix):
-                        y_true_arr = np.asarray(y_true_arr)
-                        preds_arr = np.asarray(preds_arr)
-
-                        # Fix: Ensure predictions have the right shape for plotting
-                        # if preds_arr.ndim == 2 and preds_arr.shape[0] == 1:
-                        #     # ARIMA returns (1, 300), convert to (300,)
-                        #     preds_arr = preds_arr.flatten()
-
-                        fig, ax = plt.subplots(figsize=(12, 6))
-                        if y_true_arr.ndim == 1:
-                            min_len = min(len(y_true_arr), len(preds_arr))
-                            ax.plot(
-                                y_true_arr[:min_len],
-                                color=colors[0],
-                                label="True",
-                                linewidth=2,
-                            )
-                            ax.plot(
-                                preds_arr[:min_len],
-                                color=colors[1],
-                                label="Predicted",
-                                linewidth=2,
-                                linestyle="--",
-                                alpha=0.9,
-                            )
-                        else:
-                            num_targets = y_true_arr.shape[1]
-                            for i in range(num_targets):
-                                c_true = colors[i % len(colors)]
-                                ax.plot(
-                                    y_true_arr[:, i],
-                                    color=c_true,
-                                    label=f"True Target {i}",
-                                    linewidth=2,
-                                    alpha=0.8,
-                                )
-                                if preds_arr.ndim == 1 and i == 0:
-                                    ax.plot(
-                                        preds_arr,
-                                        color=colors[(i + 1) % len(colors)],
-                                        label=f"Predicted Target {i}",
-                                        linewidth=2,
-                                        linestyle="--",
-                                        alpha=0.9,
-                                    )
-                                elif preds_arr.ndim == 2 and i < preds_arr.shape[1]:
-                                    pred_vals = preds_arr[:, i]
-                                    if not np.all(np.isnan(pred_vals)):
-                                        ax.plot(
-                                            pred_vals,
-                                            color=colors[(i + 1) % len(colors)],
-                                            label=f"Predicted Target {i}",
-                                            linewidth=2,
-                                            linestyle="--",
-                                            alpha=0.9,
-                                        )
-                        ax.set_title(
-                            f"{model_name} Predictions vs True Values ({title_suffix})",
-                            fontsize=14,
-                            fontweight="bold",
-                        )
-                        ax.set_xlabel("Time Steps", fontsize=12)
-                        ax.set_ylabel("Values", fontsize=12)
-                        ax.grid(True, alpha=0.3)
-                        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-                        plt.tight_layout()
-                        import tempfile
-
-                        with tempfile.NamedTemporaryFile(
-                            delete=False, suffix=".png"
-                        ) as tmp_png:
-                            p = tmp_png.name
-                        fig.savefig(p)
-                        plt.close(fig)
-                        return p
-
-                    plot_test = _save_plot(
-                        y_true_arr=y_test, preds_arr=y_pred, title_suffix="Test"
+                for params in {hyper_grid}:
+                    trained_model = model.train(
+                        y_context: target[:, cstart:cend], # context
+                        y_target: target[:, tstart:tend], # train
+                        timestamps_context: timestamps[cstart:cend],
+                        timestamps_target: timestamps[tstart:tend],
+                        freq: freq,
                     )
 
-                    payload["forecast_plot_test_path"] = plot_test
-                except Exception as e:
-                    self.logger.warning(f"Failed to create forecast plots: {e}")
+                    results = trained_model.predict(
+                        y_context: target[:, cstart:tend], # context + train
+                        timestamps_context: timestamps[cstart:tend],
+                        timestamps_target: timestamps[vstart:vend], # validate
+                        freq: freq,
+                    )
 
-                with open(self.result_path, "w") as rf:
-                    json.dump(payload, rf)
-            except Exception as write_err:
-                print(
-                    f"[WARNING] Failed to write results to {self.result_path}: {write_err}"
+                    loss = trained_model.compute_loss(results, target[:, vstart:vend])
+        """)
+        return script
+
+    def optimize_hyperparameters(self,
+            context_steps: int,
+            train_steps: int,
+            validate_steps: int):
+        """
+        Run model evaluation with the provided hyperparameters.
+
+        Args:
+            hyperparameters: Dictionary containing hyperparameters for each model
+        """
+        logging = self.logger is not None
+
+        # This method needs to be implemented based on the actual requirements
+        # For now, it's a placeholder that handles the basic structure
+        for model_name, hyperparameters in self.config["model"].items():
+            # INSERT_YOUR_CODE
+            hyper_grid = []
+            if hyperparameters:
+                keys = list(hyperparameters.keys())
+                values_lists = [hyperparameters[k] for k in keys]
+                # Cartesian product: build list of dicts for each combination
+                from itertools import product
+                hyper_grid = [dict(zip(keys, values)) for values in product(*values_lists)]
+            else:
+                hyper_grid = [None]
+
+            if logging:
+                self.logger.info(f"Preparing to run model: {model_name}")
+                self.logger.debug(f"Hyperparameters for {model_name}: {hyperparameters}")
+                if not hyperparameters:
+                    self.logger.warning(f"{model_name} has no parameters, using empty dict, probably a foundation model")
+
+            # Create Conda Env
+            conda_env = CondaEnvManager(
+                name = f"benchmark.{model_name}",
+                python = "3.11",
+                requirements_path = model.requirements_path
+            )
+
+            conda_env.run(
+                script=self._generate_hyperparameter_tuning_script(
+                    model_name=model_name,
+                    context_steps=context_steps,
+                    train_steps=train_steps,
+                    validate_steps=validate_steps,
+                    hyper_grid=hyper_grid
                 )
-
-    def run(self):
-        # Extract the model name from the folder path for parameter lookup
-        # The folder path is now an absolute path like '/path/to/benchmarking_pipeline/models/multivariate/arima'
-        # We need to extract just 'arima' for parameter lookup
-        
-        model_name = self.model_folder_name.split("/")[-1]
-        self.model_name = model_name
-        self.logger.info(f"Preparing to run model: {model_name}")
-        # Build the module path for import
-        # The model_folder_name is now an absolute path, so we need to extract the relative part
-        # from the models directory to construct the module path
-        if "/models/" in self.model_folder_name:
-            # Extract the part after 'models/' to get the relative path
-            models_index = self.model_folder_name.find("/models/")
-            relative_path = self.model_folder_name[
-                models_index + 8 :
-            ]  # +8 to skip '/models/'
-            # Replace forward slashes with dots for proper Python module path
-            relative_path = relative_path.replace("/", ".")
-            module_path = (
-                f"benchmarking_pipeline.models.{relative_path}.{self.model_file_name}"
             )
-        else:
-            raise ValueError(
-                f"Invalid model folder path: {self.model_folder_name}. Must contain '/models/'"
-            )
-
-        self.logger.info(f"Importing module: {module_path}")
-        module = importlib.import_module(module_path)
-        model_class = getattr(module, self.model_class_name)
-        self.logger.info(f"Executing {model_name} model...")
-
-        with open(self.chunk_path, "rb") as f:
-            serializable_chunks = pickle.load(f)
-
-        # Reconstruct Dataset objects from serializable chunks
-        from benchmarking_pipeline.pipeline.data_types import Dataset, DatasetSplit
-        import numpy as np
-
-        if isinstance(serializable_chunks, list):
-            chunk_data = serializable_chunks[0]
-
-        # Convert back to numpy arrays and reconstruct Dataset objects
-        # For univariate data, ensure targets are 1D arrays (time series)
-        train_targets = np.array(chunk_data["train"]["targets"])
-        if train_targets.ndim == 2 and train_targets.shape[0] == 1:
-            # If shape is (1, time_steps), squeeze to (time_steps,)
-            train_targets = train_targets.squeeze()
-
-        validation_targets = np.array(chunk_data["validation"]["targets"])
-        if validation_targets.ndim == 2 and validation_targets.shape[0] == 1:
-            validation_targets = validation_targets.squeeze()
-
-        test_targets = np.array(chunk_data["test"]["targets"])
-        if test_targets.ndim == 2 and test_targets.shape[0] == 1:
-            test_targets = test_targets.squeeze()
-
-        train_split = DatasetSplit(
-            targets=train_targets,
-            features=(
-                np.array(chunk_data["train"]["features"])
-                if chunk_data["train"]["features"] is not None
-                else None
-            ),
-            timestamps=np.array(chunk_data["train"]["timestamps"]),
-        )
-
-        validation_split = DatasetSplit(
-            targets=validation_targets,
-            features=(
-                np.array(chunk_data["validation"]["features"])
-                if chunk_data["validation"]["features"] is not None
-                else None
-            ),
-            timestamps=np.array(chunk_data["validation"]["timestamps"]),
-        )
-
-        test_split = DatasetSplit(
-            targets=test_targets,
-            features=(
-                np.array(chunk_data["test"]["features"])
-                if chunk_data["test"]["features"] is not None
-                else None
-            ),
-            timestamps=np.array(chunk_data["test"]["timestamps"]),
-        )
-
-        dataset = Dataset(
-            train=train_split,
-            validation=validation_split,
-            test=test_split,
-            name=chunk_data["name"],
-            metadata=chunk_data["metadata"],
-        )
-
-        # Get the hyperparameter grid for this model (no auto-injection)
-        hyper_grid = self.config["model"][model_name] or {}
-
-        self.logger.info(f"Hyperparameter grid for {model_name}: {hyper_grid}")
-
-        self.logger.info(f"{model_name} is a Base Model!")
-        # Handle case where model has no parameters (empty model)
-        if not hyper_grid:
-            self.logger.info(f"{model_name} has no parameters, using empty hyper_grid")
-
-        self.logger.info(f"{model_name} hyper grid: {hyper_grid}")
-
-        model_params = {
-            k: v[0] if isinstance(v, list) else v for k, v in hyper_grid.items()
-        }
-        
-        # Include dataset configuration for other parameters
-        self.logger.info(f"{model_name} initial model_params: {model_params}")
-
-        # Create a full config that includes evaluation metrics
-        full_config = self.config.copy()
-        # Update the model section with the current model parameters
-        if "model" not in full_config:
-            full_config["model"] = {}
-        full_config["model"][model_name] = model_params
-        full_config["dataset"] = self.config["dataset"]
-
-        base_model = model_class(model_params)
-
-        model_hyperparameter_tuner = HyperparameterTuner(
-            base_model, hyper_grid, False
-        )
-
-        opt_valid_loss, opt_hyperparams = (
-            model_hyperparameter_tuner.hyperparameter_grid_search(dataset)
-        )
-        self.logger.info(
-            f"{model_name} - optimal validation score {opt_valid_loss} achieved for hyperparameter:\n {opt_hyperparams}"
-        )
-
-        y_context, y_test, y_pred, final_metrics = (
-            model_hyperparameter_tuner.final_evaluation(opt_hyperparams, dataset)
-        )
-
-        self.logger.info(f"{model_name} results: {final_metrics}")
-        self.logger.success(f"{model_name} execution completed successfully!")
-
-        self.log_validation_results(opt_valid_loss, opt_hyperparams)
-        self.log_final_results(
-            model_name, opt_hyperparams, y_context, y_test, y_pred, final_metrics
-        )
-        self.log_final_metrics_in_csv(final_metrics = final_metrics, num_targets = y_test.shape[1])
-        
-        # Cleanup TensorBoard writer to ensure all logs are flushed
-        self.cleanup()
-
-    def log_final_metrics_in_csv(self, final_metrics, num_targets):
-        folder_type = 'multivariate' if num_targets > 1 else 'univariate'
-        model_name = os.path.basename(self.model_folder_name)
-
-        if not self.dataset_name:
-            raise ValueError("dataset_name is not set. Cannot write metrics CSV.")
-
-        # Write all metrics as columns in the CSV, converting numpy types to Python scalars
-        metrics_dir = Path(__file__).resolve().parent.parent
-        csv_path = metrics_dir / "metrics" / folder_type / self.dataset_name / model_name
-        csv_path.mkdir(parents=True, exist_ok=True)
-        csv_file = csv_path / 'metrics.csv'
-
-        # Convert all values to Python float for CSV compatibility
-        metrics_for_csv = {k: float(v) if isinstance(v, np.floating) else v for k, v in final_metrics.items()}
-
-        with open(csv_file, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=list(metrics_for_csv.keys()))
-            writer.writeheader()
-            writer.writerow(metrics_for_csv)
-        self.logger.info(f"Final metrics written to {csv_file}")
-        
-    def cleanup(self):
-        """Cleanup TensorBoard writer and ensure all logs are flushed."""
-        if self.writer:
-            try:
-                self.writer.close()
-                self.logger.info(f"TensorBoard writer closed, logs saved to: {self.log_dir}")
-            except Exception as e:
-                self.logger.warning(f"Failed to close TensorBoard writer: {e}")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Execute a single model in an isolated environment for benchmarking."
-    )
-    parser.add_argument("--config", type=str, help="Path to the config YAML file")
-    parser.add_argument(
-        "--chunk_path",
-        type=str,
-        help="Path to the temporary pickle file containing dataset chunks.",
-    )
-    parser.add_argument(
-        "--model_folder_name", type=str, help="Name of the model folder to reference."
-    )
-    parser.add_argument(
-        "--model_file_name",
-        type=str,
-        help="Name of the model file containing the model class.",
-    )
-    parser.add_argument(
-        "--model_class_name", type=str, help="Name of the model class to instantiate."
-    )
-    parser.add_argument(
-        "--result_path", type=str, help="Path to write JSON results for host logging."
-    )
-    parser.add_argument(
-        "--dataset_name", type=str, help="Name of the dataset being processed."
-    )
-    args = parser.parse_args()
-    config_path = args.config
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    model_executor = ModelExecutor(
-        config=config,
-        chunk_path=args.chunk_path,
-        model_folder_name=args.model_folder_name,
-        model_file_name=args.model_file_name,
-        model_class_name=args.model_class_name,
-        result_path=args.result_path,
-        dataset_name=os.path.basename(args.dataset_name)
-    )
-    # These print statements are in the main section and will be handled by the ModelExecutor's logger
-    print(f"[INFO] Config: {args.config}")
-    print(f"[INFO] Chunk Path: {args.chunk_path}")
-    print(f"[INFO] Model Folder: {args.model_folder_name}")
-    print(f"[INFO] Model File: {args.model_file_name}")
-    print(f"[INFO] Model Class: {args.model_class_name}")
-    
-    model_executor.run()
