@@ -1,14 +1,16 @@
 task:
-  type: deterministic
+  task_type: deterministic
   forecast_horizon: 10
   context_window: 10
+  tuning_metric: mae
   dataset:
     name: "univariate/*"
     normalize: false
     handle_missing: interpolate
-  evaluation:
-    metrics: [mae, mase, rmse, mape]
-    tensorboard: True
+
+evaluation: # hyper-parameter tuning
+    metrics: [mae, mase, rmse]
+    logging: True
 
 model:
   ############## Statistical Models ##############
@@ -72,11 +74,11 @@ model:
 
   ############## Deep Learning Models ##############
   lstm:
-    units: [32]
+    units: [32, 60, 80]
     layers: [1]
     dropout: [0.1]
     learning_rate: [0.01]
-    batch_size: [32]
+    batch_size: [32, 16]
     epochs: [100]
     sequence_length: [10]
     training_loss: ["mae"]
@@ -92,5 +94,3 @@ model:
   lagllama:
   toto:
   tabpfn:
-    context_window: [10]
-    forecast_window: [10]
