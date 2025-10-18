@@ -18,7 +18,6 @@ import pickle
 import os
 from benchmarking_pipeline.models.base_model import BaseModel
 
-
 class ArimaModel(BaseModel):
     """
     ARIMA model for univariate time series forecasting.
