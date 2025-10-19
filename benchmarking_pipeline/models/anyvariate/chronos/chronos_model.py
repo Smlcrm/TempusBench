@@ -44,7 +44,7 @@ class ChronosModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config)
-        self.logger = Logger(log_dir='logs', name='ChronosModel')
+        self.logger = Logger(logs_dir='logs', name='ChronosModel')
 
         self.model_config["model_size"] = (
             "tiny"  # Valid model sizes = {'tiny', 'mini', 'small', 'base', 'large'}

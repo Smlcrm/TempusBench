@@ -27,7 +27,7 @@ class XGBoostModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.logger = Logger(log_dir='logs', name='XGBoostModel')
+        self.logger = Logger(logs_dir='logs', name='XGBoostModel')
 
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
