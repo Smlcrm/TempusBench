@@ -23,10 +23,11 @@ class ExponentialSmoothingModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.logger = Logger(log_dir='logs', name='ExponentialSmoothingModel')
+        self.logger = Logger(logs_dir='logs', name='ExponentialSmoothingModel')
 
         # Get the model-specific config from the nested structure
         # BaseModel keeps the full config, so we need to extract the exponential_smoothing part
+        self.model_config = self._extract_model_config(config)
 
         def _cast_param(key, value):
             if key == "seasonal_periods":

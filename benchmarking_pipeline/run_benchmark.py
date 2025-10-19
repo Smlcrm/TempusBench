@@ -16,11 +16,10 @@ from benchmarking_pipeline.utils.logger import Logger
 from benchmarking_pipeline.utils import config_validator
 from benchmarking_pipeline.model_executor import ModelExecutor
 from benchmarking_pipeline.pipeline.preprocessor import Preprocessor
-from benchmarking_pipeline.pipeline.hyperparameter_tuning import HyperparameterTuner
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUNS_DIR = os.path.join(ROOT_DIR, "runs")
-DATASETS_DIR = os.path.join(ROOT_DIR, "datasets")
+DATASETS_DIR = os.path.join(ROOT_DIR, "benchmarking_pipeline", "datasets")
 
 class BenchmarkRunner:
     def __init__(self, config_path: str):
@@ -30,7 +29,7 @@ class BenchmarkRunner:
             config: Configuration dictionary for the pipeline
             config_path: Path to the config file used
         """
-        self.config = config_validator.load_config(config)
+        self.config = config_validator.load_config(config_path)
         self.config_path = config_path
         self.config_name = os.path.splitext(os.path.basename(self.config_path))[0]
         self.run_dir = None # Defined in self.run
@@ -66,7 +65,8 @@ class BenchmarkRunner:
         self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         # Directory where the run logs and evaluations are stored
         self.run_dir = os.path.join(RUNS_DIR, f"run_{self.config_name}_{self.run_timestamp}")
-        self.datasets_dir = os.path.join(DATASETS_DIR, dataset_config["name"])
+        dataset_config =  self.config['task']['dataset']
+        self.datasets_dir = DATASETS_DIR
         logging = self.setup_logging()
 
         if logging: self.logger.info(f"Run starts - {self.run_timestamp}")
@@ -76,11 +76,11 @@ class BenchmarkRunner:
         if logging: self.logger.info("Extracting Configs")
         task_config = self.config["task"]
         dataset_config = task_config["dataset"]
-        evaluation_config = task_config["evaluation"]
+        evaluation_config = self.config["evaluation"]
 
         # Task Config
         if logging: self.logger.info("Extracting Task Configs")
-        task_type = task_config["type"]
+        task_type = task_config["task_type"]
         context_window = task_config["context_window"]
         forecast_horizon = task_config["forecast_horizon"]
 
@@ -95,7 +95,11 @@ class BenchmarkRunner:
         )
 
         # Hyperparameter Tuning - Context + Train + Validate Losses (Rolling Window with strides of validate_steps)
-        evals, hyperparameters = hyperparameter_tuner.optimize_hyperparameters() # For all models in config
+        evals, hyperparameters = hyperparameter_tuner.optimize_hyperparameters(
+            context_steps=context_window,
+            train_steps=forecast_horizon,
+            validate_steps=forecast_horizon
+        ) # For all models in config
         if logging: self.logger.success("Hyperparameters Optimized")
 
         # Model Executor

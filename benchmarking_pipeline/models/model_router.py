@@ -33,7 +33,6 @@ class ModelRouter:
 
     def __init__(self):
         """Initialize the router and discover available models."""
-        self.logger = Logger(log_dir='logs', name='ModelRouter')
         self.anyvariate_models: Set[str] = set()
         self.multivariate_models: Set[str] = set()
         self.univariate_models: Set[str] = set()

@@ -2,20 +2,20 @@ task:
   task_type: deterministic
   forecast_horizon: 10
   context_window: 10
-  tuning_metric: mae
+  tuning_loss: mae
   dataset:
-    name: "univariate/*"
+    name: "multivariate/*"
     normalize: false
     handle_missing: interpolate
 
 evaluation: # hyper-parameter tuning
     metrics: [mae, mase, rmse]
-    logging: True
+    logging: true
 
 model:
   ############## Statistical Models ##############
   exponential_smoothing:
-    trend: ["add", null]
+    trend: ["add"]
     seasonal: [null]
     seasonal_periods: [null]
     damped_trend: [false, true]

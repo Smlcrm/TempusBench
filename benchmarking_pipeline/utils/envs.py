@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class CondaEnvManager:
     def __init__(self, name: str, python: str = None, requirements_path: str = None):
@@ -17,7 +17,7 @@ class CondaEnvManager:
         self.python_version = python
         self.requirements_path = requirements_path
 
-        # Check if the conda environment already exists
+        # Check if the conda environment already exists and has the package installed
         version_result = subprocess.run(
             f"conda run -n {self.env_name} python --version",
             shell=True, executable="/bin/bash",
@@ -26,7 +26,24 @@ class CondaEnvManager:
 
         if version_result.returncode == 0 and "Python" in version_result.stdout:
             self.python_version = version_result.stdout.strip().split()[-1]
-            self._env_created = True; self._installed = True
+            # Check if benchmarking_pipeline is installed
+            package_check = subprocess.run(
+                f"conda run -n {self.env_name} python -c 'import benchmarking_pipeline'",
+                shell=True, executable="/bin/bash",
+                capture_output=True, text=True
+            )
+            if package_check.returncode == 0:
+                self._env_created = True; self._installed = True
+            else:
+                # Environment exists but package not installed, install it
+                self._env_created = True; self._installed = False
+                subprocess.run([
+                    "conda", "run", "-n", self.env_name, "pip", "install", "-e", ROOT_DIR,
+                ], check=True)
+                subprocess.run([
+                    "conda", "run", "-n", self.env_name, "pip", "install", "pydantic>=2.0.0",
+                ], check=True)
+                self.install(self.requirements_path)
         else:
             self.create_env()
             self.install(self.requirements_path)
@@ -44,6 +61,9 @@ class CondaEnvManager:
         ], check=True)
         subprocess.run([
             "conda", "run", "-n", self.env_name, "pip", "install", "-e", ROOT_DIR,
+        ], check=True)
+        subprocess.run([
+            "conda", "run", "-n", self.env_name, "pip", "install", "pydantic>=2.0.0",
         ], check=True)
         self._env_created = True
 
@@ -71,12 +91,20 @@ class CondaEnvManager:
             script (str): Path to script to run, or module.
             args (str): Arguments string to pass to `python script`.
         """
+        # Properly execute the Python script in the conda environment, capturing output.
+        # The shell command should fully execute non-interactively for a script file.
         run_cmd = (
             f"source $(conda info --base)/etc/profile.d/conda.sh && "
             f"conda activate {self.env_name} && "
             f"python {script} {args}"
         )
-        completed = subprocess.run(run_cmd, shell=True, executable="/bin/bash", text=True)
+        completed = subprocess.run(
+            run_cmd,
+            shell=True,
+            executable="/bin/bash",
+            capture_output=True,
+            text=True
+        )
         if completed.returncode != 0:
             error_msg = (
                 f"Failed to run script ({script}) in conda env ({self.env_name}).\n"
@@ -86,6 +114,8 @@ class CondaEnvManager:
                 f"Standard Error:\n{completed.stderr}"
             )
             raise RuntimeError(error_msg)
+        
+        return completed
 
     def delete(self):
         if self._env_created:

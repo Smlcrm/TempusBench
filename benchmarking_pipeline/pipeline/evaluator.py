@@ -19,16 +19,14 @@ class Evaluator:
         Initialize evaluator with configuration.
         """
         self.config = config if config is not None else {}
-        self.logger = Logger(log_dir='logs', name='Evaluator')
+        self.logger = Logger(logs_dir='logs', name='Evaluator')
 
         # Get evaluation metrics from the evaluation section of config
-        evaluation_cfg = self.config.get("evaluation", {})
-        self.metrics_to_calculate = evaluation_cfg.get(
-            "metrics", ["mae", "rmse", "mase", "mape"]
-        )
+        evaluation_cfg = self.config.get("evaluation")
+        self.metrics_to_calculate = evaluation_cfg.get("metrics")
 
         # Get task type from config (default to deterministic for backward compatibility)
-        self.task_type = self.config.get("task", {}).get("type")
+        self.task_type = self.config.get("task", {}).get("task_type")
 
         self.logger.debug(f"Evaluator initialized with config: {self.config}")
         self.logger.debug(f"Evaluation config: {evaluation_cfg}")
@@ -74,8 +72,9 @@ class Evaluator:
         # if isinstance(y_train, pd.DataFrame):
         #     y_train = y_train.values
 
+        y_train_shape = y_train.shape if y_train is not None else "None"
         self.logger.debug(
-            f"y_predictions shape: {y_predictions.shape}, y_true shape: {y_true.shape}, y_train shape: {y_train.shape}"
+            f"y_predictions shape: {y_predictions.shape}, y_true shape: {y_true.shape}, y_train shape: {y_train_shape}"
         )
         # If predictions longer than true, truncate to match
         if y_predictions is not None and y_true is not None:

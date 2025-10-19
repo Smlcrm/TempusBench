@@ -48,7 +48,7 @@ class BaseModel(ABC):
         """
 
         self.model_config = config
-        self.training_loss = config.get("training_loss", "mae")
+        self.training_loss = config["task"]["tuning_loss"]
 
         # Determine forecast horizon from model configuration keys if present
         # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
@@ -138,7 +138,6 @@ class BaseModel(ABC):
         self,
         y_true: np.ndarray,
         y_pred: np.ndarray,
-        loss_function: str = None,
         y_train: np.ndarray = None,
     ) -> Dict[str, float]:
         """
@@ -149,7 +148,6 @@ class BaseModel(ABC):
         Args:
             y_true: True target values
             y_pred: Predicted values
-            loss_function: Name of the loss function to use (defaults to training_loss)
             y_train: Training target values (required for MASE calculation)
 
         Returns:

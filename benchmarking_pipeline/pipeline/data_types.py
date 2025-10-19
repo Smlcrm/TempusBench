@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 @dataclass
 class DatasetSplit:
@@ -30,15 +30,16 @@ class Dataset:
     metadata: Optional[Dict[str, Any]] = None
 
 @dataclass
-class PreprocessedData:
-    """Container for preprocessed data."""
-    data: Dataset
-    preprocessing_info: Dict[str, Any]
-
-@dataclass
-class ModelArtifacts:
-    """Container for model artifacts and metadata."""
-    model: Any  # The actual model object
-    parameters: Dict[str, Any]
-    training_history: Optional[Dict[str, List[float]]] = None
-    metadata: Optional[Dict[str, Any]] = None 
+class TaskResult:
+    """
+    Contains results of a model task, including hyperparameter optimization and dataset metadata.
+    """
+    optimal_hyperparameters: Dict[int, Dict[str, float]]
+    final_evaluations: Dict[str, float]
+    dataset_path: str
+    context_window: int
+    forecast_horizon: int
+    task_type: Literal["deterministic", "stochastic"]
+    tuning_loss: str
+    dataset_normalize: bool
+    dataset_handle_missing: Literal["interpolate", "mean", "median", "drop", "forward_fill", "backward_fill"]

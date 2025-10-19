@@ -19,8 +19,8 @@ class Preprocessor:
                 Supports: normalize, handle_missing.
         """
         self.config = config
-        self.normalize = config.get('dataset').get('normalize', False)
-        self.handle_missing = config.get('dataset').get('handle_missing', 'interpolate')
+        self.normalize = config.get('task', {}).get('dataset', {}).get('normalize', False)
+        self.handle_missing = config.get('task', {}).get('dataset', {}).get('handle_missing', 'interpolate')
 
     def _handle_missing_values(self, arr: np.ndarray, start: str, freq: str) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -38,6 +38,9 @@ class Preprocessor:
         data_length = arr.shape[0] if arr.ndim == 1 else arr.shape[1]
         timestamps = pd.date_range(start=start, periods=data_length, freq=freq).values
         timestamps = np.array(timestamps)
+        # Convert None values to np.nan and ensure float dtype
+        arr = np.array(arr, dtype=float)
+        
         # Ensure we have a 2D array for consistent processing
         is_1d = arr.ndim == 1
         if is_1d:
@@ -138,7 +141,7 @@ class Preprocessor:
                 result[i] = next_valid
         return result
 
-    def clean(self, time_start: str, freq: str, target: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def clean(self, time_start: str, freq: str, target: np.ndarray) -> Tuple[np.ndarray, str, str, np.ndarray]:
         """
         Clean a single target array by validating time_start and freq, handling missing values, and normalizing.
 
@@ -148,7 +151,7 @@ class Preprocessor:
             target: Target array (univariate or multivariate ndarray)
 
         Returns:
-            Tuple of (target, timestamps) - cleaned target and corresponding timestamps
+            Tuple of (timestamps, time_start, freq, target) - cleaned timestamps, time_start, freq, and target
         """
         # Handle empty arrays
         if target.size == 0:

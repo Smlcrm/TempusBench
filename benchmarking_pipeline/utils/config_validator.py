@@ -42,7 +42,7 @@ class Task(BaseModel):
     task_type: Literal['deterministic', 'stochastic'] = Field(..., description="Task type")
     forecast_horizon: int = Field(..., ge=1, description="Forecast horizon")
     context_window: int = Field(..., ge=1, description="Context window size")
-    tuning_metric: str = Field(..., description="Single metric for hyperparameter tuning, must be compatible with task type")
+    tuning_loss: str = Field(..., description="Single metric for hyperparameter tuning, must be compatible with task type")
     dataset: Dataset = Field(..., description="Dataset configuration")
 
     ALLOWED_METRICS: ClassVar[Dict[str, List[str]]] = {
@@ -52,9 +52,9 @@ class Task(BaseModel):
 
     @model_validator(mode='after')
     def validate_task_consistency(self):
-        if not self.tuning_metric in Task.ALLOWED_METRICS.get(self.task_type):
+        if not self.tuning_loss in Task.ALLOWED_METRICS.get(self.task_type):
             raise ValueError(
-                f"Invalid tuning_metric '{self.tuning_metric}' for {self.task_type} task_type. "
+                f"Invalid tuning_loss '{self.tuning_loss}' for {self.task_type} task_type. "
                 f"Allowed metrics: {self.ALLOWED_METRICS[self.task_type]}"
             )
         return self
@@ -68,7 +68,7 @@ class BenchmarkConfig(BaseModel):
 
     @model_validator(mode='after')
     def validate_evaluation_consistency(self):
-        """Validate evaluation metrics and tuning_metric for consistency and task type."""
+        """Validate evaluation metrics and tuning_loss for consistency and task type."""
         task_type = self.task.task_type
 
         # Validate evaluation metrics
@@ -80,10 +80,10 @@ class BenchmarkConfig(BaseModel):
                 f"Allowed: {Task.ALLOWED_METRICS[task_type]}"
             )
 
-        # Ensure tuning_metric is present in metrics list
-        if self.task.tuning_metric not in self.evaluation.metrics:
+        # Ensure tuning_loss is present in metrics list
+        if self.task.tuning_loss not in self.evaluation.metrics:
             raise ValueError(
-                f"tuning_metric '{self.task.tuning_metric}' is not present in evaluation.metrics list."
+                f"tuning_loss '{self.task.tuning_loss}' is not present in evaluation.metrics list."
             )
 
         return self
