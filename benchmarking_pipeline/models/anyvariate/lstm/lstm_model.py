@@ -47,7 +47,6 @@ class LSTMModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config)
-        self.model_config = self._extract_model_config(config)
         if "units" not in self.model_config:
             raise ValueError("units must be specified in config")
         if "layers" not in self.model_config:
@@ -104,17 +103,18 @@ class LSTMModel(BaseModel):
         Prepare input sequences for Multivariate LSTM.
 
         Args:
-            X: Input features (2D array with shape (num_series, num_timesteps))
+            X: Input features (2D array with shape (num_timesteps, num_targets))
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: Prepared sequences and targets
         """
-        # Handle (num_series, timesteps) format - transpose to (timesteps, num_series)
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-        
-        # Transpose from (num_series, timesteps) to (timesteps, num_series)
-        X = X.T  # Now shape is (timesteps, num_series)
+        # # Ensure X is 2D: (num_timesteps, num_targets) for multivariate
+        # if X.ndim == 1:
+        #     # If univariate input, reshape to (num_timesteps, 1)
+        #     X = X.reshape(-1, 1)
+        # elif X.ndim > 2:
+        #     # If 3D or higher, flatten to 2D
+        #     X = X.reshape(X.shape[0], -1)
 
         X_seq, y_seq = [], []
         for i in range(
@@ -124,6 +124,7 @@ class LSTMModel(BaseModel):
             + 1
         ):
             curr_X = X[i : (i + self.model_config["context_length"])]
+            # curr_X = curr_X.flatten()
 
             X_seq.append(curr_X)
             # y_seq: flatten to 1D array of length prediction_window * num_targets
@@ -165,18 +166,17 @@ class LSTMModel(BaseModel):
         Returns:
             self: The fitted model instance
         """
-        # Handle (num_series, timesteps) format
+        # Handle (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
         if y_target.ndim == 1:
-            y_target = y_target.reshape(1, -1)
-            
-        num_series, timesteps = y_context.shape
-        forecast_length = y_target.shape[1]
+            y_target = y_target.reshape(-1, 1)
+        num_steps, num_features = y_context.shape
+        forecast_length = y_target.shape[0]
 
         # Prepare sequences using the combined context + target data
         # Concatenate context and target data for training
-        combined_data = np.concatenate([y_context, y_target], axis=1)
+        combined_data = np.concatenate([y_context, y_target], axis=0)
         X_seq, y_seq = self._prepare_sequences(combined_data)
 
         print("X shape:", X_seq.shape)
@@ -185,7 +185,7 @@ class LSTMModel(BaseModel):
         # Build model if not already built
         if self.model is None:
             self._build_model(
-                input_shape=(self.model_config["context_length"], num_series)
+                input_shape=(self.model_config["context_length"], num_features)
             )
 
         # Train model with progress logging
@@ -229,12 +229,7 @@ class LSTMModel(BaseModel):
         if self.model is None:
             raise ValueError("Model not initialized. Call train first.")
 
-        # Handle (num_series, timesteps) format
-        if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
-            
-        num_series, timesteps = y_context.shape
-        forecast_length = len(timestamps_target)
+        forecast_length, num_targets = y_context.shape
 
         # Calculate how many prediction windows we need
         num_windows = math.ceil(
@@ -242,17 +237,16 @@ class LSTMModel(BaseModel):
         )
 
         all_predictions = []
-        # Get last context_length timesteps and transpose to (timesteps, num_series)
-        current_sequence = y_context[:, -self.model_config["context_length"] :].T.reshape(
-            1, self.model_config["context_length"], num_series
+        current_sequence = y_context[-self.model_config["context_length"]:].reshape(
+            1, self.model_config["context_length"], num_targets
         )
 
         for window in range(num_windows):
             # Predict prediction_window steps at once for all targets
             predictions = self.model.predict(current_sequence, verbose=0)
-            # Reshape predictions from (1, prediction_window * num_series) to (prediction_window, num_series)
+            # Reshape predictions from (1, prediction_window * num_targets) to (prediction_window, num_targets)
             predictions_reshaped = predictions[0].reshape(
-                self.model_config["prediction_window"], num_series
+                self.model_config["prediction_window"], num_targets
             )
             all_predictions.extend(predictions_reshaped)
 
@@ -271,8 +265,8 @@ class LSTMModel(BaseModel):
 
         # Return only the requested number of predictions
         result = np.array(all_predictions[:forecast_length])
-        
-        # Transpose from (forecast_length, num_series) to (num_series, forecast_length)
-        result = result.T
+
+        if len(result.shape) == 1:
+            result = np.expand_dims(result, axis=1)
 
         return result

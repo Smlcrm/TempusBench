@@ -19,8 +19,6 @@ class ProphetModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.full_config = config  # Store full config
-        self.model_config = self._extract_model_config(config)
         self._build_model()
 
     def _build_model(self):
@@ -177,7 +175,7 @@ class ProphetModel(BaseModel):
         forecast = np.asarray(forecast["yhat"])
 
         if len(forecast.shape) == 1:
-            forecast = np.expand_dims(forecast, axis=0)  # Shape: (1, n_forecast_steps)
+            forecast = np.expand_dims(forecast, axis=1)
         # Return the predicted values
 
         return forecast
@@ -208,19 +206,18 @@ class ProphetModel(BaseModel):
             self: Trained model instance
         """
         # Handle multivariate data by training separate Prophet models for each variate
-        # Input format is (num_series, timesteps)
-        if y_context.ndim > 1 and y_context.shape[0] > 1:
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
             # Multivariate case: train separate models for each variate
             self.models = []  # Store list of Prophet models for each variate
             
-            for variate_idx in range(y_context.shape[0]):
+            for variate_idx in range(y_context.shape[1]):
                 # Extract single variate data
-                y_context_variate = y_context[variate_idx, :]
-                y_target_variate = y_target[variate_idx, :] if y_target is not None else None
+                y_context_variate = y_context[:, variate_idx]
+                y_target_variate = y_target[:, variate_idx] if y_target is not None else None
                 
                 # Create a temporary model instance for this variate
-                # Use the original full config but create a new instance
-                temp_model = ProphetModel(self.full_config)
+                # Use the model-specific configuration already stored in the base class
+                temp_model = ProphetModel(self.model_config)
                 
                 # Train on this variate using the univariate method
                 temp_model._train(
@@ -279,7 +276,7 @@ class ProphetModel(BaseModel):
             
             for variate_idx, model in enumerate(self.models):
                 # Extract single variate context if provided
-                y_context_variate = y_context[variate_idx, :] if y_context is not None else None
+                y_context_variate = y_context[:, variate_idx] if y_context is not None else None
                 
                 # Predict for this variate
                 variate_pred = model._predict(
@@ -292,19 +289,14 @@ class ProphetModel(BaseModel):
                 predictions.append(variate_pred)
             
             # Combine predictions from all variates
-            # Convert from list of (n_forecast_steps,) to (n_variates, n_forecast_steps)
-            combined_predictions = np.array(predictions)
+            combined_predictions = np.column_stack(predictions)
             return combined_predictions
             
         else:
             # Univariate case: use the original univariate method
-            pred = self._predict(
+            return self._predict(
                 y_context=y_context,
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
                 freq=freq
             )
-            # Ensure shape is (1, n_forecast_steps) for univariate
-            if pred.ndim == 1:
-                pred = pred.reshape(1, -1)
-            return pred

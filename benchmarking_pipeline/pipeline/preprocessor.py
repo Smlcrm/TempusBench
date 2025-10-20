@@ -33,12 +33,12 @@ class Preprocessor:
             target_raw: Raw target data as string (JSON-like array format)
 
         Returns:
-            Cleaned numpy array in (num_time_series, num_time_steps) format
+            Cleaned numpy array in (num_steps, num_features) format
         """
         # Clean the target string to handle empty values before parsing
         print(f"[DEBUG] Raw target string length: {len(target_raw)}")
         print(f"[DEBUG] Raw target preview: {target_raw[:200]}...")
-        
+
         # Replace empty values (consecutive commas) with None
         target_cleaned_str = target_raw
         while ', ,' in target_cleaned_str or ',,' in target_cleaned_str:
@@ -47,56 +47,68 @@ class Preprocessor:
         target_cleaned_str = re.sub(r'\[\s*,', '[None,', target_cleaned_str)
         # Handle trailing empty values like "[1, 2, ]" -> "[1, 2, None]"
         target_cleaned_str = re.sub(r',\s*\]', ', None]', target_cleaned_str)
-        
+
         print(f"[DEBUG] Cleaned target string length: {len(target_cleaned_str)}")
-        
+
         try:
             target_parsed = ast.literal_eval(target_cleaned_str)
             print(f"[DEBUG] Successfully parsed target with ast.literal_eval")
         except SyntaxError as e:
             print(f"[DEBUG] ast.literal_eval failed: {e}")
             # If still fails, try more aggressive cleaning
-            # Replace any remaining empty strings with None
             target_cleaned_str = target_cleaned_str.replace('""', 'None').replace("''", 'None')
             target_parsed = ast.literal_eval(target_cleaned_str)
             print(f"[DEBUG] Successfully parsed after aggressive cleaning")
-        
+
         print(f"[DEBUG] Parsed target type: {type(target_parsed)}")
+
         if isinstance(target_parsed, list) and len(target_parsed) > 0:
             print(f"[DEBUG] First element type: {type(target_parsed[0])}")
             if isinstance(target_parsed[0], list):
                 print(f"[DEBUG] First row length: {len(target_parsed[0])}")
-        
-        # Detect if univariate (1D list) or multivariate (2D list)
+
+        # Detect if parsed as univariate: [v1, v2, ...] (1D list)
         is_univariate = isinstance(target_parsed, list) and len(target_parsed) > 0 and not isinstance(target_parsed[0], list)
         print(f"[DEBUG] Is univariate: {is_univariate}")
-        
+
         if is_univariate:
-            # Convert 1D list to 2D: [v1, v2, ...] -> [[v1, v2, ...]]
-            target_parsed = [target_parsed]
-            print(f"[DEBUG] Converted to 2D, new length: {len(target_parsed)}")
-        
-        # Convert None values and empty strings to NaN before creating numpy array
-        target_cleaned = []
-        for i, row in enumerate(target_parsed):
-            cleaned_row = []
-            for j, val in enumerate(row):
+            # Convert 1D list to column vector of shape (num_steps, 1)
+            target_cleaned = []
+            for i, val in enumerate(target_parsed):
                 if val is None or val == "" or val == "None":
-                    cleaned_row.append(np.nan)
+                    target_cleaned.append([np.nan])
                 else:
                     try:
-                        cleaned_row.append(float(val))
+                        target_cleaned.append([float(val)])
                     except (ValueError, TypeError):
-                        cleaned_row.append(np.nan)
-            target_cleaned.append(cleaned_row)
-            if i < 3:  # Debug first few rows
-                print(f"[DEBUG] Row {i} length: {len(cleaned_row)}, first few values: {cleaned_row[:5]}")
-        
-        target = np.array(target_cleaned)
-        print(f"[DEBUG] Final target shape: {target.shape}")
+                        target_cleaned.append([np.nan])
+                if i < 3:
+                    print(f"[DEBUG] Row {i} first value: {target_cleaned[-1][0]}")
+            target = np.array(target_cleaned)  # shape (num_steps, 1)
+        else:
+            # It is a list of lists: [[feature1], [feature2], ...] -> shape (num_features, num_steps)
+            # We'll treat each sublist as one feature, and transpose after cleaning
+            cleaned_features = []
+            for fi, feature_seq in enumerate(target_parsed):
+                cleaned_seq = []
+                for ti, val in enumerate(feature_seq):
+                    if val is None or val == "" or val == "None":
+                        cleaned_seq.append(np.nan)
+                    else:
+                        try:
+                            cleaned_seq.append(float(val))
+                        except (ValueError, TypeError):
+                            cleaned_seq.append(np.nan)
+                    if fi < 2 and ti < 3:
+                        print(f"[DEBUG] Feature {fi}, time {ti}, value: {cleaned_seq[-1]}")
+                cleaned_features.append(cleaned_seq)
+            # Transpose: (num_features, num_steps) -> (num_steps, num_features)
+            target = np.array(cleaned_features, dtype=float).T
+
+        print(f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_features))")
         print(f"[DEBUG] Target dtype: {target.dtype}")
         print(f"[DEBUG] NaN count: {np.isnan(target).sum()}")
-        
+
         return target
 
     def _handle_missing_values(self, arr: np.ndarray, start: str, freq: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -104,74 +116,67 @@ class Preprocessor:
         Handle missing values in the ndarray and return cleaned data with corresponding timestamps.
 
         Args:
-            arr: Input array to clean
+            arr: Input array to clean, shape (num_steps, num_features)
             start: Start time as string
             freq: Frequency as string
 
         Returns:
-            Tuple of (cleaned_array, cleaned_timestamps)
+            Tuple of (timestamps, cleaned_array)
+                - timestamps: shape (num_steps,)
+                - cleaned_array: shape (num_steps, num_features)
         """
-        # Create timestamps array
-        # For (num_time_series, num_time_steps) format, time_steps is the second dimension
-        data_length = arr.shape[0] if arr.ndim == 1 else arr.shape[1]
-        timestamps = pd.date_range(start=start, periods=data_length, freq=freq).values
-        timestamps = np.array(timestamps)
-        # Convert None values to np.nan and ensure float dtype
-        # First convert None to NaN, then convert to float
-        if arr.dtype == object:
-            # Handle None values in object arrays
-            arr = np.where(arr == None, np.nan, arr)
-        arr = np.array(arr, dtype=float)
-        
-        # Ensure we have a 2D array for consistent processing
-        is_1d = arr.ndim == 1
-        if is_1d:
-            arr = arr.reshape(1, -1)  # (num_time_series, num_time_steps) for single series
-            timestamps = timestamps.reshape(-1, 1)
+        # Input requirement: arr shape (num_steps, num_features)
+        num_steps = arr.shape[0]
+        # Generate timestamps for each step (length = num_steps)
+        timestamps = pd.date_range(start=start, periods=num_steps, freq=freq).to_numpy()
 
-        result = arr.copy()
-        result_timestamps = timestamps.copy()
+        # Convert to float and handle None
+        if arr.dtype == object:
+            arr = np.where(arr == None, np.nan, arr)
+        data = np.array(arr, dtype=float)  # ensure float dtype and copy
+
+        result = data.copy()
 
         if self.handle_missing == 'drop':
-            # Remove series with any NaN values (rows in our format)
-            valid_series = ~np.isnan(result).any(axis=1)
-            result = result[valid_series]
-            # Note: timestamps don't change when dropping series
+            # Remove rows (timesteps) with any NaN values
+            valid_rows = ~np.isnan(result).any(axis=1)
+            result = result[valid_rows]
+            timestamps = timestamps[valid_rows]
         elif self.handle_missing == 'mean':
-            # Fill NaN with series means (row means in our format)
-            for series_idx in range(result.shape[0]):
-                series_data = result[series_idx, :]
-                mean_val = np.nanmean(series_data)
+            # Fill NaN with column means (feature means)
+            for col_idx in range(result.shape[1]):
+                col_data = result[:, col_idx]
+                mean_val = np.nanmean(col_data)
                 if not np.isnan(mean_val):
-                    series_data[np.isnan(series_data)] = mean_val
-                    result[series_idx, :] = series_data
+                    col_data[np.isnan(col_data)] = mean_val
+                    result[:, col_idx] = col_data
         elif self.handle_missing == 'median':
-            # Fill NaN with series medians (row medians in our format)
-            for series_idx in range(result.shape[0]):
-                series_data = result[series_idx, :]
-                median_val = np.nanmedian(series_data)
+            # Fill NaN with column medians (feature medians)
+            for col_idx in range(result.shape[1]):
+                col_data = result[:, col_idx]
+                median_val = np.nanmedian(col_data)
                 if not np.isnan(median_val):
-                    series_data[np.isnan(series_data)] = median_val
-                    result[series_idx, :] = series_data
+                    col_data[np.isnan(col_data)] = median_val
+                    result[:, col_idx] = col_data
         elif self.handle_missing == 'interpolate':
-            # Interpolate missing values for each series (row in our format)
-            for series_idx in range(result.shape[0]):
-                result[series_idx, :] = self._interpolate_column(result[series_idx, :])
+            # Interpolate missing values for each column (feature)
+            for col_idx in range(result.shape[1]):
+                result[:, col_idx] = self._interpolate_column(result[:, col_idx])
         elif self.handle_missing == 'forward_fill':
-            # Forward fill missing values for each series
-            for series_idx in range(result.shape[0]):
-                result[series_idx, :] = self._forward_fill_column(result[series_idx, :])
+            # Forward fill missing values for each column (feature)
+            for col_idx in range(result.shape[1]):
+                result[:, col_idx] = self._forward_fill_column(result[:, col_idx])
         elif self.handle_missing == 'backward_fill':
-            # Backward fill missing values for each series
-            for series_idx in range(result.shape[0]):
-                result[series_idx, :] = self._backward_fill_column(result[series_idx, :])
+            # Backward fill missing values for each column (feature)
+            for col_idx in range(result.shape[1]):
+                result[:, col_idx] = self._backward_fill_column(result[:, col_idx])
         else:
-            # Default: forward fill then backward fill for each series
-            for series_idx in range(result.shape[0]):
-                series_data = self._forward_fill_column(result[series_idx, :])
-                result[series_idx, :] = self._backward_fill_column(series_data)
+            # Default: forward fill then backward fill for each column
+            for col_idx in range(result.shape[1]):
+                col_filled = self._forward_fill_column(result[:, col_idx])
+                result[:, col_idx] = self._backward_fill_column(col_filled)
 
-        return result_timestamps, result
+        return timestamps, result
 
     def _interpolate_column(self, col_data: np.ndarray) -> np.ndarray:
         """Interpolate missing values in a single column."""
@@ -225,26 +230,22 @@ class Preprocessor:
 
     def _cap_variates(self, target: np.ndarray) -> np.ndarray:
         """
-        Cap the number of variates (time series) to max_num_variates if specified.
-        
+        Cap the number of features (variates/columns) to max_num_variates if specified.
+
         Args:
-            target: Target array in (num_time_series, num_time_steps) format
-            
+            target: Target array in (num_steps, num_features) format
+
         Returns:
-            Target array with capped number of variates
+            Target array with capped number of features
         """
         if self.max_num_variates is None:
             return target
-            
-        # For 2D arrays, first dimension is num_time_series (variates)
-        if target.ndim == 2 and target.shape[0] > self.max_num_variates:
-            print(f"[DEBUG] Capping variates from {target.shape[0]} to {self.max_num_variates}")
-            target = target[:self.max_num_variates, :]
+
+        if target.shape[1] > self.max_num_variates:
+            print(f"[DEBUG] Capping num_features from {target.shape[1]} to {self.max_num_variates}")
+            target = target[:, :self.max_num_variates]
             print(f"[DEBUG] After capping, target shape: {target.shape}")
-        elif target.ndim == 1:
-            # For 1D arrays, we only have one variate, so no capping needed
-            pass
-            
+
         return target
 
     def clean(self, time_start: str, freq: str, target_raw: str) -> Tuple[np.ndarray, str, str, np.ndarray]:
@@ -258,19 +259,24 @@ class Preprocessor:
 
         Returns:
             Tuple of (timestamps, time_start, freq, target) - cleaned timestamps, time_start, freq, and target
+            Where target is a 2D ndarray of shape (num_steps, num_features)
         """
         print(f"[DEBUG] Starting preprocessor.clean() with time_start={time_start}, freq={freq}")
-        
+
         # 1. Parse and clean the raw target string
         target = self._parse_and_clean_target(target_raw)
-        
+
         # Handle empty arrays
         if target.size == 0:
             raise ValueError("Target array is empty in Preprocessor.clean().")
-        
+
         print(f"[DEBUG] After parsing, target shape: {target.shape}")
 
-        # 2. Cap the number of variates if specified
+        # Target is already in desired shape (num_steps, num_features)
+        if target.ndim != 2:
+            raise ValueError(f"Target array must be 2D (num_steps, num_features), got shape: {target.shape}")
+
+        # 2. Cap the number of variates/features if specified
         target = self._cap_variates(target)
         print(f"[DEBUG] After variate capping, target shape: {target.shape}")
 
@@ -296,12 +302,7 @@ class Preprocessor:
         # 6. Normalize if configured
         if self.normalize:
             print(f"[DEBUG] Normalizing data...")
-            # Ensure we have a 2D array for StandardScaler
-            is_1d = target_cleaned.ndim == 1
-            if is_1d:
-                target_cleaned = target_cleaned.reshape(-1, 1)
-
-            # Apply StandardScaler (standardization: mean=0, std=1)
+            # target_cleaned: (num_steps, num_features)
             scaler = StandardScaler()
             target_cleaned = scaler.fit_transform(target_cleaned)
             print(f"[DEBUG] After normalization, target shape: {target_cleaned.shape}")
