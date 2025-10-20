@@ -25,10 +25,6 @@ class ExponentialSmoothingModel(BaseModel):
         super().__init__(config)
         self.logger = Logger(logs_dir='logs', name='ExponentialSmoothingModel')
 
-        # Get the model-specific config from the nested structure
-        # BaseModel keeps the full config, so we need to extract the exponential_smoothing part
-        self.model_config = self._extract_model_config(config)
-
         def _cast_param(key, value):
             if key == "seasonal_periods":
                 return int(value) if value is not None else None
@@ -44,15 +40,7 @@ class ExponentialSmoothingModel(BaseModel):
                 return value
             return value
 
-        if "trend" not in self.model_config:
-            self.model_config["trend"] = None
-        if "seasonal" not in self.model_config:
-            self.model_config["seasonal"] = None
-        if "seasonal_periods" not in self.model_config:
-            self.model_config["seasonal_periods"] = None
-        if "damped_trend" not in self.model_config:
-            self.model_config["damped_trend"] = False
-
+        # Cast parameters to correct types (no defaults - all must be in config)
         self.model_config["trend"] = _cast_param("trend", self.model_config["trend"])
         self.model_config["seasonal"] = _cast_param(
             "seasonal", self.model_config["seasonal"]

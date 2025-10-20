@@ -87,22 +87,22 @@ class TotoModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
         
-        # Handle (num_series, timesteps) format
+        # Handle (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
             
-        num_series, timesteps = y_context.shape
+        num_steps, num_features = y_context.shape
 
         # Convert datetime to numeric (nanoseconds since epoch)
         if timestamps_context.dtype.kind == 'M':  # datetime64
             timestamps_context = timestamps_context.astype('datetime64[ns]').astype('int64')
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
 
-        # Toto expects (channels, time_steps) format
-        y_context = torch.tensor(y_context, dtype=torch.float)  # (num_series, timesteps)
+        # Toto expects (channels, time_steps) format - transpose to (num_features, num_steps)
+        y_context = torch.tensor(y_context.T, dtype=torch.float)  # (num_features, num_steps)
         # timestamps_context is 1D, so we need to expand it to match y_context shape
-        timestamps_context = torch.tensor(timestamps_context, dtype=torch.float)  # (timesteps,)
-        timestamps_context = timestamps_context.unsqueeze(0).expand(num_series, timesteps)  # (num_series, timesteps)
+        timestamps_context = torch.tensor(timestamps_context, dtype=torch.float)  # (num_steps,)
+        timestamps_context = timestamps_context.unsqueeze(0).expand(num_features, num_steps)  # (num_features, num_steps)
         time_diff = self.freq_to_seconds(freq)
 
         # Create a MaskedTimeseries object

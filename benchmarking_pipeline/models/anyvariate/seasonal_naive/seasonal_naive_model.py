@@ -22,7 +22,6 @@ class SeasonalNaiveModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.model_config = self._extract_model_config(config)
 
     def train(
         self,
@@ -50,13 +49,13 @@ class SeasonalNaiveModel(BaseModel):
                 raise ValueError("sp must be specified in model_params")
             sp = self.model_config["sp"]
 
-            # Handle multivariate data by creating separate models for each time series
+            # Handle multivariate data by creating separate models for each feature
             if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
-                num_series = y_context.shape[0]
+                num_features = y_context.shape[1]
                 self.models = []
-                for i in range(num_series):
+                for i in range(num_features):
                     model = NaiveForecaster(strategy="last", sp=sp)
-                    series_data = pd.Series(y_context[i, :])
+                    series_data = pd.Series(y_context[:, i])
                     model.fit(y=series_data, X=None)
                     self.models.append(model)
             else:
@@ -97,15 +96,15 @@ class SeasonalNaiveModel(BaseModel):
         
         # Handle multivariate data
         if hasattr(self, 'models') and self.models:
-            # Multivariate case: predict for each time series
-            num_series = len(self.models)
-            predictions = np.zeros((num_series, forecast_horizon))
+            # Multivariate case: predict for each feature
+            num_features = len(self.models)
+            predictions = np.zeros((forecast_horizon, num_features))
             
             for i, model in enumerate(self.models):
                 pred = model.predict(fh=fh)
                 if len(pred.shape) == 1:
                     pred = np.asarray(pred)
-                predictions[i, :] = pred
+                predictions[:, i] = pred
         else:
             # Univariate case
             predictions = self.model.predict(fh=fh)

@@ -125,26 +125,26 @@ class ChronosModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        # Handle (num_series, timesteps) format
+        # Handle (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
             
-        num_series, timesteps = y_context.shape
+        num_steps, num_features = y_context.shape
         
-        padding_length = self.model_config["context_length"] - timesteps
+        padding_length = self.model_config["context_length"] - num_steps
         if padding_length <= 0:
             # Use the most recent context_length data points
-            y_context = y_context[:, -self.model_config["context_length"] :]
+            y_context = y_context[-self.model_config["context_length"] :, :]
         else:
             # If not enough data, pad with the last available value
             y_context = np.pad(
                 y_context,
-                ((0, 0), (padding_length, 0)),
+                ((padding_length, 0), (0, 0)),
                 mode="constant"
             )
 
-        # Chronos expects (timesteps, num_series) format
-        y_context = torch.tensor(y_context.T)
+        # Chronos expects (timesteps, num_features) format
+        y_context = torch.tensor(y_context)
         # Generate forecasts
         forecasts = self.model.predict(
             context=y_context,

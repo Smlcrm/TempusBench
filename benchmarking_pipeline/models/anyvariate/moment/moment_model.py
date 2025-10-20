@@ -182,7 +182,7 @@ class MomentModel(BaseModel):
                 )
 
             # Create proper 3D tensor: [batch_size=1, sequence_length=1, features=1]
-            y_context = torch.FloatTensor(y_context.T).unsqueeze(0).to(self.device)
+            y_context = torch.FloatTensor(y_context).unsqueeze(0).to(self.device)
             print("[BEFORE] y_context shape:", y_context.shape)
             # Create input mask
             input_mask = torch.ones(1, self.model_config["context_length"]).to(

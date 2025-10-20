@@ -119,27 +119,29 @@ class ModelExecutor:
                             model = model_class(full_config_copy)
 
                             trained_model = model.train(
-                                y_context=target[:, cstart:cend],
-                                y_target=target[:, tstart:tend],
+                                y_context=target[cstart:cend],
+                                y_target=target[tstart:tend],
                                 timestamps_context=timestamps[cstart:cend],
                                 timestamps_target=timestamps[tstart:tend],
                                 freq=freq
                             )
 
                             results = trained_model.predict(
-                                y_context=target[:, cstart:tend],
+                                y_context=target[cstart:tend],
                                 timestamps_context=timestamps[cstart:tend],
                                 timestamps_target=timestamps[vstart:vend],
                                 freq=freq,
                             )
 
                             eval_losses = trained_model.compute_loss(
-                                y_true=target[:, vstart:vend],
+                                y_true=target[vstart:vend],
                                 y_pred=results,
-                                y_train=target[:, tstart:tend],
+                                y_train=target[tstart:tend],
                                 freq=freq
                             )
 
+                            del trained_model
+                            del model
                             immutable_params = tuple(sorted(params.items()))
                             tuning_losses[immutable_params] = eval_losses[tuning_loss]
                             eval_metrics[immutable_params] = eval_losses

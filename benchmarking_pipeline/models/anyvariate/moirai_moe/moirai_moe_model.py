@@ -108,16 +108,16 @@ class MoiraiMoeModel(BaseModel):
         prediction_length = timestamps_target.shape[0]
         print("prediction length", prediction_length)
         
-        # Handle (num_series, timesteps) format
+        # Handle (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
             
-        num_series, timesteps = y_context.shape
+        num_steps, num_features = y_context.shape
         
-        # Work with (num_series, timesteps) format directly
-        # Use timesteps as context_steps and num_series as num_targets
-        context_steps = timesteps
-        num_targets = num_series
+        # Work with (num_steps, num_features) format directly
+        # Use num_steps as context_steps and num_features as num_targets
+        context_steps = num_steps
+        num_targets = num_features
 
         ctx = self.model_config["ctx"]
         # Use actual context length instead of config ctx if it's smaller
@@ -127,10 +127,10 @@ class MoiraiMoeModel(BaseModel):
         observed_mask = np.ones((actual_ctx, num_targets), dtype=bool)
 
         # Prepare past_target tensor: shape (1, actual_ctx, num_targets)
-        # Use only the last actual_ctx timesteps from (num_series, timesteps) format
-        y_context_trimmed = y_context[:, -actual_ctx:] if actual_ctx < context_steps else y_context
+        # Use only the last actual_ctx timesteps from (num_steps, num_features) format
+        y_context_trimmed = y_context[-actual_ctx:, :] if actual_ctx < context_steps else y_context
         # Reshape to (actual_ctx, num_targets) for Moirai MoE
-        past_target = torch.tensor(y_context_trimmed.T, dtype=torch.float32).unsqueeze(0)
+        past_target = torch.tensor(y_context_trimmed, dtype=torch.float32).unsqueeze(0)
 
         # past_observed_target: True where value is observed, False where padded (1, ctx, num_targets)
         past_observed_target = torch.tensor(observed_mask, dtype=torch.bool).unsqueeze(

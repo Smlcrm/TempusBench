@@ -40,7 +40,6 @@ class Theta(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.model_config = self._extract_model_config(config)
         if "sp" not in self.model_config:
             raise ValueError("sp must be specified in config")
 
@@ -190,34 +189,11 @@ class Theta(BaseModel):
             self: The fitted model instance
         """
 
-        # Ensure data is in (time_steps, num_targets) format
-        # Data comes in as (num_targets, time_steps), need to transpose to (time_steps, num_targets)
-        print(f"Original y_context shape: {y_context.shape}")
-        if y_context.shape[0] < y_context.shape[1]:
-            # Data is (num_targets, time_steps), transpose to (time_steps, num_targets)
-            y_context = y_context.T
-            print(f"Transposed y_context shape: {y_context.shape}")
-        
         # Calculate num_targets from data
-        num_targets = y_context.shape[1]  # Number of series (columns)
-        print(f"Final y_context shape: {y_context.shape}")
-        
-        # Handle univariate case (single series)
-        if num_targets == 1:
-            print("Training Univariate Theta...")
-            # For univariate data, use simple exponential smoothing
-            theta_model = ThetaForecaster(sp=self.model_config["sp"], deseasonalize=True)
-            theta_model.fit(y=pd.Series(y_context[:, 0]))
-            self.univariate_models = {0: theta_model}
-            self.is_fitted = True
-            print("Univariate Theta training complete.")
-            return self
-        
+        num_targets = y_context.shape[1]
+        print(f"y_context shape: {y_context.shape}")
         print(f"Training Multivariate Theta with {num_targets} targets...")
 
-        # Use context data for parameter estimation (historical data)
-        print(f"Using context data shape: {y_context.shape}")
-        
         # Step 1: Estimate drift vector μ
         self.drift_vector = self._estimate_drift(y_context)
         print(f"Estimated drift vector: {self.drift_vector}")
@@ -244,34 +220,9 @@ class Theta(BaseModel):
         for i in range(num_targets):
             # Convert to pandas Series for sktime
             theta_line_series = pd.Series(theta_lines[:, i])
-            
-            # Handle NaN values in theta_line_series
-            if theta_line_series.isna().any():
-                print(f"Warning: θ-line {i} contains NaN values, interpolating...")
-                # Forward fill then backward fill to handle NaNs
-                theta_line_series = theta_line_series.fillna(method='ffill').fillna(method='bfill')
-                # If still NaN (all values were NaN), fill with 0
-                if theta_line_series.isna().any():
-                    theta_line_series = theta_line_series.fillna(0)
-
-            # Adjust seasonal period based on available data length
-            # Need at least 2 complete cycles for seasonal decomposition
-            data_length = len(theta_line_series)
-            sp = self.model_config["sp"]
-            deseasonalize = True
-            
-            # Check if data contains zero or negative values for deseasonalization
-            has_zero_or_negative = (theta_line_series <= 0).any()
-            if has_zero_or_negative:
-                deseasonalize = False
-                print(f"θ-line {i} contains zero or negative values, disabling deseasonalization")
-            elif data_length < 2 * sp:
-                # If not enough data for the specified seasonal period, disable deseasonalization
-                deseasonalize = False
-                print(f"Disabled deseasonalization due to insufficient data (length={data_length}, required={2*sp})")
 
             # Create and fit univariate Theta model
-            theta_model = ThetaForecaster(sp=sp, deseasonalize=deseasonalize)
+            theta_model = ThetaForecaster(sp=self.model_config["sp"])
             theta_model.fit(y=theta_line_series)
 
             self.univariate_models[i] = theta_model
@@ -309,18 +260,11 @@ class Theta(BaseModel):
             raise ValueError("Model is not trained yet. Call train() first.")
 
         forecast_horizon = len(timestamps_target)
-        num_targets = len(self.univariate_models)
+        num_targets = self.num_targets
         # Determine forecast horizon
         fh = np.arange(1, forecast_horizon + 1)
 
         forecast_steps = len(fh)
-
-        # Handle univariate case
-        if num_targets == 1:
-            # For univariate data, just get the forecast from the single model
-            theta_forecast = self.univariate_models[0].predict(fh=fh)
-            forecasts = theta_forecast.values.reshape(-1, 1)
-            return forecasts
 
         # Get predictions from each individual Theta model
         all_predictions = np.zeros((forecast_horizon, num_targets))

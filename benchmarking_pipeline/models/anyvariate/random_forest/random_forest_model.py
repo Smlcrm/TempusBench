@@ -25,7 +25,6 @@ class RandomForestModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.model_config = self._extract_model_config(config)
         self.logger = Logger(logs_dir='logs', name='RandomForestModel')
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
@@ -67,30 +66,29 @@ class RandomForestModel(BaseModel):
         Create time series features for Random Forest with timestamp features.
 
         Args:
-            y_series: Target time series with shape (num_series, timesteps)
+            y_series: Target time series
+            x_series: Exogenous variables (optional)
             timestamps: Timestamp features (optional)
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: Features and targets
         """
-        # Handle multivariate data - work with (num_series, timesteps) format
-        if y_series.ndim == 1:
-            y_series = y_series.reshape(1, -1)  # Convert to (1, timesteps)
-        
-        num_series, timesteps = y_series.shape
+        # Ensure univariate series for feature generation
+        y_series = np.squeeze(y_series)
+        if getattr(y_series, "ndim", 1) > 1:
+            y_series = y_series[:, 0]
         if timestamps is not None:
             timestamps = np.squeeze(timestamps)
 
         forecast_horizon = self.model_config["forecast_horizon"]
 
         n_samples = (
-            timesteps - self.model_config["lookback_window"] - forecast_horizon + 1
+            len(y_series) - self.model_config["lookback_window"] - forecast_horizon + 1
         )
 
-        self.logger.debug(f"y_series shape: {y_series.shape}")
-        self.logger.debug(f"timesteps: {timesteps}")
-        self.logger.debug(f"len timestamps: {len(timestamps) if timestamps is not None else 'None'}")
-        self.logger.debug(f"forecast_horizon: {forecast_horizon}")
+        print("len y_series:", len(y_series))
+        print("len timestamps:", len(timestamps))
+        print("forecast_horizon:", forecast_horizon)
 
         if n_samples <= 0:
             raise ValueError(
@@ -101,37 +99,28 @@ class RandomForestModel(BaseModel):
         targets = []
 
         for i in range(n_samples):
-            # Create lag features for all series
-            lag_features = y_series[:, i : i + self.model_config["lookback_window"]]  # Shape: (num_series, lookback_window)
-            
-            # Flatten lag features for all series
-            lag_features_flat = lag_features.flatten()  # Shape: (num_series * lookback_window,)
+            # Create lag features
+            lag_features = y_series[i : i + self.model_config["lookback_window"]]
 
-            # Create rolling statistics for each series
-            sample_features = list(lag_features_flat)  # Start with lag features
-            
-            for series_idx in range(num_series):
-                series_data = lag_features[series_idx, :]  # Shape: (lookback_window,)
-                
-                # Create rolling statistics for this series
-                rolling_mean = np.mean(series_data)
-                rolling_std = np.std(series_data)
-                rolling_min = np.min(series_data)
-                rolling_max = np.max(series_data)
+            # Create rolling statistics
+            rolling_mean = np.mean(lag_features)
+            rolling_std = np.std(lag_features)
+            rolling_min = np.min(lag_features)
+            rolling_max = np.max(lag_features)
 
-                # Create trend features for this series
-                trend = np.polyfit(
-                    range(self.model_config["lookback_window"]), series_data, 1
-                )[0]
+            # Create trend features
+            trend = np.polyfit(
+                range(self.model_config["lookback_window"]), lag_features, 1
+            )[0]
 
-                # Add statistics for this series
-                sample_features.extend([
-                    rolling_mean,
-                    rolling_std,
-                    rolling_min,
-                    rolling_max,
-                    trend,
-                ])
+            # Combine all features
+            sample_features = list(lag_features) + [
+                rolling_mean,
+                rolling_std,
+                rolling_min,
+                rolling_max,
+                trend,
+            ]
 
             # Add timestamp features if available
             if (
@@ -189,13 +178,13 @@ class RandomForestModel(BaseModel):
                 sample_features.extend(current_time_features + future_time_features)
 
             features.append(sample_features)
-            # Multi-output: target is a vector of length forecast_horizon * num_series
-            # Flatten targets for all series
-            target_values = []
-            for step in range(forecast_horizon):
-                for series_idx in range(num_series):
-                    target_values.append(y_series[series_idx, i + self.model_config["lookback_window"] + step])
-            targets.append(target_values)
+            # Multi-output: target is a vector of length forecast_horizon
+            targets.append(
+                [
+                    y_series[i + self.model_config["lookback_window"] + step]
+                    for step in range(forecast_horizon)
+                ]
+            )
 
         return np.array(features), np.array(targets)
 
@@ -235,8 +224,8 @@ class RandomForestModel(BaseModel):
         # Train the model to predict the configured forecast horizon
         forecast_horizon = int(self.model_config.get("forecast_horizon", 1))
 
-        # Concatenate along time axis (axis=1) for our (num_series, timesteps) format
-        full_y_data = np.concatenate([y_context, y_target], axis=1)
+        # Concatenate along time axis (axis=0) for our (num_steps, num_features) format
+        full_y_data = np.concatenate([y_context, y_target], axis=0)
         
         # Combine timestamps if available
         full_timestamps = np.concatenate(
@@ -303,9 +292,9 @@ class RandomForestModel(BaseModel):
 
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        # Ensure y_context is in (num_series, timesteps) format
+        # Ensure y_context is in (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
 
         # Combine timestamps if available
         full_timestamps = np.concatenate(
@@ -318,9 +307,9 @@ class RandomForestModel(BaseModel):
         # So we need to create a feature row for the current context and the next forecast_horizon timestamps
 
         # Create dummy future data for feature creation
-        num_series = y_context.shape[0]
-        dummy_future = np.zeros((num_series, forecast_horizon))
-        full_y_data = np.concatenate([y_context, dummy_future], axis=1)
+        num_features = y_context.shape[1]
+        dummy_future = np.zeros((forecast_horizon, num_features))
+        full_y_data = np.concatenate([y_context, dummy_future], axis=0)
         
         feature_row, _ = self._create_features(full_y_data, full_timestamps)
 
@@ -331,8 +320,8 @@ class RandomForestModel(BaseModel):
         # Predict all steps at once
         preds = self.model.predict(X_last)
         
-        # Reshape predictions back to (num_series, forecast_horizon)
-        preds_reshaped = preds.reshape(num_series, forecast_horizon)
+        # Reshape predictions back to (forecast_horizon, num_features)
+        preds_reshaped = preds.reshape(forecast_horizon, num_features)
         return preds_reshaped
 
     def predict(
@@ -362,15 +351,15 @@ class RandomForestModel(BaseModel):
         # Initialize context with the last lookback_window values from y_context
         # Ensure context is 1D for consistent handling
 
-        # Ensure y_context is in (num_series, timesteps) format
+        # Ensure y_context is in (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
 
-        num_series = y_context.shape[0]
+        num_features = y_context.shape[1]
         forecast_horizon = len(timestamps_target)
         
         # Use the last lookback_window timesteps as context
-        y_context = y_context[:, -self.model_config["lookback_window"]:]
+        y_context = y_context[-self.model_config["lookback_window"]:, :]
         timestamps_context = timestamps_context[-self.model_config["lookback_window"]:]
 
         # Make prediction for the full forecast horizon
