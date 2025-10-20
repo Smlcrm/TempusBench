@@ -24,6 +24,7 @@ class CrostonClassicModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
+        self.model_config = self._extract_model_config(config)
 
         # Parameters, initialized to None
         self.demand_level_ = None
@@ -70,7 +71,7 @@ class CrostonClassicModel(BaseModel):
 
                 # Set levels to a default state (e.g., average of the whole series)
                 demand_levels[variate] = np.mean(serie) if len(serie) > 0 else 0
-                interval_levels[variate] = len(series) if len(serie) > 0 else 1
+                interval_levels[variate] = len(serie) if len(serie) > 0 else 1
 
             else:
                 self.is_fitted = True
@@ -123,7 +124,7 @@ class CrostonClassicModel(BaseModel):
             y_context, x_context, x_target: Not used.
 
         Returns:
-            np.ndarray: Model predictions with shape (forecast_horizon, num_target_features).
+            np.ndarray: Model predictions with shape (num_series, forecast_horizon).
         """
         if not self.is_fitted:
             raise ValueError("Model not fitted. Call train() first.")
@@ -135,9 +136,11 @@ class CrostonClassicModel(BaseModel):
             out=np.zeros_like(self.demand_level_, dtype=float),
             where=self.interval_level_ != 0,
         )
-        forecast = np.tile(forecast, reps=(forecast_horizon, 1))
+        # For multivariate data, broadcast each series across forecast horizon
+        # Shape: (num_series, forecast_horizon)
+        forecast = np.tile(forecast.reshape(-1, 1), reps=(1, forecast_horizon))
 
-        return forecast.reshape(1, -1)  # Reshape to (1, forecast_steps)
+        return forecast  # Return (num_series, forecast_horizon)
 
 
     def get_model_summary(self) -> Dict[str, Any]:

@@ -18,7 +18,6 @@ from benchmarking_pipeline.utils.logger import Logger
 from chronos import ChronosPipeline as BaseChronosPipeline
 from einops import rearrange
 
-
 class ChronosModel(BaseModel):
     """
     Chronos foundation model wrapper for time series forecasting.
@@ -45,7 +44,7 @@ class ChronosModel(BaseModel):
             config_file: Path to a JSON configuration file
         """
         super().__init__(config)
-        self.logger = Logger(log_dir='logs', name='ChronosModel')
+        self.logger = Logger(logs_dir='logs', name='ChronosModel')
 
         self.model_config["model_size"] = (
             "tiny"  # Valid model sizes = {'tiny', 'mini', 'small', 'base', 'large'}
@@ -126,18 +125,25 @@ class ChronosModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        padding_length = self.model_config["context_length"] - y_context.shape[0]
+        # Handle (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
+            
+        num_series, timesteps = y_context.shape
+        
+        padding_length = self.model_config["context_length"] - timesteps
         if padding_length <= 0:
             # Use the most recent context_length data points
-            y_context = y_context[-self.model_config["context_length"] :, :]
+            y_context = y_context[:, -self.model_config["context_length"] :]
         else:
             # If not enough data, pad with the last available value
             y_context = np.pad(
                 y_context,
-                ((padding_length, 0), (0, 0)),
+                ((0, 0), (padding_length, 0)),
                 mode="constant"
             )
 
+        # Chronos expects (timesteps, num_series) format
         y_context = torch.tensor(y_context.T)
         # Generate forecasts
         forecasts = self.model.predict(
@@ -146,8 +152,13 @@ class ChronosModel(BaseModel):
             num_samples=self.model_config["num_samples"],
         )
         forecasts = np.squeeze(np.asarray(forecasts))
-        forecasts = np.mean(forecasts, axis=0, keepdims=True).T
-
+        forecasts = np.mean(forecasts, axis=0)
+        
+        # Ensure correct shape: (num_series, forecast_horizon)
+        if forecasts.ndim == 1:
+            forecasts = forecasts.reshape(1, -1)  # (1, forecast_horizon)
+        
+        # Return in (num_series, forecast_horizon) format
         return forecasts
 
         # y_context =

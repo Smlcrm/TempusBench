@@ -44,7 +44,7 @@ from gluonts.transform import (
     ValidationSplitSampler,
 )
 
-from ...gluon_utils.gluon_ts_distributions.implicit_quantile_network import (
+from gluon_utils.gluon_ts_distributions.implicit_quantile_network import (
     ImplicitQuantileNetworkOutput,
 )
 from .lightning_module import LagLlamaLightningModule

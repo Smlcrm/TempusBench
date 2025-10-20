@@ -22,6 +22,7 @@ class SeasonalNaiveModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
+        self.model_config = self._extract_model_config(config)
 
     def train(
         self,
@@ -48,25 +49,23 @@ class SeasonalNaiveModel(BaseModel):
             if "sp" not in self.model_config:
                 raise ValueError("sp must be specified in model_params")
             sp = self.model_config["sp"]
-            self.model = NaiveForecaster(strategy="last", sp=sp)
 
-        # Handle both 1D and 2D input data
-        if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
-            # Extract the single column from 2D array
-            y_context = y_context[:, 0]
-        elif (
-            hasattr(y_context, "values")
-            and hasattr(y_context.values, "ndim")
-            and y_context.values.ndim == 2
-        ):
-            # Handle pandas DataFrame or similar
-            y_context = y_context.values[:, 0]
+            # Handle multivariate data by creating separate models for each time series
+            if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
+                num_series = y_context.shape[0]
+                self.models = []
+                for i in range(num_series):
+                    model = NaiveForecaster(strategy="last", sp=sp)
+                    series_data = pd.Series(y_context[i, :])
+                    model.fit(y=series_data, X=None)
+                    self.models.append(model)
+            else:
+                # Handle univariate data
+                if not isinstance(y_context, pd.Series):
+                    y_context = pd.Series(y_context)
+                self.model = NaiveForecaster(strategy="last", sp=sp)
+                self.model.fit(y=y_context, X=None)
 
-        if not isinstance(y_context, pd.Series):
-            # works best with a proper index
-            y_context = pd.Series(y_context)
-
-        self.model.fit(y=y_context, X=None)
         self.is_fitted = True
         return self
 
@@ -88,17 +87,30 @@ class SeasonalNaiveModel(BaseModel):
             **kwargs: Additional keyword arguments.
 
         Returns:
-            np.ndarray: Model predictions with shape (forecast_horizon, 1).
+            np.ndarray: Model predictions with shape (num_series, forecast_horizon).
         """
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
         forecast_horizon = len(timestamps_target)
         fh = np.arange(1, forecast_horizon + 1)
-        predictions = self.model.predict(fh=fh)
-
-        if len(predictions.shape) == 1:
-            predictions = np.asarray(predictions)
-            predictions = np.expand_dims(predictions, axis=1)
+        
+        # Handle multivariate data
+        if hasattr(self, 'models') and self.models:
+            # Multivariate case: predict for each time series
+            num_series = len(self.models)
+            predictions = np.zeros((num_series, forecast_horizon))
+            
+            for i, model in enumerate(self.models):
+                pred = model.predict(fh=fh)
+                if len(pred.shape) == 1:
+                    pred = np.asarray(pred)
+                predictions[i, :] = pred
+        else:
+            # Univariate case
+            predictions = self.model.predict(fh=fh)
+            if len(predictions.shape) == 1:
+                predictions = np.asarray(predictions)
+                predictions = np.expand_dims(predictions, axis=0)  # Make it (1, forecast_horizon)
 
         return predictions

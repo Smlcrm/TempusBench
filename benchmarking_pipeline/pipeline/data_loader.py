@@ -12,11 +12,12 @@ appropriate Dataset objects for training, validation, and testing.
 import os, sys, ast, csv
 import pandas as pd
 import numpy as np
-
+import pdb
 from typing import Optional, List, Dict, Any
 from numpy.lib.stride_tricks import as_strided
 
 from benchmarking_pipeline.utils.logger import Logger
+from benchmarking_pipeline.utils.config_validator import load_config
 from benchmarking_pipeline.pipeline.preprocessor import Preprocessor
 from benchmarking_pipeline.pipeline.data_types import Dataset, DatasetSplit
 
@@ -31,7 +32,7 @@ class DataLoader:
     The loader automatically splits data into train/validation/test sets based on
     the configured split ratios and handles different data formats.
     """
-    def __init__(self, config: Dict[str, Any], datasets_dir: os.PathLike, run_dir: os.PathLike):
+    def __init__(self, config_path: str, datasets_dir: str, run_dir: str):
         """
         Initialize DataLoader.
 
@@ -40,17 +41,11 @@ class DataLoader:
                 - dataset.name: Name of the dataset directory
                 - dataset.split_ratio: List of train/val/test split ratios
         """
-        self.config = config
-        self.logger = Logger(log_dir='logs', name='DataLoader')
+        self.config = load_config(config_path)
+        self.logger = Logger(logs_dir="logs", name="DataLoader")
         self.datasets_dir = datasets_dir # ./datasets
         self.run_dir = run_dir
-        self.preprocessor = Preprocessor(config)
-        # Create split dirs
-        self.splits_dir = os.path.join(self.run_dir, "splits")
-        dirs_to_create = [self.splits_dir]
-        dirs_to_create += [os.path.join(self.splits_dir, subdir) for subdir in ["context", "train", "validate", "test"]]
-        for d in dirs_to_create: os.makedirs(d, exist_ok=True)
-        # Extract dataset paths
+        self.preprocessor = Preprocessor(self.config)
         self.dataset_paths = self._load_dataset_paths()
 
     def _load_dataset_paths(self) -> List[str]:
@@ -63,7 +58,8 @@ class DataLoader:
         Raises:
             ValueError: If no valid CSV files are found or an invalid path is specified.
         """
-        dataset_name = self.config['name']
+        logging = self.logger is not None
+        dataset_name = self.config['task']['dataset']['name']
 
         if dataset_name == "*":  # wildcard to select all
             dataset_paths = [os.path.join(root, f) for root, _, files in os.walk(self.datasets_dir) for f in files if f.endswith(".csv")]
@@ -84,129 +80,89 @@ class DataLoader:
             if not dataset_paths:
                 raise ValueError(f"No CSV files found in dataset directory {dataset_dir_path}")
 
-        self.logger.debug(f"dataset_paths: {dataset_paths}")
-        self.dataset_paths = dataset_paths
+        if logging: self.logger.debug(f"dataset_paths: {dataset_paths}")
+        return dataset_paths
 
-    def _load_dataset_batch(self, dataset_path, max_batch_size_mb=100):
+    def _load_dataset(self, dataset_path):
+
+        if not os.path.exists(dataset_path):
+            raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
+
+        # Load the chunk data
+        file_data = pd.read_csv(dataset_path)
+
+        # Extract basic information
+        item_id = file_data["item_id"].iloc[0]
+        time_start = file_data["start"].iloc[0]
+        time_freq = file_data["freq"].iloc[0]
+
+        # Handle targets by inference - return raw data for preprocessor to clean
+        target_raw = file_data["target"].iloc[0]
+        return time_start, time_freq, target_raw
+
+    def generate_dataset_split(self, dataset_path: str, context_steps: int, train_steps: int, validate_steps: int):
         """
-        Yields batches of targets from a csv file. Each batch contains at least 1 row and as many
-        rows as can fit into < max_batch_size_mb MB RAM.
-        Yields list-of-targets (batch).
+        Generate rolling windows for context, train, and validate splits, where each window starts validate_steps after the previous, so that windows do not overlap at all (stride = validate_steps). We stop when the end of the window for the next roll would exceed num_steps or when max_windows is reached.
+
+        For all slices extracted below (target[:, ...] or target[...]), these are numpy views,
+        not copies: they share memory with the original array. No new memory is allocated
+        except for metadata containers and timestamps.
+
+        The progression is:
+        [[----context----][---train----][---validate----]--------------------------------------]
+        [----------------[-----context----][---train----][---validate----]---------------------]
+        [---------------------------------[-----context----][---train----][---validate----]----]
 
         Args:
-            dataset_path: Path to csv file (one row per item, with columns ... 'target')
-            max_batch_size_mb: Max memory size per batch in MB (default 100)
+            context_steps: int, number of steps for context
+            train_steps: int, number of steps for train
+            validate_steps: int, number of steps for validation
 
         Yields:
-            List of [target1, ..., targetN] for each batch
+            Dataset (with .context, .train, .validation, test=None)
         """
 
-        with open(dataset_path, "r", newline="", encoding="utf-8") as csvfile:
-            reader = csv.reader(csvfile)
-            headers = next(reader)
-            # Read first row to estimate memory size per row
-            try:
-                first_row = next(reader)
-            except StopIteration:
-                raise ValueError(f"CSV file '{dataset_path}' is empty (no data rows found).")
+        self.logger.debug(f"Extracting data from {dataset_path}")
+        # All targets are 2D after cleaning: (n_targets, n_steps)
+        timestamps, time_start, time_freq, target = self.preprocessor.clean(*self._load_dataset(dataset_path))
 
-            target = ast.literal_eval(first_row[headers.index("target")])
-            row_bytes = sys.getsizeof(first_row)
+        num_steps = target.shape[1]  # Use second dimension for time steps
+        window_size = context_steps + train_steps + validate_steps
+        stride = validate_steps  # advance by validate_steps every window
+        max_windows = self.config['task']['max_windows']
 
-            batch_rows = max(1, int((max_batch_size_mb * 1024 * 1024) // row_bytes))
+        # Advance by step size = validate_steps each time, extract "view" slices
+        win = 0
+        while win < max_windows:
+            start = win * stride
+            end = start + window_size
+            if end > num_steps: break
 
-            # Prepare first batch
-            targets_batch = [target]
-            rows_in_batch = 1
-            for row in reader:
-                target = ast.literal_eval(row[headers.index("target")])
-                targets_batch.append(target)
-                rows_in_batch += 1
-                if rows_in_batch >= batch_rows:
-                    yield targets_batch
-                    targets_batch = []
-                    rows_in_batch = 0
-            if targets_batch:
-                yield targets_batch
+            ctx_start = start; ctx_end = ctx_start + context_steps
+            train_start = ctx_end; train_end = train_start + train_steps
+            val_start = train_end; val_end = val_start + validate_steps
 
-    def generate_dataset_split(self, context_steps: int, train_steps: int, validate_steps: int, test_steps: int = 0):
-        window_size = context_steps + train_steps + validate_steps + test_steps
+            window = Dataset(
+                timestamps=timestamps,
+                target=target,
+                context=DatasetSplit(
+                    start=ctx_start,
+                    end=ctx_end
+                ),
+                train=DatasetSplit(
+                    start=train_start,
+                    end=train_end
+                ),
+                validation=DatasetSplit(
+                    start=val_start,
+                    end=val_end
+                ),
+                metadata={
+                    "dataset_path": dataset_path,
+                    "window": win,
+                    "freq": time_freq
+                }
+            )
 
-        # Compute indices
-        ctx_idx = context_steps
-        trn_idx = ctx_idx + train_steps
-        vld_idx = trn_idx + validate_steps
-        tst_idx = vld_idx + test_steps
-
-        for dataset_path in self.dataset_paths:
-            row_idx = 0
-            for batch_idx, batch in enumerate(self._load_dataset_batch(dataset_path)):
-                for target in batch:
-                    target = np.array(target)
-                    target = self.preprocessor.clean(target)
-
-                    num_steps = len(target) if target.ndim == 1 else len(target[0])
-                    if num_steps < window_size:
-                        raise ValueError(f"Error in file '{dataset_path}', batch row {row_idx}: num_steps ({num_steps}) exceeds window_size ({window_size})")
-
-                    stride = target.strides[0]
-                    num_windows = num_steps - window_size + 1
-
-                    # Verify we only support 1D or 2D (multivariate timeseries)
-                    if target.ndim == 1: # Univariate case
-                        shape = (num_windows, window_size)
-                        windows = as_strided(
-                            target,
-                            shape=shape,
-                            strides=(stride, stride),
-                            writeable=False,
-                        )
-                    elif target.ndim == 2:
-                        # Multivariate: (num_targets, num_steps) --> stride along axis 1
-                        shape = (num_windows, target.shape[0], window_size)
-                        windows = as_strided(
-                            target,
-                            shape=shape,
-                            strides=(target.strides[1], target.strides[0], target.strides[1]),
-                            writeable=False,
-                        )
-                    else:
-                        raise ValueError("target array must be 1D or 2D")
-
-                    # Now, make a single slice operation for all windows & yield
-                    for win in range(num_windows):
-                        win_slice = windows[win]
-                        if target.ndim == 2:
-                            # Convert from (targets, window_size)
-                            window_data = win_slice
-                        else:
-                            window_data = win_slice  # shape (window_size,)
-
-                        # Efficient slicing: avoid redundant slicing and allow view semantics
-                        if target.ndim == 2:
-                            context_set = window_data[:, :ctx_idx]
-                            train_set = window_data[:, ctx_idx:trn_idx]
-                            validate_set = window_data[:, trn_idx:vld_idx]
-                            test_set = window_data[:, vld_idx:tst_idx]
-                        else:
-                            context_set = window_data[:ctx_idx]
-                            train_set = window_data[ctx_idx:trn_idx]
-                            validate_set = window_data[trn_idx:vld_idx]
-                            test_set = window_data[vld_idx:tst_idx]
-
-                        # Wrap each set as a DatasetSplit (here only targets are set, features/timestamps/metadata are None)
-                        dataset = Dataset(
-                            context = DatasetSplit(targets=context_set),
-                            train = DatasetSplit(targets=train_set),
-                            validation = DatasetSplit(targets=validate_set),
-                            test = DatasetSplit(targets=test_set),
-                            metadata = {
-                                "file_path": dataset_path,
-                                "batch": batch_idx,
-                                "row": row_idx,
-                                "window": win
-                            }
-                        )
-
-                        row_idx += 1
-                        yield dataset
+            yield win, window
+            win += 1

@@ -27,12 +27,14 @@ class XGBoostModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.logger = Logger(log_dir='logs', name='XGBoostModel')
+        self.model_config = self._extract_model_config(config)
+        self.logger = Logger(logs_dir='logs', name='XGBoostModel')
 
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
 
-        # forecast_horizon is inherited from parent class (BaseModel)
+        # Add forecast_horizon to model_config
+        self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
         self._build_model()
 
     def _build_model(self):
@@ -70,16 +72,17 @@ class XGBoostModel(BaseModel):
         Create advanced multivariate time series features for XGBoost.
 
         Args:
-            y_series: Target time series with shape (timesteps, num_targets)
+            y_series: Target time series with shape (num_series, timesteps)
             x_series: Exogenous variables (optional)
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: Features and targets arrays
         """
 
-        num_targets = y_series.shape[1]
+        num_targets = y_series.shape[0]  # num_series
+        timesteps = y_series.shape[1]    # timesteps
         n_samples = (
-            len(y_series)
+            timesteps
             - self.model_config["lookback_window"]
             - self.model_config["forecast_horizon"]
             + 1
@@ -98,8 +101,8 @@ class XGBoostModel(BaseModel):
 
             # Get lookback window for all targets
             lookback_data = y_series[
-                i : i + self.model_config["lookback_window"]
-            ]  # Shape: (lookback_window, num_targets)
+                :, i : i + self.model_config["lookback_window"]
+            ]  # Shape: (num_targets, lookback_window)
 
             # 1. Lag features for each target (flattened)
             lag_features = (
@@ -109,7 +112,7 @@ class XGBoostModel(BaseModel):
 
             # 2. Rolling statistics for each target individually
             for target_idx in range(num_targets):
-                target_data = lookback_data[:, target_idx]
+                target_data = lookback_data[target_idx, :]  # Shape: (lookback_window,)
 
                 # Basic statistics
                 rolling_mean = np.mean(target_data)
@@ -120,7 +123,7 @@ class XGBoostModel(BaseModel):
 
                 # Trend features
                 trend = np.polyfit(
-                    range(self.model_config["lookback_window"]), target_data, 1
+                    range(len(target_data)), target_data, 1
                 )[0]
 
                 # Volatility features
@@ -148,15 +151,15 @@ class XGBoostModel(BaseModel):
                     for j_target in range(i_target + 1, num_targets):
                         # Correlation between target pairs
                         corr = np.corrcoef(
-                            lookback_data[:, i_target], lookback_data[:, j_target]
+                            lookback_data[i_target, :], lookback_data[j_target, :]
                         )[0, 1]
                         if np.isnan(corr):
                             corr = 0.0  # Handle constant series
                         sample_features.append(corr)
 
                         # Ratio features
-                        mean_i = np.mean(lookback_data[:, i_target])
-                        mean_j = np.mean(lookback_data[:, j_target])
+                        mean_i = np.mean(lookback_data[i_target, :])
+                        mean_j = np.mean(lookback_data[j_target, :])
                         if mean_j != 0:
                             ratio = mean_i / mean_j
                         else:
@@ -166,9 +169,9 @@ class XGBoostModel(BaseModel):
             # 4. Temporal features (if window is large enough)
             if self.model_config["lookback_window"] >= 7:
                 # Weekly patterns (last 7 values for each target)
-                recent_data = lookback_data[-7:]
+                recent_data = lookback_data[:, -7:]  # Shape: (num_targets, 7)
                 for target_idx in range(num_targets):
-                    recent_mean = np.mean(recent_data[:, target_idx])
+                    recent_mean = np.mean(recent_data[target_idx, :])
                     sample_features.append(recent_mean)
 
             # # 5. Add exogenous features if available
@@ -180,11 +183,11 @@ class XGBoostModel(BaseModel):
 
             # Create target: next forecast_horizon steps for all targets, flattened
             future_values = y_series[
-                i
+                :, i
                 + self.model_config["lookback_window"] : i
                 + self.model_config["lookback_window"]
                 + self.model_config["forecast_horizon"]
-            ]
+            ]  # Shape: (num_targets, forecast_horizon)
             targets.append(
                 future_values.flatten()
             )  # Shape: (forecast_horizon * num_targets,)
@@ -222,8 +225,18 @@ class XGBoostModel(BaseModel):
         if self.model is None:
             self._build_model()
 
+        # Use full target data if available and has more data than context
+        if y_target is not None and y_target.shape[1] > y_context.shape[1]:
+            training_data = y_target
+        else:
+            training_data = y_context
+            
+        print(f"XGBoost training data shape: {training_data.shape}")
+        print(f"Lookback window: {self.model_config['lookback_window']}")
+        print(f"Forecast horizon: {self.model_config['forecast_horizon']}")
+            
         # Prepare features for training
-        X, y = self._create_multivariate_features(y_context)
+        X, y = self._create_multivariate_features(training_data)
 
         # Train the model
         self.model.fit(X, y)
@@ -254,7 +267,7 @@ class XGBoostModel(BaseModel):
         preds = []
         # Use the entire context, maintaining the multivariate structure
         context = y_context.copy()
-        num_targets = y_context.shape[1]
+        num_targets = y_context.shape[0]
         total_steps = len(timestamps_target)
         steps_done = 0
 
@@ -262,7 +275,7 @@ class XGBoostModel(BaseModel):
             steps = min(self.model_config["forecast_horizon"], total_steps - steps_done)
 
             # Take the last lookback_window timesteps for feature creation
-            current_window = context[-self.model_config["lookback_window"] :]
+            current_window = context[:, -self.model_config["lookback_window"] :]  # Shape: (num_targets, lookback_window)
 
             try:
                 # Create features using the current window
@@ -274,7 +287,7 @@ class XGBoostModel(BaseModel):
 
                 # 2. Rolling statistics for each target
                 for target_idx in range(num_targets):
-                    target_data = current_window[:, target_idx]
+                    target_data = current_window[target_idx, :]  # Shape: (lookback_window,)
 
                     rolling_mean = np.mean(target_data)
                     rolling_std = np.std(target_data)
@@ -282,7 +295,7 @@ class XGBoostModel(BaseModel):
                     rolling_max = np.max(target_data)
                     rolling_median = np.median(target_data)
                     trend = np.polyfit(
-                        range(self.model_config["lookback_window"]), target_data, 1
+                        range(len(target_data)), target_data, 1
                     )[0]
                     rolling_range = rolling_max - rolling_min
                     rolling_iqr = np.percentile(target_data, 75) - np.percentile(
@@ -307,22 +320,22 @@ class XGBoostModel(BaseModel):
                     for i_target in range(num_targets):
                         for j_target in range(i_target + 1, num_targets):
                             corr = np.corrcoef(
-                                current_window[:, i_target], current_window[:, j_target]
+                                current_window[i_target, :], current_window[j_target, :]
                             )[0, 1]
                             if np.isnan(corr):
                                 corr = 0.0
                             sample_features.append(corr)
 
-                            mean_i = np.mean(current_window[:, i_target])
-                            mean_j = np.mean(current_window[:, j_target])
+                            mean_i = np.mean(current_window[i_target, :])
+                            mean_j = np.mean(current_window[j_target, :])
                             ratio = mean_i / mean_j if mean_j != 0 else 0.0
                             sample_features.append(ratio)
 
                 # 4. Temporal features (if applicable)
                 if self.model_config["lookback_window"] >= 7:
-                    recent_data = current_window[-7:]
+                    recent_data = current_window[:, -7:]  # Shape: (num_targets, 7)
                     for target_idx in range(num_targets):
-                        recent_mean = np.mean(recent_data[:, target_idx])
+                        recent_mean = np.mean(recent_data[target_idx, :])
                         sample_features.append(recent_mean)
 
                 # 5. No exogenous features (removed as per cleanup)
@@ -344,9 +357,9 @@ class XGBoostModel(BaseModel):
                         "Model produced NaN predictions. This indicates a training or data issue."
                     )
 
-                # Reshape predictions back to (forecast_horizon, num_targets)
+                # Reshape predictions back to (num_targets, forecast_horizon)
                 pred_reshaped = pred_flat.reshape(
-                    self.model_config["forecast_horizon"], num_targets
+                    num_targets, self.model_config["forecast_horizon"]
                 )
 
                 self.logger.debug(
@@ -354,18 +367,18 @@ class XGBoostModel(BaseModel):
                 )
 
                 # Only take as many steps as needed
-                pred_steps = pred_reshaped[:steps]
+                pred_steps = pred_reshaped[:, :steps]  # Shape: (num_targets, steps)
                 preds.append(pred_steps)
 
                 # Update context with new predictions
-                context = np.concatenate([context, pred_steps], axis=0)
+                context = np.concatenate([context, pred_steps], axis=1)  # Concatenate along time axis
                 steps_done += steps
 
             except Exception as e:
                 raise RuntimeError(f"Error during prediction step: {str(e)}")
 
-        # Concatenate all predictions
-        result = np.concatenate(preds, axis=0)
+        # Concatenate all predictions along time axis
+        result = np.concatenate(preds, axis=1)  # Shape: (num_targets, total_steps)
         return result
 
     def predict(

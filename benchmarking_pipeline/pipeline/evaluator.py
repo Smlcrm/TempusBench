@@ -7,11 +7,11 @@ from ..metrics.crps import CRPS
 from ..metrics.quantile_loss import QuantileLoss
 from ..metrics.interval_score import IntervalScore
 from ..metrics.mape import MAPE
+from ..utils.logger import Logger
 
 """
 Model evaluation.
 """
-
 
 class Evaluator:
     def __init__(self, config=None):
@@ -19,20 +19,19 @@ class Evaluator:
         Initialize evaluator with configuration.
         """
         self.config = config if config is not None else {}
+        self.logger = Logger(logs_dir='logs', name='Evaluator')
 
         # Get evaluation metrics from the evaluation section of config
-        evaluation_cfg = self.config.get("evaluation", {})
-        self.metrics_to_calculate = evaluation_cfg.get(
-            "metrics", ["mae", "rmse", "mase", "mape"]
-        )
+        evaluation_cfg = self.config.get("evaluation")
+        self.metrics_to_calculate = evaluation_cfg.get("metrics")
 
         # Get task type from config (default to deterministic for backward compatibility)
-        self.task_type = self.config.get("task", {}).get("type")
+        self.task_type = self.config.get("task", {}).get("task_type")
 
-        print(f"[DEBUG] Evaluator initialized with config: {self.config}")
-        print(f"[DEBUG] Evaluation config: {evaluation_cfg}")
-        print(f"[DEBUG] Metrics to calculate: {self.metrics_to_calculate}")
-        print(f"[DEBUG] Task type: {self.task_type}")
+        self.logger.debug(f"Evaluator initialized with config: {self.config}")
+        self.logger.debug(f"Evaluation config: {evaluation_cfg}")
+        self.logger.debug(f"Metrics to calculate: {self.metrics_to_calculate}")
+        self.logger.debug(f"Task type: {self.task_type}")
 
         # maps string names to metric class instances
         self.metric_registry = {
@@ -45,7 +44,7 @@ class Evaluator:
             "interval_score": IntervalScore(),
         }
 
-    def evaluate(self, y_predictions, y_true, y_train=None, **metric_kwargs):
+    def evaluate(self, y_predictions, y_true, y_train=None, freq=None, **metric_kwargs):
         """
         Evaluate model performance on given data.
 
@@ -73,8 +72,9 @@ class Evaluator:
         # if isinstance(y_train, pd.DataFrame):
         #     y_train = y_train.values
 
-        print(
-            f"[DEBUG] y_predictions shape: {y_predictions.shape}, y_true shape: {y_true.shape}, y_train shape: {y_train.shape}"
+        y_train_shape = y_train.shape if y_train is not None else "None"
+        self.logger.debug(
+            f"y_predictions shape: {y_predictions.shape}, y_true shape: {y_true.shape}, y_train shape: {y_train_shape}"
         )
         # If predictions longer than true, truncate to match
         if y_predictions is not None and y_true is not None:
@@ -91,19 +91,21 @@ class Evaluator:
 
             metric = self.metric_registry[metric_name]
             try:
-                # Add task_type to metric calls only if available in config
+                # Add task_type and freq to metric calls only if available in config
                 metric_kwargs = {**metric_kwargs, 'task_type': self.task_type}
+                if freq is not None:
+                    metric_kwargs['freq'] = freq
 
                 if metric_name == "mase":
                     if y_train is None:
                         raise ValueError(
                             "y_train must be provided for MASE calculation."
                         )
-                    print(
-                        f"[DEBUG] Calculating MASE with y_true shape: {y_true.shape}, y_pred shape: {y_predictions.shape}, y_train shape: {y_train.shape}"
+                    self.logger.debug(
+                        f"Calculating MASE with y_true shape: {y_true.shape}, y_pred shape: {y_predictions.shape}, y_train shape: {y_train.shape}"
                     )
                     metric_value = metric(y_true, y_predictions, y_train=y_train, **metric_kwargs)
-                    print(f"[DEBUG] MASE result: {metric_value}")
+                    self.logger.debug(f"MASE result: {metric_value}")
                 elif metric_name == "crps":
                     if "y_pred_dist_samples" not in metric_kwargs:
                         raise ValueError(
@@ -138,7 +140,7 @@ class Evaluator:
                     results[metric_name] = metric_value
 
             except Exception as e:
-                print(f"[ERROR] Failed to calculate {metric_name}: {e}")
+                self.logger.error(f"Failed to calculate {metric_name}: {e}")
                 # Continue with other metrics instead of failing completely
                 continue
 

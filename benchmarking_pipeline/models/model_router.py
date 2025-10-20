@@ -24,8 +24,8 @@ class ModelRouter:
     Handles three cases:
     1. anyvariate models: Route to anyvariate implementation (handles both variants)
     2. models with separate implementations: Automatically detect variant based on target count:
-       - num_targets == 1: Use univariate variant (fails if not available)
-       - num_targets > 1: Use multivariate variant
+        - num_targets == 1: Use univariate variant (fails if not available)
+        - num_targets > 1: Use multivariate variant
     3. univariate-only models: Route to univariate implementation
 
     All data is treated as multivariate where univariate is just num_targets == 1.
@@ -33,7 +33,6 @@ class ModelRouter:
 
     def __init__(self):
         """Initialize the router and discover available models."""
-        self.logger = Logger(log_dir='logs', name='ModelRouter')
         self.anyvariate_models: Set[str] = set()
         self.multivariate_models: Set[str] = set()
         self.univariate_models: Set[str] = set()
@@ -420,7 +419,6 @@ class ModelRouter:
             Tuple of (folder_path, file_name, class_name)
         """
         return self.get_model_path_by_target_count(model_name, num_targets)
-
 
 # Global router instance
 model_router = ModelRouter()

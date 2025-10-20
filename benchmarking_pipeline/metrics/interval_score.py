@@ -73,5 +73,5 @@ class IntervalScore:
         penalty_upper = (2 / alpha) * np.maximum(0, y_true - upper)
         score = width + penalty_lower + penalty_upper
 
-        # Return scores for each timestep (not the mean)
-        return score
+        # Return mean interval score across all dimensions
+        return np.mean(score)
