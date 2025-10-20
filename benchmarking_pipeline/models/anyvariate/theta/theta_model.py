@@ -43,7 +43,7 @@ class Theta(BaseModel):
         if "sp" not in self.model_config:
             raise ValueError("sp must be specified in config")
 
-        self.model_config["theta_method"] = "correlation_optimal"
+        # Note: theta_method should be in config, no defaults
         self.univariate_models = {}
         self.theta_matrix = None
         self.drift_vector = None
@@ -191,6 +191,7 @@ class Theta(BaseModel):
 
         # Calculate num_targets from data
         num_targets = y_context.shape[1]
+        self.num_targets = num_targets  # Store for use in predict
         print(f"y_context shape: {y_context.shape}")
         print(f"Training Multivariate Theta with {num_targets} targets...")
 
@@ -221,8 +222,20 @@ class Theta(BaseModel):
             # Convert to pandas Series for sktime
             theta_line_series = pd.Series(theta_lines[:, i])
 
+            # Check if data has non-positive values (common with normalized data)
+            # If so, disable deseasonalization to avoid multiplicative seasonality errors
+            has_non_positive = (theta_line_series <= 0).any()
+            # Also disable deseasonalization if we don't have at least two full cycles
+            sp = int(self.model_config["sp"])
+            insufficient_cycles = len(theta_line_series) < 2 * sp
+            deseasonalize = (not has_non_positive) and (not insufficient_cycles)
+            
             # Create and fit univariate Theta model
-            theta_model = ThetaForecaster(sp=self.model_config["sp"])
+            # Disable deseasonalization if data has non-positive values
+            theta_model = ThetaForecaster(
+                sp=sp,
+                deseasonalize=deseasonalize
+            )
             theta_model.fit(y=theta_line_series)
 
             self.univariate_models[i] = theta_model

@@ -121,12 +121,14 @@ class TabpfnModel(BaseModel):
         freq: str,
         **kwargs,
     ) -> "TabpfnModel":
-        if y_context.ndim > 1 and y_context.shape[0] > 1:
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
             self.models = []
-            for k in range(y_context.shape[0]):
-                m = TabpfnModel(self.model_config)
-                m._train(y_context[k, :], y_target[k, :] if y_target is not None and y_target.ndim > 1 else y_target,
-                         timestamps_context, timestamps_target, freq, **kwargs)
+            num_features = y_context.shape[1]
+            for k in range(num_features):
+                m = TabpfnModel(self.config)
+                yc = y_context[:, k]
+                yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
+                m._train(y_context=yc, y_target=yt, timestamps_context=timestamps_context, timestamps_target=timestamps_target, freq=freq, **kwargs)
                 self.models.append(m)
             self.is_fitted = True
             return self

@@ -1,7 +1,7 @@
 task:
   task_type: deterministic
   forecast_horizon: 128
-  context_window: 54190
+  context_window: 512
   max_windows: 20
   max_num_variates: 1
   tuning_loss: mae
@@ -45,6 +45,8 @@ model:
     sp:
     - 12
     - 24
+    theta_method:
+    - correlation_optimal
   arima:
     p:
     - 1
@@ -94,8 +96,6 @@ model:
     forecast_horizon:
     - 50
   svr:
-    training_loss:
-    - mae
     kernel:
     - rbf
     - linear
@@ -143,8 +143,6 @@ model:
     - 50
     sequence_length:
     - 10
-    training_loss:
-    - mae
     forecast_horizon:
     - 10
   chronos: {}
