@@ -31,6 +31,9 @@ class RandomForestModel(BaseModel):
         
         # Add forecast_horizon to model_config
         self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
+        
+        # Store scaler for inverse transformation
+        self.scaler = None
 
         self._build_model()
 
@@ -73,10 +76,10 @@ class RandomForestModel(BaseModel):
         Returns:
             Tuple[np.ndarray, np.ndarray]: Features and targets
         """
-        # Ensure univariate series for feature generation
-        y_series = np.squeeze(y_series)
-        if getattr(y_series, "ndim", 1) > 1:
-            y_series = y_series[:, 0]
+        # Handle multivariate series for feature generation
+        if y_series.ndim == 1:
+            y_series = y_series.reshape(-1, 1)
+        num_targets = y_series.shape[1]
         if timestamps is not None:
             timestamps = np.squeeze(timestamps)
 
@@ -99,28 +102,38 @@ class RandomForestModel(BaseModel):
         targets = []
 
         for i in range(n_samples):
-            # Create lag features
-            lag_features = y_series[i : i + self.model_config["lookback_window"]]
+            # Create lag features for all targets
+            lag_features = y_series[i : i + self.model_config["lookback_window"]].flatten()
 
-            # Create rolling statistics
-            rolling_mean = np.mean(lag_features)
-            rolling_std = np.std(lag_features)
-            rolling_min = np.min(lag_features)
-            rolling_max = np.max(lag_features)
+            # Create rolling statistics for each target
+            sample_features = []
+            sample_features.extend(lag_features)
+            
+            for target_idx in range(num_targets):
+                target_data = y_series[i : i + self.model_config["lookback_window"], target_idx]
+                
+                rolling_mean = np.mean(target_data)
+                rolling_std = np.std(target_data)
+                rolling_min = np.min(target_data)
+                rolling_max = np.max(target_data)
 
-            # Create trend features
-            trend = np.polyfit(
-                range(self.model_config["lookback_window"]), lag_features, 1
-            )[0]
+                # Create trend features
+                trend = np.polyfit(range(len(target_data)), target_data, 1)[0]
 
-            # Combine all features
-            sample_features = list(lag_features) + [
-                rolling_mean,
-                rolling_std,
-                rolling_min,
-                rolling_max,
-                trend,
-            ]
+                # Create volatility features
+                rolling_range = rolling_max - rolling_min
+                rolling_iqr = np.percentile(target_data, 75) - np.percentile(target_data, 25)
+
+                # Add features for this target
+                sample_features.extend([
+                    rolling_mean,
+                    rolling_std,
+                    rolling_min,
+                    rolling_max,
+                    trend,
+                    rolling_range,
+                    rolling_iqr,
+                ])
 
             # Add timestamp features if available
             if (
@@ -178,13 +191,14 @@ class RandomForestModel(BaseModel):
                 sample_features.extend(current_time_features + future_time_features)
 
             features.append(sample_features)
-            # Multi-output: target is a vector of length forecast_horizon
-            targets.append(
-                [
-                    y_series[i + self.model_config["lookback_window"] + step]
-                    for step in range(forecast_horizon)
-                ]
-            )
+            # Multi-output: target is a vector of length forecast_horizon * num_targets
+            target_values = []
+            for step in range(forecast_horizon):
+                for target_idx in range(num_targets):
+                    target_values.append(
+                        y_series[i + self.model_config["lookback_window"] + step, target_idx]
+                    )
+            targets.append(target_values)
 
         return np.array(features), np.array(targets)
 
@@ -321,7 +335,13 @@ class RandomForestModel(BaseModel):
         preds = self.model.predict(X_last)
         
         # Reshape predictions back to (forecast_horizon, num_features)
+        # The model predicts forecast_horizon * num_features values
         preds_reshaped = preds.reshape(forecast_horizon, num_features)
+        
+        # Inverse transform predictions if scaler is available
+        if self.scaler is not None:
+            preds_reshaped = self.scaler.inverse_transform(preds_reshaped)
+        
         return preds_reshaped
 
     def predict(

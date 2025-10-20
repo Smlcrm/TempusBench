@@ -62,18 +62,24 @@ class MoiraiMoeModel(BaseModel):
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
+            # prediction length (future steps)
             self.model_config["pdt"] = y_target.shape[0]
-            self.model_config["ctx"] = y_context.shape[1]  # Use timesteps, not num_series
+            # context length is number of timesteps in y_context (shape: (timesteps, num_targets))
+            self.model_config["ctx"] = y_context.shape[0]
             print(f"[DEBUG TRAINING] pdt: {self.model_config['pdt']}")
+            # Ensure patch_size does not exceed context length
+            effective_psz = min(self.model_config["psz"], self.model_config["ctx"]) if self.model_config["psz"] else self.model_config["ctx"]
+
             self.model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
                     pretrained_model_name_or_path=f"Salesforce/{self.model_config['model_name']}-1.0-R-{self.model_config['size']}"
                 ),
                 prediction_length=self.model_config["pdt"],
                 context_length=self.model_config["ctx"],
-                patch_size=self.model_config["psz"],
+                patch_size=effective_psz,
                 num_samples=self.model_config["num_samples"],
-                target_dim=y_context.shape[0],  # Use num_series, not timesteps
+                # target_dim is number of variates (num_targets)
+                target_dim=y_context.shape[1],
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
             )

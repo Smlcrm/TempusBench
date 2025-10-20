@@ -216,8 +216,10 @@ class ProphetModel(BaseModel):
                 y_target_variate = y_target[:, variate_idx] if y_target is not None else None
                 
                 # Create a temporary model instance for this variate
-                # Use the model-specific configuration already stored in the base class
-                temp_model = ProphetModel(self.model_config)
+                # Use the full config but replace the model section with the specific model config
+                inner_config = self.config.copy()
+                inner_config["model"] = {"prophet": self.model_config}
+                temp_model = ProphetModel(inner_config)
                 
                 # Train on this variate using the univariate method
                 temp_model._train(
@@ -290,6 +292,11 @@ class ProphetModel(BaseModel):
             
             # Combine predictions from all variates
             combined_predictions = np.column_stack(predictions)
+            
+            # Inverse transform predictions if scaler is available
+            if self.scaler is not None:
+                combined_predictions = self.scaler.inverse_transform(combined_predictions)
+            
             return combined_predictions
             
         else:

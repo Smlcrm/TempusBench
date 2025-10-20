@@ -7,7 +7,7 @@ import pandas as pd
 import random
 import re
 import ast
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from sklearn.preprocessing import StandardScaler
 
 
@@ -248,7 +248,7 @@ class Preprocessor:
 
         return target
 
-    def clean(self, time_start: str, freq: str, target_raw: str) -> Tuple[np.ndarray, str, str, np.ndarray]:
+    def clean(self, time_start: str, freq: str, target_raw: str) -> Tuple[np.ndarray, str, str, np.ndarray, Optional[StandardScaler]]:
         """
         Clean raw target data by parsing, handling missing values, and normalizing.
 
@@ -286,12 +286,11 @@ class Preprocessor:
         except (ValueError, TypeError):
             time_start = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # 4. Validate/fix freq
+        # 4. Validate freq strictly (must come from data, no defaults)
         try:
             pd.date_range(start=time_start, periods=2, freq=freq)
-        except (ValueError, TypeError):
-            valid_freqs = ['D', 'H', 'W']
-            freq = random.choice(valid_freqs)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid or missing frequency from data: {freq!r}. Original error: {e}")
 
         # 5. Handle missing values (creates timestamps internally)
         print(f"[DEBUG] Before missing value handling, target shape: {target.shape}")
@@ -300,6 +299,7 @@ class Preprocessor:
         print(f"[DEBUG] Timestamps shape: {timestamps_cleaned.shape}")
 
         # 6. Normalize if configured
+        scaler = None
         if self.normalize:
             print(f"[DEBUG] Normalizing data...")
             # target_cleaned: (num_steps, num_features)
@@ -308,4 +308,4 @@ class Preprocessor:
             print(f"[DEBUG] After normalization, target shape: {target_cleaned.shape}")
 
         print(f"[DEBUG] Final result - timestamps: {timestamps_cleaned.shape}, target: {target_cleaned.shape}")
-        return timestamps_cleaned, time_start, freq, target_cleaned
+        return timestamps_cleaned, time_start, freq, target_cleaned, scaler

@@ -35,9 +35,6 @@ class SVRModel(BaseModel):
         
         # Add forecast_horizon from task config
         self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
-        
-        # Add training_loss from task config
-        self.model_config["training_loss"] = config["task"]["tuning_loss"]
 
         # Extract SVR-specific parameters for the underlying SVR model
         svr_params = {}
@@ -187,5 +184,7 @@ class SVRModel(BaseModel):
         # Return (total_steps, num_features) - truncate if needed
         if preds.shape[0] > total_steps:
             preds = preds[:total_steps, :]
+
+        # Note: Do not inverse-transform targets with feature scaler; predictions are in original target scale
 
         return preds

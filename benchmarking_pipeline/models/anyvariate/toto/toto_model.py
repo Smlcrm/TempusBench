@@ -115,7 +115,7 @@ class TotoModel(BaseModel):
             padding_mask=padding_mask,
             id_mask=id_mask,
             timestamp_seconds=timestamps_context,
-            time_interval_seconds=torch.full((num_series,), time_diff, dtype=torch.float),
+            time_interval_seconds=torch.full((num_features,), time_diff, dtype=torch.float),
         )
 
         # Generate forecasts for the next 336 timesteps

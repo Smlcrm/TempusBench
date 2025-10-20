@@ -124,7 +124,7 @@ class DataLoader:
 
         self.logger.debug(f"Extracting data from {dataset_path}")
         # All targets are 2D after cleaning: (n_steps, n_variates)
-        timestamps, time_start, time_freq, target = self.preprocessor.clean(*self._load_dataset(dataset_path))
+        timestamps, time_start, time_freq, target, scaler = self.preprocessor.clean(*self._load_dataset(dataset_path))
         num_steps = target.shape[0]  # (n_steps, n_features): first dim is time-steps
         window_size = context_steps + train_steps + validate_steps
         stride = validate_steps  # slide by validate_steps to avoid overlap
@@ -157,6 +157,7 @@ class DataLoader:
                     start=val_start,
                     end=val_end
                 ),
+                scaler=scaler,  # Store the scaler for inverse transformation
                 metadata={
                     "dataset_path": dataset_path,
                     "window": win,
