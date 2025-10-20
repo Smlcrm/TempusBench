@@ -44,7 +44,7 @@ class Evaluator:
             "interval_score": IntervalScore(),
         }
 
-    def evaluate(self, y_predictions, y_true, y_train=None, **metric_kwargs):
+    def evaluate(self, y_predictions, y_true, y_train=None, freq=None, **metric_kwargs):
         """
         Evaluate model performance on given data.
 
@@ -91,8 +91,10 @@ class Evaluator:
 
             metric = self.metric_registry[metric_name]
             try:
-                # Add task_type to metric calls only if available in config
+                # Add task_type and freq to metric calls only if available in config
                 metric_kwargs = {**metric_kwargs, 'task_type': self.task_type}
+                if freq is not None:
+                    metric_kwargs['freq'] = freq
 
                 if metric_name == "mase":
                     if y_train is None:

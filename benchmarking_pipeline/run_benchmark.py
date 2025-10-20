@@ -101,11 +101,6 @@ class BenchmarkRunner:
             validate_steps=forecast_horizon
         ) # For all models in config
         if logging: self.logger.success("Hyperparameters Optimized")
-
-        # Model Executor
-        if logging: self.logger.info("Final Model Evaluation Starts")
-
-
         if logging: self.logger.success("Final Model Evaluation Executed")
 
         self.cleanup()
@@ -131,6 +126,12 @@ if __name__ == "__main__":
         default=None,
         help="Path to the config YAML file. If not specified, uses the default config in benchmarking_pipeline/configs/all_models.yaml",
     )
+    parser.add_argument(
+        "--datasets-dir",
+        type=str,
+        default=None,
+        help="Path to datasets directory. If not specified, uses the default datasets directory.",
+    )
     args = parser.parse_args()
 
     if args.config is not None:
@@ -150,4 +151,9 @@ if __name__ == "__main__":
 
     # Run the Benchmarks
     runner = BenchmarkRunner(config_path=config_path)
+
+    # Override datasets directory if provided
+    if args.datasets_dir:
+        runner.datasets_dir = args.datasets_dir
+
     runner.run()

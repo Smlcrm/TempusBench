@@ -107,16 +107,30 @@ class MoiraiModel(BaseModel):
 
         prediction_length = timestamps_target.shape[0]
         print("prediction length", prediction_length)
-        # y_context is always (context_steps, num_targets)
-
-        context_steps, num_targets = y_context.shape
+        
+        # Handle (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
+            
+        num_series, timesteps = y_context.shape
+        
+        # Work with (num_series, timesteps) format directly
+        # Use timesteps as context_steps and num_series as num_targets
+        context_steps = timesteps
+        num_targets = num_series
 
         ctx = self.model_config["ctx"]
-        # Create mask with the padded size (ctx, num_targets)
-        observed_mask = np.ones((ctx, num_targets), dtype=bool)
+        # Use actual context length instead of config ctx if it's smaller
+        actual_ctx = min(ctx, context_steps) if ctx is not None else context_steps
+        
+        # Create mask with the actual context size
+        observed_mask = np.ones((actual_ctx, num_targets), dtype=bool)
 
-        # Prepare past_target tensor: shape (1, ctx, num_targets)
-        past_target = torch.tensor(y_context, dtype=torch.float32).unsqueeze(0)
+        # Prepare past_target tensor: shape (1, actual_ctx, num_targets)
+        # Use only the last actual_ctx timesteps from (num_series, timesteps) format
+        y_context_trimmed = y_context[:, -actual_ctx:] if actual_ctx < context_steps else y_context
+        # Reshape to (actual_ctx, num_targets) for Moirai
+        past_target = torch.tensor(y_context_trimmed.T, dtype=torch.float32).unsqueeze(0)
 
         # past_observed_target: True where value is observed, False where padded (1, ctx, num_targets)
         past_observed_target = torch.tensor(observed_mask, dtype=torch.bool).unsqueeze(
@@ -171,4 +185,11 @@ class MoiraiModel(BaseModel):
         print(f"[DEBUG] forecasted_values.size: {forecasted_values.size}")
 
         forecast_matrix = forecasted_values[:prediction_length, :]
+        
+        # Remove any extra dimensions and ensure correct shape
+        if forecast_matrix.ndim > 2:
+            forecast_matrix = forecast_matrix.squeeze()
+        
+        # Return in (num_series, prediction_length) format
+        # forecast_matrix is (prediction_length, num_series), transpose to (num_series, prediction_length)
         return forecast_matrix.T

@@ -96,13 +96,13 @@ class DataLoader:
         time_start = file_data["start"].iloc[0]
         time_freq = file_data["freq"].iloc[0]
 
-        # Handle targets by inference
-        target = np.array(ast.literal_eval(file_data["target"].iloc[0]))
-        return time_start, time_freq, target
+        # Handle targets by inference - return raw data for preprocessor to clean
+        target_raw = file_data["target"].iloc[0]
+        return time_start, time_freq, target_raw
 
     def generate_dataset_split(self, dataset_path: str, context_steps: int, train_steps: int, validate_steps: int):
         """
-        Generate rolling windows for context, train, and validate splits, where each window starts validate_steps after the previous, so that windows do not overlap at all (stride = validate_steps). We stop when the end of the window for the next roll would exceed num_steps.
+        Generate rolling windows for context, train, and validate splits, where each window starts validate_steps after the previous, so that windows do not overlap at all (stride = validate_steps). We stop when the end of the window for the next roll would exceed num_steps or when max_windows is reached.
 
         For all slices extracted below (target[:, ...] or target[...]), these are numpy views,
         not copies: they share memory with the original array. No new memory is allocated
@@ -126,13 +126,14 @@ class DataLoader:
         # All targets are 2D after cleaning: (n_targets, n_steps)
         timestamps, time_start, time_freq, target = self.preprocessor.clean(*self._load_dataset(dataset_path))
 
-        num_steps = target.shape[0]
+        num_steps = target.shape[1]  # Use second dimension for time steps
         window_size = context_steps + train_steps + validate_steps
         stride = validate_steps  # advance by validate_steps every window
+        max_windows = self.config['task']['max_windows']
 
         # Advance by step size = validate_steps each time, extract "view" slices
         win = 0
-        while True:
+        while win < max_windows:
             start = win * stride
             end = start + window_size
             if end > num_steps: break

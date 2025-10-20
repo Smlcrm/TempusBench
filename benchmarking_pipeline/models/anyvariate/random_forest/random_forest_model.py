@@ -25,9 +25,13 @@ class RandomForestModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
+        self.model_config = self._extract_model_config(config)
         self.logger = Logger(logs_dir='logs', name='RandomForestModel')
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
+        
+        # Add forecast_horizon to model_config
+        self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
 
         self._build_model()
 
@@ -63,28 +67,29 @@ class RandomForestModel(BaseModel):
         Create time series features for Random Forest with timestamp features.
 
         Args:
-            y_series: Target time series
-            x_series: Exogenous variables (optional)
+            y_series: Target time series with shape (num_series, timesteps)
             timestamps: Timestamp features (optional)
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: Features and targets
         """
-        # Ensure univariate series for feature generation
-        y_series = np.squeeze(y_series)
-        if getattr(y_series, "ndim", 1) > 1:
-            y_series = y_series[:, 0]
+        # Handle multivariate data - work with (num_series, timesteps) format
+        if y_series.ndim == 1:
+            y_series = y_series.reshape(1, -1)  # Convert to (1, timesteps)
+        
+        num_series, timesteps = y_series.shape
         if timestamps is not None:
             timestamps = np.squeeze(timestamps)
 
         forecast_horizon = self.model_config["forecast_horizon"]
 
         n_samples = (
-            len(y_series) - self.model_config["lookback_window"] - forecast_horizon + 1
+            timesteps - self.model_config["lookback_window"] - forecast_horizon + 1
         )
 
-        self.logger.debug(f"len y_series: {len(y_series)}")
-        self.logger.debug(f"len timestamps: {len(timestamps)}")
+        self.logger.debug(f"y_series shape: {y_series.shape}")
+        self.logger.debug(f"timesteps: {timesteps}")
+        self.logger.debug(f"len timestamps: {len(timestamps) if timestamps is not None else 'None'}")
         self.logger.debug(f"forecast_horizon: {forecast_horizon}")
 
         if n_samples <= 0:
@@ -96,28 +101,37 @@ class RandomForestModel(BaseModel):
         targets = []
 
         for i in range(n_samples):
-            # Create lag features
-            lag_features = y_series[i : i + self.model_config["lookback_window"]]
+            # Create lag features for all series
+            lag_features = y_series[:, i : i + self.model_config["lookback_window"]]  # Shape: (num_series, lookback_window)
+            
+            # Flatten lag features for all series
+            lag_features_flat = lag_features.flatten()  # Shape: (num_series * lookback_window,)
 
-            # Create rolling statistics
-            rolling_mean = np.mean(lag_features)
-            rolling_std = np.std(lag_features)
-            rolling_min = np.min(lag_features)
-            rolling_max = np.max(lag_features)
+            # Create rolling statistics for each series
+            sample_features = list(lag_features_flat)  # Start with lag features
+            
+            for series_idx in range(num_series):
+                series_data = lag_features[series_idx, :]  # Shape: (lookback_window,)
+                
+                # Create rolling statistics for this series
+                rolling_mean = np.mean(series_data)
+                rolling_std = np.std(series_data)
+                rolling_min = np.min(series_data)
+                rolling_max = np.max(series_data)
 
-            # Create trend features
-            trend = np.polyfit(
-                range(self.model_config["lookback_window"]), lag_features, 1
-            )[0]
+                # Create trend features for this series
+                trend = np.polyfit(
+                    range(self.model_config["lookback_window"]), series_data, 1
+                )[0]
 
-            # Combine all features
-            sample_features = list(lag_features) + [
-                rolling_mean,
-                rolling_std,
-                rolling_min,
-                rolling_max,
-                trend,
-            ]
+                # Add statistics for this series
+                sample_features.extend([
+                    rolling_mean,
+                    rolling_std,
+                    rolling_min,
+                    rolling_max,
+                    trend,
+                ])
 
             # Add timestamp features if available
             if (
@@ -175,13 +189,13 @@ class RandomForestModel(BaseModel):
                 sample_features.extend(current_time_features + future_time_features)
 
             features.append(sample_features)
-            # Multi-output: target is a vector of length forecast_horizon
-            targets.append(
-                [
-                    y_series[i + self.model_config["lookback_window"] + step]
-                    for step in range(forecast_horizon)
-                ]
-            )
+            # Multi-output: target is a vector of length forecast_horizon * num_series
+            # Flatten targets for all series
+            target_values = []
+            for step in range(forecast_horizon):
+                for series_idx in range(num_series):
+                    target_values.append(y_series[series_idx, i + self.model_config["lookback_window"] + step])
+            targets.append(target_values)
 
         return np.array(features), np.array(targets)
 
@@ -221,10 +235,10 @@ class RandomForestModel(BaseModel):
         # Train the model to predict the configured forecast horizon
         forecast_horizon = int(self.model_config.get("forecast_horizon", 1))
 
-        full_y_data = np.concatenate([y_context, y_target], axis=0)
-        full_y_data = np.squeeze(full_y_data)
+        # Concatenate along time axis (axis=1) for our (num_series, timesteps) format
+        full_y_data = np.concatenate([y_context, y_target], axis=1)
+        
         # Combine timestamps if available
-
         full_timestamps = np.concatenate(
             [timestamps_context, timestamps_target], axis=0
         )
@@ -289,10 +303,11 @@ class RandomForestModel(BaseModel):
 
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        y_context = np.squeeze(y_context)
+        # Ensure y_context is in (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
 
         # Combine timestamps if available
-
         full_timestamps = np.concatenate(
             [timestamps_context, timestamps_target], axis=0
         )
@@ -302,11 +317,12 @@ class RandomForestModel(BaseModel):
         # For prediction, we want to predict forecast_horizon ahead
         # So we need to create a feature row for the current context and the next forecast_horizon timestamps
 
-        # Use the last lookback_window context and the actual target timestamps
-        context_timestamps = timestamps_context[-self.model_config["lookback_window"] :]
-        feature_row, _ = self._create_features(
-            np.concatenate([y_context, np.zeros(forecast_horizon)]), full_timestamps
-        )
+        # Create dummy future data for feature creation
+        num_series = y_context.shape[0]
+        dummy_future = np.zeros((num_series, forecast_horizon))
+        full_y_data = np.concatenate([y_context, dummy_future], axis=1)
+        
+        feature_row, _ = self._create_features(full_y_data, full_timestamps)
 
         X_last = feature_row[-1:].reshape(1, -1)
 
@@ -314,7 +330,10 @@ class RandomForestModel(BaseModel):
 
         # Predict all steps at once
         preds = self.model.predict(X_last)
-        return preds
+        
+        # Reshape predictions back to (num_series, forecast_horizon)
+        preds_reshaped = preds.reshape(num_series, forecast_horizon)
+        return preds_reshaped
 
     def predict(
         self,
@@ -343,78 +362,24 @@ class RandomForestModel(BaseModel):
         # Initialize context with the last lookback_window values from y_context
         # Ensure context is 1D for consistent handling
 
-        # If multivariate, predict each variate separately and stack
-        if y_context.ndim > 1 and y_context.shape[1] > 1:
-            # Multivariate: predict each variate, then assemble as (horizon, num_targets)
-            per_var_preds = []
-            for k in range(y_context.shape[1]):
-                yc = y_context[:, k]
-                # Timestamps are shared across variates; pass as 1D arrays
-                tc = timestamps_context
-                tt = timestamps_target
-                pk = self._predict(
-                    y_context=yc,
-                    timestamps_context=tc,
-                    timestamps_target=tt,
-                    freq=freq,
-                    **kwargs,
-                )  # pk shape (1, horizon)
-                pk = np.squeeze(pk)  # -> (horizon,)
-                per_var_preds.append(pk)
-            # Shape (num_targets, horizon) -> transpose to (horizon, num_targets)
-            pred_matrix = np.stack(per_var_preds, axis=0).T
-            # Return only the last-step prediction to match evaluator (shape (1, num_targets))
-            return pred_matrix[-1:, :]
+        # Ensure y_context is in (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
 
-        # Ensure 1D context for univariate flow to avoid shape mismatches during concat
-        y_context = np.squeeze(y_context)
-        y_context = y_context[-self.model_config["lookback_window"] :]
-        timestamps_context = timestamps_context[-self.model_config["lookback_window"] :]
+        num_series = y_context.shape[0]
+        forecast_horizon = len(timestamps_target)
+        
+        # Use the last lookback_window timesteps as context
+        y_context = y_context[:, -self.model_config["lookback_window"]:]
+        timestamps_context = timestamps_context[-self.model_config["lookback_window"]:]
 
-        preds = []
-        default_steps = self.model_config["forecast_horizon"]
-        steps_remaining = len(timestamps_target)
+        # Make prediction for the full forecast horizon
+        pred = self._predict(
+            y_context=y_context,
+            timestamps_context=timestamps_context,
+            timestamps_target=timestamps_target,
+            freq=freq,
+            **kwargs,
+        )  # pred shape (num_series, forecast_horizon)
 
-        while steps_remaining > 0:
-            # Determine how many steps to predict in this iteration
-            steps = min(default_steps, steps_remaining)
-
-            # Get the current target timestamps for this prediction window
-
-            current_target_start = len(preds)
-            current_target_end = current_target_start + steps
-            current_target_timestamps = timestamps_target[
-                current_target_start:current_target_end
-            ]
-
-            # Make prediction for this window
-            pred = self._predict(
-                y_context=y_context,
-                timestamps_context=timestamps_context,
-                timestamps_target=timestamps_target,
-                freq=freq,
-                **kwargs,
-            )
-
-            # Extract the predictions for this window and ensure they're 1D
-            pred = pred.flatten()[:steps]
-            preds.extend(pred)
-
-            # Update context by removing oldest values and adding new predictions
-            # This maintains a fixed-size context equal to lookback_window
-            # Ensure pred is 1D before concatenating
-            y_context = np.concatenate([y_context, pred])[
-                -self.model_config["lookback_window"] :
-            ]
-
-            # Update context timestamps if available
-            timestamps_context = np.concatenate(
-                [timestamps_context, timestamps_target]
-            )[-self.model_config["lookback_window"] :]
-
-            # Update remaining steps
-            steps_remaining -= steps
-
-        preds = np.array(preds)
-        # Return last-step only to match evaluator expectations (shape (1, 1))
-        return preds.reshape(1, -1)[:, -1:]
+        return pred
