@@ -16,7 +16,6 @@ from typing import Tuple, Dict, Any, Optional, Set
 from pathlib import Path
 from ..utils.logger import Logger
 
-
 class ModelRouter:
     """
     Routes model requests to appropriate folders based on inferred target count.

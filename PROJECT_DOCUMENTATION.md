@@ -244,11 +244,15 @@ All models follow a consistent implementation pattern:
 
 ```python
 class ModelName(BaseModel):
-    def __init__(self, config=None, config_file=None):
-        super().__init__(config, config_file)
-        # Extract model-specific parameters
-        self.param1 = self.config.get('param1', default_value)
-        self.param2 = self.config.get('param2', default_value)
+    def __init__(self, config: Dict[str, Any]):
+        # IMPORTANT: Always call super().__init__(config) first
+        # This extracts and validates self.model_config from config['model']
+        super().__init__(config)
+        
+        # Access model-specific hyperparameters from self.model_config
+        # NO defaults should be specified - all params must come from config
+        self.param1 = self.model_config['param1']
+        self.param2 = self.model_config['param2']
         
         # Initialize model state
         self.model_ = None
@@ -266,13 +270,47 @@ class ModelName(BaseModel):
     
     def get_params(self):
         # Return current parameters
-        return {'param1': self.param1, 'param2': self.param2}
+        return self.model_config
     
     def set_params(self, **params):
         # Update parameters
         # Reset model if parameters change
+        self.model_config.update(params)
+        self.is_fitted = False
         return self
 ```
+
+#### Model Configuration Contract
+
+**Critical Requirements:**
+
+1. **Single Selected Configuration**: At runtime, `config['model']` must contain exactly ONE model entry with ONE selected hyperparameter dictionary. This is NOT a grid of possibilities, but a single chosen set of parameters.
+
+   ```python
+   # CORRECT - Single selected configuration
+   config = {
+       'model': {
+           'theta': {'sp': 12}  # One model, one parameter set
+       },
+       'task': {'tuning_loss': 'mae'},
+       'evaluation': {'metrics': ['mae', 'rmse']}
+   }
+   
+   # INCORRECT - Multiple models or grid
+   config = {
+       'model': {
+           'theta': [{'sp': 12}, {'sp': 24}]  # Grid - INVALID
+       }
+   }
+   ```
+
+2. **No Default Parameters**: Models must NOT define default parameter values. All parameters must be explicitly provided in the configuration. This ensures reproducibility and prevents hidden assumptions.
+
+3. **Model-Specific Storage**: Every model stores its runtime hyperparameters in `self.model_config` (set automatically by `BaseModel.__init__`). This attribute contains only the selected hyperparameters for that model instance.
+
+4. **Strict Validation**: `BaseModel` enforces these rules and raises `ValueError` if violated. This fail-fast approach catches configuration errors immediately rather than during training.
+
+5. **Hyperparameter Tuning Flow**: The executor generates the hyperparameter grid and creates separate model instances for each combination. Each instance receives a single selected configuration.
 
 ### 2. Data Flow Implementation
 

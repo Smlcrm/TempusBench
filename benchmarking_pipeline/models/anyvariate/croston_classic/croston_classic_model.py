@@ -24,7 +24,6 @@ class CrostonClassicModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.model_config = self._extract_model_config(config)
 
         # Parameters, initialized to None
         self.demand_level_ = None
@@ -136,11 +135,11 @@ class CrostonClassicModel(BaseModel):
             out=np.zeros_like(self.demand_level_, dtype=float),
             where=self.interval_level_ != 0,
         )
-        # For multivariate data, broadcast each series across forecast horizon
-        # Shape: (num_series, forecast_horizon)
-        forecast = np.tile(forecast.reshape(-1, 1), reps=(1, forecast_horizon))
+        # For multivariate data, broadcast each feature across forecast horizon
+        # Shape: (forecast_horizon, num_features)
+        forecast = np.tile(forecast.reshape(1, -1), reps=(forecast_horizon, 1))
 
-        return forecast  # Return (num_series, forecast_horizon)
+        return forecast  # Return (forecast_horizon, num_features)
 
 
     def get_model_summary(self) -> Dict[str, Any]:
