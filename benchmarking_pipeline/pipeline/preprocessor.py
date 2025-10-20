@@ -17,12 +17,13 @@ class Preprocessor:
         Initialize preprocessor with configuration.
 
         Args:
-            config: Configuration dictionary. Preprocessing-related keys are under 'dataset'.
-                Supports: normalize, handle_missing.
+            config: Configuration dictionary. Preprocessing-related keys are under 'task'.
+                Supports: normalize, handle_missing, max_num_variates.
         """
         self.config = config
         self.normalize = config.get('task', {}).get('dataset', {}).get('normalize', False)
         self.handle_missing = config.get('task', {}).get('dataset', {}).get('handle_missing', 'interpolate')
+        self.max_num_variates = config.get('task', {}).get('max_num_variates', None)
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """
@@ -222,6 +223,30 @@ class Preprocessor:
                 result[i] = next_valid
         return result
 
+    def _cap_variates(self, target: np.ndarray) -> np.ndarray:
+        """
+        Cap the number of variates (time series) to max_num_variates if specified.
+        
+        Args:
+            target: Target array in (num_time_series, num_time_steps) format
+            
+        Returns:
+            Target array with capped number of variates
+        """
+        if self.max_num_variates is None:
+            return target
+            
+        # For 2D arrays, first dimension is num_time_series (variates)
+        if target.ndim == 2 and target.shape[0] > self.max_num_variates:
+            print(f"[DEBUG] Capping variates from {target.shape[0]} to {self.max_num_variates}")
+            target = target[:self.max_num_variates, :]
+            print(f"[DEBUG] After capping, target shape: {target.shape}")
+        elif target.ndim == 1:
+            # For 1D arrays, we only have one variate, so no capping needed
+            pass
+            
+        return target
+
     def clean(self, time_start: str, freq: str, target_raw: str) -> Tuple[np.ndarray, str, str, np.ndarray]:
         """
         Clean raw target data by parsing, handling missing values, and normalizing.
@@ -245,26 +270,30 @@ class Preprocessor:
         
         print(f"[DEBUG] After parsing, target shape: {target.shape}")
 
-        # 2. Validate/fix time_start
+        # 2. Cap the number of variates if specified
+        target = self._cap_variates(target)
+        print(f"[DEBUG] After variate capping, target shape: {target.shape}")
+
+        # 3. Validate/fix time_start
         try:
             pd.Timestamp(time_start)
         except (ValueError, TypeError):
             time_start = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # 3. Validate/fix freq
+        # 4. Validate/fix freq
         try:
             pd.date_range(start=time_start, periods=2, freq=freq)
         except (ValueError, TypeError):
             valid_freqs = ['D', 'H', 'W']
             freq = random.choice(valid_freqs)
 
-        # 4. Handle missing values (creates timestamps internally)
+        # 5. Handle missing values (creates timestamps internally)
         print(f"[DEBUG] Before missing value handling, target shape: {target.shape}")
         timestamps_cleaned, target_cleaned = self._handle_missing_values(target, time_start, freq)
         print(f"[DEBUG] After missing value handling, target shape: {target_cleaned.shape}")
         print(f"[DEBUG] Timestamps shape: {timestamps_cleaned.shape}")
 
-        # 5. Normalize if configured
+        # 6. Normalize if configured
         if self.normalize:
             print(f"[DEBUG] Normalizing data...")
             # Ensure we have a 2D array for StandardScaler

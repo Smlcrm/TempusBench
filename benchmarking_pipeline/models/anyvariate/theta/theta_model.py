@@ -190,16 +190,24 @@ class Theta(BaseModel):
             self: The fitted model instance
         """
 
+        # Ensure data is in (time_steps, num_targets) format
+        # Data comes in as (num_targets, time_steps), need to transpose to (time_steps, num_targets)
+        print(f"Original y_context shape: {y_context.shape}")
+        if y_context.shape[0] < y_context.shape[1]:
+            # Data is (num_targets, time_steps), transpose to (time_steps, num_targets)
+            y_context = y_context.T
+            print(f"Transposed y_context shape: {y_context.shape}")
+        
         # Calculate num_targets from data
-        num_targets = y_context.shape[0]  # Number of series (rows)
-        print(f"y_context shape: {y_context.shape}")
+        num_targets = y_context.shape[1]  # Number of series (columns)
+        print(f"Final y_context shape: {y_context.shape}")
         
         # Handle univariate case (single series)
         if num_targets == 1:
             print("Training Univariate Theta...")
             # For univariate data, use simple exponential smoothing
             theta_model = ThetaForecaster(sp=self.model_config["sp"], deseasonalize=True)
-            theta_model.fit(y=pd.Series(y_context[0, :]))
+            theta_model.fit(y=pd.Series(y_context[:, 0]))
             self.univariate_models = {0: theta_model}
             self.is_fitted = True
             print("Univariate Theta training complete.")
@@ -207,6 +215,9 @@ class Theta(BaseModel):
         
         print(f"Training Multivariate Theta with {num_targets} targets...")
 
+        # Use context data for parameter estimation (historical data)
+        print(f"Using context data shape: {y_context.shape}")
+        
         # Step 1: Estimate drift vector μ
         self.drift_vector = self._estimate_drift(y_context)
         print(f"Estimated drift vector: {self.drift_vector}")
@@ -249,7 +260,12 @@ class Theta(BaseModel):
             sp = self.model_config["sp"]
             deseasonalize = True
             
-            if data_length < 2 * sp:
+            # Check if data contains zero or negative values for deseasonalization
+            has_zero_or_negative = (theta_line_series <= 0).any()
+            if has_zero_or_negative:
+                deseasonalize = False
+                print(f"θ-line {i} contains zero or negative values, disabling deseasonalization")
+            elif data_length < 2 * sp:
                 # If not enough data for the specified seasonal period, disable deseasonalization
                 deseasonalize = False
                 print(f"Disabled deseasonalization due to insufficient data (length={data_length}, required={2*sp})")

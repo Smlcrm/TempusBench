@@ -225,8 +225,18 @@ class XGBoostModel(BaseModel):
         if self.model is None:
             self._build_model()
 
+        # Use full target data if available and has more data than context
+        if y_target is not None and y_target.shape[1] > y_context.shape[1]:
+            training_data = y_target
+        else:
+            training_data = y_context
+            
+        print(f"XGBoost training data shape: {training_data.shape}")
+        print(f"Lookback window: {self.model_config['lookback_window']}")
+        print(f"Forecast horizon: {self.model_config['forecast_horizon']}")
+            
         # Prepare features for training
-        X, y = self._create_multivariate_features(y_context)
+        X, y = self._create_multivariate_features(training_data)
 
         # Train the model
         self.model.fit(X, y)
