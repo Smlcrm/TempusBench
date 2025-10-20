@@ -27,7 +27,6 @@ class XGBoostModel(BaseModel):
             config_file: Path to a JSON configuration file.
         """
         super().__init__(config)
-        self.model_config = self._extract_model_config(config)
         self.logger = Logger(logs_dir='logs', name='XGBoostModel')
 
         if "lookback_window" not in self.model_config:
@@ -72,17 +71,17 @@ class XGBoostModel(BaseModel):
         Create advanced multivariate time series features for XGBoost.
 
         Args:
-            y_series: Target time series with shape (num_series, timesteps)
+            y_series: Target time series with shape (num_steps, num_features)
             x_series: Exogenous variables (optional)
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: Features and targets arrays
         """
 
-        num_targets = y_series.shape[0]  # num_series
-        timesteps = y_series.shape[1]    # timesteps
+        num_steps = y_series.shape[0]    # num_steps
+        num_features = y_series.shape[1] # num_features
         n_samples = (
-            timesteps
+            num_steps
             - self.model_config["lookback_window"]
             - self.model_config["forecast_horizon"]
             + 1

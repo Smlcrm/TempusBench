@@ -106,28 +106,28 @@ class TinyTimeMixerModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        # Handle (num_series, timesteps) format
+        # Handle (num_steps, num_features) format
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
+            y_context = y_context.reshape(-1, 1)
             
-        num_series, timesteps = y_context.shape
+        num_steps, num_features = y_context.shape
 
-        # Construct DataFrame - Tiny Time Mixer expects (timesteps, num_series)
-        columns = list(range(num_series))
+        # Construct DataFrame - Tiny Time Mixer expects (timesteps, num_features)
+        columns = list(range(num_features))
         timestamps_context = self.convert_to_datetimeindex(timestamps_context)
 
-        # Transpose to (timesteps, num_series) for Tiny Time Mixer
-        df = pd.DataFrame(y_context.T, index=timestamps_context, columns=columns)
+        # Data is already in (timesteps, num_features) format for Tiny Time Mixer
+        df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
 
         results = self._sub_predict(df, forecast_horizon)
         results = np.asarray(results)
         
-        # Convert to (num_series, forecast_horizon) format
+        # Convert to (forecast_horizon, num_features) format
         if results.ndim == 1:
             # Univariate case
-            results = results.reshape(1, -1)
-        elif results.ndim == 2 and results.shape[0] == forecast_horizon:
-            # Results are (forecast_horizon, num_series), transpose to (num_series, forecast_horizon)
+            results = results.reshape(-1, 1)
+        elif results.ndim == 2 and results.shape[1] == forecast_horizon:
+            # Results are (num_features, forecast_horizon), transpose to (forecast_horizon, num_features)
             results = results.T
         
         return results

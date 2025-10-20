@@ -123,25 +123,25 @@ class DataLoader:
         """
 
         self.logger.debug(f"Extracting data from {dataset_path}")
-        # All targets are 2D after cleaning: (n_targets, n_steps)
+        # All targets are 2D after cleaning: (n_steps, n_variates)
         timestamps, time_start, time_freq, target = self.preprocessor.clean(*self._load_dataset(dataset_path))
-
-        num_steps = target.shape[1]  # Use second dimension for time steps
+        num_steps = target.shape[0]  # (n_steps, n_features): first dim is time-steps
         window_size = context_steps + train_steps + validate_steps
-        stride = validate_steps  # advance by validate_steps every window
+        stride = validate_steps  # slide by validate_steps to avoid overlap
         max_windows = self.config['task']['max_windows']
 
-        # Advance by step size = validate_steps each time, extract "view" slices
         win = 0
         while win < max_windows:
             start = win * stride
             end = start + window_size
-            if end > num_steps: break
+            if end > num_steps:
+                break
 
-            ctx_start = start; ctx_end = ctx_start + context_steps
-            train_start = ctx_end; train_end = train_start + train_steps
-            val_start = train_end; val_end = val_start + validate_steps
+            ctx_start, ctx_end = start, start + context_steps
+            train_start, train_end = ctx_end, ctx_end + train_steps
+            val_start, val_end = train_end, train_end + validate_steps
 
+            # Each window yields indices over the 0th dimension (timesteps) of target: [t, features]
             window = Dataset(
                 timestamps=timestamps,
                 target=target,

@@ -46,8 +46,12 @@ class BaseModel(ABC):
                 - dataset: dict containing dataset configuration
             config_file: Path to a JSON configuration file
         """
+        # Store the full configuration for evaluator and global settings
+        self.config = config
 
-        self.model_config = config
+        # Enforce: model_config must be exactly one selected hyper-parameter set (dict)
+        self.model_config = self._extract_model_config_strict(config)
+        
         self.training_loss = config["task"]["tuning_loss"]
 
         # Determine forecast horizon from model configuration keys if present
@@ -63,26 +67,33 @@ class BaseModel(ABC):
         self._last_y_true = None
         self._last_y_pred = None
 
-    def _extract_model_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_model_config_strict(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Extract model-specific configuration from nested config structure.
+        Strictly extract the single selected model configuration from the full config.
 
-        Args:
-            config: Full configuration dictionary
-
-        Returns:
-            Dict[str, Any]: Model-specific configuration
+        Rules:
+        - config['model'] must exist and contain exactly one entry
+        - that entry's value must be a dict (one chosen hyper-parameter set), not a list/grid/None
+        - no defaults are applied; fail fast if invalid
         """
-        # If config has a 'model' section, look for the specific model type
-        if "model" in config:
-            model_section = config["model"]
-            # Find the first model configuration (e.g., 'arima', 'lstm', etc.)
-            for model_name, model_config in model_section.items():
-                if isinstance(model_config, dict):
-                    return model_config
+        if "model" not in config:
+            raise ValueError("Missing 'model' section in config; expected a single selected model configuration.")
 
-        # If no nested structure, return the config as-is
-        return config
+        model_section = config["model"]
+        if not isinstance(model_section, dict) or len(model_section) != 1:
+            raise ValueError(
+                "config['model'] must be a dict with exactly one model entry (single selected combo), not a grid or multiple entries."
+            )
+
+        # Extract the only model's params
+        (_, model_params) = next(iter(model_section.items()))
+
+        if not isinstance(model_params, dict) or model_params is None:
+            raise ValueError(
+                "The selected model's parameters must be a dict containing exactly one chosen hyper-parameter set."
+            )
+
+        return model_params
 
     @abstractmethod
     def train(
@@ -147,50 +158,19 @@ class BaseModel(ABC):
         This method computes evaluation metrics as configured in evaluation.metrics
 
         Args:
-            y_true: True target values
-            y_pred: Predicted values
-            y_train: Training target values (required for MASE calculation)
+            y_true: True target values (ndarray, shape [num_steps, num_features])
+            y_pred: Predicted values (ndarray, shape [num_steps, num_features])
+            y_train: Training target values (required for MASE calculation) (ndarray, shape [num_steps, num_features])
 
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
         """
-        # Convert inputs to numpy arrays if needed
-        if isinstance(y_true, pd.Series):
-            y_true = y_true.values
-        if isinstance(y_pred, pd.Series):
-            y_pred = y_pred.values
-        if y_train is not None and isinstance(y_train, pd.Series):
-            y_train = y_train.values
-
-        # Handle shape mismatches - ensure consistent 2D format (num_series, time_steps)
-        # Convert 1D arrays to 2D (1, time_steps)
-        if y_true.ndim == 1:
-            y_true = y_true.reshape(1, -1)
-        if y_pred.ndim == 1:
-            y_pred = y_pred.reshape(1, -1)
-        
-        # Now both should be 2D (num_series, time_steps)
-        # Handle case where predictions are (1, time_steps) but true values are (num_series, time_steps)
-        if y_pred.shape[0] == 1 and y_true.shape[0] > 1:
-            # Broadcast predictions to match number of series
-            y_pred = np.tile(y_pred, (y_true.shape[0], 1))
-        
-        # Handle case where true values are (1, time_steps) but predictions are (num_series, time_steps)
-        if y_true.shape[0] == 1 and y_pred.shape[0] > 1:
-            # Broadcast true values to match number of series
-            y_true = np.tile(y_true, (y_pred.shape[0], 1))
-        
-        # Ensure both arrays have the same time_steps dimension
-        min_time_steps = min(y_true.shape[1], y_pred.shape[1])
-        y_true = y_true[:, :min_time_steps]
-        y_pred = y_pred[:, :min_time_steps]
-
         # Store for TensorBoard logging
         self._last_y_true = y_true
         self._last_y_pred = y_pred
 
         # Use evaluator to compute evaluation metrics (from evaluation.metrics)
-        # Pass y_train for metrics like MASE that require it, and other kwargs like freq
+        # y_pred, y_true, y_train are guaranteed ndarrays of matching shapes
         return self.evaluator.evaluate(y_pred, y_true, y_train=y_train, **kwargs)
 
     def evaluate(
