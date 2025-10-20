@@ -44,13 +44,7 @@ class ModelExecutor:
             context_steps: int,
             train_steps: int,
             validate_steps: int,
-            hyper_grid: list[dict],
-            csv_path: str):
-
-        # Create CSV headers
-        csv_headers = ['model_name', 'dataset_path', 'batch_idx', 'row_idx', 'window_idx', 'hyper_parameters']
-        tuning_loss = self.config["task"]["tuning_loss"]
-        csv_headers.extend([f'{tuning_loss}'] + [f'{metric}' for metric in self.config["evaluation"]["metrics"]])
+            hyper_grid: list[dict]):
 
         # This rewrite fixes the f-string syntax error by avoiding double braces in f-strings (see @file_context_0)
         # and fixes dynamic target/variable issues by moving model import into the split loop where target shape is known.
@@ -106,8 +100,6 @@ class ModelExecutor:
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
                         model_class = getattr(module, class_name)
-                        full_config = copy.deepcopy(config)
-                        model = model_class(full_config)
 
                         # Extract split indices
                         cstart, cend = window.context.start, window.context.end
@@ -119,29 +111,33 @@ class ModelExecutor:
                         eval_metrics = dict()
 
                         # Try each hyperparameter combination
-                        for params in {hyper_grid}:
-                            if params:
-                                model.model_config = params
+                        for params in {repr(hyper_grid)}:
+                            # Update the config with the hyperparameters before creating the model
+                            full_config_copy = copy.deepcopy(config)
+                            # Replace the entire model section with only the current model
+                            full_config_copy["model"] = {{model_name: params}}
+                            model = model_class(full_config_copy)
 
                             trained_model = model.train(
-                                y_context=target[cstart:cend, :],
-                                y_target=target[tstart:tend, :],
+                                y_context=target[:, cstart:cend],
+                                y_target=target[:, tstart:tend],
                                 timestamps_context=timestamps[cstart:cend],
                                 timestamps_target=timestamps[tstart:tend],
                                 freq=freq
                             )
 
                             results = trained_model.predict(
-                                y_context=target[cstart:tend, :],
+                                y_context=target[:, cstart:tend],
                                 timestamps_context=timestamps[cstart:tend],
                                 timestamps_target=timestamps[vstart:vend],
                                 freq=freq,
                             )
 
                             eval_losses = trained_model.compute_loss(
-                                y_true=target[vstart:vend, :],
+                                y_true=target[:, vstart:vend],
                                 y_pred=results,
-                                y_train=target[tstart:tend, :]
+                                y_train=target[:, tstart:tend],
+                                freq=freq
                             )
 
                             immutable_params = tuple(sorted(params.items()))
@@ -154,6 +150,9 @@ class ModelExecutor:
                         evaluations.append(eval_metrics)
                         num_windows += 1
 
+                    if num_windows == 0:
+                        raise Exception(f"No windows for {{dataset_path}}")
+
                     # Aggregate test loss over all windows, for each metric
                     test_loss = {{ metric: [] for metric in evaluation_metrics }}
                     for window_j in range(num_windows-1):
@@ -164,26 +163,84 @@ class ModelExecutor:
                             )
                     avg_test_loss = {{ metric: float(np.mean(test_loss[metric])) if test_loss[metric] else float('nan') for metric in evaluation_metrics }}
 
-                    # Construct CSV row
-                    header = ["dataset_path"] + [f"avg_test_{{metric}}" for metric in evaluation_metrics] + ["best_params"]
-                    row = [dataset_path] + [avg_test_loss[metric] for metric in evaluation_metrics] + [str(optimal_hyperparameters)]
-
                     # Write to evaluations CSV in run_dir/evals
-                    csv_filename = f"evaluations_{{model_name}}.csv"
+                    csv_filename = f"evaluations.csv"
                     evals_dir = os.path.join(run_dir, "evals")
                     os.makedirs(evals_dir, exist_ok=True)
                     csv_outpath = os.path.join(evals_dir, csv_filename)
                     file_exists = os.path.exists(csv_outpath)
+                    row = [model_name, dataset_path] + [avg_test_loss[metric] for metric in evaluation_metrics] + [str(optimal_hyperparameters)]
                     with open(csv_outpath, "a", newline="") as csvfile:
                         writer = csv.writer(csvfile)
-                        if not file_exists:
-                            writer.writerow(header)
+                        if not file_exists: # write header
+                            writer.writerow(["model_name", "dataset_path"] + [f"avg_test_{{metric}}" for metric in evaluation_metrics] + ["best_params"])
                         writer.writerow(row)
 
             if __name__ == "__main__":
                 main()
         """)
         return script
+
+    def _is_valid_combination(self, model_name: str, combination: dict) -> bool:
+        """
+        Check if a hyperparameter combination is valid for the given model.
+        
+        Args:
+            model_name: Name of the model
+            combination: Dictionary of hyperparameter values
+            
+        Returns:
+            bool: True if combination is valid, False otherwise
+        """
+        if model_name == "exponential_smoothing":
+            # For exponential smoothing, if seasonal is not null, seasonal_periods must not be null
+            seasonal = combination.get("seasonal")
+            seasonal_periods = combination.get("seasonal_periods")
+            
+            if seasonal is not None and seasonal != "null" and seasonal_periods is None:
+                return False
+            if seasonal is None or seasonal == "null":
+                if seasonal_periods is not None and seasonal_periods != "null":
+                    return False
+            
+            # At least one of trend or seasonal must be specified (not null)
+            trend = combination.get("trend")
+            if (trend is None or trend == "null") and (seasonal is None or seasonal == "null"):
+                return False
+                
+        elif model_name == "arima":
+            # For ARIMA, if seasonal component s > 0, then p, d, q should be reasonable
+            s = combination.get("s")
+            p = combination.get("p")
+            d = combination.get("d")
+            q = combination.get("q")
+            
+            # Basic validation: p, d, q should be non-negative
+            if p < 0 or d < 0 or q < 0 or s < 0:
+                return False
+                
+        elif model_name == "theta":
+            # For theta, sp should be positive
+            sp = combination.get("sp")
+            if sp is not None and sp <= 0:
+                return False
+                
+        elif model_name == "seasonal_naive":
+            # For seasonal naive, sp should be positive
+            sp = combination.get("sp")
+            if sp is not None and sp <= 0:
+                return False
+                
+        elif model_name == "croston_classic":
+            # For croston classic, alpha and gamma should be between 0 and 1
+            alpha = combination.get("alpha")
+            gamma = combination.get("gamma")
+            if alpha is not None and (alpha <= 0 or alpha >= 1):
+                return False
+            if gamma is not None and (gamma <= 0 or gamma >= 1):
+                return False
+                
+        return True
 
     def _get_model_requirements(self, model_name: str, modality: str):
         """
@@ -197,54 +254,6 @@ class ModelExecutor:
         if not os.path.exists(req_path):
             raise FileNotFoundError(f"requirements.txt not found at expected path: {req_path}")
         return os.path.abspath(req_path)
-
-    def _compute_optimal_hyperparameters(self, model_name: str, csv_path: str, tuning_loss: str) -> tuple:
-        """
-        Read validation losses CSV and compute optimal hyperparameters.
-
-        Args:
-            model_name: Name of the model
-            csv_path: Path to the CSV file with validation losses
-            tuning_loss: Metric to use for hyperparameter selection
-
-        Returns:
-            tuple: (best_hyperparameters, evaluation_results)
-                - best_hyperparameters: dict with optimal hyperparameters
-                - evaluation_results: dict with average metrics for best config
-        """
-        if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"CSV file not found: {csv_path}")
-
-        # Read CSV into pandas DataFrame
-        df = pd.read_csv(csv_path)
-
-        if df.empty:
-            return {}, {}
-
-        # Group by hyper_parameters column and compute mean of tuning_loss
-        grouped = df.groupby('hyper_parameters')[tuning_loss].mean()
-
-        # Find hyperparameters with lowest mean tuning_loss
-        best_hyperparams_str = grouped.idxmin()
-
-        # Parse the best hyperparameters from JSON string
-        try:
-            best_hyperparameters = json.loads(best_hyperparams_str) if best_hyperparams_str != 'null' else {}
-        except (json.JSONDecodeError, TypeError):
-            best_hyperparameters = {}
-
-        # For best hyperparameters, compute mean of all evaluation metrics
-        best_rows = df[df['hyper_parameters'] == best_hyperparams_str]
-        evaluation_results = {}
-
-        # Get all metric columns (excluding metadata columns)
-        metric_columns = [col for col in df.columns if col not in
-            ['model_name', 'dataset_path', 'batch_idx', 'row_idx', 'window_idx', 'hyper_parameters']]
-
-        for metric in metric_columns:
-            evaluation_results[metric] = best_rows[metric].mean()
-
-        return best_hyperparameters, evaluation_results
 
     def optimize_hyperparameters(self,
             context_steps: int,
@@ -278,9 +287,15 @@ class ModelExecutor:
                 # For each combination, create a dictionary mapping each key to its value.
                 for values_tuple in product(*values_lists):
                     combination = dict(zip(keys, values_tuple))
-                    hyper_grid.append(combination)
+                    # Check for incompatible combinations and log warnings
+                    if self._is_valid_combination(model_name, combination):
+                        hyper_grid.append(combination)
+                    else:
+                        if logging:
+                            self.logger.warning(f"Skipping incompatible parameter combination for {model_name}: {combination}")
             else:
-                hyper_grid = []
+                # For foundation models with no hyperparameters, use empty dict
+                hyper_grid = [{}]
 
             if logging:
                 self.logger.info(f"Preparing to run model: {model_name}")
@@ -299,16 +314,12 @@ class ModelExecutor:
                 requirements_path = requirements_path
             )
 
-            # Define CSV path for this model
-            csv_path = os.path.join(self.run_dir, f'validation_losses_{model_name}.csv')
-
             script = self._generate_hyperparameter_tuning_script(
                 model_name=model_name,
                 context_steps=context_steps,
                 train_steps=train_steps,
                 validate_steps=validate_steps,
-                hyper_grid=hyper_grid,
-                csv_path=csv_path
+                hyper_grid=hyper_grid
             )
             if logging: self.logger.debug(f'Running Script: """\n{script}\n"""')
 
@@ -319,20 +330,7 @@ class ModelExecutor:
 
             try:
                 result = conda_env.run(script=script_path)
-                if logging: self.logger.success(f'Script ran successfully')
-
-                # Analyze CSV to find optimal hyperparameters
-                best_params, eval_results = self._compute_optimal_hyperparameters(
-                    model_name, csv_path, tuning_loss
-                )
-
-                # Store results
-                best_hyperparameters[model_name] = best_params
-                all_evals[model_name] = eval_results
-
-                if logging:
-                    self.logger.info(f"Best hyperparameters for {model_name}: {best_params}")
-                    self.logger.info(f"Evaluation results for {model_name}: {eval_results}")
+                if logging: self.logger.success(f'Script ran successfully for model {model_name}')
 
             finally:
                 # Clean up temporary file

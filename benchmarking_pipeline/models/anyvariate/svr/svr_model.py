@@ -27,12 +27,18 @@ class SVRModel(BaseModel):
             logger: Logger instance for TensorBoard logging
         """
         super().__init__(config)
+        self.model_config = self._extract_model_config(config)
 
         self.scaler = StandardScaler()  # SVR is sensitive to feature scaling
 
         if "lookback_window" not in self.model_config:
             self.model_config["lookback_window"] = 10
-        # Extract model-level parameters (not SVR-specific)
+        
+        # Add forecast_horizon from task config
+        self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
+        
+        # Add training_loss from task config
+        self.model_config["training_loss"] = config["task"]["tuning_loss"]
 
         # Extract SVR-specific parameters for the underlying SVR model
         svr_params = {}
@@ -58,21 +64,27 @@ class SVRModel(BaseModel):
         """
         Create features and multi-step targets for direct multi-output forecasting.
         Each sample uses the previous lookback_window values as features and the next forecast_horizon values as targets.
+        Handles (num_series, timesteps) format.
         """
         X, y = [], []
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        for i in range(len(y_series) - lookback_window - forecast_horizon + 1):
-            curr_X = y_series[i : i + lookback_window].flatten()
+        # Handle (num_series, timesteps) format
+        if y_series.ndim == 1:
+            y_series = y_series.reshape(1, -1)
+        
+        num_series, timesteps = y_series.shape
+
+        for i in range(timesteps - lookback_window - forecast_horizon + 1):
+            # Extract lookback window for all series
+            curr_X = y_series[:, i : i + lookback_window].flatten()
             X.append(curr_X)
 
-            curr_y = y_series[
-                i + lookback_window : i + lookback_window + forecast_horizon
-            ].flatten()
+            # Extract forecast horizon for all series
+            curr_y = y_series[:, i + lookback_window : i + lookback_window + forecast_horizon].flatten()
             y.append(curr_y)
 
-        # print(f"X: {curr_X.shape}, y: {curr_y.shape}")
         X, y = np.array(X), np.array(y)
 
         return X, y
@@ -93,10 +105,10 @@ class SVRModel(BaseModel):
             self._build_model()
 
         # Combine context and target for full training series if y_target is provided
-        # Ensure both arrays are 1D before concatenation
+        # Handle (num_series, timesteps) format
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
-        y_series = np.concatenate([y_context, y_target], axis=0)
+        y_series = np.concatenate([y_context, y_target], axis=1)
 
         X, y = self._create_features_targets(y_series)
 
@@ -125,44 +137,50 @@ class SVRModel(BaseModel):
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
-        if len(y_context) < self.model_config["lookback_window"]:
+        if y_context.shape[1] < self.model_config["lookback_window"]:
             raise ValueError(
-                f"y_context too short: {len(y_context)} < lookback_window {self.model_config['lookback_window']}"
+                f"y_context too short: {y_context.shape[1]} < lookback_window {self.model_config['lookback_window']}"
             )
 
         total_steps = len(timestamps_target)
-        num_targets = y_context.shape[1]
+        num_targets = y_context.shape[0]  # num_series is first dimension
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        y_context = y_context
+        # Ensure y_context is (num_series, timesteps)
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
 
         preds = []
-        context = np.array(y_context).flatten().tolist()
+        context = y_context.copy()
 
         steps = forecast_horizon
         steps_done = 0
 
         while steps_done < total_steps:
-
-            y_context = y_context[-lookback_window:]
-            # y_context_scaled = self.scaler.transform(y_context.flatten())
-            y_flat = np.expand_dims(y_context.flatten(), axis=0)
+            # Use last lookback_window timesteps
+            current_window = context[:, -lookback_window:]
+            
+            # Flatten for prediction
+            y_flat = np.expand_dims(current_window.flatten(), axis=0)
             pred = self.model.predict(y_flat)
-            # print("pred", pred.shape)
-            # print("forecast_horizon", forecast_horizon)
-            # print("num_targets", num_targets)
+            
+            # Reshape prediction to (forecast_horizon, num_targets)
             pred = np.reshape(pred, (forecast_horizon, num_targets))
-            # print("pred AFTER", pred.shape)
-            preds.extend(pred)
+            
+            # Transpose to (num_targets, forecast_horizon) for concatenation
+            pred = pred.T
+            preds.append(pred)
 
-            y_context = np.concatenate([y_context, pred], axis=0)
+            # Concatenate along time axis (axis=1)
+            context = np.concatenate([context, pred], axis=1)
             steps_done += steps
 
-        preds = np.array(preds)
-        if len(preds.shape) == 1:
-            preds = np.expand_dims(preds, axis=1)
-        else:
-            pred = np.concatenate(preds, axis=0)
+        # Concatenate all predictions along time axis
+        preds = np.concatenate(preds, axis=1)
+        
+        # Return (num_targets, total_steps) - truncate if needed
+        if preds.shape[1] > total_steps:
+            preds = preds[:, :total_steps]
 
         return preds

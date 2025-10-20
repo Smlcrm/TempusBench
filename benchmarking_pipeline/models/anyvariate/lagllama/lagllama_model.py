@@ -11,7 +11,12 @@ from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
 from benchmarking_pipeline.models.base_model import BaseModel
 
-from .lag_llama.gluon.estimator import LagLlamaEstimator
+# Add the lagllama directory to the Python path for absolute imports
+lagllama_dir = os.path.dirname(os.path.abspath(__file__))
+if lagllama_dir not in sys.path:
+    sys.path.insert(0, lagllama_dir)
+
+from lag_llama.gluon.estimator import LagLlamaEstimator
 
 # Try to import lag_llama, install if not available
 
@@ -185,10 +190,16 @@ class LagllamaModel(BaseModel):
         timestamps = pd.date_range(start=start_time, periods=periods, freq=freq)
 
         # Create series DataFrame
+        # Ensure y_context is 1D for single series prediction
+        if y_context.ndim > 1:
+            y_context_1d = y_context[:, 0] if y_context.shape[1] > 0 else y_context.flatten()
+        else:
+            y_context_1d = y_context
+            
         context_df = pd.DataFrame(
             {
                 "ds": timestamps,
-                "target": y_context[:, 0],
+                "target": y_context_1d,
                 "unique_id": "test_series",
             }
         )
@@ -241,11 +252,11 @@ class LagllamaModel(BaseModel):
         """
         Anyvariate wrapper: for multivariate, no separate fitting is needed; we keep separate handles.
         """
-        if y_context.ndim > 1 and y_context.shape[1] > 1:
+        if y_context.ndim > 1 and y_context.shape[0] > 1:
             self.models = []
-            for k in range(y_context.shape[1]):
+            for k in range(y_context.shape[0]):  # (num_series, timesteps) format
                 m = LagllamaModel(self.model_config)
-                m._train(y_context[:, k], y_target[:, k] if y_target is not None and y_target.ndim > 1 else y_target,
+                m._train(y_context[k, :], y_target[k, :] if y_target is not None and y_target.ndim > 1 else y_target,
                          timestamps_context, timestamps_target, freq)
                 self.models.append(m)
             self.is_fitted = True

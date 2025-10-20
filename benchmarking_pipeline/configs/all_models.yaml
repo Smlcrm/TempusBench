@@ -1,14 +1,15 @@
 task:
   task_type: deterministic
-  forecast_horizon: 10
-  context_window: 10
-  tuning_loss: mae
+  forecast_horizon: 25
+  context_window: 50
+  max_windows: 20
+  tuning_loss: mae # hyper-parameter tuning
   dataset:
-    name: "multivariate/*"
+    name: "*"
     normalize: false
     handle_missing: interpolate
 
-evaluation: # hyper-parameter tuning
+evaluation: # Reported evals
     metrics: [mae, mase, rmse]
     logging: true
 

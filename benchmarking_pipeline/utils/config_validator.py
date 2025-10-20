@@ -40,8 +40,9 @@ class Task(BaseModel):
     """Task configuration model."""
 
     task_type: Literal['deterministic', 'stochastic'] = Field(..., description="Task type")
-    forecast_horizon: int = Field(..., ge=1, description="Forecast horizon")
+    forecast_horizon: int = Field(..., ge=1, le=128, description="Forecast horizon (max 128)")
     context_window: int = Field(..., ge=1, description="Context window size")
+    max_windows: int = Field(..., ge=1, description="Maximum number of windows to generate")
     tuning_loss: str = Field(..., description="Single metric for hyperparameter tuning, must be compatible with task type")
     dataset: Dataset = Field(..., description="Dataset configuration")
 
