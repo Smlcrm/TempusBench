@@ -96,6 +96,9 @@ class ArimaModel(BaseModel):
             y_target, timestamps_context, timestamps_target, and freq are ignored to prevent data leakage.
         """
 
+        # Ensure endogenous series is 1D for statsmodels
+        endog = y_context.squeeze()
+
         # No exogenous variables supported
         exog = None
 
@@ -195,7 +198,7 @@ class ArimaModel(BaseModel):
                 yc = y_context[:, k]    # Already 1D
                 yt = y_target[:, k] if y_target is not None else None  # Already 1D
                 # No need to reshape to 2D column; _train can handle 1D array for this variate
-                m = ArimaModel(self.model_config)
+                m = ArimaModel(self.config)
                 m._train(
                     y_context=yc,
                     y_target=yt,

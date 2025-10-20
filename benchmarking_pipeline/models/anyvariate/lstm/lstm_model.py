@@ -22,7 +22,7 @@ import pickle
 import os
 from benchmarking_pipeline.models.base_model import BaseModel
 import time
-from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 
 
 class LSTMModel(BaseModel):
@@ -92,10 +92,16 @@ class LSTMModel(BaseModel):
         # Add output layer - predicts prediction_window * num_targets values (flattened)
         self.model.add(Dense(self.model_config["prediction_window"] * num_targets))
 
-        # Compile model
+        # Compile model with optimized settings
         self.model.compile(
-            optimizer=Adam(learning_rate=self.model_config["learning_rate"]),
+            optimizer=Adam(
+                learning_rate=self.model_config["learning_rate"],
+                beta_1=0.9,
+                beta_2=0.999,
+                epsilon=1e-7
+            ),
             loss=self.training_loss,
+            metrics=['mae']  # Add MAE for better monitoring
         )
 
     def _prepare_sequences(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -188,9 +194,20 @@ class LSTMModel(BaseModel):
                 input_shape=(self.model_config["context_length"], num_features)
             )
 
-        # Train model with progress logging
+        # Train model with progress logging and early stopping
         print(f"Training LSTM: units={self.model_config['units']}, layers={self.model_config['layers']}, lr={self.model_config['learning_rate']}")
         print(f"Data shapes: X_seq={X_seq.shape}, y_seq={y_seq.shape}")
+        
+        # Add early stopping to prevent overfitting and reduce training time
+        early_stopping = EarlyStopping(
+            monitor='loss',
+            patience=3,
+            restore_best_weights=True,
+            verbose=1
+        )
+        
+        # Only use validation split if we have enough samples
+        validation_split = 0.1 if len(X_seq) > 10 else 0.0
         
         self.model.fit(
             X_seq,
@@ -198,6 +215,8 @@ class LSTMModel(BaseModel):
             batch_size=self.model_config["batch_size"],
             epochs=self.model_config["epochs"],
             verbose=1,  # Enable verbose output to show epochs
+            callbacks=[early_stopping] if validation_split > 0 else [],
+            validation_split=validation_split
         )
 
         self.is_fitted = True
@@ -268,5 +287,9 @@ class LSTMModel(BaseModel):
 
         if len(result.shape) == 1:
             result = np.expand_dims(result, axis=1)
+
+        # Inverse transform predictions if scaler is available
+        if self.scaler is not None:
+            result = self.scaler.inverse_transform(result)
 
         return result

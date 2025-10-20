@@ -146,68 +146,50 @@ class MomentModel(BaseModel):
         """
 
         forecast_horizon = timestamps_target.shape[0]
-        
-        # Handle (num_series, timesteps) format
+
+        # Ensure 2D input: (num_steps, num_features)
         if y_context.ndim == 1:
-            y_context = y_context.reshape(1, -1)
-            
-        num_series, timesteps = y_context.shape
-        
-        # Moment expects (timesteps, features) format
-        y_context = y_context.T  # Transpose to (timesteps, num_series)
-        num_y_features = y_context.shape[1]
-        self.model_config["num_y_features"] = num_y_features
+            y_context = y_context.reshape(-1, 1)
 
+        num_steps, num_features = y_context.shape
+        self.model_config["num_y_features"] = num_features
+
+        # Fixed context length per model config
+        context_length = int(self.model_config.get("context_length", 512))
+
+        # Load model with correct metadata
         self._load_model(forecast_horizon)
-
         self.model.eval()
 
         with torch.no_grad():
-
-            # Scale the context data using the fitted scaler
+            # Scale in (num_steps, num_features)
             self.scaler.fit(y_context)
             y_context = self.scaler.transform(y_context)
 
-            if y_context.shape[0] >= self.model_config["context_length"]:
-                y_context = y_context[-self.model_config["context_length"] :, :]
+            # Trim/pad along time dimension to context_length
+            if y_context.shape[0] >= context_length:
+                y_context = y_context[-context_length:, :]
             else:
-                # Create padding with correct shape (context_length - current_length, num_series)
-                padding_length = self.model_config["context_length"] - y_context.shape[0]
-                padding = np.zeros((padding_length, y_context.shape[1]))
-                y_context = np.concatenate([padding, y_context], axis=0)
+                pad_rows = context_length - y_context.shape[0]
+                y_context = np.concatenate([np.zeros((pad_rows, num_features)), y_context], axis=0)
                 warnings.warn(
-                    f"Time Series is shorter than context_length {self.model_config['context_length']}. "
-                    "Padded with zeros.",
+                    f"Time Series is shorter than context_length {context_length}. Padded with zeros.",
                     UserWarning,
                 )
 
-            # Create proper 3D tensor: [batch_size=1, sequence_length=1, features=1]
-            y_context = torch.FloatTensor(y_context).unsqueeze(0).to(self.device)
-            print("[BEFORE] y_context shape:", y_context.shape)
-            # Create input mask
-            input_mask = torch.ones(1, self.model_config["context_length"]).to(
-                self.device
-            )
+            # To MOMENT format (batch, channels, seq_len) = (1, num_features, context_length)
+            y_context_tensor = torch.from_numpy(y_context.T.copy()).float().unsqueeze(0).to(self.device)
+            input_mask = torch.ones(1, context_length, device=self.device)
 
-            # Debug shapes and contents before passing to model
-            print(
-                f"[AFTER y_context shape: {y_context.shape}, dtype: {y_context.dtype}"
-            )
+            # Debug
+            print("[BEFORE] y_context shape:", y_context_tensor.shape)
             print(f"input_mask shape: {input_mask.shape}, dtype: {input_mask.dtype}")
-            print(
-                f"y_context (sample): {y_context[0, :5, :].cpu().numpy() if y_context.shape[1] >= 5 else y_context[0, :, :].cpu().numpy()}"
-            )
-            print(
-                f"input_mask (sample): {input_mask[0, :5].cpu().numpy() if input_mask.shape[1] >= 5 else input_mask[0, :].cpu().numpy()}"
-            )
-            output = self.model(x_enc=y_context, input_mask=input_mask)
 
-            # Inverse scale the forecast
+            output = self.model(x_enc=y_context_tensor, input_mask=input_mask)
+
+            # Forecast shape expected (batch, forecast_horizon, channels)
             forecast_scaled = output.forecast.cpu().numpy()
-            forecast = self.scaler.inverse_transform(forecast_scaled[0, :, :].T)
-            # forecast = forecast_scaled[0, :, :].T
-            
-            # Return in (num_series, forecast_horizon) format
-            # forecast is already (num_series, forecast_horizon) from the inverse transform
+            forecast = self.scaler.inverse_transform(forecast_scaled[0, :, :])  # (forecast_horizon, channels)
+            forecast = forecast.T  # (channels, forecast_horizon)
 
         return forecast

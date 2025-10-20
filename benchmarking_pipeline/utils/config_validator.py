@@ -124,6 +124,12 @@ class BenchmarkConfig(BaseModel):
                     f"got {type(model_params).__name__}")
 
             if isinstance(model_params, dict):
+                # Validate that training_loss is not in model configs
+                if 'training_loss' in model_params:
+                    raise ValueError(
+                        f"Model '{model_name}' cannot have 'training_loss' parameter. "
+                        f"Training loss must be defined in task.tuning_loss only.")
+                
                 for param_name, param_val in model_params.items():
                     if not isinstance(param_val, list):
                         raise ValueError(

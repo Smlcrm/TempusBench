@@ -12,11 +12,12 @@ class TimesFMModel(BaseModel):
         super().__init__(config)
         self.is_fitted = True
 
+        horizon = self.config["task"]["forecast_horizon"]
         self.model = timesfm.TimesFm(
             hparams=timesfm.TimesFmHparams(
                 backend="cpu",
                 input_patch_len=32,
-                horizon_len=1000,
+                horizon_len=horizon,
                 num_layers=20,
                 model_dims=1280,
                 # Se this to True for v1.0 checkpoints

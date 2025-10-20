@@ -7,6 +7,7 @@ import pandas as pd
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Union
+from sklearn.preprocessing import StandardScaler
 
 @dataclass
 class DatasetSplit:
@@ -27,6 +28,7 @@ class Dataset:
     context: DatasetSplit
     train: DatasetSplit
     validation: DatasetSplit
+    scaler: Optional[StandardScaler] = None  # Scaler used for normalization (if any)
     metadata: Optional[Dict[str, Any]] = None
 
 @dataclass
