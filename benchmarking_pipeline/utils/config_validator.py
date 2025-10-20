@@ -6,29 +6,21 @@ to ensure they comply with the expected schema before execution.
 """
 
 import os
-import re
 import yaml
 import logging
 
 from pathlib import Path
-from typing import Dict, Any, List, Union, Optional, Literal
-from pydantic import BaseModel, Field, field_validator, ValidationError, constr
+from typing import Dict, Any, List, Optional, Literal, ClassVar
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError, constr
 
 logger = logging.getLogger(__name__)
 
 class ConfigValidationError(Exception):
     """Custom exception for configuration validation errors."""
 
-    def __init__(self, message: str, field_path: str = "", details: str = ""):
+    def __init__(self, message: str):
         self.message = message
-        self.field_path = field_path
-        self.details = details
-        super().__init__(self._format_message())
-
-    def _format_message(self) -> str:
-        if self.field_path:
-            return f"Config validation error at '{self.field_path}': {self.message}"
-        return f"Config validation error: {self.message}"
+        super().__init__(message)
 
 class Dataset(BaseModel):
     """Dataset configuration model."""
@@ -38,203 +30,116 @@ class Dataset(BaseModel):
     handle_missing: Literal['interpolate', 'mean', 'median', 'drop', 'forward_fill', 'backward_fill'] = Field(
         ..., description="Strategy for handling missing values"
     )
-    chunks: Optional[int] = Field(default=1, ge=1, description="Number of data chunks")
 
 class Evaluation(BaseModel):
     """Evaluation configuration model."""
     metrics: List[str] = Field(..., min_items=1, description="List of evaluation metrics")
-    tensorboard: Optional[bool] = Field(default=False, description="Enable TensorBoard logging")
+    logging: Optional[bool] = Field(default=False, description="Enable logging")
 
 class Task(BaseModel):
     """Task configuration model."""
 
-    type: Literal['deterministic', 'stochastic'] = Field(..., description="Task type")
-    forecast_horizon: int = Field(..., ge=1, description="Forecast horizon")
+    task_type: Literal['deterministic', 'stochastic'] = Field(..., description="Task type")
+    forecast_horizon: int = Field(..., ge=1, le=128, description="Forecast horizon (max 128)")
     context_window: int = Field(..., ge=1, description="Context window size")
+    max_windows: int = Field(..., ge=1, description="Maximum number of windows to generate")
+    max_num_variates: int = Field(..., ge=1, description="Maximum number of variates to extract from dataset")
+    tuning_loss: str = Field(..., description="Single metric for hyperparameter tuning, must be compatible with task type")
     dataset: Dataset = Field(..., description="Dataset configuration")
-    evaluation: Evaluation = Field(..., description="Evaluation configuration")
 
-    @field_validator('evaluation')
-    @classmethod
-    def validate_evaluation_metrics(cls, v, info):
-        """Validate evaluation metrics based on task type."""
-        # Get task type from the parent data
-        if info.data and 'type' in info.data:
-            task_type = info.data['type']
-            allowed_metrics = {
-                'deterministic': ['mae', 'rmse', 'mape', 'smape', 'mase'],
-                'stochastic': ['crps', 'quantile_loss', 'interval_score', 'mae', 'rmse']
-            }
+    ALLOWED_METRICS: ClassVar[Dict[str, List[str]]] = {
+        'deterministic': ['mae', 'rmse', 'mape', 'mase'],
+        'stochastic': ['crps', 'quantile_loss', 'interval_score', 'mae', 'rmse']
+    }
 
-            if task_type in allowed_metrics:
-                invalid_metrics = [m for m in v.metrics if m not in allowed_metrics[task_type]]
-                if invalid_metrics:
-                    raise ValueError(
-                        f"Invalid metrics for {task_type} task: {invalid_metrics}. "
-                        f"Allowed: {allowed_metrics[task_type]}")
-        return v
-
+    @model_validator(mode='after')
+    def validate_task_consistency(self):
+        if not self.tuning_loss in Task.ALLOWED_METRICS.get(self.task_type):
+            raise ValueError(
+                f"Invalid tuning_loss '{self.tuning_loss}' for {self.task_type} task_type. "
+                f"Allowed metrics: {self.ALLOWED_METRICS[self.task_type]}"
+            )
+        return self
 
 class BenchmarkConfig(BaseModel):
     """Root configuration model for the benchmarking pipeline."""
 
     task: Task = Field(..., description="Task configuration")
+    evaluation: Evaluation = Field(..., description="Evaluation configuration")
     model: Dict[str, Optional[Dict[str, Any]]] = Field(..., description="Model configurations")
+
+    @model_validator(mode='after')
+    def validate_evaluation_consistency(self):
+        """Validate evaluation metrics and tuning_loss for consistency and task type."""
+        task_type = self.task.task_type
+
+        # Validate evaluation metrics
+        allowed_metrics = Task.ALLOWED_METRICS.get(task_type, [])
+        invalid_metrics = [m for m in self.evaluation.metrics if m not in allowed_metrics]
+        if invalid_metrics:
+            raise ValueError(
+                f"Invalid metrics for {task_type} task_type: {invalid_metrics}. "
+                f"Allowed: {Task.ALLOWED_METRICS[task_type]}"
+            )
+
+        # Ensure tuning_loss is present in metrics list
+        if self.task.tuning_loss not in self.evaluation.metrics:
+            raise ValueError(
+                f"tuning_loss '{self.task.tuning_loss}' is not present in evaluation.metrics list."
+            )
+
+        return self
 
     @field_validator('model')
     @classmethod
-    def validate_model_names(cls, v):
-        """Validate that model names match folders in anyvariate directory."""
-        # Get the path to the anyvariate models directory
+    def validate_model_configuration(cls, v):
+        """Validate model names and parameters structure."""
+        # Validate model names exist as subdirectories
         current_dir = Path(__file__).parent
-        anyvariate_dir = current_dir.parent / 'models' / 'anyvariate'
+        models_dir = current_dir.parent / 'models'
 
-        if not anyvariate_dir.exists():
-            raise ValueError(f"Anyvariate models directory not found: {anyvariate_dir}")
+        if not models_dir.exists():
+            raise ValueError(f"Models directory not found: {models_dir}")
 
-        # Get list of valid model names from directory structure
-        valid_models = [d.name for d in anyvariate_dir.iterdir() if d.is_dir()]
+        # Collect all model folders under any subfolder of models/
+        valid_models = set()
+        for subdir in models_dir.iterdir():
+            if subdir.is_dir():
+                for model_folder in subdir.iterdir():
+                    if model_folder.is_dir():
+                        valid_models.add(model_folder.name)
 
-        # Validate each model name
+        # Validate model names
         invalid_models = [name for name in v.keys() if name not in valid_models]
         if invalid_models:
             raise ValueError(
                 f"Invalid model names: {invalid_models}. "
                 f"Valid models: {sorted(valid_models)}")
 
-        return v
-
-    @field_validator('model')
-    @classmethod
-    def validate_model_parameters(cls, v):
-        """Validate model parameters structure."""
+        # Validate model parameters structure
         for model_name, model_params in v.items():
             if model_params is not None and not isinstance(model_params, dict):
                 raise ValueError(
                     f"Model parameters for '{model_name}' must be a dict or None, "
                     f"got {type(model_params).__name__}")
+
+            if isinstance(model_params, dict):
+                for param_name, param_val in model_params.items():
+                    if not isinstance(param_val, list):
+                        raise ValueError(
+                            f"Parameter '{param_name}' for model '{model_name}' must be a list of values, "
+                            f"got {type(param_val).__name__}")
+
+                    # Additional validation: ensure list is not empty if provided
+                    if len(param_val) == 0:
+                        raise ValueError(
+                            f"Parameter '{param_name}' for model '{model_name}' cannot be an empty list. "
+                            f"Provide a list with at least one value or set the model to None.")
+
         return v
 
-class ConfigValidator:
-    """
-    Validates configuration files using Pydantic models.
-
-    This class provides backward compatibility with the old ConfigValidator interface
-    while using Pydantic for validation under the hood.
-    """
-
-    def __init__(self):
-        """Initialize the validator."""
-        pass
-
-    def validate_config(self, config: Dict[str, Any], config_path: str = "") -> bool:
-        """
-        Validate a configuration dictionary against the schema.
-
-        Args:
-            config: Configuration dictionary to validate
-            config_path: Path to the config file (for error reporting)
-
-        Returns:
-            True if validation passes
-
-        Raises:
-            ConfigValidationError: If validation fails
-        """
-        try:
-            BenchmarkConfig(**config)
-            logger.info(f"Configuration validation passed for {config_path or 'config'}")
-            return True
-        except ValidationError as e:
-            # Convert Pydantic validation errors to ConfigValidationError
-            error_messages = []
-            for error in e.errors():
-                field_path = " -> ".join(str(loc) for loc in error['loc'])
-                error_messages.append(f"{field_path}: {error['msg']}")
-
-            error_msg = "; ".join(error_messages)
-            logger.error(f"Configuration validation failed: {error_msg}")
-            raise ConfigValidationError(error_msg, config_path)
-
-    def validate_config_file(self, config_path: str) -> bool:
-        """
-        Load and validate a configuration file.
-
-        Args:
-            config_path: Path to the configuration file
-
-        Returns:
-            True if validation passes
-
-        Raises:
-            ConfigValidationError: If validation fails
-            FileNotFoundError: If config file doesn't exist
-        """
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-
-        try:
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-
-            if config is None:
-                raise ConfigValidationError("Configuration file is empty or invalid YAML")
-
-            return self.validate_config(config, config_path)
-
-        except yaml.YAMLError as e:
-            raise ConfigValidationError(f"Invalid YAML format: {e}")
-
-
-def validate_config_file(config_path: str) -> bool:
-    """
-    Convenience function to validate a config file.
-
-    Args:
-        config_path: Path to the configuration file
-
-    Returns:
-        True if validation passes
-
-    Raises:
-        ConfigValidationError: If validation fails
-        FileNotFoundError: If config file doesn't exist
-    """
-    validator = ConfigValidator()
-    return validator.validate_config_file(config_path)
-
-
-def validate_config_dict(config: Dict[str, Any]) -> bool:
-    """
-    Convenience function to validate a config dictionary.
-
-    Args:
-        config: Configuration dictionary to validate
-
-    Returns:
-        True if validation passes
-
-    Raises:
-        ConfigValidationError: If validation fails
-    """
-    validator = ConfigValidator()
-    return validator.validate_config(config)
-
-
-def load_and_validate_config(config_path: str) -> BenchmarkConfig:
-    """
-    Load and validate a configuration file, returning the validated Pydantic model.
-
-    Args:
-        config_path: Path to the configuration file
-
-    Returns:
-        Validated BenchmarkConfig instance
-
-    Raises:
-        ConfigValidationError: If validation fails
-        FileNotFoundError: If config file doesn't exist
-    """
+def load_config(config_path: str) -> Dict[str, Any]:
+    """Load configuration file and return as dictionary."""
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
@@ -245,42 +150,43 @@ def load_and_validate_config(config_path: str) -> BenchmarkConfig:
         if config is None:
             raise ConfigValidationError("Configuration file is empty or invalid YAML")
 
-        # Validate using Pydantic model and return it directly
-        return BenchmarkConfig(**config)
+        return config
 
     except yaml.YAMLError as e:
         raise ConfigValidationError(f"Invalid YAML format: {e}")
-    except ValidationError as e:
-        # Convert Pydantic validation errors to ConfigValidationError
-        error_messages = []
-        for error in e.errors():
-            field_path = " -> ".join(str(loc) for loc in error['loc'])
-            error_messages.append(f"{field_path}: {error['msg']}")
 
-        error_msg = "; ".join(error_messages)
-        raise ConfigValidationError(error_msg, config_path)
+def _convert_pydantic_errors(validation_error: ValidationError) -> str:
+    """Convert Pydantic validation errors to a readable string."""
+    error_messages = []
+    for error in validation_error.errors():
+        field_path = " -> ".join(str(loc) for loc in error['loc'])
+        error_messages.append(f"{field_path}: {error['msg']}")
+    return "; ".join(error_messages)
 
+def validate_config_file(config_path: str) -> bool:
+    """
+    Validate a configuration file.
 
-if __name__ == "__main__":
-    # Example usage
-    import sys
+    Args:
+        config_path: Path to the configuration file
 
-    if len(sys.argv) != 2:
-        print("Usage: python config_validator.py <config_file>")
-        sys.exit(1)
+    Returns:
+        True if validation passes
 
-    config_file = sys.argv[1]
+    Raises:
+        ConfigValidationError: If validation fails
+        FileNotFoundError: If config file doesn't exist
+    """
+    config = load_config(config_path)
 
     try:
-        validate_config_file(config_file)
-        print(f"✅ Configuration file '{config_file}' is valid!")
-        sys.exit(0)
-    except ConfigValidationError as e:
-        print(f"❌ Configuration validation failed: {e}")
-        sys.exit(1)
-    except FileNotFoundError as e:
-        print(f"❌ File not found: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        sys.exit(1)
+        # Validate using Pydantic model
+        BenchmarkConfig(**config)
+        logger.info(f"Configuration validation passed for {config_path}")
+        return True
+
+    except ValidationError as e:
+        error_msg = _convert_pydantic_errors(e)
+        logger.error(f"Configuration validation failed: {error_msg}")
+        raise ConfigValidationError(error_msg)
+

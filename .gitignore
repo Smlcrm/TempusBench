@@ -59,5 +59,14 @@ temp/
 *.tmp
 *.temp
 
-# Model checkpoints
+# Model checkpoints and large model files
 *.ckpt
+*.pth
+*.pt
+*.bin
+*.safetensors
+checkpoints/
+models/*/checkpoints/
+**/checkpoints/
+
+runs/*

@@ -1,19 +1,22 @@
 task:
-  type: deterministic
-  forecast_horizon: 10
-  context_window: 10
+  task_type: deterministic
+  forecast_horizon: 25
+  context_window: 50
+  max_windows: 20
+  tuning_loss: mae # hyper-parameter tuning
   dataset:
-    name: "univariate/*"
-    normalize: false
+    name: "*"
+    normalize: true
     handle_missing: interpolate
-  evaluation:
-    metrics: [mae, mase, rmse, mape]
-    tensorboard: True
+
+evaluation: # Reported evals
+    metrics: [mae, mase, rmse]
+    logging: true
 
 model:
   ############## Statistical Models ##############
   exponential_smoothing:
-    trend: ["add", null]
+    trend: ["add"]
     seasonal: [null]
     seasonal_periods: [null]
     damped_trend: [false, true]
@@ -72,11 +75,11 @@ model:
 
   ############## Deep Learning Models ##############
   lstm:
-    units: [32]
+    units: [32, 60, 80]
     layers: [1]
     dropout: [0.1]
     learning_rate: [0.01]
-    batch_size: [32]
+    batch_size: [32, 16]
     epochs: [100]
     sequence_length: [10]
     training_loss: ["mae"]
@@ -92,5 +95,3 @@ model:
   lagllama:
   toto:
   tabpfn:
-    context_window: [10]
-    forecast_window: [10]

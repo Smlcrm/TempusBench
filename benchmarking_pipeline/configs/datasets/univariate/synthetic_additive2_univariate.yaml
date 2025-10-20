@@ -1,0 +1,158 @@
+task:
+  task_type: deterministic
+  forecast_horizon: 128
+  context_window: 300
+  max_windows: 20
+  max_num_variates: 1
+  tuning_loss: mae
+  dataset:
+    name: univariate/synthetic_additive2_univariate
+    normalize: true
+    handle_missing: interpolate
+evaluation:
+  metrics:
+  - mae
+  - mase
+  - rmse
+  - mape
+  logging: true
+model:
+  exponential_smoothing:
+    trend:
+    - add
+    seasonal:
+    - null
+    seasonal_periods:
+    - null
+    - 12
+    - 24
+    damped_trend:
+    - false
+    - true
+  seasonal_naive:
+    sp:
+    - 12
+    - 24
+  croston_classic:
+    alpha:
+    - 0.1
+    - 0.3
+    - 0.5
+    gamma:
+    - 0.1
+    - 0.3
+  theta:
+    sp:
+    - 12
+    - 24
+  arima:
+    p:
+    - 1
+    - 2
+    d:
+    - 1
+    q:
+    - 1
+    - 2
+    s:
+    - 2
+  xgboost:
+    lookback_window:
+    - 30
+    - 50
+    n_estimators:
+    - 100
+    - 200
+    max_depth:
+    - 3
+    - 4
+    learning_rate:
+    - 0.05
+    - 0.1
+    subsample:
+    - 0.9
+    colsample_bytree:
+    - 0.9
+    random_state:
+    - 42
+    n_jobs:
+    - 1
+  random_forest:
+    lookback_window:
+    - 30
+    - 50
+    n_estimators:
+    - 10
+    - 20
+    max_depth:
+    - 2
+    - 3
+    random_state:
+    - 42
+    n_jobs:
+    - 1
+    forecast_horizon:
+    - 50
+  svr:
+    training_loss:
+    - mae
+    kernel:
+    - rbf
+    - linear
+    C:
+    - 1.0
+    - 10.0
+    epsilon:
+    - 0.1
+    gamma:
+    - scale
+    lookback_window:
+    - 30
+    - 50
+    forecast_horizon:
+    - 10
+  prophet:
+    seasonality_mode:
+    - additive
+    - multiplicative
+    changepoint_prior_scale:
+    - 0.05
+    - 0.1
+    seasonality_prior_scale:
+    - 10.0
+    yearly_seasonality:
+    - true
+    weekly_seasonality:
+    - true
+    daily_seasonality:
+    - false
+  lstm:
+    units:
+    - 32
+    - 64
+    layers:
+    - 1
+    - 2
+    dropout:
+    - 0.1
+    learning_rate:
+    - 0.001
+    batch_size:
+    - 16
+    epochs:
+    - 30
+    sequence_length:
+    - 10
+    training_loss:
+    - mae
+    forecast_horizon:
+    - 10
+  chronos: {}
+  tiny_time_mixer: {}
+  moirai: {}
+  moirai_moe: {}
+  moment: {}
+  timesfm: {}
+  lagllama: {}
+  toto: {}
+  tabpfn: {}

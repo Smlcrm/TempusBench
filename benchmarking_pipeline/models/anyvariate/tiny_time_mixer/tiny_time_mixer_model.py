@@ -106,21 +106,30 @@ class TinyTimeMixerModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        # Construct DataFrame
-        columns = list(range(y_context.shape[1]))
+        # Handle (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
+            
+        num_series, timesteps = y_context.shape
 
+        # Construct DataFrame - Tiny Time Mixer expects (timesteps, num_series)
+        columns = list(range(num_series))
         timestamps_context = self.convert_to_datetimeindex(timestamps_context)
 
-        df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
+        # Transpose to (timesteps, num_series) for Tiny Time Mixer
+        df = pd.DataFrame(y_context.T, index=timestamps_context, columns=columns)
 
         results = self._sub_predict(df, forecast_horizon)
         results = np.asarray(results)
-        # if len(list(results.keys())) == 1:
-        #     return np.array(results["1"])
-        # else:
-        #     multivariate_values = []
-        #     for key in results.keys():
-        #         multivariate_values.append(results[key])
+        
+        # Convert to (num_series, forecast_horizon) format
+        if results.ndim == 1:
+            # Univariate case
+            results = results.reshape(1, -1)
+        elif results.ndim == 2 and results.shape[0] == forecast_horizon:
+            # Results are (forecast_horizon, num_series), transpose to (num_series, forecast_horizon)
+            results = results.T
+        
         return results
 
     def _sub_predict(self, dataframe: pd.DataFrame, forecast_horizon):

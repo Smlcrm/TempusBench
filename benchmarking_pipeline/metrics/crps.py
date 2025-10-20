@@ -56,8 +56,8 @@ class CRPS:
             else:
                 term2 = np.zeros_like(term1)
 
-            # Return CRPS for each timestep (not the mean)
-            return term1 - term2
+            # Return mean CRPS across all timesteps
+            return np.mean(term1 - term2)
 
         elif y_true.ndim == 2:  # Multivariate: (n_timesteps, num_targets)
             # y_s shape: (n_timesteps, num_targets, n_samples) from test
@@ -86,7 +86,8 @@ class CRPS:
                 # Mean CRPS for this target
                 crps_per_series.append(np.mean(term1 - term2))
 
-            return np.array(crps_per_series)
+            # Return mean CRPS across all targets
+            return np.mean(crps_per_series)
 
         else:
             raise ValueError(f"y_true must be 1D or 2D array, got {y_true.ndim}D")

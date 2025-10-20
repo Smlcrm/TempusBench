@@ -3,10 +3,16 @@ import torch
 import numpy as np
 import pandas as pd
 import re
+import sys
 
-from .toto.model.toto import Toto
-from .toto.data.util.dataset import MaskedTimeseries
-from .toto.inference.forecaster import TotoForecaster
+# Add the toto directory to the Python path
+toto_dir = os.path.dirname(os.path.abspath(__file__))
+if toto_dir not in sys.path:
+    sys.path.insert(0, toto_dir)
+
+from toto.model.toto import Toto
+from toto.data.util.dataset import MaskedTimeseries
+from toto.inference.forecaster import TotoForecaster
 from benchmarking_pipeline.models.base_model import BaseModel
 from typing import Optional, Union, Dict, Any
 
@@ -79,21 +85,37 @@ class TotoModel(BaseModel):
             np.ndarray: Model predictions with shape (prediction_length,)
         """
 
-        forecast_horizon, num_variates = timestamps_target.shape
+        forecast_horizon = timestamps_target.shape[0]
+        
+        # Handle (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
+            
+        num_series, timesteps = y_context.shape
 
+        # Convert datetime to numeric (nanoseconds since epoch)
+        if timestamps_context.dtype.kind == 'M':  # datetime64
+            timestamps_context = timestamps_context.astype('datetime64[ns]').astype('int64')
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
 
-        y_context = torch.tensor(y_context.T, dtype=torch.float)
-        timestamps_context = torch.tensor(timestamps_context.T, dtype=torch.float)
+        # Toto expects (channels, time_steps) format
+        y_context = torch.tensor(y_context, dtype=torch.float)  # (num_series, timesteps)
+        # timestamps_context is 1D, so we need to expand it to match y_context shape
+        timestamps_context = torch.tensor(timestamps_context, dtype=torch.float)  # (timesteps,)
+        timestamps_context = timestamps_context.unsqueeze(0).expand(num_series, timesteps)  # (num_series, timesteps)
         time_diff = self.freq_to_seconds(freq)
 
         # Create a MaskedTimeseries object
+        # Ensure all tensors have the same shape (channels, time_steps)
+        padding_mask = torch.full_like(y_context, True, dtype=torch.bool)
+        id_mask = torch.zeros_like(y_context, dtype=torch.float)
+        
         inputs = MaskedTimeseries(
             series=y_context,
-            padding_mask=torch.full_like(y_context, True, dtype=torch.bool),
-            id_mask=torch.zeros_like(y_context, dtype=torch.float),
+            padding_mask=padding_mask,
+            id_mask=id_mask,
             timestamp_seconds=timestamps_context,
-            time_interval_seconds=torch.full((num_variates,), time_diff, dtype=torch.float),
+            time_interval_seconds=torch.full((num_series,), time_diff, dtype=torch.float),
         )
 
         # Generate forecasts for the next 336 timesteps
@@ -107,6 +129,9 @@ class TotoModel(BaseModel):
         forecast_samples = np.squeeze(np.asarray(forecast.samples), axis=0)
 
         forecast = np.mean(forecast_samples, axis=-1).T
+        
+        # Return in (num_series, forecast_horizon) format
+        # forecast is already (num_series, forecast_horizon) from the transpose
 
         return forecast
 

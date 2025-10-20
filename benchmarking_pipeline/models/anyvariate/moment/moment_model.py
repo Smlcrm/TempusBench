@@ -146,6 +146,15 @@ class MomentModel(BaseModel):
         """
 
         forecast_horizon = timestamps_target.shape[0]
+        
+        # Handle (num_series, timesteps) format
+        if y_context.ndim == 1:
+            y_context = y_context.reshape(1, -1)
+            
+        num_series, timesteps = y_context.shape
+        
+        # Moment expects (timesteps, features) format
+        y_context = y_context.T  # Transpose to (timesteps, num_series)
         num_y_features = y_context.shape[1]
         self.model_config["num_y_features"] = num_y_features
 
@@ -162,8 +171,9 @@ class MomentModel(BaseModel):
             if y_context.shape[0] >= self.model_config["context_length"]:
                 y_context = y_context[-self.model_config["context_length"] :, :]
             else:
-                padding = np.zeros(self.model_config["context_length"] - len(y_context))
-                padding = np.expand_dims(padding, axis=1)
+                # Create padding with correct shape (context_length - current_length, num_series)
+                padding_length = self.model_config["context_length"] - y_context.shape[0]
+                padding = np.zeros((padding_length, y_context.shape[1]))
                 y_context = np.concatenate([padding, y_context], axis=0)
                 warnings.warn(
                     f"Time Series is shorter than context_length {self.model_config['context_length']}. "
@@ -196,5 +206,8 @@ class MomentModel(BaseModel):
             forecast_scaled = output.forecast.cpu().numpy()
             forecast = self.scaler.inverse_transform(forecast_scaled[0, :, :].T)
             # forecast = forecast_scaled[0, :, :].T
+            
+            # Return in (num_series, forecast_horizon) format
+            # forecast is already (num_series, forecast_horizon) from the inverse transform
 
         return forecast

@@ -9,6 +9,7 @@ import numpy as np
 from scipy import stats
 from typing import Optional, Dict, Any, Union
 from datetime import datetime
+from ..utils.logger import Logger
 
 class Visualizer:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -19,6 +20,7 @@ class Visualizer:
             config (dict, optional): Configuration dictionary with visualization parameters.
         """
         self.config = config if config is not None else {}
+        self.logger = Logger(log_dir='logs', name='Visualizer')
         # Use a built-in style instead of seaborn
         plt.style.use('fivethirtyeight')
         # Set seaborn style separately
@@ -90,7 +92,7 @@ class Visualizer:
         # Save plot if path provided
         if save_path:
             plt.savefig(save_path)
-            print(f"Plot saved to {save_path}")
+            self.logger.info(f"Plot saved to {save_path}")
             
         plt.show()
         
@@ -138,6 +140,6 @@ class Visualizer:
         # Save plot if path provided
         if save_path:
             plt.savefig(save_path)
-            print(f"Plot saved to {save_path}")
+            self.logger.info(f"Plot saved to {save_path}")
             
         plt.show() 

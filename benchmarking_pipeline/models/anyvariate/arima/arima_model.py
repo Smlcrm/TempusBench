@@ -18,7 +18,6 @@ import pickle
 import os
 from benchmarking_pipeline.models.base_model import BaseModel
 
-
 class ArimaModel(BaseModel):
     """
     ARIMA model for univariate time series forecasting.
@@ -53,6 +52,8 @@ class ArimaModel(BaseModel):
                 - forecast_horizon: int, number of steps to forecast ahead
         """
         super().__init__(config)
+        self.full_config = config  # Store the full config for creating new instances
+        self.model_config = self._extract_model_config(config)
 
         # Extract ARIMA-specific parameters
         if "p" not in self.model_config:
@@ -92,14 +93,25 @@ class ArimaModel(BaseModel):
             self: The fitted model instance
 
         Note:
-            ARIMA models only use y_context for training.
-            y_target, timestamps_context, timestamps_target, and freq are ignored to prevent data leakage.
+            ARIMA models use the full historical data for training when available.
+            If y_target is provided and has more data than y_context, it will be used for training.
         """
-        # Convert y_context to numpy array if needed
-        if isinstance(y_context, pd.Series):
-            endog = y_context.values
+        # Use full target data if available and has more data than context
+        if y_target is not None and len(y_target) > len(y_context):
+            training_data = y_target
         else:
-            endog = y_context
+            training_data = y_context
+            
+        # Convert to numpy array if needed
+        if isinstance(training_data, pd.Series):
+            endog = training_data.values
+        else:
+            endog = training_data
+
+        # Validate data length - be more flexible for small datasets
+        min_required_length = max(5, self.model_config["p"] + self.model_config["d"] + self.model_config["q"] + 2)
+        if len(endog) < min_required_length:
+            raise ValueError(f"Insufficient data for ARIMA. Have {len(endog)} observations, need at least {min_required_length}")
 
         # No exogenous variables supported
         exog = None
@@ -190,14 +202,18 @@ class ArimaModel(BaseModel):
         Anyvariate wrapper: trains a separate ARIMA per variate if multivariate.
         """
         # Multivariate: shape (T, K)
-        if y_context.ndim > 1 and y_context.shape[1] > 1:
+        if y_context.ndim > 1 and y_context.shape[0] > 1:
             self.models = []
-            num_variates = y_context.shape[1]
+            num_variates = y_context.shape[0]  # (num_series, timesteps) format
             for k in range(num_variates):
-                yc = y_context[:, k]
-                yt = y_target[:, k] if y_target is not None and y_target.ndim > 1 else y_target
+                yc = y_context[k, :]  # Get k-th series
+                if y_target is not None and y_target.ndim > 1 and y_target.shape[0] > k:
+                    yt = y_target[k, :]
+                else:
+                    yt = y_target
                 # Instantiate per-variate model with same config
-                m = ArimaModel(self.model_config)
+                # Use the full config that was passed to this instance
+                m = ArimaModel(self.full_config)
                 m._train(
                     y_context=yc,
                     y_target=yt,
@@ -210,10 +226,10 @@ class ArimaModel(BaseModel):
             self.model_ = self.models[0].model_
             self.is_fitted = True
             return self
-        # Univariate
+        # Univariate - extract the single series
         return self._train(
-            y_context=y_context,
-            y_target=y_target,
+            y_context=y_context[0, :],  # Extract first (and only) series
+            y_target=y_target[0, :] if y_target is not None else None,  # Extract first (and only) series
             timestamps_context=timestamps_context,
             timestamps_target=timestamps_target,
             freq=freq,

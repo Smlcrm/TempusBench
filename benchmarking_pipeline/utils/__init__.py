@@ -5,11 +5,9 @@ This package contains various utility functions and classes that support
 the main pipeline functionality.
 """
 
-from .config_validator import ConfigValidator, ConfigValidationError, validate_config_file, validate_config_dict
+from .config_validator import ConfigValidationError, validate_config_file
 
 __all__ = [
-    'ConfigValidator',
-    'ConfigValidationError', 
-    'validate_config_file',
-    'validate_config_dict'
+    'ConfigValidationError',
+    'validate_config_file'
 ]

@@ -25,17 +25,34 @@ class MASE:
         y_train = kwargs.get("y_train")
         seasonal_period = kwargs.get("seasonal_period", 1)
 
-        # Check if training data is long enough for seasonal lag
-        if len(y_train) <= seasonal_period:
+        # Check if training data is provided and long enough for seasonal lag
+        if y_train is None:
             return np.nan
+        
+        # For 2D arrays, check the time dimension (axis 1), for 1D arrays check the length
+        if y_train.ndim == 2:
+            if y_train.shape[1] <= seasonal_period:
+                return np.nan
+        else:
+            if len(y_train) <= seasonal_period:
+                return np.nan
 
         # Forecast errors
         forecast_errors = np.abs(y_true - y_pred)
 
-        # Naive seasonal errors using np.diff
-        naive_errors = np.mean(
-            np.abs(np.diff(y_train, n=seasonal_period, axis=0)), axis=0, keepdims=True
-        )
+        # Handle both 1D and 2D arrays
+        if y_train.ndim == 1:
+            # 1D case: single time series
+            naive_errors = np.mean(np.abs(np.diff(y_train, n=seasonal_period)))
+        else:
+            # 2D case: multiple time series (num_series, time_steps)
+            # Calculate naive errors for each series and take the mean
+            naive_errors_per_series = []
+            for i in range(y_train.shape[0]):
+                series_naive_errors = np.mean(np.abs(np.diff(y_train[i, :], n=seasonal_period)))
+                naive_errors_per_series.append(series_naive_errors)
+            naive_errors = np.mean(naive_errors_per_series)
+        
         epsilon = 1e-10  # stability term
 
         return np.mean(forecast_errors / (naive_errors + epsilon))

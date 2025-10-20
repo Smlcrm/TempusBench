@@ -48,7 +48,7 @@ class BaseModel(ABC):
         """
 
         self.model_config = config
-        self.training_loss = config.get("training_loss", "mae")
+        self.training_loss = config["task"]["tuning_loss"]
 
         # Determine forecast horizon from model configuration keys if present
         # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
@@ -138,8 +138,8 @@ class BaseModel(ABC):
         self,
         y_true: np.ndarray,
         y_pred: np.ndarray,
-        loss_function: str = None,
         y_train: np.ndarray = None,
+        **kwargs
     ) -> Dict[str, float]:
         """
         Compute all loss metrics between true and predicted values using the Evaluator class.
@@ -149,7 +149,6 @@ class BaseModel(ABC):
         Args:
             y_true: True target values
             y_pred: Predicted values
-            loss_function: Name of the loss function to use (defaults to training_loss)
             y_train: Training target values (required for MASE calculation)
 
         Returns:
@@ -163,31 +162,36 @@ class BaseModel(ABC):
         if y_train is not None and isinstance(y_train, pd.Series):
             y_train = y_train.values
 
-        # Handle shape mismatches
-        if y_pred.ndim == 2 and y_true.ndim == 1:
-            # If predictions are 2D and true values are 1D, flatten predictions
-            if y_pred.shape[0] == 1:
-                # Single prediction row, flatten it
-                y_pred = y_pred.flatten()
-            elif y_pred.shape[1] == 1:
-                # Single prediction column, flatten it
-                y_pred = y_pred.flatten()
-            else:
-                # Multiple predictions, take the first row
-                y_pred = y_pred[0]
-
-        # Ensure both arrays have the same length
-        min_length = min(len(y_true), len(y_pred))
-        y_true = y_true[:min_length]
-        y_pred = y_pred[:min_length]
+        # Handle shape mismatches - ensure consistent 2D format (num_series, time_steps)
+        # Convert 1D arrays to 2D (1, time_steps)
+        if y_true.ndim == 1:
+            y_true = y_true.reshape(1, -1)
+        if y_pred.ndim == 1:
+            y_pred = y_pred.reshape(1, -1)
+        
+        # Now both should be 2D (num_series, time_steps)
+        # Handle case where predictions are (1, time_steps) but true values are (num_series, time_steps)
+        if y_pred.shape[0] == 1 and y_true.shape[0] > 1:
+            # Broadcast predictions to match number of series
+            y_pred = np.tile(y_pred, (y_true.shape[0], 1))
+        
+        # Handle case where true values are (1, time_steps) but predictions are (num_series, time_steps)
+        if y_true.shape[0] == 1 and y_pred.shape[0] > 1:
+            # Broadcast true values to match number of series
+            y_true = np.tile(y_true, (y_pred.shape[0], 1))
+        
+        # Ensure both arrays have the same time_steps dimension
+        min_time_steps = min(y_true.shape[1], y_pred.shape[1])
+        y_true = y_true[:, :min_time_steps]
+        y_pred = y_pred[:, :min_time_steps]
 
         # Store for TensorBoard logging
         self._last_y_true = y_true
         self._last_y_pred = y_pred
 
         # Use evaluator to compute evaluation metrics (from evaluation.metrics)
-        # Pass y_train for metrics like MASE that require it
-        return self.evaluator.evaluate(y_pred, y_true, y_train=y_train)
+        # Pass y_train for metrics like MASE that require it, and other kwargs like freq
+        return self.evaluator.evaluate(y_pred, y_true, y_train=y_train, **kwargs)
 
     def evaluate(
         self, X: Union[pd.DataFrame, np.ndarray], y: Union[pd.Series, np.ndarray]
