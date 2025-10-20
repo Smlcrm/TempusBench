@@ -48,6 +48,9 @@ class BaseModel(ABC):
         """
         # Store the full configuration for evaluator and global settings
         self.config = config
+        
+        # Store scaler for inverse transformation (set by external code)
+        self.scaler = None
 
         # Enforce: model_config must be exactly one selected hyper-parameter set (dict)
         self.model_config = self._extract_model_config_strict(config)
@@ -213,6 +216,19 @@ class BaseModel(ABC):
         self.model_config.update(params)
         self.is_fitted = False  # Mark as unfitted if parameters change
 
+        return self
+
+    def set_scaler(self, scaler) -> "BaseModel":
+        """
+        Set the scaler for inverse transformation of predictions.
+
+        Args:
+            scaler: Scaler instance (e.g., StandardScaler) used for normalization
+
+        Returns:
+            self: The model instance with updated scaler
+        """
+        self.scaler = scaler
         return self
 
     # def save(self, path: str) -> None:

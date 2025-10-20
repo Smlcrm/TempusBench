@@ -117,6 +117,10 @@ class ModelExecutor:
                             # Replace the entire model section with only the current model
                             full_config_copy["model"] = {{model_name: params}}
                             model = model_class(full_config_copy)
+                            
+                            # Set the scaler for inverse transformation if available
+                            if hasattr(window, 'scaler') and window.scaler is not None:
+                                model.set_scaler(window.scaler)
 
                             trained_model = model.train(
                                 y_context=target[cstart:cend],
