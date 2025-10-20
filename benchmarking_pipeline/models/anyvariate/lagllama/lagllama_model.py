@@ -186,13 +186,13 @@ class LagllamaModel(BaseModel):
         # Use the internal prediction method
         # results = self._predict_internal(df, forecast_horizon)
         start_time = self.convert_to_datetimeindex(timestamps_context)[0]
-        periods = y_context.shape[0]
+        periods = y_context.shape[1]  # Use timesteps, not num_series
         timestamps = pd.date_range(start=start_time, periods=periods, freq=freq)
 
         # Create series DataFrame
         # Ensure y_context is 1D for single series prediction
         if y_context.ndim > 1:
-            y_context_1d = y_context[:, 0] if y_context.shape[1] > 0 else y_context.flatten()
+            y_context_1d = y_context[0, :] if y_context.shape[0] > 0 else y_context.flatten()
         else:
             y_context_1d = y_context
             

@@ -152,7 +152,11 @@ class ChronosModel(BaseModel):
             num_samples=self.model_config["num_samples"],
         )
         forecasts = np.squeeze(np.asarray(forecasts))
-        forecasts = np.mean(forecasts, axis=0, keepdims=True)
+        forecasts = np.mean(forecasts, axis=0)
+        
+        # Ensure correct shape: (num_series, forecast_horizon)
+        if forecasts.ndim == 1:
+            forecasts = forecasts.reshape(1, -1)  # (1, forecast_horizon)
         
         # Return in (num_series, forecast_horizon) format
         return forecasts

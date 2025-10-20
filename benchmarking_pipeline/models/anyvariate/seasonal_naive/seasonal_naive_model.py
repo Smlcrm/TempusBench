@@ -49,7 +49,7 @@ class SeasonalNaiveModel(BaseModel):
             if "sp" not in self.model_config:
                 raise ValueError("sp must be specified in model_params")
             sp = self.model_config["sp"]
-            
+
             # Handle multivariate data by creating separate models for each time series
             if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
                 num_series = y_context.shape[0]

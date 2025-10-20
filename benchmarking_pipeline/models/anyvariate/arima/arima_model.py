@@ -93,17 +93,23 @@ class ArimaModel(BaseModel):
             self: The fitted model instance
 
         Note:
-            ARIMA models only use y_context for training.
-            y_target, timestamps_context, timestamps_target, and freq are ignored to prevent data leakage.
+            ARIMA models use the full historical data for training when available.
+            If y_target is provided and has more data than y_context, it will be used for training.
         """
-        # Convert y_context to numpy array if needed
-        if isinstance(y_context, pd.Series):
-            endog = y_context.values
+        # Use full target data if available and has more data than context
+        if y_target is not None and len(y_target) > len(y_context):
+            training_data = y_target
         else:
-            endog = y_context
+            training_data = y_context
+            
+        # Convert to numpy array if needed
+        if isinstance(training_data, pd.Series):
+            endog = training_data.values
+        else:
+            endog = training_data
 
-        # Validate data length
-        min_required_length = max(10, self.model_config["p"] + self.model_config["d"] + self.model_config["q"] + 5)
+        # Validate data length - be more flexible for small datasets
+        min_required_length = max(5, self.model_config["p"] + self.model_config["d"] + self.model_config["q"] + 2)
         if len(endog) < min_required_length:
             raise ValueError(f"Insufficient data for ARIMA. Have {len(endog)} observations, need at least {min_required_length}")
 

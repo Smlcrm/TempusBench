@@ -6,7 +6,7 @@ task:
   tuning_loss: mae # hyper-parameter tuning
   dataset:
     name: "*"
-    normalize: false
+    normalize: true
     handle_missing: interpolate
 
 evaluation: # Reported evals

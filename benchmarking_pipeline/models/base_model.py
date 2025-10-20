@@ -139,7 +139,7 @@ class BaseModel(ABC):
         y_true: np.ndarray,
         y_pred: np.ndarray,
         y_train: np.ndarray = None,
-        freq: str = None,
+        **kwargs
     ) -> Dict[str, float]:
         """
         Compute all loss metrics between true and predicted values using the Evaluator class.
@@ -190,8 +190,8 @@ class BaseModel(ABC):
         self._last_y_pred = y_pred
 
         # Use evaluator to compute evaluation metrics (from evaluation.metrics)
-        # Pass y_train for metrics like MASE that require it, and freq for seasonal period calculation
-        return self.evaluator.evaluate(y_pred, y_true, y_train=y_train, freq=freq)
+        # Pass y_train for metrics like MASE that require it, and other kwargs like freq
+        return self.evaluator.evaluate(y_pred, y_true, y_train=y_train, **kwargs)
 
     def evaluate(
         self, X: Union[pd.DataFrame, np.ndarray], y: Union[pd.Series, np.ndarray]

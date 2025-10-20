@@ -75,6 +75,11 @@ class SVRModel(BaseModel):
             y_series = y_series.reshape(1, -1)
         
         num_series, timesteps = y_series.shape
+        
+        # Validate data length
+        min_required_length = lookback_window + forecast_horizon
+        if timesteps < min_required_length:
+            raise ValueError(f"Not enough data for SVR. Have {timesteps} observations, need at least {min_required_length}")
 
         for i in range(timesteps - lookback_window - forecast_horizon + 1):
             # Extract lookback window for all series
@@ -101,7 +106,7 @@ class SVRModel(BaseModel):
         """
         Train the SVR model for direct multi-output forecasting using MultiOutputRegressor.
         """
-        if not self.is_fitted is None:
+        if self.is_fitted is None:
             self._build_model()
 
         # Combine context and target for full training series if y_target is provided
@@ -109,13 +114,16 @@ class SVRModel(BaseModel):
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
         y_series = np.concatenate([y_context, y_target], axis=1)
+        
+        print(f"SVR training data shape: {y_series.shape}")
+        print(f"Lookback window: {lookback_window}")
+        print(f"Forecast horizon: {forecast_horizon}")
 
         X, y = self._create_features_targets(y_series)
 
-        # Scale features (time index is not used; features are lagged values)
-        # self.scaler.fit(X)
-        # X_scaled = self.scaler.transform(X)
-        X_scaled = X
+        # Scale features (SVR is sensitive to feature scaling)
+        self.scaler.fit(X)
+        X_scaled = self.scaler.transform(X)
         self.model.fit(X_scaled, y)
         self.is_fitted = True
 

@@ -43,6 +43,7 @@ class Task(BaseModel):
     forecast_horizon: int = Field(..., ge=1, le=128, description="Forecast horizon (max 128)")
     context_window: int = Field(..., ge=1, description="Context window size")
     max_windows: int = Field(..., ge=1, description="Maximum number of windows to generate")
+    max_num_variates: int = Field(..., ge=1, description="Maximum number of variates to extract from dataset")
     tuning_loss: str = Field(..., description="Single metric for hyperparameter tuning, must be compatible with task type")
     dataset: Dataset = Field(..., description="Dataset configuration")
 

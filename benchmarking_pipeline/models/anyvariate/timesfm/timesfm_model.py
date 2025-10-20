@@ -64,7 +64,7 @@ class TimesFMModel(BaseModel):
         forecasts = self.model.forecast(y_context)[0]
         # print(forecasts)
         if len(forecasts) == 1:
-            forecasts = np.expand_dims(forecasts)
+            forecasts = np.expand_dims(forecasts, axis=0)
 
         forecasts = forecasts[:forecast_horizon]
 
