@@ -17,33 +17,22 @@ class CondaEnvManager:
         self.python_version = python
         self.requirements_path = requirements_path
 
-        # Check if the conda environment already exists and has the package installed
-        version_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version",
+        # Check if the conda environment already exists and has tempus_bench installed
+        check_result = subprocess.run(
+            f"conda run -n {self.env_name} python --version && conda run -n {self.env_name} python -c 'import tempus_bench'",
             shell=True, executable="/bin/bash",
             capture_output=True, text=True
         )
 
-        if version_result.returncode == 0 and "Python" in version_result.stdout:
-            self.python_version = version_result.stdout.strip().split()[-1]
-            # Check if tempus_bench is installed
-            package_check = subprocess.run(
-                f"conda run -n {self.env_name} python -c 'import tempus_bench'",
-                shell=True, executable="/bin/bash",
-                capture_output=True, text=True
-            )
-            if package_check.returncode == 0:
-                self._env_created = True; self._installed = True
-            else:
-                # Environment exists but package not installed, install it
-                self._env_created = True; self._installed = False
-                result = subprocess.run([
-                    "conda", "run", "-n", self.env_name, "pip", "install", "-e", ROOT_DIR,
-                ], capture_output=True, text=True)
-                if result.returncode != 0:
-                    raise RuntimeError(f"Failed to install tempus_bench in conda environment {self.env_name}: {result.stderr}")
-                self.install(self.requirements_path)
+        if check_result.returncode == 0 and "Python" in check_result.stdout:
+            for line in check_result.stdout.split('\n'):
+                if "Python" in line:
+                    self.python_version = line.strip().split("Python")[-1].strip()
+                    break
+            self._env_created = True
+            self._installed = True
         else:
+            # Environment doesn't exist or tempus_bench not installed
             self.create_env()
             self.install(self.requirements_path)
 
@@ -58,18 +47,18 @@ class CondaEnvManager:
         result = subprocess.run([
             "conda", "create", "-y", "-n", self.env_name, f"python={self.python_version}"
         ], capture_output=True, text=True)
-        
+
         if result.returncode != 0:
             raise RuntimeError(f"Failed to create conda environment {self.env_name}: {result.stderr}")
-        
+
         # Install tempus_bench package
         result = subprocess.run([
             "conda", "run", "-n", self.env_name, "pip", "install", "-e", ROOT_DIR,
         ], capture_output=True, text=True)
-        
+
         if result.returncode != 0:
             raise RuntimeError(f"Failed to install tempus_bench in conda environment {self.env_name}: {result.stderr}")
-        
+
         self._env_created = True
 
     def install(self, requirements_path: str):
@@ -79,7 +68,7 @@ class CondaEnvManager:
         result = subprocess.run([
             "conda", "run", "-n", self.env_name, "pip", "install", "-r", requirements_path
         ], capture_output=True, text=True)
-        
+
         if result.returncode != 0:
             raise RuntimeError(f"Failed to install requirements {requirements_path} in conda environment {self.env_name}: {result.stderr}")
 
@@ -96,7 +85,7 @@ class CondaEnvManager:
         result = subprocess.run([
             "conda", "run", "-n", self.env_name, "python", script, args
         ], capture_output=True, text=True)
-        
+
         if result.returncode != 0:
             error_msg = (
                 f"Failed to run script ({script}) in conda env ({self.env_name}).\n"
@@ -105,7 +94,7 @@ class CondaEnvManager:
                 f"Standard Error:\n{result.stderr}"
             )
             raise RuntimeError(error_msg)
-        
+
         return result
 
     def delete(self):

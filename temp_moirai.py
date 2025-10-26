@@ -28,7 +28,7 @@ class MoiraiModel(BaseModel):
         # Set reasonable defaults for all model-specific parameters if not provided in config
         # As in https://arxiv.org/pdf/2402.02592
         self.model_config["model_name"] = "moirai"
-        self.model_config["size"] = self.model_config.get("size", "small")
+        self.model_config["size"] = self.model_config.get("size")
         self.model_config["ctx"] = None
         self.model_config["psz"] = 16
         self.model_config["bsz"] = 32

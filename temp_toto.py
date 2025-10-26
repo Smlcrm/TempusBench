@@ -209,7 +209,7 @@ class TotoModel(BaseModel):
             "sec.": "s",
         }
 
-        unit = aliases.get(unit, unit)  # fold alias
+        unit = aliases.get(unit)
 
         # Seconds per unit (months/years use astronomical averages)
         SECS = {

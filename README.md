@@ -33,7 +33,7 @@ tempus_bench/
 ├── metrics/                   # Evaluation metrics
 │   ├── __init__.py
 │   ├── crps.py              # Continuous Ranked Probability Score
-│   ├── interval_score.py    # Interval score for prediction intervals
+│   ├── weighted_interval_score.py    # Weighted interval score for prediction intervals
 │   └── ... (other metrics)
 ├── models/                    # Model implementations
 │   ├── __init__.py
@@ -62,7 +62,7 @@ tempus_bench/
 │   ├── evaluation.py        # Model evaluation (moved to metrics/)
 │   ├── logger.py            # Logging and metrics storage
 │   ├── preprocessor.py      # Data preprocessing
-│   ├── trainer.py           # Model training and hyperparameter tuning
+│   ├── model_executor.py    # Model execution in isolated environments
 │   ├── visualizer.py        # Plots and visualizations
 │   └── ... (other components)
 ├── trainer/                   # Training utilities
@@ -215,7 +215,7 @@ evaluation:
 ### Basic Usage
 
 ```python
-from tempus_bench.pipeline import DataLoader, Trainer
+from tempus_bench.pipeline import DataLoader, ModelExecutor
 from tempus_bench.models import model_router
 
 # Load configuration
@@ -228,8 +228,8 @@ data_loader = DataLoader(config)
 datasets = data_loader.load_several_chunks(3)
 
 # Train and evaluate models
-trainer = Trainer(config)
-results = trainer.run_benchmark(datasets)
+model_executor = ModelExecutor(config_path, run_dir, datasets_dir)
+results = model_executor.execute_model(model_name, hyperparameters, context_steps, train_steps, validate_steps, dataset_path, window_idx)
 ```
 
 ### Command Line Interface
