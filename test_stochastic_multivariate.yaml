@@ -9,8 +9,8 @@ task:
 evaluation:
   metrics: [crps, quantile_score, weighted_interval_score, mae, rmse]
   tuning_loss: mae
-  max_windows: 20
-  max_num_variates: 10
+  max_windows: 3
+  max_num_variates: 5
 model:
   moirai: {}
 logging:
