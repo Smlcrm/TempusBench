@@ -16,6 +16,9 @@ evaluation:
   tuning_loss: mae
   max_windows: 5
   max_num_variates: 2
+  num_samples: 100
+  num_quantiles: 10
+  point_forecast_statistic: mean
 model:
   chronos: {}
   deepar: {}
