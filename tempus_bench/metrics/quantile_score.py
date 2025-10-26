@@ -25,6 +25,11 @@ class QuantileScore:
 
         if task_type != 'stochastic':
             raise ValueError(f"QuantileScore can only be used with 'stochastic' task_type, got '{task_type}'.")
+
+        S, T, M = y_pred.shape
+        if y_true.shape != (T, M):
+            raise ValueError(f"Shape mismatch: y_true has shape {y_true.shape}, but expected ({T}, {M}) to match y_pred (num_samples={S}, time_steps={T}, num_targets={M})")
+
         rho = lambda u, tau: np.maximum(tau * u, (tau - 1) * u)
         QS = np.zeros(y_true.shape)
         for tau in np.arange(0.0, 1.1, 0.1):
