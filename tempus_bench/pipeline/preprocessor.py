@@ -21,9 +21,15 @@ class Preprocessor:
                 Supports: normalize, handle_missing, max_num_variates.
         """
         self.config = config
-        self.normalize = config.get('task', {}).get('dataset', {}).get('normalize', False)
-        self.handle_missing = config.get('task', {}).get('dataset', {}).get('handle_missing', 'interpolate')
-        self.max_num_variates = config.get('evaluation', {}).get('max_num_variates', None)
+        
+        # Extract configuration values without defaults
+        task_config = config.get('task')
+        dataset_config = task_config.get('dataset')
+        evaluation_config = config.get('evaluation')
+        
+        self.normalize = dataset_config.get('normalize')
+        self.handle_missing = dataset_config.get('handle_missing')
+        self.max_num_variates = evaluation_config.get('max_num_variates')
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """
@@ -33,7 +39,7 @@ class Preprocessor:
             target_raw: Raw target data as string (JSON-like array format)
 
         Returns:
-            Cleaned numpy array in (num_steps, num_features) format
+            Cleaned numpy array in (num_steps, num_targets) format
         """
         # Clean the target string to handle empty values before parsing
         print(f"[DEBUG] Raw target string length: {len(target_raw)}")
@@ -86,7 +92,7 @@ class Preprocessor:
                     print(f"[DEBUG] Row {i} first value: {target_cleaned[-1][0]}")
             target = np.array(target_cleaned)  # shape (num_steps, 1)
         else:
-            # It is a list of lists: [[feature1], [feature2], ...] -> shape (num_features, num_steps)
+            # It is a list of lists: [[feature1], [feature2], ...] -> shape (num_targets, num_steps)
             # We'll treat each sublist as one feature, and transpose after cleaning
             cleaned_features = []
             for fi, feature_seq in enumerate(target_parsed):
@@ -102,10 +108,10 @@ class Preprocessor:
                     if fi < 2 and ti < 3:
                         print(f"[DEBUG] Feature {fi}, time {ti}, value: {cleaned_seq[-1]}")
                 cleaned_features.append(cleaned_seq)
-            # Transpose: (num_features, num_steps) -> (num_steps, num_features)
+            # Transpose: (num_targets, num_steps) -> (num_steps, num_targets)
             target = np.array(cleaned_features, dtype=float).T
 
-        print(f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_features))")
+        print(f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_targets))")
         print(f"[DEBUG] Target dtype: {target.dtype}")
         print(f"[DEBUG] NaN count: {np.isnan(target).sum()}")
 
@@ -116,16 +122,16 @@ class Preprocessor:
         Handle missing values in the ndarray and return cleaned data with corresponding timestamps.
 
         Args:
-            arr: Input array to clean, shape (num_steps, num_features)
+            arr: Input array to clean, shape (num_steps, num_targets)
             start: Start time as string
             freq: Frequency as string
 
         Returns:
             Tuple of (timestamps, cleaned_array)
                 - timestamps: shape (num_steps,)
-                - cleaned_array: shape (num_steps, num_features)
+                - cleaned_array: shape (num_steps, num_targets)
         """
-        # Input requirement: arr shape (num_steps, num_features)
+        # Input requirement: arr shape (num_steps, num_targets)
         num_steps = arr.shape[0]
         # Generate timestamps for each step (length = num_steps)
         # Map deprecated frequency strings to new ones
@@ -134,7 +140,7 @@ class Preprocessor:
             'Q': 'QE',  # Quarterly -> Quarter End
             'A': 'YE',  # Annual -> Year End
         }
-        mapped_freq = freq_mapping.get(freq, freq)
+        mapped_freq = freq_mapping.get(freq)
         timestamps = pd.date_range(start=start, periods=num_steps, freq=mapped_freq).to_numpy()
 
         # Convert to float and handle None
@@ -240,7 +246,7 @@ class Preprocessor:
         Cap the number of features (variates/columns) to max_num_variates if specified.
 
         Args:
-            target: Target array in (num_steps, num_features) format
+            target: Target array in (num_steps, num_targets) format
 
         Returns:
             Target array with capped number of features
@@ -249,7 +255,7 @@ class Preprocessor:
             return target
 
         if target.shape[1] > self.max_num_variates:
-            print(f"[DEBUG] Capping num_features from {target.shape[1]} to {self.max_num_variates}")
+            print(f"[DEBUG] Capping num_targets from {target.shape[1]} to {self.max_num_variates}")
             target = target[:, :self.max_num_variates]
             print(f"[DEBUG] After capping, target shape: {target.shape}")
 
@@ -266,7 +272,7 @@ class Preprocessor:
 
         Returns:
             Tuple of (timestamps, time_start, freq, target) - cleaned timestamps, time_start, freq, and target
-            Where target is a 2D ndarray of shape (num_steps, num_features)
+            Where target is a 2D ndarray of shape (num_steps, num_targets)
         """
         print(f"[DEBUG] Starting preprocessor.clean() with time_start={time_start}, freq={freq}")
 
@@ -279,9 +285,9 @@ class Preprocessor:
 
         print(f"[DEBUG] After parsing, target shape: {target.shape}")
 
-        # Target is already in desired shape (num_steps, num_features)
+        # Target is already in desired shape (num_steps, num_targets)
         if target.ndim != 2:
-            raise ValueError(f"Target array must be 2D (num_steps, num_features), got shape: {target.shape}")
+            raise ValueError(f"Target array must be 2D (num_steps, num_targets), got shape: {target.shape}")
 
         # 2. Cap the number of variates/features if specified
         target = self._cap_variates(target)
@@ -300,7 +306,7 @@ class Preprocessor:
             'Q': 'QE',  # Quarterly -> Quarter End
             'A': 'YE',  # Annual -> Year End
         }
-        mapped_freq = freq_mapping.get(freq, freq)
+        mapped_freq = freq_mapping.get(freq)
         
         try:
             pd.date_range(start=time_start, periods=2, freq=mapped_freq)
@@ -317,7 +323,7 @@ class Preprocessor:
         scaler = None
         if self.normalize:
             print(f"[DEBUG] Normalizing data...")
-            # target_cleaned: (num_steps, num_features)
+            # target_cleaned: (num_steps, num_targets)
             scaler = StandardScaler()
             target_cleaned = scaler.fit_transform(target_cleaned)
             print(f"[DEBUG] After normalization, target shape: {target_cleaned.shape}")
