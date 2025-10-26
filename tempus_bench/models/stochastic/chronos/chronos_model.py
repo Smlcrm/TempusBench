@@ -9,6 +9,7 @@ The model supports multiple sizes (tiny, mini, small, base, large) and can be co
 with different context lengths and sampling strategies.
 """
 
+import pdb
 import pandas as pd
 import numpy as np
 import torch
@@ -98,10 +99,10 @@ class ChronosModel(StochasticBaseModel):
 
     def predict(
         self,
-        y_context: np.ndarray = None,
-        timestamps_context: np.ndarray = None,
-        timestamps_target: np.ndarray = None,
-        freq: str = None,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        freq: str,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -116,7 +117,7 @@ class ChronosModel(StochasticBaseModel):
             **kwargs: Additional keyword arguments
 
         Returns:
-            np.ndarray: Model prediction samples with shape (num_samples, forecast_horizon, num_targets)
+            np.ndarray: Model predictions
 
         Raises:
             ValueError: If model is not fitted or required data is missing
@@ -141,15 +142,15 @@ class ChronosModel(StochasticBaseModel):
         forecasts = self.model.predict(
             context=y_context,
             prediction_length=forecast_horizon,
-            num_samples=self.num_samples,
+            num_samples=self.config["evaluation"]["num_samples"],
         )
-        forecasts = np.squeeze(np.asarray(forecasts))
+        self.logger.debug("ChronosModel", f"Shape of Stochastic Forecasts {forecasts.shape}")
+        forecasts = np.asarray(forecasts)
         
-        # Ensure correct shape: (num_samples, forecast_horizon, num_targets)
-        if forecasts.ndim == 2:
-            # If univariate, add target dimension
-            forecasts = forecasts[:, :, np.newaxis]
-        
+        # Chronos returns shape (num_targets, num_samples, forecast_horizon)
+        # We need to transpose to (num_samples, forecast_horizon, num_targets)
+        forecasts = np.transpose(forecasts, (1, 2, 0))
+
         return forecasts
 
     def get_model_summary(self) -> Dict[str, Any]:
