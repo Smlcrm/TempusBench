@@ -1,0 +1,26 @@
+task:
+  task_type: stochastic
+  forecast_horizon: 128
+  context_window: 512
+  max_windows: 20
+  max_num_variates: 10
+  dataset:
+    name: multivariate/madrid_cyclical_multivariate
+    normalize: true
+    handle_missing: interpolate
+evaluation:
+  metrics:
+  - crps
+  - quantile_score
+  - weighted_interval_score
+  - mae
+  - rmse
+  logging: true
+  tuning_loss: mae
+model:
+  chronos: {}
+  deepar: {}
+  lagllama: {}
+  moirai: {}
+  moirai_moe: {}
+  toto: {}
