@@ -1,0 +1,296 @@
+"""
+Base model class that defines the interface for all traditional time series forecasting models.
+
+This abstract base class provides a common interface for traditional statistical and machine learning
+models used in time series forecasting. It handles configuration management, training, prediction,
+evaluation, and model persistence.
+
+All traditional models (ARIMA, LSTM, XGBoost, etc.) should inherit from this class and implement
+the required abstract methods.
+"""
+
+from abc import ABC, abstractmethod
+import numpy as np
+from typing import Dict, Any, Union, Tuple, List, Optional
+import pandas as pd
+import json
+import os
+import pickle
+from tempus_bench.metrics.evaluation import Evaluator
+
+class BaseModel(ABC):
+    """
+    Abstract base class for traditional time series forecasting models.
+
+    This class provides a unified interface for training, prediction, and evaluation
+    of traditional time series forecasting models. It handles configuration management,
+    data preprocessing, and evaluation metrics computation.
+
+    Attributes:
+        config: Configuration dictionary containing model and dataset parameters
+        training_loss: Primary loss function for training
+        forecast_horizon: Number of steps to forecast ahead
+        is_fitted: Whether the model has been trained
+        evaluator: Evaluator instance for computing metrics
+    """
+
+    def __init__(self, config: Dict[str, Any] = {}):
+        """
+        Initialize the base model.
+
+        Args:
+            config: Configuration dictionary containing model parameters
+                - training_loss: str, primary loss function for training
+                - forecast_horizon: int, number of steps to forecast ahead
+                - dataset: dict containing dataset configuration
+            config_file: Path to a JSON configuration file
+        """
+        # Store the full configuration for evaluator and global settings
+        self.config = config
+        
+        # Store scaler for inverse transformation (set by external code)
+        self.scaler = None
+
+        # Enforce: model_config must be exactly one selected hyper-parameter set (dict)
+        self.model_config = self._extract_model_config_strict(config)
+        
+        self.training_loss = config["evaluation"]["tuning_loss"]
+
+        # Determine forecast horizon from model configuration keys if present
+        # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
+
+        self.is_fitted = False
+
+        # Initialize evaluator with the full config to access evaluation.metrics
+        # We need to pass the original config, not the extracted model config
+        self.evaluator = Evaluator(config=config)
+
+        # For logging last eval
+        self._last_y_true = None
+        self._last_y_pred = None
+
+    def _extract_model_config_strict(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Strictly extract the single selected model configuration from the full config.
+
+        Rules:
+        - config['model'] must exist and contain exactly one entry
+        - that entry's value must be a dict (one chosen hyper-parameter set), not a list/grid/None
+        - no defaults are applied; fail fast if invalid
+        """
+        if "model" not in config:
+            raise ValueError("Missing 'model' section in config; expected a single selected model configuration.")
+
+        model_section = config["model"]
+        if not isinstance(model_section, dict) or len(model_section) != 1:
+            raise ValueError(
+                "config['model'] must be a dict with exactly one model entry (single selected combo), not a grid or multiple entries."
+            )
+
+        # Extract the only model's params
+        (_, model_params) = next(iter(model_section.items()))
+
+        if not isinstance(model_params, dict) or model_params is None:
+            raise ValueError(
+                "The selected model's parameters must be a dict containing exactly one chosen hyper-parameter set."
+            )
+
+        return model_params
+
+    @abstractmethod
+    def train(
+        self,
+        y_context: Optional[np.ndarray],
+        y_target: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
+    ) -> "BaseModel":
+        """
+        Train the model on given data.
+
+        Args:
+            y_context: Past target values - training data during tuning time, training + validation data during testing time
+            y_target: Future target values - validation data during tuning time, None during testing time (avoid data leakage)
+            y_start_date: The start date timestamp for y_context and y_target in string form
+
+        Returns:
+            self: The fitted model instance
+        """
+        pass
+
+    @abstractmethod
+    def predict(
+        self,
+        y_context: Optional[np.ndarray] = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
+    ) -> np.ndarray:
+        """
+        Make predictions using the trained model.
+
+        Args:
+            y_context: Recent/past target values (for sequence models, optional for ARIMA)
+            forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
+            freq: Frequency string (e.g., 'H', 'D', 'M') - MUST be provided from CSV data
+
+        Returns:
+            np.ndarray: Model predictions with shape (n_samples, forecast_horizon)
+
+        Raises:
+            ValueError: If freq is None or empty - frequency must always be read from CSV data
+        """
+        if freq is None or freq == "":
+            raise ValueError(
+                "Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks."
+            )
+        pass
+
+    def compute_loss(
+        self,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+        y_train: np.ndarray = None,
+        **kwargs
+    ) -> Dict[str, float]:
+        """
+        Compute all loss metrics between true and predicted values using the Evaluator class.
+
+        This method computes evaluation metrics as configured in evaluation.metrics
+
+        Args:
+            y_true: True target values (ndarray, shape [num_steps, num_features])
+            y_pred: Predicted values (ndarray, shape [num_steps, num_features])
+            y_train: Training target values (required for MASE calculation) (ndarray, shape [num_steps, num_features])
+
+        Returns:
+            Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
+        """
+        # Store for TensorBoard logging
+        self._last_y_true = y_true
+        self._last_y_pred = y_pred
+
+        # Use evaluator to compute evaluation metrics (from evaluation.metrics)
+        # y_pred, y_true, y_train are guaranteed ndarrays of matching shapes
+        return self.evaluator.evaluate(y_pred, y_true, y_train=y_train, **kwargs)
+
+    def evaluate(
+        self, X: Union[pd.DataFrame, np.ndarray], y: Union[pd.Series, np.ndarray]
+    ) -> Dict[str, float]:
+        """
+        Train and evaluate model on given data.
+
+        Args:
+            X: Evaluation features
+            y: True target values
+
+        Returns:
+            Dict[str, float]: Dictionary of evaluation metrics
+        """
+        # Get predictions
+        predictions = self.predict(X)
+        loss = self.compute_loss(y, predictions)
+        return loss
+
+    def get_params(self) -> Dict[str, Any]:
+        """
+        Get the current model parameters.
+
+        Returns:
+            Dict[str, Any]: Dictionary of model parameters
+        """
+        return self.model_config
+
+    def set_params(self, **params: Dict[str, Any]) -> "BaseModel":
+        """
+        Set model parameters.
+
+        Args:
+            **params: Model parameters to set
+
+        Returns:
+            self: The model instance with updated parameters
+        """
+        self.model_config.update(params)
+        self.is_fitted = False  # Mark as unfitted if parameters change
+
+        return self
+
+    def set_scaler(self, scaler) -> "BaseModel":
+        """
+        Set the scaler for inverse transformation of predictions.
+
+        Args:
+            scaler: Scaler instance (e.g., StandardScaler) used for normalization
+
+        Returns:
+            self: The model instance with updated scaler
+        """
+        self.scaler = scaler
+        return self
+
+    # def save(self, path: str) -> None:
+    #     """
+    #     Save the model to disk.
+
+    #     Args:
+    #         path: Path to save the model
+    #     """
+    #     if not self.is_fitted:
+    #         raise ValueError("Cannot save an unfitted model")
+
+    #     # Create directory if it doesn't exist
+    #     os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    #     # Save model state
+    #     model_state = {
+    #         "config": self.config,
+    #         "is_fitted": self.is_fitted,
+    #         "params": self.get_params(),
+    #     }
+
+    #     # Save model state to file
+    #     with open(path, "wb") as f:
+    #         pickle.dump(model_state, f)
+
+    # def load(self, path: str) -> None:
+    #     """
+    #     Load the model from disk.
+
+    #     Args:
+    #         path: Path to load the model from
+    #     """
+    #     if not os.path.exists(path):
+    #         raise FileNotFoundError(f"No model found at {path}")
+
+    #     # Load model state from file
+    #     with open(path, "rb") as f:
+    #         model_state = pickle.load(f)
+
+    #     # Restore model state
+    #     self.config = model_state["config"]
+    #     self.is_fitted = model_state["is_fitted"]
+    #     self.set_params(**model_state["params"])
+
+    def get_model_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of the model's properties and performance.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing model summary information
+        """
+        return {
+            "model_type": self.__class__.__name__,
+            "is_fitted": self.is_fitted,
+            "parameters": self.get_params(),
+        }
+
+    def get_last_eval_true_pred(self):
+        """
+        Return the last y_true and y_pred used in compute_loss for TensorBoard logging.
+
+        Returns:
+            Tuple of (y_true, y_pred) arrays
+        """
+        return self._last_y_true, self._last_y_pred
