@@ -58,7 +58,7 @@ def test_preprocessor_normalizes_multivariate_when_enabled():
 
     _, _, _, target = pre.clean(time_start=time_start, freq=freq, target_raw=target_raw)
 
-    # Shape: (num_steps, num_features)
+    # Shape: (num_steps, num_targets)
     assert target.shape == (5, 2)
 
     # Check each feature standardized independently
