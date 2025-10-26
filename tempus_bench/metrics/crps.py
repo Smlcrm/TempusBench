@@ -22,28 +22,17 @@ class CRPS:
 
         if task_type != 'stochastic':
             raise ValueError(f"CRPS can only be used with 'stochastic' task_type, got '{task_type}'.")
+        S, T, M = y_pred.shape
+        if y_true.shape != (T, M):
+            raise ValueError(f"Shape mismatch: y_true has shape {y_true.shape}, but expected ({T}, {M}) to match y_pred (num_samples={S}, time_steps={T}, num_targets={M})")
 
-        num_samples = y_pred.shape[0]
+        # Assuming i.i.d. samples, y_pred_1, ..., y_pred_N
+        # We estimate the unbiased Monte-Carlo Estimator for CRPS
 
-        # CRPS formula: E|X - x| - E|X - X'|/2
+        crps = np.mean(np.abs(y_pred - y_true[None, ...]), axis=0)
+        y_pred_sort = np.sort(y_pred, axis=0)
+        j = np.arange(1, S + 1)[:, None, None]
+        coeff = (2 * j - S - 1)
+        crps -= np.sum(coeff * y_pred_sort, axis=0) / (S**2)
 
-        # Term 1: E|X - x| = mean(|samples - true_value|)
-        # Broadcasting: (num_samples, ...) - (...) -> (num_samples, ...)
-        term1 = np.mean(np.abs(y_pred - y_true), axis=0)
-
-        # Term 2: E|X - X'|/2 = mean(|samples - samples')|/2
-        # Compute pairwise differences between all samples
-        # Reshape for broadcasting: (num_samples, 1, ...) - (1, num_samples, ...)
-        y_pred_expanded1 = np.expand_dims(y_pred, axis=1)  # (num_samples, 1, ...)
-        y_pred_expanded2 = np.expand_dims(y_pred, axis=0)  # (1, num_samples, ...)
-
-        # Compute absolute differences: (num_samples, num_samples, ...)
-        pairwise_diffs = np.abs(y_pred_expanded1 - y_pred_expanded2)
-
-        # Take mean over sample pairs (first two dimensions), then over timesteps/targets
-        term2 = np.mean(pairwise_diffs, axis=(0, 1)) / 2
-
-        # CRPS = term1 - term2, then take mean across all dimensions
-        crps = np.mean(term1 - term2)
-
-        return float(crps)
+        return float(np.mean(crps))
