@@ -34,7 +34,7 @@ class BaseModel(ABC):
         evaluator: Evaluator instance for computing metrics
     """
 
-    def __init__(self, config: Dict[str, Any] = {}):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize the base model.
 
@@ -43,17 +43,20 @@ class BaseModel(ABC):
                 - training_loss: str, primary loss function for training
                 - forecast_horizon: int, number of steps to forecast ahead
                 - dataset: dict containing dataset configuration
-            config_file: Path to a JSON configuration file
+            logs_dir: Directory for storing log files (required)
         """
         # Store the full configuration for evaluator and global settings
         self.config = config
-        
+
+        # Store logs_dir for internal model instantiations
+        self.logs_dir = logs_dir
+
         # Store scaler for inverse transformation (set by external code)
         self.scaler = None
 
         # Enforce: model_config must be exactly one selected hyper-parameter set (dict)
         self.model_config = self._extract_model_config_strict(config)
-        
+
         self.training_loss = config["evaluation"]["tuning_loss"]
 
         # Determine forecast horizon from model configuration keys if present
@@ -63,7 +66,10 @@ class BaseModel(ABC):
 
         # Initialize evaluator with the full config to access evaluation.metrics
         # We need to pass the original config, not the extracted model config
-        self.evaluator = Evaluator(config=config)
+        self.evaluator = Evaluator(config=config, logs_dir=logs_dir)
+
+        # Expose logger for direct use by models
+        self.logger = self.evaluator.logger
 
         # For logging last eval
         self._last_y_true = None
@@ -160,9 +166,9 @@ class BaseModel(ABC):
         This method computes evaluation metrics as configured in evaluation.metrics
 
         Args:
-            y_true: True target values (ndarray, shape [num_steps, num_features])
-            y_pred: Predicted values (ndarray, shape [num_steps, num_features])
-            y_train: Training target values (required for MASE calculation) (ndarray, shape [num_steps, num_features])
+            y_true: True target values (ndarray, shape [num_steps, num_targets])
+            y_pred: Predicted values (ndarray, shape [num_steps, num_targets])
+            y_train: Training target values (required for MASE calculation) (ndarray, shape [num_steps, num_targets])
 
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
