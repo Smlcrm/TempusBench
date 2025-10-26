@@ -7,7 +7,7 @@ import pytest
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
-from benchmarking_pipeline.pipeline.preprocessor import Preprocessor
+from tempus_bench.pipeline.preprocessor import Preprocessor
 
 
 def _build_config(normalize: bool):

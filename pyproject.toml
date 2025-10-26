@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "benchmarking_pipeline"
+name = "tempus_bench"
 version = "1.0.0"
 description = "Time Series Forecasting Benchmarking Pipeline"
 authors = [
@@ -23,6 +23,7 @@ dependencies = [
     "tqdm>=4.64.0",
     "psutil>=5.8.0",
     "conda-merge>=0.1.5",
+    "pydantic>=2.0.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -43,11 +44,11 @@ dev = [
 ]
 
 [project.scripts]
-run_benchmark = "benchmarking_pipeline.run_benchmark:main"
+run_benchmark = "tempus_bench.run_benchmark:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["benchmarking_pipeline*"]
+include = ["tempus_bench*"]
 
 [tool.setuptools.package-data]
-"benchmarking_pipeline" = ["**/*.yaml", "**/*.json", "**/*.txt", "**/*.md"]
+"tempus_bench" = ["**/*.yaml", "**/*.json", "**/*.txt", "**/*.md"]

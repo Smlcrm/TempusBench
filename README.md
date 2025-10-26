@@ -15,7 +15,7 @@ This project provides a unified benchmarking framework for evaluating the perfor
 ## Project Structure
 
 ```
-benchmarking_pipeline/
+tempus_bench/
 ├── __init__.py                 # Package initialization and documentation
 ├── cli.py                     # Command-line interface
 ├── configs/                   # Configuration files
@@ -59,7 +59,7 @@ benchmarking_pipeline/
 │   ├── __init__.py
 │   ├── data_loader.py       # Data loading and preprocessing
 │   ├── data_types.py        # Data structures and types
-│   ├── evaluator.py         # Model evaluation
+│   ├── evaluation.py        # Model evaluation (moved to metrics/)
 │   ├── logger.py            # Logging and metrics storage
 │   ├── preprocessor.py      # Data preprocessing
 │   ├── trainer.py           # Model training and hyperparameter tuning
@@ -82,7 +82,7 @@ The `ModelRouter` automatically discovers available models and routes requests b
 - **Folder structure** (automatic discovery)
 
 ```python
-from benchmarking_pipeline.models import model_router
+from tempus_bench.models import model_router
 
 # Get available models
 available = model_router.get_available_models()
@@ -105,7 +105,7 @@ All models implement a consistent interface through base classes:
 - **`FoundationModel`**: For large pre-trained foundation models
 
 ```python
-from benchmarking_pipeline.models import BaseModel, FoundationModel
+from tempus_bench.models import BaseModel, FoundationModel
 
 # Traditional model
 class MyModel(BaseModel):
@@ -129,7 +129,7 @@ The pipeline automatically handles:
 - **Frequency alignment** (automatic detection)
 
 ```python
-from benchmarking_pipeline.pipeline import DataLoader
+from tempus_bench.pipeline import DataLoader
 
 # Load data
 data_loader = DataLoader(config)
@@ -207,7 +207,7 @@ evaluation:
 
 3. **Verify installation**:
    ```bash
-   python -c "from benchmarking_pipeline import model_router; print('Installation successful!')"
+   python -c "from tempus_bench import model_router; print('Installation successful!')"
    ```
 
 ## Usage
@@ -215,8 +215,8 @@ evaluation:
 ### Basic Usage
 
 ```python
-from benchmarking_pipeline.pipeline import DataLoader, Trainer
-from benchmarking_pipeline.models import model_router
+from tempus_bench.pipeline import DataLoader, Trainer
+from tempus_bench.models import model_router
 
 # Load configuration
 import yaml
@@ -256,7 +256,7 @@ python -m run_benchmark --output-dir results/
 
 2. **Implement model class**:
    ```python
-   from benchmarking_pipeline.models.base_model import BaseModel
+   from tempus_bench.models.base_model import BaseModel
    
    class MyModelModel(BaseModel):
        def __init__(self, config=None, config_file=None):
@@ -326,7 +326,7 @@ pytest tests/integration/
 pytest tests/e2e/
 
 # Run with coverage
-pytest --cov=benchmarking_pipeline
+pytest --cov=tempus_bench
 ```
 
 ## License
@@ -338,7 +338,7 @@ pytest --cov=benchmarking_pipeline
 If you use this framework in your research, please cite:
 
 ```bibtex
-@software{benchmarking_pipeline,
+@software{tempus_bench,
   title={Time Series Forecasting Benchmarking Pipeline},
   author={[Your Name/Organization]},
   year={2024},
