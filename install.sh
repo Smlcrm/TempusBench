@@ -15,4 +15,4 @@ pip install -r requirements.txt
 echo "✅ Installation complete!"
 echo ""
 echo "🎯 You can now run benchmarks with:"
-echo "   python benchmarking_pipeline/run_benchmark.py --config benchmarking_pipeline/configs/all_model_univariate.yaml"
+echo "   python tempus_bench/run_benchmark.py --config tempus_bench/configs/all_model_univariate.yaml"

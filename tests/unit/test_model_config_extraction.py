@@ -7,7 +7,7 @@ contains exactly one selected hyperparameter dictionary, not a grid or list.
 
 import pytest
 import numpy as np
-from benchmarking_pipeline.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel
 
 
 class DummyModel(BaseModel):
