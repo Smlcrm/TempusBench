@@ -18,6 +18,10 @@ class MASE:
 
         task_type = kwargs.get('task_type')
         if task_type == 'stochastic':
+            S, T, M = y_pred.shape
+            if y_true.shape != (T, M):
+                raise ValueError(f"Shape mismatch: y_true has shape {y_true.shape}, but expected ({T}, {M}) to match y_pred (num_samples={S}, time_steps={T}, num_targets={M})")
+
             point_forecast_statistic = kwargs['point_forecast_statistic']
             if point_forecast_statistic == 'mean':
                 y_ppred = np.mean(y_pred, axis=0)
