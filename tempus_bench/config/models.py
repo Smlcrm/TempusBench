@@ -85,7 +85,7 @@ class TaskConfig(BaseModel):
     # Allowed metrics for each task type
     ALLOWED_METRICS: Dict[str, List[str]] = {
         'deterministic': ['mae', 'rmse', 'mape', 'mase'],
-        'stochastic': ['crps', 'quantile_loss', 'interval_score', 'mae', 'rmse']
+        'stochastic': ['crps', 'quantile_score', 'weighted_interval_score', 'mae', 'rmse']
     }
 
     @model_validator(mode='after')
@@ -114,6 +114,7 @@ class ModelConfig(BaseModel):
 
     # Foundation models (no hyperparameters)
     chronos: Optional[Dict[str, Any]] = None
+    deepar: Optional[Dict[str, Any]] = None
     tiny_time_mixer: Optional[Dict[str, Any]] = None
     moirai: Optional[Dict[str, Any]] = None
     moirai_moe: Optional[Dict[str, Any]] = None
@@ -135,7 +136,7 @@ class ModelConfig(BaseModel):
 
         # For foundation models, parameters should be simple key-value pairs
         foundation_models = {
-            'chronos', 'tiny_time_mixer', 'moirai', 'moirai_moe',
+            'chronos', 'deepar', 'tiny_time_mixer', 'moirai', 'moirai_moe',
             'moment', 'timesfm', 'lagllama', 'toto', 'tabpfn'
         }
 
@@ -262,7 +263,7 @@ class BenchmarkConfig(BaseModel):
         # Define allowed metrics for each task type
         ALLOWED_METRICS = {
             'deterministic': ['mae', 'rmse', 'mape', 'mase'],
-            'stochastic': ['crps', 'quantile_loss', 'interval_score', 'mae', 'rmse']
+            'stochastic': ['crps', 'quantile_score', 'weighted_interval_score', 'mae', 'rmse']
         }
 
         allowed_metrics = ALLOWED_METRICS.get(task_type, [])
