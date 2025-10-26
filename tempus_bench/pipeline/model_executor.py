@@ -33,13 +33,13 @@ class ModelExecutor:
         self.tf_logger = get_tf_logger(os.path.join(run_dir, 'tensorboard'))
 
     def _generate_model_execution_script(self,
-            model_name: str,
-            hyperparameters: dict,
-            context_steps: int,
-            train_steps: int,
-            validate_steps: int,
-            dataset_path: str,
-            window_idx: int):
+        model_name: str,
+        hyperparameters: dict,
+        context_steps: int,
+        train_steps: int,
+        validate_steps: int,
+        dataset_path: str,
+        window_idx: int):
 
         script = textwrap.dedent(f"""
             import os
@@ -80,9 +80,10 @@ class ModelExecutor:
                         target = window.target
 
                         # Import model here, so we know target shape
-                        router = ModelRouter()
-                        folder_path, file_name, class_name = router.get_model_path_by_target_count(
-                            model_name, target.shape[1] if len(target.shape) > 1 else 1
+                        router = ModelRouter(logs_dir=os.path.join({repr(self.run_dir)}, 'logs'))
+                        task_type = config['task']['task_type']
+                        folder_path, file_name, class_name = router.get_model_path_by_task_type(
+                            model_name, task_type
                         )
                         module_path = os.path.join(folder_path, f"{{file_name}}.py")
                         spec = importlib.util.spec_from_file_location(file_name, module_path)
@@ -99,9 +100,8 @@ class ModelExecutor:
                         # Update the config with the hyperparameters before creating the model
                         full_config_copy = copy.deepcopy(config)
                         full_config_copy["model"] = {{model_name: hyperparameters}}
-                        # Add run directory for logging
-                        full_config_copy["logging"] = {{"logs_dir": os.path.join({repr(self.run_dir)}, 'logs')}}
-                        model = model_class(full_config_copy)
+                        logs_dir = os.path.join({repr(self.run_dir)}, 'logs')
+                        model = model_class(full_config_copy, logs_dir=logs_dir)
 
                         # Set the scaler for inverse transformation if available
                         if hasattr(window, 'scaler') and window.scaler is not None:
@@ -122,17 +122,33 @@ class ModelExecutor:
                             freq=freq,
                         )
 
-                        eval_losses = trained_model.compute_loss(
-                            y_true=target[vstart:vend],
-                            y_pred=results,
-                            y_train=target[tstart:tend],
-                            freq=freq
-                        )
+                        # Check if this is a stochastic model (returns samples)
+                        if hasattr(trained_model, 'num_samples'):
+                            # Stochastic model - results are samples
+                            y_pred_samples = results  # Shape: (num_samples, forecast_horizon, num_targets)
+                            y_pred_point = trained_model.compute_point_forecast(y_pred_samples)  # Shape: (forecast_horizon, num_targets)
+                            
+                            eval_losses = trained_model.compute_loss(
+                                y_true=target[vstart:vend],
+                                y_pred_samples=y_pred_samples,
+                                y_train=target[tstart:tend],
+                                freq=freq
+                            )
+                        else:
+                            # Deterministic model - results are point forecasts
+                            y_pred_point = results
+                            
+                            eval_losses = trained_model.compute_loss(
+                                y_true=target[vstart:vend],
+                                y_pred=y_pred_point,
+                                y_train=target[tstart:tend],
+                                freq=freq
+                            )
 
                         # Include predictions in output for plotting
                         output = {{
                             **eval_losses,
-                            "predictions": results.tolist(),
+                            "predictions": y_pred_point.tolist(),
                             "y_true": target[vstart:vend].tolist()
                         }}
 
@@ -148,13 +164,13 @@ class ModelExecutor:
         return script
 
     def execute_model(self,
-                     model_name: str,
-                     hyperparameters: dict,
-                     context_steps: int,
-                     train_steps: int,
-                     validate_steps: int,
-                     dataset_path: str,
-                     window_idx: int) -> dict:
+        model_name: str,
+        hyperparameters: dict,
+        context_steps: int,
+        train_steps: int,
+        validate_steps: int,
+        dataset_path: str,
+        window_idx: int) -> dict:
         """
         Execute a single model with specific hyperparameters on a specific dataset window.
 
@@ -176,19 +192,13 @@ class ModelExecutor:
             self.logger.info("ModelExecutor", f"Executing model {model_name} with hyperparameters {hyperparameters}")
 
         # Create Conda Environment
-        requirements_path = self._get_model_requirements(
-            model_name=model_name,
-            modality="anyvariate"
-        )
+        requirements_path = self._get_model_requirements(model_name=model_name)
         python_version = self.config['system']['python_version']
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,
             requirements_path=requirements_path
         )
-
-        # Install requirements in the conda environment
-        conda_env.install(requirements_path)
 
         script = self._generate_model_execution_script(
             model_name=model_name,
@@ -221,10 +231,10 @@ class ModelExecutor:
                 if line.strip().startswith('{') and line.strip().endswith('}'):
                     json_line = line.strip()
                     break
-            
+
             if json_line is None:
                 raise ValueError(f"No valid JSON found in script output. Output was: {result.stdout}")
-            
+
             eval_results = json.loads(json_line)
             return eval_results
 
@@ -232,15 +242,22 @@ class ModelExecutor:
             # Clean up temporary file
             os.unlink(script_path)
 
-    def _get_model_requirements(self, model_name: str, modality: str):
+    def _get_model_requirements(self, model_name: str):
         """
         Returns the absolute path to requirements.txt for the requested model.
-        The structure is: @models/<modality>/<model_name>/requirements.txt
+        Uses the model router to determine the correct path based on task type.
         """
+        # Get task type from config
+        task_type = self.config['task']['task_type']
 
-        # Locate models directory (ROOT_DIR is already tempus_bench)
-        models_dir = os.path.join(ROOT_DIR, "models")
-        req_path = os.path.join(models_dir, modality, model_name, "requirements.txt")
+        # Use model router to get the correct path
+        router = ModelRouter(logs_dir=os.path.join(self.run_dir, 'logs'))
+        folder_path, file_name, class_name = router.get_model_path_by_task_type(
+            model_name, task_type
+        )
+
+        # Construct requirements path
+        req_path = os.path.join(folder_path, "requirements.txt")
         if not os.path.exists(req_path):
             raise FileNotFoundError(f"requirements.txt not found at expected path: {req_path}")
         return os.path.abspath(req_path)
