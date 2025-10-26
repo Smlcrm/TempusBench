@@ -2,10 +2,10 @@
 Stochastic base model class that defines the interface for all stochastic time series forecasting models.
 
 This abstract base class provides a common interface for stochastic models that generate
-probabilistic forecasts through sampling. It handles configuration management, training, 
+probabilistic forecasts through sampling. It handles configuration management, training,
 prediction, evaluation, and model persistence.
 
-All stochastic models (Chronos, DeepAR, LagLlama, Moirai, Toto, etc.) should inherit 
+All stochastic models (Chronos, DeepAR, LagLlama, Moirai, Toto, etc.) should inherit
 from this class and implement the required abstract methods.
 """
 
@@ -54,12 +54,12 @@ class StochasticBaseModel(BaseModel):
             logs_dir: Directory for storing log files (required)
         """
         super().__init__(config, logs_dir)
-        
+
         # Get evaluation configuration
         evaluation_cfg = self.config["evaluation"]
         self.num_samples = evaluation_cfg["num_samples"]
         self.point_forecast_statistic = evaluation_cfg["point_forecast_statistic"]
-        
+
         # Validate point forecast statistic
         if self.point_forecast_statistic != "mean":
             raise ValueError(f"Only 'mean' point forecast statistic is supported, got '{self.point_forecast_statistic}'")
@@ -115,8 +115,7 @@ class StochasticBaseModel(BaseModel):
     def compute_loss(
         self,
         y_true: np.ndarray,
-        y_pred_samples: np.ndarray,
-        y_train: np.ndarray = None,
+        y_pred: np.ndarray,
         **kwargs
     ) -> Dict[str, float]:
         """
@@ -128,37 +127,34 @@ class StochasticBaseModel(BaseModel):
 
         Args:
             y_true: True target values (ndarray, shape [num_steps, num_targets])
-            y_pred_samples: Predicted samples (ndarray, shape [num_samples, num_steps, num_targets])
-            y_train: Training target values (required for MASE calculation) (ndarray, shape [num_steps, num_targets])
+            y_pred: Predicted samples (ndarray, shape [num_samples, num_steps, num_targets])
 
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
         """
         # Store for TensorBoard logging
         self._last_y_true = y_true
-        self._last_y_pred_samples = y_pred_samples
+        self._last_y_pred = y_pred
 
         # Compute point forecast for deterministic metrics
-        y_pred_point = self.compute_point_forecast(y_pred_samples)
+        y_pred_point = self.compute_point_forecast(y_pred)
 
         # Use evaluator to compute evaluation metrics
         # Pass both samples and point forecast to evaluator
         return self.evaluator.evaluate(
-            y_pred_point, 
-            y_true, 
-            y_train=y_train, 
-            y_pred_samples=y_pred_samples,
+            y_true=y_true,
+            y_pred=y_pred,
             **kwargs
         )
 
     def get_last_eval_true_pred(self):
         """
-        Return the last y_true and y_pred_samples used in compute_loss for TensorBoard logging.
+        Return the last y_true and y_pred used in compute_loss for TensorBoard logging.
 
         Returns:
-            Tuple of (y_true, y_pred_samples) arrays
+            Tuple of (y_true, y_pred) arrays
         """
-        return self._last_y_true, self._last_y_pred_samples
+        return self._last_y_true, self._last_y_pred
 
     def get_model_summary(self) -> Dict[str, Any]:
         """
