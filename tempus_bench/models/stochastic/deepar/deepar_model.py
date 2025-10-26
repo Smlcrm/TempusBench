@@ -26,9 +26,9 @@ import math
 # If you only have one time series, you can set group to be 0.
 
 class DeepARModel(BaseModel):
-    def __init__(self, config: Dict[str, Any] = None, config_file: str = None):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
-        Initialize LSTM model with given configuration.
+        Initialize DeepAR model with given configuration.
         
         Args:
             config: Configuration dictionary containing model parameters
@@ -44,9 +44,9 @@ class DeepARModel(BaseModel):
                 - epochs: int, number of training epochs
                 - gradient_clip_val: float, threshold to clip gradient to during training
                 - num_workers: int, number of workers used for the dataloaders
-            config_file: Path to a JSON configuration file
+            logs_dir: Directory for storing log files (optional)
         """
-        super().__init__(config, config_file)
+        super().__init__(config, logs_dir)
         if 'hidden_size' not in self.config:
             raise ValueError("hidden_size must be specified in config")
         if 'rnn_layers' not in self.config:

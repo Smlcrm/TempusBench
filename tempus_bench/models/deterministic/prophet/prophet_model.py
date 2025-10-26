@@ -9,16 +9,16 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class ProphetModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Prophet model with a given configuration.
 
         Args:
             config: Configuration dictionary for Prophet parameters.
                     e.g., {'model_params': {'seasonality_mode': 'multiplicative'}}
-            config_file: Path to a JSON configuration file.
+            logs_dir: Directory for storing log files (optional)
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
         self._build_model()
 
     def _build_model(self):
@@ -219,7 +219,7 @@ class ProphetModel(BaseModel):
                 # Use the full config but replace the model section with the specific model config
                 inner_config = self.config.copy()
                 inner_config["model"] = {"prophet": self.model_config}
-                temp_model = ProphetModel(inner_config)
+                temp_model = ProphetModel(inner_config, logs_dir=self.logs_dir)
                 
                 # Train on this variate using the univariate method
                 temp_model._train(

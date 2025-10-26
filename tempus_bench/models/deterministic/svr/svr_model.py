@@ -16,7 +16,7 @@ import io
 
 
 class SVRModel(BaseModel):
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Support Vector Regression (SVR) model with a given configuration.
         Uses direct multi-output strategy via sklearn's MultiOutputRegressor.
@@ -26,7 +26,7 @@ class SVRModel(BaseModel):
             config_file: Path to configuration file
             logger: Logger instance for TensorBoard logging
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
         self.scaler = StandardScaler()  # SVR is sensitive to feature scaling
 
@@ -66,11 +66,11 @@ class SVRModel(BaseModel):
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        # Handle (num_steps, num_features) format
+        # Handle (num_steps, num_targets) format
         if y_series.ndim == 1:
             y_series = y_series.reshape(-1, 1)
         
-        num_steps, num_features = y_series.shape
+        num_steps, num_targets = y_series.shape
         
         # Validate data length
         min_required_length = lookback_window + forecast_horizon
@@ -106,7 +106,7 @@ class SVRModel(BaseModel):
             self._build_model()
 
         # Combine context and target for full training series if y_target is provided
-        # Handle (num_steps, num_features) format
+        # Handle (num_steps, num_targets) format
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
         y_series = np.concatenate([y_context, y_target], axis=0)
@@ -147,11 +147,11 @@ class SVRModel(BaseModel):
             )
 
         total_steps = len(timestamps_target)
-        num_features = y_context.shape[1]  # num_features is second dimension
+        num_targets = y_context.shape[1]  # num_targets is second dimension
         lookback_window = self.model_config["lookback_window"]
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        # Ensure y_context is (num_steps, num_features)
+        # Ensure y_context is (num_steps, num_targets)
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
 
@@ -169,8 +169,8 @@ class SVRModel(BaseModel):
             y_flat = np.expand_dims(current_window.flatten(), axis=0)
             pred = self.model.predict(y_flat)
             
-            # Reshape prediction to (forecast_horizon, num_features)
-            pred = np.reshape(pred, (forecast_horizon, num_features))
+            # Reshape prediction to (forecast_horizon, num_targets)
+            pred = np.reshape(pred, (forecast_horizon, num_targets))
             
             preds.append(pred)
 
@@ -181,7 +181,7 @@ class SVRModel(BaseModel):
         # Concatenate all predictions along time axis
         preds = np.concatenate(preds, axis=0)
         
-        # Return (total_steps, num_features) - truncate if needed
+        # Return (total_steps, num_targets) - truncate if needed
         if preds.shape[0] > total_steps:
             preds = preds[:total_steps, :]
 

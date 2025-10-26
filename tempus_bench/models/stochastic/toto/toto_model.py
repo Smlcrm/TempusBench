@@ -7,19 +7,20 @@ import re
 from .toto.model.toto import Toto
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
-from benchmarking_pipeline.models.base_model import BaseModel
+from tempus_bench.models.stochastic_base_model import StochasticBaseModel
 from typing import Optional, Union, Dict, Any
 
 
-class TotoModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+class TotoModel(StochasticBaseModel):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize TOTO model with configuration.
 
         Args:
             config: Configuration dictionary containing model parameters
+            logs_dir: Directory for storing log files (optional)
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
@@ -76,7 +77,7 @@ class TotoModel(BaseModel):
             y_target_timestamps: Timestamps for the target data
 
         Returns:
-            np.ndarray: Model predictions with shape (prediction_length,)
+            np.ndarray: Model prediction samples with shape (num_samples, forecast_horizon, num_targets)
         """
 
         forecast_horizon, num_variates = timestamps_target.shape
@@ -100,15 +101,19 @@ class TotoModel(BaseModel):
         forecast = self.model.forecast(
             inputs,
             prediction_length=forecast_horizon,
-            num_samples=50,  # Number of samples for probabilistic forecasting
-            samples_per_batch=50,  # Control memory usage during inference
+            num_samples=self.num_samples,  # Use configured number of samples
+            samples_per_batch=self.num_samples,  # Control memory usage during inference
         )
 
         forecast_samples = np.squeeze(np.asarray(forecast.samples), axis=0)
 
-        forecast = np.mean(forecast_samples, axis=-1).T
-
-        return forecast
+        # Return samples with shape (num_samples, forecast_horizon, num_targets)
+        # Ensure correct shape for multivariate case
+        if forecast_samples.ndim == 2:
+            # If univariate, add target dimension
+            forecast_samples = forecast_samples[:, :, np.newaxis]
+        
+        return forecast_samples
 
     def freq_to_seconds(self, freq: Union[str, float, int]) -> float:
         """

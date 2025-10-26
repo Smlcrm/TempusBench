@@ -26,7 +26,7 @@ from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 
 
 class LSTMModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Multivariate LSTM model with given configuration.
 
@@ -46,7 +46,7 @@ class LSTMModel(BaseModel):
                 - forecast_horizon: int, number of steps to forecast ahead
             config_file: Path to a JSON configuration file
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
         if "units" not in self.model_config:
             raise ValueError("units must be specified in config")
         if "layers" not in self.model_config:
@@ -172,12 +172,12 @@ class LSTMModel(BaseModel):
         Returns:
             self: The fitted model instance
         """
-        # Handle (num_steps, num_features) format
+        # Handle (num_steps, num_targets) format
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
         if y_target.ndim == 1:
             y_target = y_target.reshape(-1, 1)
-        num_steps, num_features = y_context.shape
+        num_steps, num_targets = y_context.shape
         forecast_length = y_target.shape[0]
 
         # Prepare sequences using the combined context + target data
@@ -191,7 +191,7 @@ class LSTMModel(BaseModel):
         # Build model if not already built
         if self.model is None:
             self._build_model(
-                input_shape=(self.model_config["context_length"], num_features)
+                input_shape=(self.model_config["context_length"], num_targets)
             )
 
         # Train model with progress logging and early stopping
