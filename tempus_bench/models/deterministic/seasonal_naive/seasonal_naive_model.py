@@ -12,7 +12,7 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class SeasonalNaiveModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Seasonal Naive model with a given configuration.
 
@@ -21,7 +21,7 @@ class SeasonalNaiveModel(BaseModel):
                     e.g., {'model_params': {'sp': 7}} for weekly seasonality in daily data.
             config_file: Path to a JSON configuration file.
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
     def train(
         self,
@@ -51,9 +51,9 @@ class SeasonalNaiveModel(BaseModel):
 
             # Handle multivariate data by creating separate models for each feature
             if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
-                num_features = y_context.shape[1]
+                num_targets = y_context.shape[1]
                 self.models = []
-                for i in range(num_features):
+                for i in range(num_targets):
                     model = NaiveForecaster(strategy="last", sp=sp)
                     series_data = pd.Series(y_context[:, i])
                     model.fit(y=series_data, X=None)
@@ -97,8 +97,8 @@ class SeasonalNaiveModel(BaseModel):
         # Handle multivariate data
         if hasattr(self, 'models') and self.models:
             # Multivariate case: predict for each feature
-            num_features = len(self.models)
-            predictions = np.zeros((forecast_horizon, num_features))
+            num_targets = len(self.models)
+            predictions = np.zeros((forecast_horizon, num_targets))
             
             for i, model in enumerate(self.models):
                 pred = model.predict(fh=fh)

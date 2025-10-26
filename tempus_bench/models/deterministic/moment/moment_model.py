@@ -69,10 +69,8 @@ class MomentDataset(Dataset):
 class MomentModel(BaseModel):
     """MOMENT model wrapper for time series forecasting, extending FoundationModel."""
 
-    def __init__(self, config: Dict[str, Any] = None):
-        super().__init__(
-            config,
-        )
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
+        super().__init__(config, logs_dir)
         self.model_config["context_length"] = 512
 
         self.scaler = StandardScaler()
@@ -147,22 +145,22 @@ class MomentModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        # Ensure 2D input: (num_steps, num_features)
+        # Ensure 2D input: (num_steps, num_targets)
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
 
-        num_steps, num_features = y_context.shape
-        self.model_config["num_y_features"] = num_features
+        num_steps, num_targets = y_context.shape
+        self.model_config["num_y_features"] = num_targets
 
         # Fixed context length per model config
-        context_length = int(self.model_config.get("context_length", 512))
+        context_length = int(self.model_config.get("context_length"))
 
         # Load model with correct metadata
         self._load_model(forecast_horizon)
         self.model.eval()
 
         with torch.no_grad():
-            # Scale in (num_steps, num_features)
+            # Scale in (num_steps, num_targets)
             self.scaler.fit(y_context)
             y_context = self.scaler.transform(y_context)
 
@@ -171,13 +169,13 @@ class MomentModel(BaseModel):
                 y_context = y_context[-context_length:, :]
             else:
                 pad_rows = context_length - y_context.shape[0]
-                y_context = np.concatenate([np.zeros((pad_rows, num_features)), y_context], axis=0)
+                y_context = np.concatenate([np.zeros((pad_rows, num_targets)), y_context], axis=0)
                 warnings.warn(
                     f"Time Series is shorter than context_length {context_length}. Padded with zeros.",
                     UserWarning,
                 )
 
-            # To MOMENT format (batch, channels, seq_len) = (1, num_features, context_length)
+            # To MOMENT format (batch, channels, seq_len) = (1, num_targets, context_length)
             y_context_tensor = torch.from_numpy(y_context.T.copy()).float().unsqueeze(0).to(self.device)
             input_mask = torch.ones(1, context_length, device=self.device)
 

@@ -27,7 +27,7 @@ class LagllamaModel(BaseModel):
     Works seamlessly like TimesFM with automatic setup.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Lag-Llama model with BaseModel interface.
 
@@ -38,11 +38,11 @@ class LagllamaModel(BaseModel):
                 - prediction_length: int, number of time series elements to predict (30)
                 - num_samples: int, number of probabilistic samples (default: 5)
                 - device: str, device to use (default: "auto")
-            config_file: Path to JSON config file
+            logs_dir: Directory for storing log files (optional)
         """
 
         # Initialize base model
-        super().__init__(config)
+        super().__init__(config, logs_dir)
         # Set up device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -186,7 +186,7 @@ class LagllamaModel(BaseModel):
         # Use the internal prediction method
         # results = self._predict_internal(df, forecast_horizon)
         start_time = self.convert_to_datetimeindex(timestamps_context)[0]
-        periods = y_context.shape[0]  # Use num_steps, not num_features
+        periods = y_context.shape[0]  # Use num_steps, not num_targets
         timestamps = pd.date_range(start=start_time, periods=periods, freq=freq)
 
         # Create series DataFrame
@@ -255,9 +255,9 @@ class LagllamaModel(BaseModel):
         if y_context.ndim > 1 and y_context.shape[1] > 1:
             # Treat each feature (column) as an independent series
             self.models = []
-            num_features = y_context.shape[1]
-            for k in range(num_features):
-                m = LagllamaModel(self.config)
+            num_targets = y_context.shape[1]
+            for k in range(num_targets):
+                m = LagllamaModel(self.config, logs_dir=self.logs_dir)
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
                 m._train(y_context=yc, y_target=yt,
@@ -425,11 +425,11 @@ class LagLlamaForecaster:
     Standalone forecaster wrapper for easy usage (mirrors TimesFM interface)
     """
 
-    def __init__(self, checkpoint_path: str = "lag-llama.ckpt", **kwargs):
+    def __init__(self, checkpoint_path: str = "lag-llama.ckpt", logs_dir: str = None, **kwargs):
         """Initialize with TimesFM-like interface"""
         config = {"checkpoint_path": checkpoint_path}
         config.update(kwargs)
-        self.model = LagllamaModel(config)
+        self.model = LagllamaModel(config, logs_dir=logs_dir)
 
     def predict(self, df: pd.DataFrame, forecast_horizon: int, **kwargs):
         """TimesFM-style predict method"""

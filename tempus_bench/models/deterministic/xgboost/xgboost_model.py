@@ -17,19 +17,16 @@ from tempus_bench.utils.logger import get_logger
 
 
 class XGBoostModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize XGBoost model with a given configuration.
 
         Args:
             config: Configuration dictionary for XGBoostRegressor parameters.
                     e.g., {'n_estimators': 100, 'learning_rate': 0.1, 'lookback_window': 10}
-            config_file: Path to a JSON configuration file.
+            logs_dir: Directory for storing log files (required)
         """
-        super().__init__(config)
-        # Get logs directory from config, default to 'logs' if not specified
-        logs_dir = config.get('logging', {}).get('logs_dir', 'logs')
-        self.logger = get_logger(logs_dir)
+        super().__init__(config, logs_dir)
 
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
@@ -71,7 +68,7 @@ class XGBoostModel(BaseModel):
         Create features for a single sample (used by both training and prediction).
         
         Args:
-            y_series: Target time series with shape (num_steps, num_features)
+            y_series: Target time series with shape (num_steps, num_targets)
             
         Returns:
             np.ndarray: Feature vector for the single sample
@@ -142,7 +139,7 @@ class XGBoostModel(BaseModel):
         Create advanced multivariate time series features for XGBoost.
 
         Args:
-            y_series: Target time series with shape (num_steps, num_features)
+            y_series: Target time series with shape (num_steps, num_targets)
             x_series: Exogenous variables (optional)
 
         Returns:
@@ -150,8 +147,8 @@ class XGBoostModel(BaseModel):
         """
 
         num_steps = y_series.shape[0]    # num_steps
-        num_features = y_series.shape[1] # num_features
-        num_targets = num_features  # For multivariate, num_targets = num_features
+        num_targets = y_series.shape[1] # num_targets
+        num_targets = num_targets  # For multivariate, num_targets = num_targets
         n_samples = (
             num_steps
             - self.model_config["lookback_window"]

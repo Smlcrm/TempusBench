@@ -9,13 +9,13 @@ from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 class TinyTimeMixerModel(BaseModel):
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Args:
           prediction length: any positive integer that shows many steps to forecast
         """
 
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
         # forecast_horizon is inherited from parent class (FoundationModel)
         self.model = None
@@ -106,28 +106,28 @@ class TinyTimeMixerModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        # Handle (num_steps, num_features) format
+        # Handle (num_steps, num_targets) format
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
             
-        num_steps, num_features = y_context.shape
+        num_steps, num_targets = y_context.shape
 
-        # Construct DataFrame - Tiny Time Mixer expects (timesteps, num_features)
-        columns = list(range(num_features))
+        # Construct DataFrame - Tiny Time Mixer expects (timesteps, num_targets)
+        columns = list(range(num_targets))
         timestamps_context = self.convert_to_datetimeindex(timestamps_context)
 
-        # Data is already in (timesteps, num_features) format for Tiny Time Mixer
+        # Data is already in (timesteps, num_targets) format for Tiny Time Mixer
         df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
 
         results = self._sub_predict(df, forecast_horizon)
         results = np.asarray(results)
         
-        # Convert to (forecast_horizon, num_features) format
+        # Convert to (forecast_horizon, num_targets) format
         if results.ndim == 1:
             # Univariate case
             results = results.reshape(-1, 1)
         elif results.ndim == 2 and results.shape[1] == forecast_horizon:
-            # Results are (num_features, forecast_horizon), transpose to (forecast_horizon, num_features)
+            # Results are (num_targets, forecast_horizon), transpose to (forecast_horizon, num_targets)
             results = results.T
         
         return results

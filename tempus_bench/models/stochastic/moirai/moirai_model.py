@@ -10,25 +10,19 @@ from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 class MoiraiModel(BaseModel):
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Args:
-          model_name: the type of moirai model you want to use - choose from {'moirai', 'moirai_moe'}
-          size: the model size - choose from {'small', 'base', 'large'}
-          pdt: prediction length - any positive integer
-          ctz: context length - any positive integer
-          psz: patch size - choose from {"auto", 8, 16, 32, 64, 128}
-          bsz: batch size - any positive integer
-          test: test set length - any positive integer
-          num_samples: number of samples to generate during prediction time - any positive integer
+          config: Configuration dictionary containing model parameters
+          logs_dir: Directory for storing log files (optional)
         """
 
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
         # Set reasonable defaults for all model-specific parameters if not provided in config
         # As in https://arxiv.org/pdf/2402.02592
         self.model_config["model_name"] = "moirai"
-        self.model_config["size"] = self.model_config.get("size", "small")
+        self.model_config["size"] = self.model_config.get("size")
         self.model_config["ctx"] = None
         self.model_config["psz"] = 16
         self.model_config["bsz"] = 32
