@@ -27,7 +27,7 @@ class ConfigManager:
 
     def load_from_file(self, config_path: Union[str, Path]) -> BenchmarkConfig:
         """
-        Load configuration from a file, always merging with config/default.yaml
+        Load configuration from a file, merging with appropriate default config based on task type.
 
         Args:
             config_path: Path to the configuration file
@@ -94,6 +94,7 @@ class ConfigManager:
     def _merge_with_defaults(self, user_config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Merge user configuration with default configuration.
+        Uses the appropriate default config based on task type.
 
         Args:
             user_config: User-provided configuration dictionary
@@ -101,11 +102,17 @@ class ConfigManager:
         Returns:
             Merged configuration dictionary
         """
-        # Load default configuration
-        default_config_path = self.config_dir / "default.yaml"
+        # Determine which default config to use based on task type
+        task_config = user_config.get('task')
+        task_type = task_config.get('task_type')
+        
+        if task_type == 'stochastic':
+            default_config_path = self.config_dir / "default_stochastic.yaml"
+        else:
+            default_config_path = self.config_dir / "default_deterministic.yaml"
 
         if not default_config_path.exists():
-            # If no default.yaml, return user config as-is
+            # If no appropriate default config exists, return user config as-is
             return user_config
 
         try:
