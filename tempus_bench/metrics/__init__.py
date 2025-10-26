@@ -6,8 +6,8 @@ time series forecasting models, including both point forecasts and probabilistic
 
 Available Metrics:
 - crps: Continuous Ranked Probability Score for stochastic forecasts
-- interval_score: Interval score for prediction intervals (stochastic)
-- quantile_loss: Quantile Loss (Pinball Loss) for stochastic forecasts
+- weighted_interval_score: Weighted Interval Score for prediction intervals (stochastic)
+- quantile_score: Quantile Score for stochastic forecasts
 - mae: Mean Absolute Error (deterministic and stochastic)
 - rmse: Root Mean Square Error (deterministic and stochastic)
 - mape: Mean Absolute Percentage Error (deterministic only)
@@ -15,7 +15,7 @@ Available Metrics:
 
 Task Type Requirements:
 - deterministic: mae, rmse, mape, mase
-- stochastic: crps, quantile_loss, interval_score, mae, rmse
+- stochastic: crps, quantile_score, weighted_interval_score, mae, rmse
 
 All metrics accept an optional 'task_type' parameter in kwargs to validate compatibility.
 If not provided, metrics default to their compatible task type.
