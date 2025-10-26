@@ -55,6 +55,20 @@ class EvaluationConfig(BaseModel):
         ge=1,
         description="Maximum number of variates to extract from dataset for evaluation"
     )
+    num_samples: int = Field(
+        default=100,
+        ge=1,
+        description="Number of samples to generate for stochastic metrics"
+    )
+    num_quantiles: int = Field(
+        default=10,
+        ge=1,
+        description="Number of quantiles to compute for quantile-based metrics"
+    )
+    point_forecast_statistic: str = Field(
+        default="mean",
+        description="Statistic to use for converting stochastic predictions to point forecasts"
+    )
 
 
 class TaskConfig(BaseModel):
