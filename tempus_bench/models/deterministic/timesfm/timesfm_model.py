@@ -8,8 +8,8 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class TimesFMModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
+        super().__init__(config, logs_dir)
         self.is_fitted = True
 
         horizon = self.config["task"]["forecast_horizon"]

@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 
 
 class VARMAXModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize VARMAX model with given configuration.
 
@@ -35,7 +35,7 @@ class VARMAXModel(BaseModel):
                 - forecast_horizon: int, number of steps to forecast ahead
             config_file: Path to a JSON configuration file
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
         if "trend" not in self.model_config:
             raise ValueError("trend must be specified in config")
         if "p" not in self.model_config:

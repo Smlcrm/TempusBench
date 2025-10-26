@@ -13,7 +13,7 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class CrostonClassicModel(BaseModel):
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize the Croston's Classic model with a given configuration.
 
@@ -23,7 +23,7 @@ class CrostonClassicModel(BaseModel):
                 - gamma: float, smoothing parameter for interval level (0 < gamma < 1)
             config_file: Path to a JSON configuration file.
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
         # Parameters, initialized to None
         self.demand_level_ = None
@@ -136,10 +136,10 @@ class CrostonClassicModel(BaseModel):
             where=self.interval_level_ != 0,
         )
         # For multivariate data, broadcast each feature across forecast horizon
-        # Shape: (forecast_horizon, num_features)
+        # Shape: (forecast_horizon, num_targets)
         forecast = np.tile(forecast.reshape(1, -1), reps=(forecast_horizon, 1))
 
-        return forecast  # Return (forecast_horizon, num_features)
+        return forecast  # Return (forecast_horizon, num_targets)
 
 
     def get_model_summary(self) -> Dict[str, Any]:

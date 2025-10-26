@@ -13,44 +13,26 @@ from tempus_bench.utils.logger import get_logger
 
 
 class ExponentialSmoothingModel(BaseModel):
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Exponential Smoothing model with a given configuration.
 
         Args:
             config: Configuration dictionary for model parameters.
                     e.g., {'trend': 'add', 'seasonal': 'add', 'seasonal_periods': 12, ...}
-            config_file: Path to a JSON configuration file.
+            logs_dir: Directory for storing log files (required)
         """
-        super().__init__(config)
-        # Get logs directory from config, default to 'logs' if not specified
-        logs_dir = config['logging']['logs_dir']
-        self.logger = get_logger(logs_dir)
-
-        def _cast_param(key, value):
-            if key == "seasonal_periods":
-                return int(value) if value is not None else None
-            if key == "damped_trend":
-                if isinstance(value, str):
-                    return value.lower() == "true"
-                return bool(value)
-            if key == "forecast_horizon":
-                return int(value) if value is not None else 1
-            if key in ["trend", "seasonal"]:
-                if isinstance(value, str) and value.lower() == "none":
-                    return None
-                return value
-            return value
+        super().__init__(config, logs_dir)
 
         # Cast parameters to correct types (no defaults - all must be in config)
-        self.model_config["trend"] = _cast_param("trend", self.model_config["trend"])
-        self.model_config["seasonal"] = _cast_param(
+        self.model_config["trend"] = self._cast_param("trend", self.model_config["trend"])
+        self.model_config["seasonal"] = self._cast_param(
             "seasonal", self.model_config["seasonal"]
         )
-        self.model_config["seasonal_periods"] = _cast_param(
+        self.model_config["seasonal_periods"] = self._cast_param(
             "seasonal_periods", self.model_config["seasonal_periods"]
         )
-        self.model_config["damped_trend"] = _cast_param(
+        self.model_config["damped_trend"] = self._cast_param(
             "damped_trend", self.model_config["damped_trend"]
         )
 
@@ -69,6 +51,22 @@ class ExponentialSmoothingModel(BaseModel):
             raise ValueError("damped_trend can only be True when trend is specified")
 
         self.model = None
+
+    def _cast_param(self, key, value):
+        """Cast parameter values to correct types."""
+        if key == "seasonal_periods":
+            return int(value) if value is not None else None
+        if key == "damped_trend":
+            if isinstance(value, str):
+                return value.lower() == "true"
+            return bool(value)
+        if key == "forecast_horizon":
+            return int(value) if value is not None else 1
+        if key in ["trend", "seasonal"]:
+            if isinstance(value, str) and value.lower() == "none":
+                return None
+            return value
+        return value
 
     def _train(
         self,
@@ -151,25 +149,25 @@ class ExponentialSmoothingModel(BaseModel):
         Anyvariate wrapper: trains a separate Exponential Smoothing per variate if multivariate,
         or a single Exponential Smoothing in the univariate case.
 
-        Assumes y_context and y_target are 2D ndarrays: (num_steps, num_features), even for univariate.
+        Assumes y_context and y_target are 2D ndarrays: (num_steps, num_targets), even for univariate.
         """
-        num_features = y_context.shape[1]
+        num_targets = y_context.shape[1]
         
         if self.logger:
-            self.logger.debug("ExponentialSmoothing Train Wrapper", f"Number of features/variates detected: {num_features}")
+            self.logger.debug("ExponentialSmoothing Train Wrapper", f"Number of features/variates detected: {num_targets}")
         
         # Multivariate: more than one feature (column)
-        if num_features > 1:
+        if num_targets > 1:
             if self.logger:
                 self.logger.debug("ExponentialSmoothing Train Wrapper", "Taking multivariate path - training separate Exponential Smoothing per variate")
             self.models = []
-            for k in range(num_features):
+            for k in range(num_targets):
                 if self.logger:
                     self.logger.debug("ExponentialSmoothing Train Wrapper", f"Training variate k={k}")
                 yc = y_context[:, k]    # Already 1D
                 yt = y_target[:, k] if y_target is not None else None  # Already 1D
                 # Create new model instance for this variate
-                m = ExponentialSmoothingModel(self.config)
+                m = ExponentialSmoothingModel(self.config, logs_dir=self.logs_dir)
                 m._train(
                     y_context=yc,
                     y_target=yt,
@@ -183,7 +181,7 @@ class ExponentialSmoothingModel(BaseModel):
             self.model = self.models[0].model
             self.is_fitted = True
             if self.logger:
-                self.logger.info("ExponentialSmoothing Train Wrapper", f"Multivariate training completed for {num_features} variates")
+                self.logger.info("ExponentialSmoothing Train Wrapper", f"Multivariate training completed for {num_targets} variates")
             return self
         else:
             # Univariate: input is always (num_steps, 1)

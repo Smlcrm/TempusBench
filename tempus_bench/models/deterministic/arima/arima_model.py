@@ -39,7 +39,7 @@ class ArimaModel(BaseModel):
         loss_function: Loss function for training
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize ARIMA model with given configuration.
 
@@ -51,16 +51,10 @@ class ArimaModel(BaseModel):
                 - s: int, seasonality period (default: 1)
                 - loss_function: str, loss function for training (default: 'mae')
                 - forecast_horizon: int, number of steps to forecast ahead
+            logs_dir: Directory for storing log files (required)
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
         self.full_config = config
-
-        # Initialize logger if logs_dir is available
-        logs_dir = config.get('logging', {}).get('logs_dir')
-        if logs_dir:
-            self.logger = get_logger(logs_dir)
-        else:
-            self.logger = None
 
         # Extract ARIMA-specific parameters
         if "p" not in self.model_config:
@@ -246,25 +240,25 @@ class ArimaModel(BaseModel):
         Anyvariate wrapper: trains a separate ARIMA per variate if multivariate,
         or a single ARIMA in the univariate case.
 
-        Assumes y_context and y_target are 2D ndarrays: (num_steps, num_features), even for univariate.
+        Assumes y_context and y_target are 2D ndarrays: (num_steps, num_targets), even for univariate.
         """
-        num_features = y_context.shape[1]
+        num_targets = y_context.shape[1]
         
         if self.logger:
-            self.logger.debug("ARIMA Train Wrapper", f"Number of features/variates detected: {num_features}")
+            self.logger.debug("ARIMA Train Wrapper", f"Number of features/variates detected: {num_targets}")
         
         # Multivariate: more than one feature (column)
-        if num_features > 1:
+        if num_targets > 1:
             if self.logger:
                 self.logger.debug("ARIMA Train Wrapper", "Taking multivariate path - training separate ARIMA per variate")
             self.models = []
-            for k in range(num_features):
+            for k in range(num_targets):
                 if self.logger:
                     self.logger.debug("ARIMA Train Wrapper", f"Training variate k={k}")
                 yc = y_context[:, k]    # Already 1D
                 yt = y_target[:, k] if y_target is not None else None  # Already 1D
                 # No need to reshape to 2D column; _train can handle 1D array for this variate
-                m = ArimaModel(self.config)
+                m = ArimaModel(self.config, logs_dir=self.logs_dir)
                 m._train(
                     y_context=yc,
                     y_target=yt,
@@ -277,7 +271,7 @@ class ArimaModel(BaseModel):
             self.model_ = self.models[0].model_
             self.is_fitted = True
             if self.logger:
-                self.logger.info("ARIMA Train Wrapper", f"Multivariate training completed for {num_features} variates")
+                self.logger.info("ARIMA Train Wrapper", f"Multivariate training completed for {num_targets} variates")
             return self
         else:
             # Univariate: input is always (num_steps, 1)

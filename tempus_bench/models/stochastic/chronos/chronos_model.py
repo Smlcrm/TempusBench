@@ -13,13 +13,13 @@ import pandas as pd
 import numpy as np
 import torch
 from typing import Dict, Any, Union, Tuple, List, Optional
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.stochastic_base_model import StochasticBaseModel
 from tempus_bench.utils.logger import get_logger
 from chronos import ChronosPipeline as BaseChronosPipeline
 from einops import rearrange
 
 
-class ChronosModel(BaseModel):
+class ChronosModel(StochasticBaseModel):
     """
     Chronos foundation model wrapper for time series forecasting.
 
@@ -33,7 +33,7 @@ class ChronosModel(BaseModel):
         pipeline: The underlying Chronos pipeline instance
     """
 
-    def __init__(self, config: Dict[str, Any] = None, logs_dir: str):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize the Chronos model wrapper.
 
@@ -44,14 +44,12 @@ class ChronosModel(BaseModel):
                 - num_samples: int, number of predictive samples (default: 5)
             config_file: Path to a JSON configuration file
         """
-        super().__init__(config)
-        self.logger = get_logger(logs_dir)
+        super().__init__(config, logs_dir)
 
         self.model_config["model_size"] = (
             "tiny"  # Valid model sizes = {'tiny', 'mini', 'small', 'base', 'large'}
         )
         self.model_config["context_length"] = 512
-        self.model_config["num_samples"] = 10
 
         # Initialize model state
         self.is_fitted = False
@@ -118,7 +116,7 @@ class ChronosModel(BaseModel):
             **kwargs: Additional keyword arguments
 
         Returns:
-            np.ndarray: Model predictions
+            np.ndarray: Model prediction samples with shape (num_samples, forecast_horizon, num_targets)
 
         Raises:
             ValueError: If model is not fitted or required data is missing
@@ -143,137 +141,16 @@ class ChronosModel(BaseModel):
         forecasts = self.model.predict(
             context=y_context,
             prediction_length=forecast_horizon,
-            num_samples=self.model_config["num_samples"],
+            num_samples=self.num_samples,
         )
         forecasts = np.squeeze(np.asarray(forecasts))
-        forecasts = np.squeeze(np.mean(forecasts, axis=0, keepdims=True).T)
-
+        
+        # Ensure correct shape: (num_samples, forecast_horizon, num_targets)
+        if forecasts.ndim == 2:
+            # If univariate, add target dimension
+            forecasts = forecasts[:, :, np.newaxis]
+        
         return forecasts
-
-        # y_context =
-        # # Use the working approach: load model fresh and convert to proper format
-        # results = self._sub_predict(df, prediction_length)
-
-        # # Process results based on data dimensionality
-        # if len(list(results.keys())) == 1:
-        #     # Univariate result - always expect '1' as per working commit 434d3b0e
-        #     series_vals = np.array(results["1"])  # shape (pred_len,)
-
-        #     if series_vals.ndim > 1:
-        #         series_vals = series_vals.squeeze()
-        #     if series_vals.shape[0] > prediction_length:
-        #         series_vals = series_vals[:prediction_length]
-        #     return series_vals
-        # else:
-        #     # Multivariate result
-        #     multivariate_values = []
-        #     for key in results.keys():
-        #         vals = np.array(results[key])
-        #         if vals.ndim > 1:
-        #             vals = vals.squeeze()
-        #         if vals.shape[0] > prediction_length:
-        #             vals = vals[:prediction_length]
-        #         multivariate_values.append(vals)
-        #     preds = np.array(multivariate_values)  # shape (num_targets, pred_len)
-        #     # Ensure exact horizon length
-        #     if preds.shape[1] > prediction_length:
-        #         preds = preds[:, :prediction_length]
-        # return preds
-
-    # def _sub_predict(
-    #     self, df: pd.DataFrame, prediction_length: int
-    # ) -> Dict[str, List[float]]:
-    #     """
-    #     Generates forecasts for future time steps based on the most recent data.
-
-    #     This method uses the last `context_length` data points from each time series
-    #     in the DataFrame to predict the next `prediction_length` steps.
-
-    #     Args:
-    #         df: DataFrame containing time series data with timestamps as index
-    #         prediction_length: Number of future time steps to predict
-
-    #     Returns:
-    #         Dict[str, List[float]]: A dictionary where keys are time series names (column headers)
-    #                                 and values are the list of forecasted points.
-    #     """
-
-    #     # Create one context window for each time series
-    #     all_contexts = []
-    #     for series_name in df.columns:
-    #         series_data = df[series_name].values
-
-    #         # Intelligent context selection: use more recent data for better predictions
-    #         if len(series_data) >= self.model_config["context_length"]:
-    #             # Use the most recent context_length data points
-    #             context_data = series_data[-self.model_config["context_length"] :]
-    #         else:
-    #             # If not enough data, pad with the last available value
-    #             context_data = np.full(
-    #                 self.model_config["context_length"], series_data[-1]
-    #             )
-    #             context_data[-len(series_data) :] = series_data
-
-    #         # Ensure data is properly formatted for Chronos
-    #         context_data = np.asarray(context_data, dtype=np.float32)
-
-    #         # Handle any NaN values
-    #         if np.any(np.isnan(context_data)):
-    #             context_data = np.nan_to_num(context_data, nan=0.0)
-
-    #         all_contexts.append(torch.tensor(context_data, dtype=torch.float32))
-
-    #     # Generate forecasts
-    #     all_forecasts = pipeline.predict(
-    #         context=all_contexts,
-    #         prediction_length=prediction_length,
-    #         num_samples=self.model_config["num_samples"],
-    #     )
-
-    #     # Process results
-    #     results = {}
-    #     for i, series_name in enumerate(df.columns):
-    #         # For each series, aggregate the prediction samples intelligently
-    #         forecasts = all_forecasts[i]  # shape: (num_samples, prediction_length)
-
-    #         # Convert PyTorch tensor to numpy array
-    #         if hasattr(forecasts, "cpu"):
-    #             forecasts = forecasts.cpu().numpy()
-    #         elif hasattr(forecasts, "numpy"):
-    #             forecasts = forecasts.numpy()
-    #         else:
-    #             forecasts = np.array(forecasts)
-
-    #         if self.model_config["num_samples"] > 1:
-    #             # Use weighted average: give more weight to more recent predictions
-    #             weights = np.linspace(0.5, 1.0, self.model_config["num_samples"])
-    #             weights = weights / np.sum(weights)
-
-    #             # Weighted average across samples
-    #             weighted_forecast = np.average(forecasts, axis=0, weights=weights)
-
-    #             # Also compute median as fallback
-    #             median_forecast = np.median(forecasts, axis=0)
-
-    #             # Use the better of the two (lower variance)
-    #             # Calculate variance manually to avoid numpy version issues
-    #             forecast_variance = np.mean(
-    #                 (forecasts - np.mean(forecasts, axis=0)) ** 2, axis=0
-    #             )
-    #             if np.mean(forecast_variance) < 0.1:  # Low variance = use weighted avg
-    #                 final_forecast = weighted_forecast
-    #             else:  # High variance = use median (more robust)
-    #                 final_forecast = median_forecast
-    #         else:
-    #             final_forecast = forecasts[0]  # Single sample
-
-    #         results[series_name] = final_forecast.tolist()
-
-    #     # DEBUG: Print what we're returning
-    #     print(f"[CHRONOS DEBUG] _sub_predict returning keys: {list(results.keys())}")
-    #     print(f"[CHRONOS DEBUG] _sub_predict returning content: {results}")
-
-    #     return results
 
     def get_model_summary(self) -> Dict[str, Any]:
         """
@@ -286,7 +163,7 @@ class ChronosModel(BaseModel):
             "model_type": "Chronos",
             "model_size": self.model_config["model_size"],
             "context_length": self.model_config["context_length"],
-            "num_samples": self.model_config["num_samples"],
+            "num_samples": self.num_samples,
             "forecast_horizon": self.forecast_horizon,
             "is_fitted": self.is_fitted,
             "device": "cuda" if torch.cuda.is_available() else "cpu",

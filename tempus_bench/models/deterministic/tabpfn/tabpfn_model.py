@@ -27,17 +27,15 @@ def make_time_features(n: int) -> pd.DataFrame:
 
 class TabpfnModel(BaseModel):
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initializes a TabPFN-TS forecaster
 
         Args:
-            n_ensemble_configs (int): Number of ensemble configurations (kept in signature).
-            device (str): 'cpu' or 'cuda' for the underlying TabPFN model.
-            allow_large_cpu_dataset (bool): If True, bypasses the default CPU sample limit by
-                setting ignore_pretraining_limits=True. Otherwise will error if >1000 samples.
+            config: Configuration dictionary containing model parameters
+            logs_dir: Directory for storing log files (optional)
         """
-        super().__init__(config)
+        super().__init__(config, logs_dir)
 
         # self.model_config["allow_large_cpu_dataset"]
         # self.model_config["max_sequence_length"]
@@ -73,12 +71,12 @@ class TabpfnModel(BaseModel):
         context_window = (
             int(self.model_config.get("context_window")
                 if self.model_config.get("context_window") is not None
-                else self.model_config.get("max_sequence_length", 128))
+                else self.model_config.get("max_sequence_length"))
         )
         forecast_window = (
             int(self.model_config.get("forecast_window")
                 if self.model_config.get("forecast_window") is not None
-                else self.model_config.get("prediction_length", 10))
+                else self.model_config.get("prediction_length"))
         )
 
         # Determine total horizon from target timestamps
@@ -123,9 +121,9 @@ class TabpfnModel(BaseModel):
     ) -> "TabpfnModel":
         if y_context.ndim > 1 and y_context.shape[1] > 1:
             self.models = []
-            num_features = y_context.shape[1]
-            for k in range(num_features):
-                m = TabpfnModel(self.config)
+            num_targets = y_context.shape[1]
+            for k in range(num_targets):
+                m = TabpfnModel(self.config, logs_dir=self.logs_dir)
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
                 m._train(y_context=yc, y_target=yt, timestamps_context=timestamps_context, timestamps_target=timestamps_target, freq=freq, **kwargs)

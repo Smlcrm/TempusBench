@@ -15,19 +15,16 @@ from tempus_bench.utils.logger import get_logger
 
 
 class RandomForestModel(BaseModel):
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Dict[str, Any], logs_dir: str):
         """
         Initialize Random Forest model with given configuration.
 
         Args:
             config: Configuration dictionary for RandomForestRegressor parameters.
                     e.g., {'n_estimators': 100, 'max_depth': 10, 'random_state': 42, 'lookback_window': 10}
-            config_file: Path to a JSON configuration file.
+            logs_dir: Directory for storing log files (required)
         """
-        super().__init__(config)
-        # Get logs directory from config, default to 'logs' if not specified
-        logs_dir = config.get('logging').get('logs_dir')
-        self.logger = get_logger(logs_dir)
+        super().__init__(config, logs_dir)
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")
         
@@ -238,9 +235,9 @@ class RandomForestModel(BaseModel):
 
         # Combine context and target data for training
         # Train the model to predict the configured forecast horizon
-        forecast_horizon = int(self.model_config.get("forecast_horizon", 1))
+        forecast_horizon = int(self.model_config.get("forecast_horizon"))
 
-        # Concatenate along time axis (axis=0) for our (num_steps, num_features) format
+        # Concatenate along time axis (axis=0) for our (num_steps, num_targets) format
         full_y_data = np.concatenate([y_context, y_target], axis=0)
         
         # Combine timestamps if available
@@ -308,7 +305,7 @@ class RandomForestModel(BaseModel):
 
         forecast_horizon = self.model_config["forecast_horizon"]
 
-        # Ensure y_context is in (num_steps, num_features) format
+        # Ensure y_context is in (num_steps, num_targets) format
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
 
@@ -323,8 +320,8 @@ class RandomForestModel(BaseModel):
         # So we need to create a feature row for the current context and the next forecast_horizon timestamps
 
         # Create dummy future data for feature creation
-        num_features = y_context.shape[1]
-        dummy_future = np.zeros((forecast_horizon, num_features))
+        num_targets = y_context.shape[1]
+        dummy_future = np.zeros((forecast_horizon, num_targets))
         full_y_data = np.concatenate([y_context, dummy_future], axis=0)
         
         feature_row, _ = self._create_features(full_y_data, full_timestamps)
@@ -336,9 +333,9 @@ class RandomForestModel(BaseModel):
         # Predict all steps at once
         preds = self.model.predict(X_last)
         
-        # Reshape predictions back to (forecast_horizon, num_features)
-        # The model predicts forecast_horizon * num_features values
-        preds_reshaped = preds.reshape(forecast_horizon, num_features)
+        # Reshape predictions back to (forecast_horizon, num_targets)
+        # The model predicts forecast_horizon * num_targets values
+        preds_reshaped = preds.reshape(forecast_horizon, num_targets)
         
         # Inverse transform predictions if scaler is available
         if self.scaler is not None:
@@ -373,11 +370,11 @@ class RandomForestModel(BaseModel):
         # Initialize context with the last lookback_window values from y_context
         # Ensure context is 1D for consistent handling
 
-        # Ensure y_context is in (num_steps, num_features) format
+        # Ensure y_context is in (num_steps, num_targets) format
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
 
-        num_features = y_context.shape[1]
+        num_targets = y_context.shape[1]
         forecast_horizon = len(timestamps_target)
         
         # Use the last lookback_window timesteps as context
