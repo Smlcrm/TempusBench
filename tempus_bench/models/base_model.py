@@ -157,7 +157,6 @@ class BaseModel(ABC):
         self,
         y_true: np.ndarray,
         y_pred: np.ndarray,
-        y_train: np.ndarray = None,
         **kwargs
     ) -> Dict[str, float]:
         """
@@ -166,9 +165,8 @@ class BaseModel(ABC):
         This method computes evaluation metrics as configured in evaluation.metrics
 
         Args:
-            y_true: True target values (ndarray, shape [num_steps, num_targets])
-            y_pred: Predicted values (ndarray, shape [num_steps, num_targets])
-            y_train: Training target values (required for MASE calculation) (ndarray, shape [num_steps, num_targets])
+            y_true: True target values (ndarray, shape [num_steps, num_features])
+            y_pred: Predicted values (ndarray, shape [num_steps, num_features])
 
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
@@ -179,7 +177,7 @@ class BaseModel(ABC):
 
         # Use evaluator to compute evaluation metrics (from evaluation.metrics)
         # y_pred, y_true, y_train are guaranteed ndarrays of matching shapes
-        return self.evaluator.evaluate(y_pred, y_true, y_train=y_train, **kwargs)
+        return self.evaluator.evaluate(y_true, y_pred, **kwargs)
 
     def evaluate(
         self, X: Union[pd.DataFrame, np.ndarray], y: Union[pd.Series, np.ndarray]
