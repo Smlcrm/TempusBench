@@ -122,33 +122,15 @@ class ModelExecutor:
                             freq=freq,
                         )
 
-                        # Check if this is a stochastic model (returns samples)
-                        if hasattr(trained_model, 'num_samples'):
-                            # Stochastic model - results are samples
-                            y_pred_samples = results  # Shape: (num_samples, forecast_horizon, num_targets)
-                            y_pred_point = trained_model.compute_point_forecast(y_pred_samples)  # Shape: (forecast_horizon, num_targets)
-                            
-                            eval_losses = trained_model.compute_loss(
-                                y_true=target[vstart:vend],
-                                y_pred_samples=y_pred_samples,
-                                y_train=target[tstart:tend],
-                                freq=freq
-                            )
-                        else:
-                            # Deterministic model - results are point forecasts
-                            y_pred_point = results
-                            
-                            eval_losses = trained_model.compute_loss(
-                                y_true=target[vstart:vend],
-                                y_pred=y_pred_point,
-                                y_train=target[tstart:tend],
-                                freq=freq
-                            )
+                        eval_losses = trained_model.compute_loss(
+                            y_true=target[vstart:vend],
+                            y_pred=results
+                        )
 
                         # Include predictions in output for plotting
                         output = {{
                             **eval_losses,
-                            "predictions": y_pred_point.tolist(),
+                            "predictions": results.tolist(),
                             "y_true": target[vstart:vend].tolist()
                         }}
 
