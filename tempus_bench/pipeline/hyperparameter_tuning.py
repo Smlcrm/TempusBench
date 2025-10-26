@@ -156,6 +156,10 @@ class HyperparameterTuner:
         )
 
         for model_name, hyperparameters in self.config["model"].items():
+            # Skip models that are None (not configured)
+            if hyperparameters is None:
+                continue
+                
             if logging:
                 self.logger.info("HyperparameterTuner", f"Optimizing hyperparameters for model: {model_name}")
                 self.logger.debug("HyperparameterTuner", f"Hyperparameters for {model_name}: {hyperparameters}")
@@ -177,7 +181,7 @@ class HyperparameterTuner:
                 # Generate windows for this dataset
                 steps = [('context', context_steps), ('train', train_steps), ('validate', validate_steps)]
                 window_iter = data_loader.generate_dataset_split(
-                    dataset_path, steps, stride=1
+                    dataset_path, steps, stride=validate_steps
                 )
 
                 # Store results for each window
@@ -358,8 +362,8 @@ class HyperparameterTuner:
             )
             
             # Extract actual predictions from results
-            predictions = np.array(eval_results.get('predictions', []))
-            y_true_validate = np.array(eval_results.get('y_true', []))
+            predictions = np.array(eval_results.get('predictions'))
+            y_true_validate = np.array(eval_results.get('y_true'))
             
             # Create subplots for each target
             num_targets = context_data.shape[1] if context_data.ndim > 1 else 1
