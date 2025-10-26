@@ -2,22 +2,24 @@ task:
   task_type: deterministic
   forecast_horizon: 4
   context_window: 42
-  max_windows: 20
-  max_num_variates: 10
-  tuning_loss: mae
   dataset:
     name: multivariate/baggage_100_multivariate
     normalize: true
     handle_missing: interpolate
 evaluation:
   metrics: [mae, mase, rmse, mape]
-  logging: true
+  tuning_loss: mae
+  max_windows: 20
+  max_num_variates: 10
 model:
   exponential_smoothing:
     trend: [add]
     seasonal: [null]
-    seasonal_periods: [null, 12]
-    damped_trend: [false, true]
+    seasonal_periods: [null]
+    damped_trend: [false]
+    alpha: [0.3]
+    beta: [0.3]
+    gamma: [null]
   seasonal_naive:
     sp: [4]
   croston_classic:
