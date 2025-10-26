@@ -10,7 +10,7 @@ Calculates Mean Absolute Error.
 class MAE:
     def __call__(
         self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs
-    ) -> Union[float, np.ndarray]:
+    ) -> float:
         """
         Computes the MAE.
 
@@ -23,9 +23,14 @@ class MAE:
         Returns:
             The calculated MAE score.
         """
-        task_type = kwargs.get('task_type', 'deterministic')
+        task_type = kwargs.get('task_type')
+        if task_type == 'stochastic':
+            point_forecast_statistic = kwargs['point_forecast_statistic']
+            if point_forecast_statistic == 'mean':
+                y_ppred = np.mean(y_pred, axis=0)
+            else:
+                raise ValueError("MAE can only handle point_forecast_statistic == 'mean' for stochastic evaluation.")
+        else:
+            y_ppred = y_pred
 
-        if task_type not in ['deterministic', 'stochastic']:
-            raise ValueError(f"Invalid task_type '{task_type}'. Must be 'deterministic' or 'stochastic'.")
-
-        return np.mean(np.abs(y_true - y_pred))
+        return np.mean(np.abs(y_true - y_ppred))
