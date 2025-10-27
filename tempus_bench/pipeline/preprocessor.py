@@ -2,84 +2,35 @@
 Data preprocessing utilities.
 """
 
-import numpy as np
-import pandas as pd
-import random
 import re
 import ast
 import yaml
-import logging
-from typing import Dict, Any, Tuple, Optional
-from sklearn.preprocessing import StandardScaler
+import numpy as np
+import pandas as pd
+
 from pathlib import Path
+from typing import Tuple, Optional
+from sklearn.preprocessing import StandardScaler
 
-logger = logging.getLogger(__name__)
-
+from tempus_bench.config import load_config, get_config_manager
+from tempus_bench.utils.logger import get_logger
 
 class Preprocessor:
-    def __init__(self, config: Dict[str, Any], task_path: Optional[str] = None):
+    def __init__(self, config_path: str, logs_path: str):
         """
         Initialize preprocessor with configuration.
 
         Args:
-            config: Configuration dictionary. Preprocessing-related keys are under 'task'.
-                Supports: normalize, handle_missing, max_num_variates.
-            task_path: Path to the specific task directory to load task-specific config
+            config_path: Path to the configuration YAML file
+            logs_path: Directory for log files
         """
-        self.config = config
-        
-        # Extract configuration values without defaults
-        evaluation_config = config.get('evaluation')
-        self.max_num_variates = evaluation_config.get('max_num_variates')
-        
-        # Load task-specific configuration if task_path is provided
-        if task_path:
-            self._load_task_config(task_path)
-        else:
-            # Use defaults if no task path provided
-            self.normalize = True
-            self.handle_missing = 'interpolate'
-    
-    def _load_task_config(self, task_path: str) -> None:
-        """Load task-specific configuration from task.yaml (uses first task definition)."""
-        task_dir = Path(task_path)
-        task_config_path = task_dir / "task.yaml"
-        
-        if not task_config_path.exists():
-            logger.warning(f"Task config not found: {task_config_path}, using defaults")
-            self.normalize = True
-            self.handle_missing = 'interpolate'
-            return
-        
-        try:
-            with open(task_config_path, 'r') as f:
-                # Load all YAML documents from the file
-                task_configs = list(yaml.safe_load_all(f))
-            
-            # Use the first valid task configuration
-            for task_config in task_configs:
-                if task_config is None or 'task' not in task_config:
-                    continue
-                
-                task_data = task_config['task']
-                if 'dataset' not in task_data:
-                    continue
-                
-                # Extract dataset configuration
-                dataset_config = task_data.get('dataset', {})
-                self.normalize = dataset_config.get('normalize', True)
-                self.handle_missing = dataset_config.get('handle_missing', 'interpolate')
-                return
-            
-            # If no valid task config found, use defaults
-            logger.warning(f"No valid task configuration found in {task_config_path}, using defaults")
-            self.normalize = True
-            self.handle_missing = 'interpolate'
-            
-        except Exception as e:
-            logger.warning(f"Failed to load task config from {task_config_path}: {e}, using defaults")
-            self.normalize = True
-            self.handle_missing = 'interpolate'
+        self.config = load_config(config_path, logs_path)
+        self.config_manager = get_config_manager()
+        console_logging = self.config_manager.settings.console_logging
+        file_logging = self.config_manager.settings.file_logging
+        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
+        evaluation_config = self.config['evaluation']
+        self.max_num_variates = evaluation_config['max_num_variates']
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """
@@ -167,7 +118,7 @@ class Preprocessor:
 
         return target
 
-    def _handle_missing_values(self, arr: np.ndarray, start: str, freq: str) -> Tuple[np.ndarray, np.ndarray]:
+    def _handle_missing_values(self, arr: np.ndarray, start: str, freq: str, handle_missing: str) -> Tuple[np.ndarray, np.ndarray]:
         """
         Handle missing values in the ndarray and return cleaned data with corresponding timestamps.
 
@@ -175,6 +126,7 @@ class Preprocessor:
             arr: Input array to clean, shape (num_steps, num_targets)
             start: Start time as string
             freq: Frequency as string
+            handle_missing: Strategy for handling missing values
 
         Returns:
             Tuple of (timestamps, cleaned_array)
@@ -200,12 +152,12 @@ class Preprocessor:
 
         result = data.copy()
 
-        if self.handle_missing == 'drop':
+        if handle_missing == 'drop':
             # Remove rows (timesteps) with any NaN values
             valid_rows = ~np.isnan(result).any(axis=1)
             result = result[valid_rows]
             timestamps = timestamps[valid_rows]
-        elif self.handle_missing == 'mean':
+        elif handle_missing == 'mean':
             # Fill NaN with column means (feature means)
             for col_idx in range(result.shape[1]):
                 col_data = result[:, col_idx]
@@ -213,7 +165,7 @@ class Preprocessor:
                 if not np.isnan(mean_val):
                     col_data[np.isnan(col_data)] = mean_val
                     result[:, col_idx] = col_data
-        elif self.handle_missing == 'median':
+        elif handle_missing == 'median':
             # Fill NaN with column medians (feature medians)
             for col_idx in range(result.shape[1]):
                 col_data = result[:, col_idx]
@@ -221,15 +173,15 @@ class Preprocessor:
                 if not np.isnan(median_val):
                     col_data[np.isnan(col_data)] = median_val
                     result[:, col_idx] = col_data
-        elif self.handle_missing == 'interpolate':
+        elif handle_missing == 'interpolate':
             # Interpolate missing values for each column (feature)
             for col_idx in range(result.shape[1]):
                 result[:, col_idx] = self._interpolate_column(result[:, col_idx])
-        elif self.handle_missing == 'forward_fill':
+        elif handle_missing == 'forward_fill':
             # Forward fill missing values for each column (feature)
             for col_idx in range(result.shape[1]):
                 result[:, col_idx] = self._forward_fill_column(result[:, col_idx])
-        elif self.handle_missing == 'backward_fill':
+        elif handle_missing == 'backward_fill':
             # Backward fill missing values for each column (feature)
             for col_idx in range(result.shape[1]):
                 result[:, col_idx] = self._backward_fill_column(result[:, col_idx])
@@ -301,7 +253,7 @@ class Preprocessor:
         Returns:
             Target array with capped number of features
         """
-        if self.max_num_variates is None:
+        if self.max_num_variates is None or self.max_num_variates == float('inf'):
             return target
 
         if target.shape[1] > self.max_num_variates:
@@ -311,7 +263,7 @@ class Preprocessor:
 
         return target
 
-    def clean(self, time_start: str, freq: str, target_raw: str) -> Tuple[np.ndarray, str, str, np.ndarray, Optional[StandardScaler]]:
+    def clean(self, time_start: str, freq: str, target_raw: str, normalize: bool, handle_missing: str) -> Tuple[np.ndarray, str, str, np.ndarray, Optional[StandardScaler]]:
         """
         Clean raw target data by parsing, handling missing values, and normalizing.
 
@@ -319,6 +271,8 @@ class Preprocessor:
             time_start: Start time as string (will be converted to pandas Timestamp)
             freq: Frequency as string (pandas-compatible frequency)
             target_raw: Raw target data as string (JSON-like array format)
+            normalize: Whether to normalize the data using StandardScaler
+            handle_missing: Strategy for handling missing values ('drop', 'mean', 'median', 'interpolate', 'forward_fill', 'backward_fill')
 
         Returns:
             Tuple of (timestamps, time_start, freq, target) - cleaned timestamps, time_start, freq, and target
@@ -357,7 +311,7 @@ class Preprocessor:
             'A': 'YE',  # Annual -> Year End
         }
         mapped_freq = freq_mapping.get(freq)
-        
+
         try:
             pd.date_range(start=time_start, periods=2, freq=mapped_freq)
         except (ValueError, TypeError) as e:
@@ -365,13 +319,13 @@ class Preprocessor:
 
         # 5. Handle missing values (creates timestamps internally)
         print(f"[DEBUG] Before missing value handling, target shape: {target.shape}")
-        timestamps_cleaned, target_cleaned = self._handle_missing_values(target, time_start, freq)
+        timestamps_cleaned, target_cleaned = self._handle_missing_values(target, time_start, freq, handle_missing)
         print(f"[DEBUG] After missing value handling, target shape: {target_cleaned.shape}")
         print(f"[DEBUG] Timestamps shape: {timestamps_cleaned.shape}")
 
         # 6. Normalize if configured
         scaler = None
-        if self.normalize:
+        if normalize:
             print(f"[DEBUG] Normalizing data...")
             # target_cleaned: (num_steps, num_targets)
             scaler = StandardScaler()
