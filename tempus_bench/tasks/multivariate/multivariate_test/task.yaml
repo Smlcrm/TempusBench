@@ -1,0 +1,8 @@
+task:
+  context_window: 64
+  dataset:
+    handle_missing: interpolate
+    name: multivariate_test
+    normalize: true
+  forecast_horizon: 8
+---

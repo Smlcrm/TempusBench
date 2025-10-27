@@ -1,0 +1,8 @@
+task:
+  context_window: 32
+  dataset:
+    handle_missing: interpolate
+    name: baggage_sales_multivariate
+    normalize: true
+  forecast_horizon: 16
+---
