@@ -40,7 +40,6 @@ lightning_logs/
 runs/
 results/
 logs/
-metrics/
 *.tfevents.*
 
 # Testing
@@ -69,4 +68,4 @@ checkpoints/
 models/*/checkpoints/
 **/checkpoints/
 
-runs/*
+runs/*runs/

@@ -1,0 +1,8 @@
+task:
+  name: german_quaterly_univariate
+  context_window: 32
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: german_quaterly_univariate.csv

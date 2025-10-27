@@ -1,0 +1,8 @@
+task:
+  name: delhi_climate_univariate
+  context_window: 1024
+  forecast_horizon: 16
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: delhi_climate_univariate.csv

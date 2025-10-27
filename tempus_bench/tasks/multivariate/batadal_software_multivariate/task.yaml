@@ -1,0 +1,8 @@
+task:
+  name: batadal_software_multivariate
+  context_window: 1536
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: batadal_software_multivariate.csv

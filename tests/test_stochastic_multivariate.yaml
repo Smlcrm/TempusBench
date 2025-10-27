@@ -1,0 +1,16 @@
+task:
+  task_path: 'multivariate/baggage_100_multivariate'
+
+evaluation:
+  tuning_loss: mae
+  point_forecast_statistic: mean
+  max_num_variates: 4
+  max_windows: 5
+
+model:
+  chronos: {}
+  # deepar: {}
+  # lagllama: {}
+  # moirai: {}
+  # moirai_moe: {}
+  # toto: {}
