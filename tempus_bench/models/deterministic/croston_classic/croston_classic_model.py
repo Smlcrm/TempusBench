@@ -13,7 +13,7 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class CrostonClassicModel(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize the Croston's Classic model with a given configuration.
 
@@ -23,7 +23,7 @@ class CrostonClassicModel(BaseModel):
                 - gamma: float, smoothing parameter for interval level (0 < gamma < 1)
             config_file: Path to a JSON configuration file.
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         # Parameters, initialized to None
         self.demand_level_ = None

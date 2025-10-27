@@ -16,7 +16,7 @@ import io
 
 
 class SVRModel(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize Support Vector Regression (SVR) model with a given configuration.
         Uses direct multi-output strategy via sklearn's MultiOutputRegressor.
@@ -26,7 +26,7 @@ class SVRModel(BaseModel):
             config_file: Path to configuration file
             logger: Logger instance for TensorBoard logging
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         self.scaler = StandardScaler()  # SVR is sensitive to feature scaling
 

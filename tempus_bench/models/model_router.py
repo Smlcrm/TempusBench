@@ -8,6 +8,7 @@ All models must handle both univariate and multivariate datasets internally.
 import os
 from typing import Tuple, Dict, Any, Set
 from pathlib import Path
+from ..utils.paths import get_models_dir
 from ..utils.logger import get_logger
 
 class ModelRouter:
@@ -21,18 +22,18 @@ class ModelRouter:
     All models must handle both univariate and multivariate datasets internally.
     """
 
-    def __init__(self, logs_dir: str):
+    def __init__(self, logs_path: str):
         """Initialize the router and discover available models."""
         self.deterministic_models: Set[str] = set()
         self.stochastic_models: Set[str] = set()
-        self.logger = get_logger(logs_dir)
+        self.logger = get_logger(logs_path)
 
         self._discover_models()
         self._validate_models()
 
     def _discover_models(self):
         """Discover available models by examining the folder structure."""
-        models_dir = Path(__file__).parent
+        models_dir = get_models_dir()
 
         # Discover deterministic models
         deterministic_dir = models_dir / "deterministic"
@@ -63,7 +64,7 @@ class ModelRouter:
 
         # Check for models that are not in any category
         all_models = self.deterministic_models | self.stochastic_models
-        models_dir = Path(__file__).parent
+        models_dir = get_models_dir()
 
         # Find all model folders
         all_model_folders = set()
@@ -86,18 +87,14 @@ class ModelRouter:
         # Check for models that are in categories but don't have proper structure
         for model_name in all_models:
             if model_name in self.deterministic_models:
-                model_path = (
-                    models_dir / "deterministic" / model_name / f"{model_name}_model.py"
-                )
+                model_path = models_dir / "deterministic" / model_name / f"{model_name}_model.py"
                 if not model_path.exists():
                     raise ValueError(
                         f"Deterministic model '{model_name}' missing required file: {model_path}"
                     )
 
             elif model_name in self.stochastic_models:
-                model_path = (
-                    models_dir / "stochastic" / model_name / f"{model_name}_model.py"
-                )
+                model_path = models_dir / "stochastic" / model_name / f"{model_name}_model.py"
                 if not model_path.exists():
                     raise ValueError(
                         f"Stochastic model '{model_name}' missing required file: {model_path}"
@@ -152,7 +149,7 @@ class ModelRouter:
             - Stochastic task + Deterministic model → ERROR (can't generate samples)
         """
         # Get the absolute path to the models directory
-        models_dir = Path(__file__).parent
+        models_dir = get_models_dir()
 
         # Validate inputs
         if task_type not in ["deterministic", "stochastic"]:

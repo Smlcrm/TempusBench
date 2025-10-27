@@ -9,13 +9,13 @@ from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 class TinyTimeMixerModel(BaseModel):
 
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Args:
           prediction length: any positive integer that shows many steps to forecast
         """
 
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         # forecast_horizon is inherited from parent class (FoundationModel)
         self.model = None
