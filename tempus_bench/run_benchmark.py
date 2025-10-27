@@ -5,13 +5,12 @@ import argparse
 
 from tempus_bench.utils.logger import get_logger
 from tempus_bench.utils.tf_logger import get_tf_logger
+from tempus_bench.utils.paths import get_tasks_dir
 from tempus_bench.config import load_config, validate_config_file
 from tempus_bench.pipeline.hyperparameter_tuning import HyperparameterTuner
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUNS_DIR = os.path.join(ROOT_DIR, "runs")
-DATASETS_DIR = os.path.join(ROOT_DIR, "tempus_bench", "datasets")
-LOGS_DIR = ROOT_DIR
+TASKS_DIR = get_tasks_dir()
 
 class BenchmarkRunner:
     def __init__(self, config_path: str):
@@ -26,10 +25,12 @@ class BenchmarkRunner:
         self.config_name = os.path.splitext(os.path.basename(self.config_path))[0]
         self.run_dir = None # Defined in self.run
         self.logs_dir = None # Defined in self.setup_logging
-        self.datasets_dir = None # Defined in self.run
+        self.tasks_dir = TASKS_DIR
         self.tensorflow_dir = None # Defined in self.setup_logging
         self.tf_logger = None # Defined in self.setup_logging
         self.logger = None # Will be initialized in setup_logging
+        self.runs_dir = self.config.get("paths", {}).get("runs_dir", "runs")
+        self.logs_dir_rel = self.config.get("paths", {}).get("logs_dir", "logs")
 
     def setup_logging(self):
         """Setup logging for benchmark runner execution."""
@@ -55,9 +56,8 @@ class BenchmarkRunner:
         """Execute the end-to-end benchmarking pipeline."""
         self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         # Directory where the run logs and evaluations are stored
-        self.run_dir = os.path.join(RUNS_DIR, f"run_{self.config_name}_{self.run_timestamp}")
-        dataset_config =  self.config['task']['dataset']
-        self.datasets_dir = DATASETS_DIR
+        self.run_dir = os.path.join(self.runs_dir, f"run_{self.config_name}_{self.run_timestamp}")
+        self.tasks_dir = TASKS_DIR
         logging = self.setup_logging()
 
         if logging: self.logger.info("BenchmarkRunner", f"Run starts - {self.run_timestamp}")
@@ -66,12 +66,10 @@ class BenchmarkRunner:
         # Configs
         if logging: self.logger.info("BenchmarkRunner", "Extracting Configs")
         task_config = self.config["task"]
-        dataset_config = task_config["dataset"]
         evaluation_config = self.config["evaluation"]
 
         # Task Config
         if logging: self.logger.info("BenchmarkRunner", "Extracting Task Configs")
-        task_type = task_config["task_type"]
         context_window = task_config["context_window"]
         forecast_horizon = task_config["forecast_horizon"]
 
@@ -79,8 +77,7 @@ class BenchmarkRunner:
         if logging: self.logger.info("BenchmarkRunner", "Hyperparameter Tuning Starts")
         hyperparameter_tuner = HyperparameterTuner(
             config_path=self.config_path,
-            run_dir=self.run_dir,
-            datasets_dir=self.datasets_dir
+            run_dir=self.run_dir
         )
 
         # Hyperparameter Tuning - Context + Train + Validate Losses (Rolling Window with strides of validate_steps)
@@ -115,12 +112,6 @@ if __name__ == "__main__":
         default=None,
         help="Path to the config YAML file. If not specified, uses the default config in tempus_bench/configs/all_models.yaml",
     )
-    parser.add_argument(
-        "--datasets-dir",
-        type=str,
-        default=None,
-        help="Path to datasets directory. If not specified, uses the default datasets directory.",
-    )
     args = parser.parse_args()
 
     if args.config is not None:
@@ -141,8 +132,8 @@ if __name__ == "__main__":
     # Run the Benchmarks
     runner = BenchmarkRunner(config_path=config_path)
 
-    # Override datasets directory if provided
-    if args.datasets_dir:
-        runner.datasets_dir = args.datasets_dir
+    # Override tasks directory if provided
+    if args.tasks_dir:
+        runner.tasks_dir = args.tasks_dir
 
     runner.run()
