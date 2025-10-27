@@ -1,10 +1,11 @@
 # Main configuration for the benchmarking pipeline
 # This file provides sensible defaults for all configuration options
 
-task_path: '*'
+task_path: 'multivariate/baggage_100_multivariate'
 
 evaluation:
-  tuning_loss: mae
+  deterministic_tuning_loss: mae
+  stochastic_tuning_loss: crps
   max_windows: 20
   max_num_variates: 10
   num_samples: 100

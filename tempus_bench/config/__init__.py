@@ -54,12 +54,6 @@ def load_config(config_path: str, logs_path: str) -> Dict[str, Any]:
         _config_manager = ConfigManager(config_path, logs_path)
         _current_config_path = config_path
 
-    # Get first task config for backward compatibility
-    first_task_config = None
-    if _config_manager.task:
-        first_task_name = list(_config_manager.task.keys())[0]
-        first_task_config = _config_manager.task[first_task_name][0]
-
     # Return backward-compatible dict structure
     config_dict = {
         # Backward compatibility - flatten main config to top level
@@ -73,26 +67,11 @@ def load_config(config_path: str, logs_path: str) -> Dict[str, Any]:
             "tensorboard_logging": _config_manager.settings.tensorboard_logging,
         },
 
-        # Task configuration (use first task for backward compatibility)
-        "task": {},
-
         # Additional validated configs
         "settings": _config_manager.settings.model_dump(),
         "model_settings": {name: config.model_dump() for name, config in _config_manager.model_settings.items()},
         "task_configs": {name: [task.model_dump() for task in tasks] for name, tasks in _config_manager.task.items()},
     }
-
-    # Set task config from first available task for backward compatibility
-    if first_task_config:
-        task_dict = first_task_config.model_dump()
-        # Add missing fields that pipeline components expect
-        task_dict["path"] = task_dict["dataset"]["name"]  # dataset name becomes path
-        task_dict["task_type"] = "deterministic"  # Default, will be determined by model router
-        config_dict["task"] = task_dict
-
-    # Add missing evaluation fields that pipeline components expect
-    evaluation_dict = config_dict["evaluation"]
-    evaluation_dict["metrics"] = ["mae", "rmse", "mase", "mape"]  # Default metrics
 
     return config_dict
 
