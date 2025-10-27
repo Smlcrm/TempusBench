@@ -1,0 +1,6 @@
+logging_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+file_logging: true
+console_logging: true
+tensorboard_logging: true
+runs_dir: "runs"
+conda_env_prefix: "benchmark"
