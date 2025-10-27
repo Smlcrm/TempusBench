@@ -9,14 +9,18 @@ All traditional models (ARIMA, LSTM, XGBoost, etc.) should inherit from this cla
 the required abstract methods.
 """
 
-from abc import ABC, abstractmethod
 import numpy as np
-from typing import Dict, Any, Union, Tuple, List, Optional
 import pandas as pd
-import json
-import os
-import pickle
+
+from pathlib import Path
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Union, Optional
+
+from tempus_bench.utils.logger import get_logger
+from tempus_bench.config import get_config_manager
+from tempus_bench.config.models import UnifiedConfig
 from tempus_bench.metrics.evaluation import Evaluator
+from tempus_bench.utils.tf_logger import get_tf_logger
 
 class BaseModel(ABC):
     """
@@ -34,74 +38,31 @@ class BaseModel(ABC):
         evaluator: Evaluator instance for computing metrics
     """
 
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize the base model.
 
         Args:
-            config: Configuration dictionary containing model parameters
-                - training_loss: str, primary loss function for training
-                - forecast_horizon: int, number of steps to forecast ahead
-                - dataset: dict containing dataset configuration
-            logs_dir: Directory for storing log files (required)
+            config_path: Path to the configuration YAML file
+            logs_path: Directory for storing log files (required)
+            hyperparameters: Model-specific hyperparameters to inject into config
         """
-        # Store the full configuration for evaluator and global settings
-        self.config = config
-
-        # Store logs_dir for internal model instantiations
-        self.logs_dir = logs_dir
-
-        # Store scaler for inverse transformation (set by external code)
-        self.scaler = None
-
-        # Enforce: model_config must be exactly one selected hyper-parameter set (dict)
-        self.model_config = self._extract_model_config_strict(config)
-
-        self.training_loss = config["evaluation"]["tuning_loss"]
-
-        # Determine forecast horizon from model configuration keys if present
-        # Common names across models: forecast_horizon, prediction_length, horizon_len, pdt
-
+        self.config = config.benchmark.model_dump()
+        self.model_name = self.__class__.__name__.replace('Model', '').lower()
+        if len(self.config['model']) > 1:
+            raise ValueError("Only one model is allowed to be defined in the config")
+        # check if self.config['model'] unique key coincides with the model name
+        if self.model_name not in self.config['model']:
+            raise ValueError(f"Model parameters for {self.model_name} not found in config")
+        self.model_config = self.config["model"][self.model_name]
+        self.model_settings = config.model_settings[self.model_name].model_dump()
+        self.eval_config = self.config["benchmark"]["evaluation"]
+        self.stochastic_tuning_loss = self.eval_config['stochastic_tuning_loss']
+        self.deterministic_tuning_loss = self.eval_config['deterministic_tuning_loss']
+        self.logger = get_logger(logs_path)
+        self.tf_logger = get_tf_logger(Path(logs_path).parent / 'tensorboard')
+        self.evaluator = Evaluator(config, logs_path)
         self.is_fitted = False
-
-        # Initialize evaluator with the full config to access evaluation.metrics
-        # We need to pass the original config, not the extracted model config
-        self.evaluator = Evaluator(config=config, logs_dir=logs_dir)
-
-        # Expose logger for direct use by models
-        self.logger = self.evaluator.logger
-
-        # For logging last eval
-        self._last_y_true = None
-        self._last_y_pred = None
-
-    def _extract_model_config_strict(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Strictly extract the single selected model configuration from the full config.
-
-        Rules:
-        - config['model'] must exist and contain exactly one entry
-        - that entry's value must be a dict (one chosen hyper-parameter set), not a list/grid/None
-        - no defaults are applied; fail fast if invalid
-        """
-        if "model" not in config:
-            raise ValueError("Missing 'model' section in config; expected a single selected model configuration.")
-
-        model_section = config["model"]
-        if not isinstance(model_section, dict) or len(model_section) != 1:
-            raise ValueError(
-                "config['model'] must be a dict with exactly one model entry (single selected combo), not a grid or multiple entries."
-            )
-
-        # Extract the only model's params
-        (_, model_params) = next(iter(model_section.items()))
-
-        if not isinstance(model_params, dict) or model_params is None:
-            raise ValueError(
-                "The selected model's parameters must be a dict containing exactly one chosen hyper-parameter set."
-            )
-
-        return model_params
 
     @abstractmethod
     def train(
@@ -171,12 +132,6 @@ class BaseModel(ABC):
         Returns:
             Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
         """
-        # Store for TensorBoard logging
-        self._last_y_true = y_true
-        self._last_y_pred = y_pred
-
-        # Use evaluator to compute evaluation metrics (from evaluation.metrics)
-        # y_pred, y_true, y_train are guaranteed ndarrays of matching shapes
         return self.evaluator.evaluate(y_true, y_pred, **kwargs)
 
     def evaluate(
@@ -194,8 +149,7 @@ class BaseModel(ABC):
         """
         # Get predictions
         predictions = self.predict(X)
-        loss = self.compute_loss(y, predictions)
-        return loss
+        return self.compute_loss(y, predictions)
 
     def get_params(self) -> Dict[str, Any]:
         """
@@ -221,62 +175,6 @@ class BaseModel(ABC):
 
         return self
 
-    def set_scaler(self, scaler) -> "BaseModel":
-        """
-        Set the scaler for inverse transformation of predictions.
-
-        Args:
-            scaler: Scaler instance (e.g., StandardScaler) used for normalization
-
-        Returns:
-            self: The model instance with updated scaler
-        """
-        self.scaler = scaler
-        return self
-
-    # def save(self, path: str) -> None:
-    #     """
-    #     Save the model to disk.
-
-    #     Args:
-    #         path: Path to save the model
-    #     """
-    #     if not self.is_fitted:
-    #         raise ValueError("Cannot save an unfitted model")
-
-    #     # Create directory if it doesn't exist
-    #     os.makedirs(os.path.dirname(path), exist_ok=True)
-
-    #     # Save model state
-    #     model_state = {
-    #         "config": self.config,
-    #         "is_fitted": self.is_fitted,
-    #         "params": self.get_params(),
-    #     }
-
-    #     # Save model state to file
-    #     with open(path, "wb") as f:
-    #         pickle.dump(model_state, f)
-
-    # def load(self, path: str) -> None:
-    #     """
-    #     Load the model from disk.
-
-    #     Args:
-    #         path: Path to load the model from
-    #     """
-    #     if not os.path.exists(path):
-    #         raise FileNotFoundError(f"No model found at {path}")
-
-    #     # Load model state from file
-    #     with open(path, "rb") as f:
-    #         model_state = pickle.load(f)
-
-    #     # Restore model state
-    #     self.config = model_state["config"]
-    #     self.is_fitted = model_state["is_fitted"]
-    #     self.set_params(**model_state["params"])
-
     def get_model_summary(self) -> Dict[str, Any]:
         """
         Get a summary of the model's properties and performance.
@@ -289,12 +187,3 @@ class BaseModel(ABC):
             "is_fitted": self.is_fitted,
             "parameters": self.get_params(),
         }
-
-    def get_last_eval_true_pred(self):
-        """
-        Return the last y_true and y_pred used in compute_loss for TensorBoard logging.
-
-        Returns:
-            Tuple of (y_true, y_pred) arrays
-        """
-        return self._last_y_true, self._last_y_pred

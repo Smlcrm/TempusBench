@@ -17,16 +17,16 @@ from tempus_bench.utils.logger import get_logger
 
 
 class XGBoostModel(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize XGBoost model with a given configuration.
 
         Args:
             config: Configuration dictionary for XGBoostRegressor parameters.
                     e.g., {'n_estimators': 100, 'learning_rate': 0.1, 'lookback_window': 10}
-            logs_dir: Directory for storing log files (required)
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         if "lookback_window" not in self.model_config:
             raise ValueError("lookback_window must be specified in config")

@@ -25,7 +25,7 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class Theta(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize the Multivariate Theta model with a given configuration.
 
@@ -39,7 +39,7 @@ class Theta(BaseModel):
                     }
             config_file: Path to a JSON configuration file.
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
         if "sp" not in self.model_config:
             raise ValueError("sp must be specified in config")
 

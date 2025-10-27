@@ -10,14 +10,14 @@ from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 
 class MoiraiMoeModel(BaseModel):
 
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Args:
           config: Configuration dictionary containing model parameters
-          logs_dir: Directory for storing log files (optional)
+          logs_path: Directory for storing log files (optional)
         """
 
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         # Set reasonable defaults for all model-specific parameters if not provided in config
         # As in https://arxiv.org/pdf/2402.02592
@@ -82,7 +82,7 @@ class MoiraiMoeModel(BaseModel):
         freq: str,
     ) -> np.ndarray:
         """
-        Make predictions using the Moirai model.
+        Make predictions using the MoiraiMoE model.
 
         Args:
             y_context: Recent/past target values, shape (context_steps, num_targets)
@@ -91,7 +91,7 @@ class MoiraiMoeModel(BaseModel):
             freq: Frequency string (must be provided from CSV data, required)
 
         Returns:
-            np.ndarray: Model predictions with shape (prediction_length, num_targets)
+            np.ndarray: Model prediction samples with shape (num_samples, forecast_horizon, num_targets)
 
         Raises:
             ValueError: If model is not fitted, freq is not provided, or forecast length cannot be determined
@@ -100,8 +100,6 @@ class MoiraiMoeModel(BaseModel):
             raise ValueError("Model not fitted. Call train() first.")
 
         prediction_length = timestamps_target.shape[0]
-        print("prediction length", prediction_length)
-        # y_context is always (context_steps, num_targets)
 
         context_steps, num_targets = y_context.shape
 
@@ -121,48 +119,24 @@ class MoiraiMoeModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
-        # Debug: Print tensor shapes
-        print(f"[DEBUG] past_target shape: {past_target.shape}")
-        print(f"[DEBUG] past_observed_target shape: {past_observed_target.shape}")
-        print(f"[DEBUG] past_is_pad shape: {past_is_pad.shape}")
-        print(f"[DEBUG] ctx: {ctx}, num_targets: {num_targets}")
-        print(f"[DEBUG] y_context original shape: {y_context.shape}")
-        print(f"[DEBUG] y_context_padded shape: {y_context.shape}")
-
-        # Debug: Print actual values
-        print(f"[DEBUG] past_target non-zero values: {(past_target != 0).sum()}")
-        print(f"[DEBUG] past_observed_target True values: {past_observed_target.sum()}")
-        print(f"[DEBUG] past_is_pad True values: {past_is_pad.sum()}")
-
         forecast = self.model(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,
         )
 
-        # forecast[0] shape: (num_targets, num_samples, prediction_length)
-        # Ensure forecast[0] is a numpy array before taking mean
+        # forecast shape: (num_targets, num_samples, prediction_length)
+        # Convert to numpy array
         forecast_np = (
             forecast.cpu().numpy() if hasattr(forecast, "cpu") else np.array(forecast)
         )
 
-        print("forecast_np shape", forecast_np.shape)
-
-        # The error is: IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed
-        # This is because forecasted_values is 1D, but the code tries to index it as 2D: forecasted_values[:prediction_length, :]
-
-        forecasted_values = np.round(np.mean(forecast_np, axis=1), decimals=4)
-
-        print("AFTER forecast_np shape", forecasted_values.shape)
-        pdt = self.model_config["pdt"]
-
-        print(
-            f"[DEBUG] forecasted_values shape before any reshape: {forecasted_values.shape}"
-        )
-        print(f"[DEBUG] prediction_length: {prediction_length}")
-        print(f"[DEBUG] pdt from model_config: {pdt}")
-        print(f"[DEBUG] num_targets: {num_targets}")
-        print(f"[DEBUG] forecasted_values.size: {forecasted_values.size}")
-
-        forecast_matrix = forecasted_values[:prediction_length, :]
-        return np.squeeze(forecast_matrix)
+        # Transpose from (num_targets, num_samples, prediction_length) to (num_samples, prediction_length, num_targets)
+        # Then the base class will handle point forecasts if needed
+        samples = np.transpose(forecast_np, (1, 2, 0))
+        
+        # If univariate, ensure shape is (num_samples, prediction_length, 1)
+        if samples.ndim == 2:
+            samples = samples[:, :, np.newaxis]
+        
+        return samples

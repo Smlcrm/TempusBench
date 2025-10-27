@@ -12,16 +12,16 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class SeasonalNaiveModel(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize Seasonal Naive model with a given configuration.
 
         Args:
-            config: Configuration dictionary for model parameters.
-                    e.g., {'model_params': {'sp': 7}} for weekly seasonality in daily data.
-            config_file: Path to a JSON configuration file.
+            config_path: Path to the configuration YAML file
+            logs_path: Directory for storing log files (required)
+            hyperparameters: Model-specific hyperparameters
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
     def train(
         self,
