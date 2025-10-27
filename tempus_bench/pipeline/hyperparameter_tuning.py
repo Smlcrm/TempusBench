@@ -8,23 +8,23 @@ from typing import Dict, List, Any, Tuple
 
 from tempus_bench.utils.logger import get_logger
 from tempus_bench.utils.tf_logger import get_tf_logger
+from tempus_bench.utils.paths import get_tasks_dir
 from tempus_bench.pipeline.data_loader import DataLoader
 from tempus_bench.config import load_config
 from tempus_bench.pipeline.model_executor import ModelExecutor
 
 class HyperparameterTuner:
-    def __init__(self, config_path: str, datasets_dir: str, run_dir: str):
+    def __init__(self, config_path: str, run_dir: str):
         """
         Initialize the hyperparameter tuner with configuration and directories.
 
         Args:
             config_path: Path to configuration file
-            datasets_dir: Directory containing datasets
             run_dir: Directory for run outputs
         """
         self.config = load_config(config_path)
         self.config_path = config_path
-        self.datasets_dir = datasets_dir
+        self.tasks_dir = get_tasks_dir()
         self.run_dir = run_dir
         self.logger = get_logger(os.path.join(run_dir, 'logs'))
         self.tf_logger = get_tf_logger(os.path.join(run_dir, 'tensorboard'))
@@ -144,15 +144,13 @@ class HyperparameterTuner:
         # Initialize data loader
         data_loader = DataLoader(
             config_path=self.config_path,
-            datasets_dir=self.datasets_dir,
             run_dir=self.run_dir
         )
 
         # Initialize model executor
         model_executor = ModelExecutor(
             config_path=self.config_path,
-            run_dir=self.run_dir,
-            datasets_dir=self.datasets_dir
+            run_dir=self.run_dir
         )
 
         for model_name, hyperparameters in self.config["model"].items():
@@ -303,8 +301,7 @@ class HyperparameterTuner:
             # Create data loader to get the window data
             data_loader = DataLoader(
                 config_path=self.config_path,
-                run_dir=self.run_dir,
-                datasets_dir=self.datasets_dir
+                run_dir=self.run_dir
             )
             
             # Get the specific window data
