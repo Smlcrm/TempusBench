@@ -1,0 +1,8 @@
+task:
+  context_window: 2048
+  dataset:
+    handle_missing: interpolate
+    name: madrid_hours_multivariate
+    normalize: true
+  forecast_horizon: 64
+---
