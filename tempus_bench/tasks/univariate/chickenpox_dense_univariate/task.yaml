@@ -1,8 +1,8 @@
 task:
+  name: chickenpox_dense_univariate
   context_window: 256
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
-    name: univariate/chickenpox_dense_univariate
     normalize: true
-  forecast_horizon: 8
----
+    file_name: chickenpox_dense_univariate.csv

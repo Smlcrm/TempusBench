@@ -1,8 +1,8 @@
 task:
+  name: utah_manufacturing_multivariate
   context_window: 2048
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
-    name: multivariate/utah_manufacturing_multivariate
     normalize: true
-  forecast_horizon: 64
----
+    file_name: utah_manufacturing_multivariate.csv

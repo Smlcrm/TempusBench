@@ -1,8 +1,8 @@
 task:
+  name: germanhouses_sales_univariate
   context_window: 32
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
-    name: univariate/germanhouses_sales_univariate
     normalize: true
-  forecast_horizon: 8
----
+    file_name: germanhouses_sales_univariate.csv
