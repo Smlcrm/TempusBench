@@ -5,14 +5,8 @@ This test verifies that all path functions generate correct absolute paths
 based on the project structure.
 """
 
-import os
-import sys
-from pathlib import Path
 import pytest
-
-# Ensure local workspace package is imported (not a globally installed version)
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, PROJECT_ROOT)
+from pathlib import Path
 
 from tempus_bench.utils.paths import (
     get_project_root,
@@ -20,7 +14,7 @@ from tempus_bench.utils.paths import (
     get_models_dir,
     get_configs_dir,
     get_runs_dir,
-    get_logs_dir,
+    get_logs_path,
     get_task_path,
     get_model_path,
     ensure_directory_exists,
@@ -92,10 +86,10 @@ class TestPathFunctions:
         
         assert actual == expected, "Runs directory path mismatch"
     
-    def test_get_logs_dir(self):
-        """Test that get_logs_dir returns the correct logs directory path."""
+    def test_get_logs_path(self):
+        """Test that get_logs_path returns the correct logs directory path."""
         expected = get_project_root() / "logs"
-        actual = get_logs_dir()
+        actual = get_logs_path()
         
         print(f"\nLogs Directory:")
         print(f"  Expected: {expected}")
@@ -167,7 +161,7 @@ class TestPathFunctions:
         models = get_models_dir()
         configs = get_configs_dir()
         runs = get_runs_dir()
-        logs = get_logs_dir()
+        logs = get_logs_path()
         
         assert tasks.is_relative_to(project_root) or tasks == project_root
         assert models.is_relative_to(project_root) or models == project_root
@@ -187,7 +181,7 @@ class TestPathFunctions:
             ("models_dir", get_models_dir()),
             ("configs_dir", get_configs_dir()),
             ("runs_dir", get_runs_dir()),
-            ("logs_dir", get_logs_dir()),
+            ("logs_path", get_logs_path()),
             ("task_path", get_task_path("univariate/test_univariate")),
             ("model_path", get_model_path("deterministic", "prophet")),
         ]
@@ -244,7 +238,7 @@ class TestPathFunctions:
         print(f"   {get_runs_dir()}")
         
         print(f"\n6. Logs Directory:")
-        print(f"   {get_logs_dir()}")
+        print(f"   {get_logs_path()}")
         
         print(f"\n7. Example Task Paths:")
         examples = [
