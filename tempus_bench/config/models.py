@@ -8,27 +8,8 @@ validation, type checking, and documentation of the benchmarking pipeline.
 from typing import Dict, List, Optional, Any, Literal, Union
 from pathlib import Path
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-
-
-class DatasetConfig(BaseModel):
-    """Dataset configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(
-        ...,
-        description="Dataset name or path pattern (supports wildcards like '*', 'univariate/*', etc.)"
-    )
-    normalize: bool = Field(
-        default=True,
-        description="Whether to normalize the data"
-    )
-    handle_missing: Literal[
-        'interpolate', 'mean', 'median', 'drop', 'forward_fill', 'backward_fill'
-    ] = Field(
-        default='interpolate',
-        description="Strategy for handling missing values"
-    )
+import yaml
+import numpy as np
 
 
 class EvaluationConfig(BaseModel):
@@ -36,11 +17,6 @@ class EvaluationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    metrics: List[str] = Field(
-        ...,
-        min_length=1,
-        description="List of evaluation metrics to compute"
-    )
     tuning_loss: str = Field(
         ...,
         description="Primary metric for hyperparameter optimization"
@@ -50,11 +26,20 @@ class EvaluationConfig(BaseModel):
         ge=1,
         description="Maximum number of rolling windows to generate for evaluation"
     )
-    max_num_variates: int = Field(
-        ...,
-        ge=1,
-        description="Maximum number of variates to extract from dataset for evaluation"
+    max_num_variates: float = Field(
+        default=float('inf'),
+        description="Maximum number of variates to extract from dataset for evaluation (inf for all)"
     )
+
+    @field_validator('max_num_variates')
+    @classmethod
+    def validate_max_num_variates(cls, v):
+        """Validate max_num_variates is either inf or a positive number."""
+        if v == float('inf'):
+            return v
+        if isinstance(v, (int, float)) and v < 1:
+            raise ValueError("max_num_variates must be at least 1 or inf")
+        return v
     num_samples: int = Field(
         default=100,
         ge=1,
@@ -69,44 +54,6 @@ class EvaluationConfig(BaseModel):
         default="mean",
         description="Statistic to use for converting stochastic predictions to point forecasts"
     )
-
-
-class TaskConfig(BaseModel):
-    """Task configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    task_type: Literal['deterministic', 'stochastic'] = Field(
-        ...,
-        description="Type of forecasting task"
-    )
-    forecast_horizon: int = Field(
-        ...,
-        ge=1,
-        le=128,
-        description="Number of steps to forecast ahead (max 128)"
-    )
-    context_window: int = Field(
-        ...,
-        ge=1,
-        description="Number of context steps for training"
-    )
-    dataset: DatasetConfig = Field(
-        ...,
-        description="Dataset configuration"
-    )
-
-    # Allowed metrics for each task type
-    ALLOWED_METRICS: Dict[str, List[str]] = {
-        'deterministic': ['mae', 'rmse', 'mape', 'mase'],
-        'stochastic': ['crps', 'quantile_score', 'weighted_interval_score', 'mae', 'rmse']
-    }
-
-    @model_validator(mode='after')
-    def validate_task_consistency(self):
-        """Validate task configuration consistency."""
-        # Task validation is now simpler since tuning_loss moved to evaluation
-        return self
 
 
 class ModelConfig(BaseModel):
@@ -173,127 +120,100 @@ class ModelConfig(BaseModel):
         return v
 
 
-class LoggingConfig(BaseModel):
-    """Logging configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = Field(
-        default='INFO',
-        description="Logging level"
-    )
-    format: str = Field(
-        default='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        description="Log message format"
-    )
-    file_logging: bool = Field(
-        default=True,
-        description="Enable file logging"
-    )
-    console_logging: bool = Field(
-        default=True,
-        description="Enable console logging"
-    )
-    tensorboard_logging: bool = Field(
-        default=True,
-        description="Enable TensorBoard logging"
-    )
-
-
-class PathsConfig(BaseModel):
-    """Paths configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    datasets_dir: str = Field(
-        default="tempus_bench/datasets",
-        description="Directory containing datasets"
-    )
-    runs_dir: str = Field(
-        default="runs",
-        description="Directory for storing run outputs"
-    )
-    logs_dir: str = Field(
-        default="logs",
-        description="Directory for storing log files"
-    )
-    models_dir: str = Field(
-        default="tempus_bench/models",
-        description="Directory containing model implementations"
-    )
-    configs_dir: str = Field(
-        default="tempus_bench/configs",
-        description="Directory containing configuration files"
-    )
-
-
-class SystemConfig(BaseModel):
-    """System configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    python_version: str = Field(
-        default="3.11",
-        description="Python version for conda environments"
-    )
-    conda_env_prefix: str = Field(
-        default="benchmark",
-        description="Prefix for conda environment names"
-    )
-    max_parallel_jobs: int = Field(
-        default=1,
-        ge=1,
-        description="Maximum number of parallel jobs"
-    )
-    memory_limit_gb: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Memory limit in GB for model execution"
-    )
-    timeout_seconds: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Timeout in seconds for model execution"
-    )
-
-
 class BenchmarkConfig(BaseModel):
     """Root configuration model for the benchmarking pipeline."""
 
     model_config = ConfigDict(extra="forbid")
 
-    task: TaskConfig = Field(..., description="Task configuration")
+    task_path: str = Field(..., description="Task path pattern (supports wildcards like '*', 'univariate/*', etc.)")
     evaluation: EvaluationConfig = Field(..., description="Evaluation configuration")
     model: ModelConfig = Field(..., description="Model configuration")
-    logging: LoggingConfig = Field(default_factory=LoggingConfig, description="Logging configuration")
-    paths: PathsConfig = Field(default_factory=PathsConfig, description="Paths configuration")
-    system: SystemConfig = Field(default_factory=SystemConfig, description="System configuration")
 
-    @model_validator(mode='after')
-    def validate_evaluation_consistency(self):
-        """Validate evaluation metrics and tuning_loss for consistency."""
-        task_type = self.task.task_type
 
-        # Define allowed metrics for each task type
-        ALLOWED_METRICS = {
-            'deterministic': ['mae', 'rmse', 'mape', 'mase'],
-            'stochastic': ['crps', 'quantile_score', 'weighted_interval_score', 'mae', 'rmse']
-        }
+class DatasetConfig(BaseModel):
+    """Dataset configuration model for individual task folders."""
 
-        allowed_metrics = ALLOWED_METRICS.get(task_type, [])
+    model_config = ConfigDict(extra="forbid")
 
-        # Validate evaluation metrics
-        invalid_metrics = [m for m in self.evaluation.metrics if m not in allowed_metrics]
-        if invalid_metrics:
-            raise ValueError(
-                f"Invalid metrics for {task_type} task_type: {invalid_metrics}. "
-                f"Allowed: {allowed_metrics}"
-            )
+    handle_missing: Literal[
+        'interpolate', 'mean', 'median', 'drop', 'forward_fill', 'backward_fill'
+    ] = Field(
+        default='interpolate',
+        description="Strategy for handling missing values"
+    )
+    name: str = Field(
+        ...,
+        description="Dataset name"
+    )
+    normalize: bool = Field(
+        default=True,
+        description="Whether to normalize the data"
+    )
 
-        # Ensure tuning_loss is present in metrics list
-        if self.evaluation.tuning_loss not in self.evaluation.metrics:
-            raise ValueError(
-                f"tuning_loss '{self.evaluation.tuning_loss}' is not present in evaluation.metrics list."
-            )
 
-        return self
+class TaskConfig(BaseModel):
+    """Task configuration model for individual task folders."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    forecast_horizon: int = Field(
+        ...,
+        ge=1,
+        le=128,
+        description="Number of steps to forecast ahead (max 128)"
+    )
+    context_window: int = Field(
+        ...,
+        ge=1,
+        description="Number of context steps for training"
+    )
+    dataset: DatasetConfig = Field(
+        ...,
+        description="Dataset configuration for this task"
+    )
+
+
+class ModelSettingsConfig(BaseModel):
+    """Model settings configuration model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    python_version: str = Field(
+        default="3.11",
+        description="Python version for conda environment"
+    )
+    device: Literal["cpu", "gpu"] = Field(
+        default="cpu",
+        description="Device to use for model execution"
+    )
+
+
+class SystemsConfig(BaseModel):
+    """Systems configuration model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    logging_format: str = Field(
+        ...,
+        description="Log message format"
+    )
+    file_logging: bool = Field(
+        ...,
+        description="Enable file logging"
+    )
+    console_logging: bool = Field(
+        ...,
+        description="Enable console logging"
+    )
+    tensorboard_logging: bool = Field(
+        ...,
+        description="Enable TensorBoard logging"
+    )
+    runs_dir: str = Field(
+        ...,
+        description="Directory for storing run outputs"
+    )
+    conda_env_prefix: str = Field(
+        ...,
+        description="Prefix for conda environment names"
+    )
