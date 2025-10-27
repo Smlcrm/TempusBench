@@ -2,7 +2,7 @@ task:
   context_window: 32
   dataset:
     handle_missing: interpolate
-    name: baggage_months_multivariate
+    name: multivariate/baggage_months_multivariate
     normalize: true
   forecast_horizon: 16
 ---

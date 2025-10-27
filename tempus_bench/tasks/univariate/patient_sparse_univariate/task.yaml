@@ -2,7 +2,7 @@ task:
   context_window: 2048
   dataset:
     handle_missing: interpolate
-    name: patient_sparse_univariate
+    name: univariate/patient_sparse_univariate
     normalize: true
   forecast_horizon: 64
 ---
