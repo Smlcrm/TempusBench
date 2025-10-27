@@ -19,7 +19,6 @@ class CRPS:
             CRPS score as float (mean across all timesteps and targets)
         """
         task_type = kwargs.get('task_type')
-
         if task_type != 'stochastic':
             raise ValueError(f"CRPS can only be used with 'stochastic' task_type, got '{task_type}'.")
         S, T, M = y_pred.shape

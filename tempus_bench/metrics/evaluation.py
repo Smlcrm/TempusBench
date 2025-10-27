@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
+from tempus_bench.config import load_config, get_config_manager
+from tempus_bench.config.models import UnifiedConfig
+
 from ..metrics.rmse import RMSE
 from ..metrics.mae import MAE
 from ..metrics.mase import MASE
@@ -15,30 +18,17 @@ from ..utils.logger import get_logger
 Model evaluation.
 """
 class Evaluator:
-    def __init__(self, config=None, logs_dir: str = None):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize evaluator with configuration.
 
         Args:
             config: Configuration dictionary
-            logs_dir: Directory for storing log files (optional)
+            logs_path: Directory for storing log files (optional)
         """
-        self.config = config if config is not None else {}
-
-        # Get logs_dir from parameter, fail fast if not provided
-        if logs_dir is None:
-            raise ValueError("logs_dir parameter is required")
-        self.logger = get_logger(logs_dir)
-        evaluation_cfg = self.config["evaluation"]
-        self.metrics_to_calculate = evaluation_cfg["metrics"]
-        self.task_type = self.config["task"]["task_type"]
-
-        self.logger.debug("Evaluator", f"Evaluator initialized with config: {self.config}")
-        self.logger.debug("Evaluator", f"Evaluation config: {evaluation_cfg}")
-        self.logger.debug("Evaluator", f"Metrics to calculate: {self.metrics_to_calculate}")
-        self.logger.debug("Evaluator", f"Task type: {self.task_type}")
-
-        # maps string names to metric class instances
+        self.config = config.benchmark.model_dump()
+        self.logger = get_logger(logs_path)
+        self.eval_config = self.config['evaluation']
         self.metric_registry = {
             "rmse": RMSE(),
             "mae": MAE(),
@@ -48,9 +38,11 @@ class Evaluator:
             "quantile_score": QuantileScore(),
             "weighted_interval_score": WeightedIntervalScore(),
         }
+        self.stochastic_metrics = ["crps", "quantile_score", "weighted_interval_score"]
+        self.deterministic_metrics = ["rmse", "mae", "mase", "mape"]
+        self.logger.debug("Evaluator", f"Evaluator initialized with Evaluation config: {self.eval_config}")
+        self.logger.debug("Evaluator", f"Metrics to calculate: {self.metrics_to_calculate}")
 
-        self.stochastic_metrics = {"crps", "quantile_score", "weighted_interval_score"}
-        self.deterministic_metrics = {"rmse", "mae", "mase", "mape"}
 
     def evaluate(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs: Dict[str,Any]):
         """
@@ -64,17 +56,23 @@ class Evaluator:
         Returns:
             dict: Dictionary of evaluation metrics.
         """
-        results = {}
-        for metric in self.metrics_to_calculate:
-            if metric in self.stochastic_metrics:
-                kwargs = {
-                    'task_type' : 'stochastic',
-                    'point_forecast_statistic' : self.config['evaluation']['point_forecast_statistic']
-                }
-            elif metric in self.deterministic_metrics:
-                kwargs = {'task_type' : 'deterministic'}
-            else:
-                raise ValueError(f"Metric '{metric}' is not a recognized deterministic or stochastic metric.")
-            results[metric] = self.metric_registry[metric](y_true, y_pred, **kwargs)
+        if 'task_type' not in kwargs:
+            raise ValueError("'task_type' must be provided in kwargs ('deterministic', 'stochastic')")
 
+        task_type = kwargs['task_type']
+
+        if task_type == 'deterministic':
+            metrics_to_calculate = self.deterministic_metrics
+        elif task_type == 'stochastic':
+            metrics_to_calculate = self.stochastic_metrics + self.deterministic_metrics
+        else:
+            raise ValueError("'task_type' must be 'deterministic' or 'stochastic'")
+
+        results = {}
+        for metric in metrics_to_calculate:
+            results[metric] = self.metric_registry[metric](
+                y_true=y_true,
+                y_pred=y_pred,
+                task_type=task_type,
+                point_forecast_statistic=self.eval_config['point_forecast_statistic'])
         return results

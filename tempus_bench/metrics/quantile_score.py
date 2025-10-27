@@ -2,10 +2,12 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Union
 
+from tempus_bench.metrics.base_metric import BaseMetric
+
 """
 Calculates Quantile Score (QS) for deciles using the tilted ℓ₁ loss.
 """
-class QuantileScore:
+class QuantileScore(BaseMetric):
     def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
         """
         Computes the Quantile Score (QS) for deciles using the tilted ℓ₁ loss.
@@ -21,18 +23,10 @@ class QuantileScore:
         Raises:
             ValueError: If 'task_type' is not 'stochastic'
         """
-        task_type = kwargs.get('task_type')
-
-        if task_type != 'stochastic':
-            raise ValueError(f"QuantileScore can only be used with 'stochastic' task_type, got '{task_type}'.")
-
-        S, T, M = y_pred.shape
-        if y_true.shape != (T, M):
-            raise ValueError(f"Shape mismatch: y_true has shape {y_true.shape}, but expected ({T}, {M}) to match y_pred (num_samples={S}, time_steps={T}, num_targets={M})")
-
+        y_ppred = self.process_y_pred(y_true, y_pred, **kwargs)
         rho = lambda u, tau: np.maximum(tau * u, (tau - 1) * u)
         QS = np.zeros(y_true.shape)
         for tau in np.arange(0.0, 1.1, 0.1):
-            q_tau = np.quantile(y_pred, tau, axis=0)
+            q_tau = np.quantile(y_ppred, tau, axis=0)
             QS += rho(y_true-q_tau, tau)
         return np.mean(QS)

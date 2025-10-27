@@ -35,8 +35,9 @@ class MAE:
                 y_ppred = np.mean(y_pred, axis=0)
             else:
                 raise ValueError("MAE can only handle point_forecast_statistic == 'mean' for stochastic evaluation.")
-
         else:
+            if len(y_pred.shape) > 2:
+                raise ValueError("y_pred can't have more than 2 dimensions for deterministic evaluation")
             y_ppred = y_pred
 
         return np.mean(np.abs(y_true - y_ppred))
