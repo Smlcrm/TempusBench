@@ -1,8 +1,6 @@
-import os
-import pandas as pd
-import numpy as np
 import io
-from typing import Optional
+import os
+import numpy as np
 
 # Configure TensorFlow threading before import
 os.environ.setdefault('TF_NUM_INTEROP_THREADS', '1')
@@ -10,6 +8,9 @@ os.environ.setdefault('TF_NUM_INTRAOP_THREADS', '1')
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
 
 import tensorflow as tf
+import matplotlib.pyplot as plt
+
+from typing import Optional
 from datetime import datetime
 from tensorboard.plugins.hparams import api as hp
 
@@ -19,18 +20,29 @@ This logger only writes to TensorBoard files - no console output.
 """
 
 class TFLogger:
-    def __init__(self, tf_logs_dir: str, name: str = "TFLogger"):
+    def __init__(self, tf_logs_path: str, name: str = "TFLogger", tensorboard_logging: Optional[bool] = None):
         """
         Initialize TensorBoard logger with configuration.
 
         Args:
-            tf_logs_dir: Directory to write TensorBoard log files (used directly)
+            tf_logs_path: Directory to write TensorBoard log files (used directly)
             name: Name for the logger instance (for identification only)
+            tensorboard_logging: Whether to enable TensorBoard logging
         """
         self.name = name
-        os.makedirs(tf_logs_dir, exist_ok=True)
-        self.tf_logs_dir = tf_logs_dir
-        self.tf_writer = tf.summary.create_file_writer(self.tf_logs_dir)
+        self.tensorboard_logging = tensorboard_logging
+
+        if tensorboard_logging:
+            os.makedirs(tf_logs_path, exist_ok=True)
+            self.tf_logs_path = tf_logs_path
+            self.tf_writer = tf.summary.create_file_writer(self.tf_logs_path)
+        else:
+            self.tf_logs_path = tf_logs_path
+            self.tf_writer = None
+
+    def _should_log(self) -> bool:
+        """Check if TensorBoard logging should occur."""
+        return self.tensorboard_logging and self.tf_writer is not None
 
     def log_metrics(self, metrics, step, model_name=""):
         """
@@ -41,6 +53,8 @@ class TFLogger:
             step (int): The current step (e.g., epoch, batch, or experiment ID).
             model_name (str, optional): A prefix for metric names to group them in TensorBoard.
         """
+        if not self._should_log(): return
+
         group_prefix = f"{model_name}/" if model_name else ""
         with self.tf_writer.as_default():
             for metric_name, value in metrics.items():
@@ -68,7 +82,8 @@ class TFLogger:
         """
         Log a Matplotlib figure to TensorBoard.
         """
-        import matplotlib.pyplot as plt
+        if not self._should_log(): return
+
         buf = io.BytesIO()
         figure.savefig(buf, format='png')
         buf.seek(0)
@@ -82,6 +97,8 @@ class TFLogger:
         """
         Log an image from disk to TensorBoard.
         """
+        if not self._should_log(): return
+
         try:
             with open(image_path, 'rb') as f:
                 data = f.read()
@@ -105,6 +122,8 @@ class TFLogger:
             val_loss (float, optional): Validation loss
             step (int, optional): Global step for TensorBoard
         """
+        if not self._should_log(): return
+
         if step is None:
             step = epoch
 
@@ -125,6 +144,8 @@ class TFLogger:
                             (e.g., {'learning_rate': 0.1, 'model': 'XGBoost'}).
             metrics (dict): Dictionary of final metrics for this run (e.g., {'mae': 12.3}).
         """
+        if not self._should_log(): return
+
         with self.tf_writer.as_default():
             # Sanitize hparams for TensorBoard (it has specific type requirements)
             sanitized_hparams = {k: v for k, v in hparams.items() if isinstance(v, (str, bool, int, float))}
@@ -144,6 +165,8 @@ class TFLogger:
             text (str): Text content to log
             step (int): Step number
         """
+        if not self._should_log(): return
+
         with self.tf_writer.as_default():
             tf.summary.text(tag, text, step=step)
         self.tf_writer.flush()
@@ -157,29 +180,33 @@ class TFLogger:
             value (float): Scalar value to log
             step (int): Step number
         """
+        if not self._should_log(): return
+
         with self.tf_writer.as_default():
             tf.summary.scalar(tag, value, step=step)
         self.tf_writer.flush()
 
     def close(self):
         """Closes the TensorBoard writer to ensure all data is written to disk."""
-        self.tf_writer.close()
+        if self.tf_writer is not None:
+            self.tf_writer.close()
 
 
 # Global TFLogger instance
 _global_tf_logger = None
 
-def get_tf_logger(tf_logs_dir: str) -> TFLogger:
+def get_tf_logger(tf_logs_path: str, tensorboard_logging: bool = True) -> TFLogger:
     """
     Get or create the global TFLogger instance.
-    
+
     Args:
-        tf_logs_dir: Directory to write TensorBoard log files
-        
+        tf_logs_path: Directory to write TensorBoard log files
+        tensorboard_logging: Whether to enable TensorBoard logging
+
     Returns:
         TFLogger: Global TFLogger instance
     """
     global _global_tf_logger
-    if _global_tf_logger is None or _global_tf_logger.tf_logs_dir != tf_logs_dir:
-        _global_tf_logger = TFLogger(tf_logs_dir)
+    if _global_tf_logger is None or _global_tf_logger.tf_logs_path != tf_logs_path:
+        _global_tf_logger = TFLogger(tf_logs_path, tensorboard_logging=tensorboard_logging)
     return _global_tf_logger
