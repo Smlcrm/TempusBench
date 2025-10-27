@@ -8,8 +8,6 @@ validation, type checking, and documentation of the benchmarking pipeline.
 from typing import Dict, List, Optional, Any, Literal, Union
 from pathlib import Path
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-import yaml
-import numpy as np
 
 
 class EvaluationConfig(BaseModel):
@@ -17,17 +15,21 @@ class EvaluationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    tuning_loss: str = Field(
-        ...,
-        description="Primary metric for hyperparameter optimization"
+    deterministic_tuning_loss: Optional[str] = Field(
+        default=None,
+        description="Tuning loss for deterministic models (e.g., mae, rmse)"
+    )
+    stochastic_tuning_loss: Optional[str] = Field(
+        default=None,
+        description="Tuning loss for stochastic models (e.g., crps, quantile_score)"
     )
     max_windows: int = Field(
         ...,
         ge=1,
         description="Maximum number of rolling windows to generate for evaluation"
     )
-    max_num_variates: float = Field(
-        default=float('inf'),
+    max_num_variates: int = Field(
+        default=None,
         description="Maximum number of variates to extract from dataset for evaluation (inf for all)"
     )
 
@@ -40,6 +42,7 @@ class EvaluationConfig(BaseModel):
         if isinstance(v, (int, float)) and v < 1:
             raise ValueError("max_num_variates must be at least 1 or inf")
         return v
+
     num_samples: int = Field(
         default=100,
         ge=1,
@@ -54,6 +57,13 @@ class EvaluationConfig(BaseModel):
         default="mean",
         description="Statistic to use for converting stochastic predictions to point forecasts"
     )
+
+    @model_validator(mode='after')
+    def validate_tuning_losses(self):
+        """Validate that at least one tuning loss is defined."""
+        if self.deterministic_tuning_loss is None and self.stochastic_tuning_loss is None:
+            raise ValueError("At least one of 'deterministic_tuning_loss' or 'stochastic_tuning_loss' must be defined")
+        return self
 
 
 class ModelConfig(BaseModel):
@@ -72,6 +82,7 @@ class ModelConfig(BaseModel):
     svr: Optional[Dict[str, List[Any]]] = None
     prophet: Optional[Dict[str, List[Any]]] = None
     lstm: Optional[Dict[str, List[Any]]] = None
+    varmax: Optional[Dict[str, List[Any]]] = None
 
     # Foundation models (no hyperparameters)
     chronos: Optional[Dict[str, Any]] = None
@@ -119,6 +130,54 @@ class ModelConfig(BaseModel):
 
         return v
 
+    @model_validator(mode='after')
+    def validate_training_loss_usage(self):
+        """Validate that training_loss is only used by appropriate models."""
+        # Define model categories based on project conventions
+        deterministic_models = {
+            'exponential_smoothing', 'seasonal_naive', 'croston_classic', 'theta',
+            'xgboost', 'random_forest', 'prophet', 'moment', 'timesfm', 'tabpfn', 'varmax'
+        }
+
+        stochastic_models = {
+            'chronos', 'deepar', 'tiny_time_mixer', 'moirai', 'moirai_moe',
+            'lagllama', 'toto'
+        }
+
+        # Models that can use training_loss (loss-based optimization)
+        training_loss_allowed_models = {
+            'arima', 'lstm', 'deepar', 'svr'
+        }
+
+        # Check each model configuration for training_loss parameter
+        for model_name, model_config in self.model_dump().items():
+            if model_config is None:
+                continue
+
+            if 'training_loss' in model_config:
+                # Check if this model is allowed to use training_loss
+                if model_name not in training_loss_allowed_models:
+                    if model_name in deterministic_models:
+                        raise ValueError(
+                            f"Deterministic model '{model_name}' cannot define 'training_loss' parameter. "
+                            f"Only models performing loss-based optimization (ARIMA, LSTM, DeepAR, SVR) "
+                            f"may define and use the training_loss parameter."
+                        )
+                    elif model_name in stochastic_models:
+                        raise ValueError(
+                            f"Stochastic model '{model_name}' cannot define 'training_loss' parameter. "
+                            f"Only models performing loss-based optimization (ARIMA, LSTM, DeepAR, SVR) "
+                            f"may define and use the training_loss parameter."
+                        )
+                    else:
+                        raise ValueError(
+                            f"Model '{model_name}' cannot define 'training_loss' parameter. "
+                            f"Only models performing loss-based optimization (ARIMA, LSTM, DeepAR, SVR) "
+                            f"may define and use the training_loss parameter."
+                        )
+
+        return self
+
 
 class BenchmarkConfig(BaseModel):
     """Root configuration model for the benchmarking pipeline."""
@@ -128,6 +187,50 @@ class BenchmarkConfig(BaseModel):
     task_path: str = Field(..., description="Task path pattern (supports wildcards like '*', 'univariate/*', etc.)")
     evaluation: EvaluationConfig = Field(..., description="Evaluation configuration")
     model: ModelConfig = Field(..., description="Model configuration")
+
+    @model_validator(mode='after')
+    def validate_tuning_loss_model_compatibility(self):
+        """
+        Validate that tuning losses are compatible with the models being run.
+
+        Rules:
+        1. If only deterministic_tuning_loss is defined, it must work with deterministic models
+        2. If only stochastic_tuning_loss is defined, it must work with stochastic models
+        3. If stochastic_tuning_loss is defined and only deterministic models are in the config,
+            then deterministic_tuning_loss must also be defined
+        """
+        # Import here to avoid circular imports
+        from tempus_bench.utils.paths import get_models_dir
+
+        # Get models directory
+        models_dir = get_models_dir()
+
+        # Categorize models based on their folder location
+        deterministic_models = set()
+
+        # Scan deterministic directory
+        deterministic_dir = models_dir / 'deterministic'
+        if deterministic_dir.exists():
+            for model_folder in deterministic_dir.iterdir():
+                if model_folder.is_dir():
+                    # Check if model file exists
+                    model_file = model_folder / f"{model_folder.name}_model.py"
+                    if model_file.exists():
+                        deterministic_models.add(model_folder.name)
+
+        # Get models defined in the config (non-None models)
+        defined_models = [name for name, config in self.model.model_dump().items() if config is not None]
+
+        # Categorize defined models
+        has_deterministic = any(model in deterministic_models for model in defined_models)
+        # Validation logic
+        if has_deterministic and self.evaluation.deterministic_tuning_loss is None:
+            raise ValueError(
+                f"Configuration requires 'deterministic_tuning_loss' (models: {defined_models}) "
+                f"but it is not specified. Please set 'deterministic_tuning_loss' when using deterministic models."
+            )
+
+        return self
 
 
 class DatasetConfig(BaseModel):
@@ -140,8 +243,7 @@ class DatasetConfig(BaseModel):
     ] = Field(
         default='interpolate',
         description="Strategy for handling missing values"
-    )
-    name: str = Field(
+    )     file_name: str = Field(
         ...,
         description="Dataset name"
     )
@@ -155,7 +257,10 @@ class TaskConfig(BaseModel):
     """Task configuration model for individual task folders."""
 
     model_config = ConfigDict(extra="forbid")
-
+     file_name: str = Field(
+        ...,
+        description="Task name (must match folder name)"
+    )
     forecast_horizon: int = Field(
         ...,
         ge=1,
@@ -217,3 +322,14 @@ class SystemsConfig(BaseModel):
         ...,
         description="Prefix for conda environment names"
     )
+
+
+class UnifiedConfig(BaseModel):
+    """Unified configuration model for the benchmarking pipeline."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    benchmark: BenchmarkConfig = Field(..., description="Benchmark configuration")
+    settings: SystemsConfig = Field(..., description="System settings")
+    model_settings: Dict[str, ModelSettingsConfig] = Field(..., description="Model execution settings")
+    task_configs: Dict[str, List[TaskConfig]] = Field(..., description="Task configurations")
