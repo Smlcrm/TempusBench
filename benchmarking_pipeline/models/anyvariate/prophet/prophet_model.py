@@ -117,6 +117,8 @@ class ProphetModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ):
 
@@ -131,6 +133,26 @@ class ProphetModel(BaseModel):
         timestamps_target = self.convert_to_datetimeindex(timestamps_target)
 
         train_df = pd.DataFrame({"ds": timestamps_context, "y": y_context})
+        
+        # Add covariates as additional regressors if provided
+        if x_context is not None and x_target is not None:
+            # Concatenate context and target covariates for training
+            x_all = np.concatenate([x_context, x_target], axis=0)
+            
+            # Ensure x_all is 2D
+            if x_all.ndim == 1:
+                x_all = x_all.reshape(-1, 1)
+            
+            # Add each covariate as a regressor
+            num_covariates = x_all.shape[1]
+            self.num_covariates = num_covariates
+            
+            for i in range(num_covariates):
+                regressor_name = f"covariate_{i}"
+                # Add only context covariates to training dataframe
+                train_df[regressor_name] = x_context[:, i] if x_context.ndim > 1 else x_context
+                # Add regressor to model
+                self.model.add_regressor(regressor_name)
 
         self.model.fit(train_df)
         # Store training statistics for fallback predictions
@@ -143,17 +165,19 @@ class ProphetModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Make predictions using the trained Prophet model.
 
         Args:
             y_context: Recent/past target values
-            forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
-            y_context_timestamps: Timestamps for context data
-            y_target: Target values for evaluation (optional)
-            y_target_timestamps: Timestamps for target data (optional)
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
             freq: Frequency string from CSV data - MUST be provided
+            x_context: Covariates for context period (not used in prediction)
+            x_target: Covariates for target period (used for forecasting)
 
         Returns:
             np.ndarray: Model predictions
@@ -162,12 +186,20 @@ class ProphetModel(BaseModel):
             ValueError: If freq is None or if required data is missing
         """
 
-        # Default forecast horizon if neither y_target nor y_target_timestamps provided
-
         # Create future dataframe with the correct timestamps
         future_df = pd.DataFrame(
             {"ds": self.convert_to_datetimeindex(timestamps_target)}
         )
+        
+        # Add covariates to future dataframe if they were used in training
+        if x_target is not None and hasattr(self, 'num_covariates'):
+            # Ensure x_target is 2D
+            if x_target.ndim == 1:
+                x_target = x_target.reshape(-1, 1)
+            
+            for i in range(self.num_covariates):
+                regressor_name = f"covariate_{i}"
+                future_df[regressor_name] = x_target[:, i] if x_target.ndim > 1 else x_target
 
         # Make predictions
         forecast = self.model.predict(future_df)
@@ -187,6 +219,8 @@ class ProphetModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ):
         """
@@ -200,6 +234,8 @@ class ProphetModel(BaseModel):
             timestamps_context: Timestamps for context data
             timestamps_target: Timestamps for target data
             freq: Frequency string from CSV data
+            x_context: Covariates for context period (optional)
+            x_target: Covariates for target period (optional)
             **kwargs: Additional arguments
 
         Returns:
@@ -228,6 +264,8 @@ class ProphetModel(BaseModel):
                     timestamps_context=timestamps_context,
                     timestamps_target=timestamps_target,
                     freq=freq,
+                    x_context=x_context,
+                    x_target=x_target,
                     **kwargs
                 )
                 
@@ -245,6 +283,8 @@ class ProphetModel(BaseModel):
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
                 freq=freq,
+                x_context=x_context,
+                x_target=x_target,
                 **kwargs
             )
         
@@ -256,6 +296,8 @@ class ProphetModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Make predictions using the trained Prophet model(s).
@@ -267,6 +309,8 @@ class ProphetModel(BaseModel):
             timestamps_context: Timestamps for context data
             timestamps_target: Timestamps for target data
             freq: Frequency string from CSV data
+            x_context: Covariates for context period (optional)
+            x_target: Covariates for target period (optional)
 
         Returns:
             np.ndarray: Model predictions (shape: [n_forecast_steps, n_variates])
@@ -285,7 +329,9 @@ class ProphetModel(BaseModel):
                     y_context=y_context_variate,
                     timestamps_context=timestamps_context,
                     timestamps_target=timestamps_target,
-                    freq=freq
+                    freq=freq,
+                    x_context=x_context,
+                    x_target=x_target
                 )
                 
                 predictions.append(variate_pred)
@@ -305,5 +351,7 @@ class ProphetModel(BaseModel):
                 y_context=y_context,
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
-                freq=freq
+                freq=freq,
+                x_context=x_context,
+                x_target=x_target
             )

@@ -127,7 +127,9 @@ class ModelExecutor:
                                 y_target=target[tstart:tend],
                                 timestamps_context=timestamps[cstart:cend],
                                 timestamps_target=timestamps[tstart:tend],
-                                freq=freq
+                                freq=freq,
+                                x_context=None,  # Covariates not yet implemented in data loader
+                                x_target=None    # Covariates not yet implemented in data loader
                             )
 
                             results = trained_model.predict(
@@ -135,6 +137,8 @@ class ModelExecutor:
                                 timestamps_context=timestamps[cstart:tend],
                                 timestamps_target=timestamps[vstart:vend],
                                 freq=freq,
+                                x_context=None,  # Covariates not yet implemented in data loader
+                                x_target=None    # Covariates not yet implemented in data loader
                             )
 
                             eval_losses = trained_model.compute_loss(

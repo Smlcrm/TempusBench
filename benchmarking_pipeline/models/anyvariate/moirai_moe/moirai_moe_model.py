@@ -45,6 +45,8 @@ class MoiraiMoeModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "MoiraiMoeModel":
         """
         "Train" the Moirai model (no training required for foundation models).
@@ -92,6 +94,8 @@ class MoiraiMoeModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Make predictions using the Moirai model.

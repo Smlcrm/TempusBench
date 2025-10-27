@@ -4,7 +4,7 @@ Croston's Classic Model implementation for intermittent demand forecasting.
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 import pickle
 import os
 
@@ -33,8 +33,11 @@ class CrostonClassicModel(BaseModel):
         self,
         y_context: np.ndarray,
         y_target: np.ndarray = None,
-        x_context: np.ndarray = None,
-        x_target: np.ndarray = None,
+        timestamps_context: Optional[np.ndarray] = None,
+        timestamps_target: Optional[np.ndarray] = None,
+        freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "CrostonClassicModel":
         """
@@ -113,6 +116,8 @@ class CrostonClassicModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ):
         """

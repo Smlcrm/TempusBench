@@ -133,6 +133,8 @@ class LagllamaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "LagllamaModel":
         """
         Train/fine-tune the Lag-Llama model on given data.
@@ -159,6 +161,8 @@ class LagllamaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -248,6 +252,8 @@ class LagllamaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "LagllamaModel":
         """
         Anyvariate wrapper: for multivariate, no separate fitting is needed; we keep separate handles.
@@ -261,11 +267,13 @@ class LagllamaModel(BaseModel):
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
                 m._train(y_context=yc, y_target=yt,
-                         timestamps_context=timestamps_context, timestamps_target=timestamps_target, freq=freq)
+                         timestamps_context=timestamps_context, timestamps_target=timestamps_target, freq=freq,
+                         x_context=x_context, x_target=x_target)
                 self.models.append(m)
             self.is_fitted = True
             return self
-        return self._train(y_context, y_target, timestamps_context, timestamps_target, freq)
+        return self._train(y_context, y_target, timestamps_context, timestamps_target, freq,
+                          x_context=x_context, x_target=x_target)
 
     def predict(
         self,
@@ -273,6 +281,8 @@ class LagllamaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         if hasattr(self, "models") and self.models:
@@ -280,10 +290,12 @@ class LagllamaModel(BaseModel):
             for k, m in enumerate(self.models):
                 yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
                 pk = m._predict(y_context=yc, timestamps_context=timestamps_context,
-                                timestamps_target=timestamps_target, freq=freq, **kwargs)
+                                timestamps_target=timestamps_target, freq=freq,
+                                x_context=x_context, x_target=x_target, **kwargs)
                 preds.append(pk.reshape(-1, 1) if pk.ndim == 1 else pk)
             return np.concatenate(preds, axis=1)
-        return self._predict(y_context, timestamps_context, timestamps_target, freq, **kwargs)
+        return self._predict(y_context, timestamps_context, timestamps_target, freq,
+                            x_context=x_context, x_target=x_target, **kwargs)
 
     # def _predict_internal(
     #     self,

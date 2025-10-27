@@ -4,7 +4,7 @@ Exponential Smoothing model implementation.
 
 import os
 import pickle
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
@@ -75,6 +75,8 @@ class ExponentialSmoothingModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "ExponentialSmoothingModel":
 
@@ -140,6 +142,8 @@ class ExponentialSmoothingModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
 

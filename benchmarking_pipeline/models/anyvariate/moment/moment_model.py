@@ -107,6 +107,8 @@ class MomentModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "MomentModel":
         """
         Train/fine-tune the MOMENT model on given data.
@@ -128,6 +130,8 @@ class MomentModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """

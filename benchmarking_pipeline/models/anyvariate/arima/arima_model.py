@@ -77,6 +77,8 @@ class ArimaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "ArimaModel":
         """
         Train the ARIMA model on given data.
@@ -87,6 +89,8 @@ class ArimaModel(BaseModel):
             timestamps_context: Timestamps for y_context (not used in ARIMA)
             timestamps_target: Timestamps for y_target (not used in ARIMA)
             freq: Frequency string (required by interface, not used in ARIMA)
+            x_context: Exogenous variables for context period (optional)
+            x_target: Exogenous variables for target period (optional)
 
         Returns:
             self: The fitted model instance
@@ -99,8 +103,14 @@ class ArimaModel(BaseModel):
         # Ensure endogenous series is 1D for statsmodels
         endog = y_context.squeeze()
 
-        # No exogenous variables supported
+        # Handle exogenous variables if provided
         exog = None
+        if x_context is not None and x_target is not None:
+            # Concatenate context and target exogenous variables for training
+            exog = np.concatenate([x_context, x_target], axis=0)
+            # Store for prediction
+            self.exog_context_len = len(x_context)
+            self.exog_target_len = len(x_target)
 
         # Use seasonal_order only if seasonal period is greater than 1
         if self.model_config["s"] > 1:
@@ -136,6 +146,8 @@ class ArimaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Make predictions using the trained ARIMA model, rolling forward using the fitted model.
@@ -145,6 +157,8 @@ class ArimaModel(BaseModel):
             timestamps_context: Timestamps for y_context (not used for ARIMA prediction)
             timestamps_target: Timestamps for the prediction horizon (used to determine forecast length)
             freq: Frequency string (must be provided from CSV data, required)
+            x_context: Exogenous variables for context period (not used in prediction)
+            x_target: Exogenous variables for target period (used for forecasting)
 
         Returns:
             np.ndarray: Model predictions with shape (forecast_horizon, 1)
@@ -169,7 +183,12 @@ class ArimaModel(BaseModel):
                 "Forecast horizon must be positive (timestamps_target must be non-empty)."
             )
 
-        forecast = self.model_.forecast(steps=forecast_steps, exog=None)
+        # Use exogenous variables for forecasting if provided
+        exog_forecast = None
+        if x_target is not None:
+            exog_forecast = x_target[:forecast_steps]
+
+        forecast = self.model_.forecast(steps=forecast_steps, exog=exog_forecast)
         forecast_array = np.asarray(forecast)
 
         self._last_y_pred = forecast_array.reshape(-1, 1)
@@ -183,6 +202,8 @@ class ArimaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "ArimaModel":
         """
         Anyvariate wrapper: trains a separate ARIMA per variate if multivariate,
@@ -205,6 +226,8 @@ class ArimaModel(BaseModel):
                     timestamps_context=timestamps_context,
                     timestamps_target=timestamps_target,
                     freq=freq,
+                    x_context=x_context,
+                    x_target=x_target,
                 )
                 self.models.append(m)
             # For compatibility, mirror first model state to top-level attributes
@@ -219,6 +242,8 @@ class ArimaModel(BaseModel):
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
                 freq=freq,
+                x_context=x_context,
+                x_target=x_target,
             )
 
     def predict(
@@ -227,6 +252,8 @@ class ArimaModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Anyvariate wrapper: predicts per variate and stacks columns.
@@ -241,6 +268,8 @@ class ArimaModel(BaseModel):
                     timestamps_context=timestamps_context,
                     timestamps_target=timestamps_target,
                     freq=freq,
+                    x_context=x_context,
+                    x_target=x_target,
                 )
                 preds.append(pk.reshape(-1, 1))
             return np.concatenate(preds, axis=1)
@@ -250,4 +279,6 @@ class ArimaModel(BaseModel):
             timestamps_context=timestamps_context,
             timestamps_target=timestamps_target,
             freq=freq,
+            x_context=x_context,
+            x_target=x_target,
         )

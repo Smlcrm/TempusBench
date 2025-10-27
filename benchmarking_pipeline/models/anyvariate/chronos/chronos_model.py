@@ -64,6 +64,8 @@ class ChronosModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "ChronosModel":
         """
         Initialize the Chronos model (no training required for foundation models).
@@ -103,6 +105,8 @@ class ChronosModel(BaseModel):
         timestamps_context: np.ndarray = None,
         timestamps_target: np.ndarray = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """

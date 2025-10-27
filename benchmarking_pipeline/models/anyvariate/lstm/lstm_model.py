@@ -70,10 +70,11 @@ class LSTMModel(BaseModel):
         Build the Multivariate LSTM model architecture.
 
         Args:
-            input_shape: Shape of input data (context_length, num_targets)
+            input_shape: Shape of input data (context_length, num_features)
+                         where num_features = num_targets + num_covariates
         """
 
-        context_length, num_targets = input_shape
+        context_length, num_features = input_shape
         self.model = Sequential()
 
         # Add LSTM layers
@@ -90,7 +91,8 @@ class LSTMModel(BaseModel):
                 self.model.add(Dropout(self.model_config["dropout"]))
 
         # Add output layer - predicts prediction_window * num_targets values (flattened)
-        self.model.add(Dense(self.model_config["prediction_window"] * num_targets))
+        # Note: only predicts targets, not covariates
+        self.model.add(Dense(self.model_config["prediction_window"] * self.num_targets))
 
         # Compile model with optimized settings
         self.model.compile(
@@ -151,8 +153,10 @@ class LSTMModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
-    ) -> "MultivariateLSTMModel":
+    ) -> "LSTMModel":
         """
         Train the Multivariate LSTM model on given data.
 
@@ -166,7 +170,11 @@ class LSTMModel(BaseModel):
         Args:
             y_context: Past target values (time series) - used for training (can be DataFrame for multivariate)
             y_target: Future target values (optional, for validation)
-            y_start_date: The start date timestamp for y_context and y_target in string form
+            timestamps_context: Timestamps for y_context
+            timestamps_target: Timestamps for y_target
+            freq: Frequency string
+            x_context: Covariates for context period (optional)
+            x_target: Covariates for target period (optional)
             **kwargs: Additional keyword arguments
 
         Returns:
@@ -177,12 +185,30 @@ class LSTMModel(BaseModel):
             y_context = y_context.reshape(-1, 1)
         if y_target.ndim == 1:
             y_target = y_target.reshape(-1, 1)
-        num_steps, num_features = y_context.shape
+        num_steps, num_targets = y_context.shape
+        self.num_targets = num_targets
         forecast_length = y_target.shape[0]
+
+        # Combine target data with covariates if provided
+        combined_context = y_context
+        combined_target = y_target
+        
+        if x_context is not None and x_target is not None:
+            # Ensure covariates are 2D
+            if x_context.ndim == 1:
+                x_context = x_context.reshape(-1, 1)
+            if x_target.ndim == 1:
+                x_target = x_target.reshape(-1, 1)
+            
+            # Concatenate targets and covariates along feature dimension
+            combined_context = np.concatenate([y_context, x_context], axis=1)
+            combined_target = np.concatenate([y_target, x_target], axis=1)
+        
+        num_features = combined_context.shape[1]
 
         # Prepare sequences using the combined context + target data
         # Concatenate context and target data for training
-        combined_data = np.concatenate([y_context, y_target], axis=0)
+        combined_data = np.concatenate([combined_context, combined_target], axis=0)
         X_seq, y_seq = self._prepare_sequences(combined_data)
 
         print("X shape:", X_seq.shape)
@@ -228,6 +254,8 @@ class LSTMModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         freq: str,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Make predictions using the trained Multivariate LSTM model.
@@ -241,6 +269,14 @@ class LSTMModel(BaseModel):
         - Fair comparison with non-autoregressive models (ARIMA, Exponential Smoothing)
         - No data leakage from using own predictions as input
 
+        Args:
+            y_context: Recent/past target values
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
+            freq: Frequency string
+            x_context: Covariates for context period (optional)
+            x_target: Covariates for target period (optional, used for forecasting)
+
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
         """
@@ -248,7 +284,18 @@ class LSTMModel(BaseModel):
         if self.model is None:
             raise ValueError("Model not initialized. Call train first.")
 
-        forecast_length, num_targets = y_context.shape
+        forecast_length = len(timestamps_target)
+        
+        # Combine target data with covariates if provided
+        combined_context = y_context
+        if x_context is not None:
+            # Ensure covariates are 2D
+            if x_context.ndim == 1:
+                x_context = x_context.reshape(-1, 1)
+            # Concatenate targets and covariates along feature dimension
+            combined_context = np.concatenate([y_context, x_context], axis=1)
+        
+        num_features = combined_context.shape[1]
 
         # Calculate how many prediction windows we need
         num_windows = math.ceil(
@@ -256,8 +303,8 @@ class LSTMModel(BaseModel):
         )
 
         all_predictions = []
-        current_sequence = y_context[-self.model_config["context_length"]:].reshape(
-            1, self.model_config["context_length"], num_targets
+        current_sequence = combined_context[-self.model_config["context_length"]:].reshape(
+            1, self.model_config["context_length"], num_features
         )
 
         for window in range(num_windows):
@@ -265,7 +312,7 @@ class LSTMModel(BaseModel):
             predictions = self.model.predict(current_sequence, verbose=0)
             # Reshape predictions from (1, prediction_window * num_targets) to (prediction_window, num_targets)
             predictions_reshaped = predictions[0].reshape(
-                self.model_config["prediction_window"], num_targets
+                self.model_config["prediction_window"], self.num_targets
             )
             all_predictions.extend(predictions_reshaped)
 
@@ -280,7 +327,26 @@ class LSTMModel(BaseModel):
                     self.model_config["prediction_window"],
                     self.model_config["context_length"],
                 )
-                current_sequence[0, -n:, :] = predictions_reshaped[:n, :]
+                
+                # If we have covariates, we need to combine predictions with future covariates
+                if x_target is not None:
+                    # Ensure x_target is 2D
+                    if x_target.ndim == 1:
+                        x_target = x_target.reshape(-1, 1)
+                    
+                    # Get the corresponding future covariates for this window
+                    start_idx = (window + 1) * self.model_config["prediction_window"]
+                    end_idx = start_idx + n
+                    if end_idx <= len(x_target):
+                        future_covariates = x_target[start_idx:end_idx]
+                        # Combine predicted targets with future covariates
+                        combined_predictions = np.concatenate([predictions_reshaped[:n], future_covariates], axis=1)
+                        current_sequence[0, -n:, :] = combined_predictions
+                    else:
+                        # Not enough future covariates, use predictions only for target columns
+                        current_sequence[0, -n:, :self.num_targets] = predictions_reshaped[:n]
+                else:
+                    current_sequence[0, -n:, :] = predictions_reshaped[:n, :]
 
         # Return only the requested number of predictions
         result = np.array(all_predictions[:forecast_length])

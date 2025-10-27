@@ -106,6 +106,8 @@ class BaseModel(ABC):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> "BaseModel":
         """
         Train the model on given data.
@@ -113,7 +115,11 @@ class BaseModel(ABC):
         Args:
             y_context: Past target values - training data during tuning time, training + validation data during testing time
             y_target: Future target values - validation data during tuning time, None during testing time (avoid data leakage)
-            y_start_date: The start date timestamp for y_context and y_target in string form
+            timestamps_context: Timestamps for y_context
+            timestamps_target: Timestamps for y_target
+            freq: Frequency string (e.g., 'H', 'D', 'M')
+            x_context: Covariates for context period (optional)
+            x_target: Covariates for target period (optional)
 
         Returns:
             self: The fitted model instance
@@ -127,14 +133,19 @@ class BaseModel(ABC):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
         Make predictions using the trained model.
 
         Args:
             y_context: Recent/past target values (for sequence models, optional for ARIMA)
-            forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
+            timestamps_context: Timestamps for y_context
+            timestamps_target: Timestamps for target period
             freq: Frequency string (e.g., 'H', 'D', 'M') - MUST be provided from CSV data
+            x_context: Covariates for context period (optional)
+            x_target: Covariates for target period (optional)
 
         Returns:
             np.ndarray: Model predictions with shape (n_samples, forecast_horizon)
