@@ -12,16 +12,16 @@ from datetime import datetime
 from ..utils.logger import get_logger
 
 class Visualizer:
-    def __init__(self, config: Optional[Dict[str, Any]] = None, logs_dir: str):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, logs_path: str):
         """
         Initialize visualizer with configuration.
 
         Args:
             config (dict, optional): Configuration dictionary with visualization parameters.
-            logs_dir (str): Directory for storing log files.
+            logs_path (str): Directory for storing log files.
         """
         self.config = config if config is not None else {}
-        self.logger = get_logger(logs_dir)
+        self.logger = get_logger(logs_path)
         # Use a built-in style instead of seaborn
         plt.style.use('fivethirtyeight')
         # Set seaborn style separately

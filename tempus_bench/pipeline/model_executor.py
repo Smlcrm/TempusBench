@@ -18,22 +18,23 @@ from typing import Dict, Any
 from tempus_bench.utils.logger import get_logger
 from tempus_bench.utils.envs import CondaEnvManager
 from tempus_bench.utils.tf_logger import get_tf_logger
-from tempus_bench.utils.paths import get_tasks_dir, get_models_dir
+from tempus_bench.utils.paths import get_tasks_dir, get_models_dir, get_project_root
 from tempus_bench.models.model_router import ModelRouter
 from tempus_bench.utils.model_config import get_python_version_for_model
-from tempus_bench.config import load_config
-
-ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+from tempus_bench.config import load_config, get_config_manager
 
 class ModelExecutor:
-    def __init__(self, config_path: str, run_dir: str):
-        self.config = load_config(config_path)
+    def __init__(self, config_path: str, logs_path: str):
+        self.config = load_config(config_path, logs_path)
         self.config_path = config_path
-        self.run_dir = run_dir
+        self.logs_path = logs_path
         self.tasks_dir = get_tasks_dir()
         self.models_dir = get_models_dir()
-        self.logger = get_logger(os.path.join(run_dir, 'logs'))
-        self.tf_logger = get_tf_logger(os.path.join(run_dir, 'tensorboard'))
+        self.config_manager = get_config_manager()
+        console_logging = self.config_manager.settings.console_logging
+        file_logging = self.config_manager.settings.file_logging
+        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
+        self.tf_logger = get_tf_logger(str(Path(logs_path).parent / 'tensorboard'), tensorboard_logging=self.config_manager.settings.tensorboard_logging)
 
     def _generate_model_execution_script(self,
         model_name: str,
@@ -41,7 +42,7 @@ class ModelExecutor:
         context_steps: int,
         train_steps: int,
         validate_steps: int,
-        dataset_path: str,
+        task_path: str,
         window_idx: int):
 
         script = textwrap.dedent(f"""
@@ -58,8 +59,7 @@ class ModelExecutor:
             def main():
                 data_loader = DataLoader(
                     config_path={repr(self.config_path)},
-                    tasks_dir={repr(self.tasks_dir)},
-                    run_dir={repr(self.run_dir)}
+                    logs_path={repr(self.logs_path)}
                 )
 
                 config = data_loader.config
@@ -67,13 +67,13 @@ class ModelExecutor:
                 evaluation_metrics = config['evaluation']['metrics']
                 model_name = {repr(model_name)}
                 hyperparameters = {repr(hyperparameters)}
-                dataset_path = {repr(dataset_path)}
+                task_path = {repr(task_path)}
                 window_idx = {window_idx}
 
                 # Generate the specific window
                 steps = [('context', {context_steps}), ('train', {train_steps}), ('validate', {validate_steps})]
-                window_iter = data_loader.generate_dataset_split(
-                    dataset_path, steps, stride=1
+                window_iter = data_loader.generate_task_split(
+                    task_path, steps, stride=1
                 )
 
                 # Get the specific window
@@ -83,12 +83,12 @@ class ModelExecutor:
                         target = window.target
 
                         # Import model here, so we know target shape
-                        router = ModelRouter(logs_dir=os.path.join({repr(self.run_dir)}, 'logs'))
+                        router = ModelRouter(logs_path={repr(self.logs_path)})
                         task_type = config['task']['task_type']
                         folder_path, file_name, class_name = router.get_model_path_by_task_type(
                             model_name, task_type
                         )
-                        module_path = os.path.join(folder_path, f"{{file_name}}.py")
+                        module_path = str(Path(folder_path) / f"{{file_name}}.py")
                         spec = importlib.util.spec_from_file_location(file_name, module_path)
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
@@ -100,11 +100,8 @@ class ModelExecutor:
                         vstart, vend = window.validate.start, window.validate.end
                         freq = window.metadata['freq']
 
-                        # Update the config with the hyperparameters before creating the model
-                        full_config_copy = copy.deepcopy(config)
-                        full_config_copy["model"] = {{model_name: hyperparameters}}
-                        logs_dir = os.path.join({repr(self.run_dir)}, 'logs')
-                        model = model_class(full_config_copy, logs_dir=logs_dir)
+                        # Create model with config_path and hyperparameters
+                        model = model_class(config_path={repr(self.config_path)}, logs_path={repr(self.logs_path)}, hyperparameters=hyperparameters)
 
                         # Set the scaler for inverse transformation if available
                         if hasattr(window, 'scaler') and window.scaler is not None:
@@ -141,7 +138,7 @@ class ModelExecutor:
                         print(json.dumps(output))
                         return
 
-                raise Exception(f"Window {{window_idx}} not found for dataset {{dataset_path}}")
+                raise Exception(f"Window {{window_idx}} not found for dataset {{task_path}}")
 
             if __name__ == "__main__":
                 main()
@@ -154,7 +151,7 @@ class ModelExecutor:
         context_steps: int,
         train_steps: int,
         validate_steps: int,
-        dataset_path: str,
+        task_path: str,
         window_idx: int) -> dict:
         """
         Execute a single model with specific hyperparameters on a specific dataset window.
@@ -165,7 +162,7 @@ class ModelExecutor:
             context_steps: Number of context steps
             train_steps: Number of training steps
             validate_steps: Number of validation steps
-            dataset_path: Path to the dataset file
+            task_path: Path to the dataset file
             window_idx: Index of the window to use
 
         Returns:
@@ -191,7 +188,7 @@ class ModelExecutor:
             context_steps=context_steps,
             train_steps=train_steps,
             validate_steps=validate_steps,
-            dataset_path=dataset_path,
+            task_path=task_path,
             window_idx=window_idx
         )
 
@@ -236,14 +233,14 @@ class ModelExecutor:
         task_type = self.config['task']['task_type']
 
         # Use model router to get the correct path
-        router = ModelRouter(logs_dir=os.path.join(self.run_dir, 'logs'))
+        router = ModelRouter(logs_path=self.logs_path)
         folder_path, file_name, class_name = router.get_model_path_by_task_type(
             model_name, task_type
         )
 
         # Construct requirements path
-        req_path = os.path.join(folder_path, "requirements.txt")
-        if not os.path.exists(req_path):
+        req_path = Path(folder_path) / "requirements.txt"
+        if not req_path.exists():
             raise FileNotFoundError(f"requirements.txt not found at expected path: {req_path}")
-        return os.path.abspath(req_path)
+        return str(req_path.resolve())
 
