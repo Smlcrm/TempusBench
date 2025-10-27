@@ -5,30 +5,40 @@ This module provides Pydantic-based configuration models for all global settings
 including task configuration, model parameters, evaluation metrics, and system settings.
 """
 
+import yaml
+from pathlib import Path
+from typing import Dict, Any
+
 from .models import (
     BenchmarkConfig,
     TaskConfig,
     DatasetConfig,
     EvaluationConfig,
     ModelConfig,
-    SystemConfig,
-    LoggingConfig,
-    PathsConfig
+    ModelSettingsConfig,
+    SystemsConfig,
 )
 from .validator import ConfigValidator
-from .manager import ConfigManager
 
-# Backward compatibility functions
-def load_config(config_path: str):
-    """Load configuration with automatic merging with defaults."""
-    manager = ConfigManager()
-    config = manager.load_from_file(config_path)
-    return config.model_dump()
 
-def validate_config_file(config_path: str) -> bool:
-    """Validate a configuration file."""
-    manager = ConfigManager()
-    return manager.validate_config_file(config_path)
+def validate_config_file(config_path: str, logs_dir: str) -> bool:
+    """
+    Validate a configuration file using the ConfigValidator.
+    
+    Args:
+        config_path: Path to the configuration file
+        logs_dir: Directory for log files
+        
+    Returns:
+        True if configuration is valid
+        
+    Raises:
+        ConfigValidationError: If validation fails
+    """
+    validator = ConfigValidator(logs_dir)
+    config = load_config(config_path)
+    validator.validate_benchmark_config(BenchmarkConfig(**config))
+    return True
 
 __all__ = [
     "BenchmarkConfig",
@@ -36,11 +46,9 @@ __all__ = [
     "DatasetConfig",
     "EvaluationConfig",
     "ModelConfig",
-    "SystemConfig",
-    "LoggingConfig",
-    "PathsConfig",
+    "ModelSettingsConfig",
+    "SystemsConfig",
     "ConfigValidator",
-    "ConfigManager",
     "load_config",
     "validate_config_file"
 ]
