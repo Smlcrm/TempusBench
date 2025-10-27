@@ -1,8 +1,8 @@
 task:
+  name: batadal_nonstationary_multivariate
   context_window: 1536
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
-    name: multivariate/batadal_nonstationary_multivariate
     normalize: true
-  forecast_horizon: 8
----
+    file_name: batadal_nonstationary_multivariate.csv

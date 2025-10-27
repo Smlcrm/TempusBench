@@ -1,8 +1,8 @@
 task:
+  name: indiagold_days_multivariate
   context_window: 2048
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
-    name: multivariate/indiagold_days_multivariate
     normalize: true
-  forecast_horizon: 64
----
+    file_name: indiagold_days_multivariate.csv
