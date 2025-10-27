@@ -88,7 +88,8 @@ class BenchmarkRunner:
                 if self.logger: self.logger.info("BenchmarkRunner", f"Hyperparameter Tuning Starts for task: {task_name} (config idx={idx})")
                 hyperparameter_tuner = HyperparameterTuner(
                     config_path=self.config_path,
-                    run_path=self.run_path
+                    run_path=self.run_path,
+                    task_config=task_config
                 )
 
                 # Hyperparameter Tuning - Context + Train + Validate Losses (Rolling Window with strides of validate_steps)
