@@ -82,6 +82,19 @@ def get_task_path(task_name: str) -> Path:
     return get_tasks_dir() / task_name
 
 
+def get_dataset_path(task_name: str) -> Path:
+    """
+    Get the absolute path to a specific dataset file.
+
+    Args:
+        task_name: Name of the task (e.g., 'baggage_100_multivariate')
+
+    Returns:
+        Path: Absolute path to the dataset file
+    """
+    return Path(get_task_path(task_name)) / (task_name + '.csv')
+
+
 def get_model_path(model_type: str, model_name: str) -> Path:
     """
     Get the absolute path to a specific model directory.
@@ -94,6 +107,16 @@ def get_model_path(model_type: str, model_name: str) -> Path:
         Path: Absolute path to the model directory
     """
     return get_models_dir() / model_type / model_name
+
+
+def get_runs_dir() -> Path:
+    """
+    Get the absolute path to the runs directory.
+
+    Returns:
+        Path: Absolute path to runs directory
+    """
+    return get_project_root() / "runs"
 
 
 def ensure_directory_exists(path: Path) -> None:
