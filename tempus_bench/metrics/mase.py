@@ -1,6 +1,4 @@
-import pandas as pd
 import numpy as np
-from typing import Dict, Any, Union
 
 """
 Calculates Mean Absolute Scaled Error.
@@ -30,5 +28,5 @@ class MASE:
         else:
             y_ppred = y_pred
 
-        denom = np.max(1e-10, np.mean(np.abs(y_true[1:]-y_true[:-1])))
+        denom = np.maximum(1e-10, np.mean(np.abs(y_true[1:]-y_true[:-1])))
         return np.mean(np.abs(y_true - y_ppred)) / denom
