@@ -5,9 +5,7 @@ This module provides Pydantic-based configuration models for all global settings
 including task configuration, model parameters, evaluation metrics, and system settings.
 """
 
-import yaml
-from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from .models import (
     BenchmarkConfig,
@@ -18,37 +16,105 @@ from .models import (
     ModelSettingsConfig,
     SystemsConfig,
 )
-from .validator import ConfigValidator
+from .manager import ConfigManager, ConfigValidationError
 
+# Global ConfigManager instance for singleton pattern
+_config_manager: Optional[ConfigManager] = None
+_current_config_path: Optional[str] = None
 
-def validate_config_file(config_path: str, logs_dir: str) -> bool:
+def load_config(config_path: str, logs_path: str) -> Dict[str, Any]:
     """
-    Validate a configuration file using the ConfigValidator.
-    
+    Load and validate configuration using ConfigManager singleton.
+
+    This function ensures that configuration is validated before any execution.
+    It maintains a global ConfigManager instance to avoid redundant validation
+    of the same config file.
+
     Args:
-        config_path: Path to the configuration file
-        logs_dir: Directory for log files
-        
+        config_path: Path to the main benchmark configuration YAML file
+        logs_path: Directory for log files
+
     Returns:
-        True if configuration is valid
-        
+        Dictionary containing validated configuration with backward-compatible structure:
+        - logging: System logging settings (from settings)
+        - evaluation: Evaluation configuration (from main.evaluation)
+        - task: Task configuration (from main.task - first task's config)
+        - model: Model hyperparameters (from main.model)
+        - settings: System settings (from settings)
+        - model_settings: Model execution settings
+        - task_configs: All task configurations
+
     Raises:
-        ConfigValidationError: If validation fails
+        ConfigValidationError: If configuration validation fails
     """
-    validator = ConfigValidator(logs_dir)
-    config = load_config(config_path)
-    validator.validate_benchmark_config(BenchmarkConfig(**config))
-    return True
+    global _config_manager, _current_config_path
+
+    # Check if we need to create a new ConfigManager instance
+    if _config_manager is None or _current_config_path != config_path:
+        _config_manager = ConfigManager(config_path, logs_path)
+        _current_config_path = config_path
+
+    # Get first task config for backward compatibility
+    first_task_config = None
+    if _config_manager.task:
+        first_task_name = list(_config_manager.task.keys())[0]
+        first_task_config = _config_manager.task[first_task_name][0]
+
+    # Return backward-compatible dict structure
+    config_dict = {
+        # Backward compatibility - flatten main config to top level
+        "evaluation": _config_manager.main.evaluation.model_dump(),
+        "model": _config_manager.model,
+
+        # System settings (flattened for backward compatibility)
+        "logging": {
+            "console_logging": _config_manager.settings.console_logging,
+            "file_logging": _config_manager.settings.file_logging,
+            "tensorboard_logging": _config_manager.settings.tensorboard_logging,
+        },
+
+        # Task configuration (use first task for backward compatibility)
+        "task": {},
+
+        # Additional validated configs
+        "settings": _config_manager.settings.model_dump(),
+        "model_settings": {name: config.model_dump() for name, config in _config_manager.model_settings.items()},
+        "task_configs": {name: [task.model_dump() for task in tasks] for name, tasks in _config_manager.task.items()},
+    }
+
+    # Set task config from first available task for backward compatibility
+    if first_task_config:
+        task_dict = first_task_config.model_dump()
+        # Add missing fields that pipeline components expect
+        task_dict["path"] = task_dict["dataset"]["name"]  # dataset name becomes path
+        task_dict["task_type"] = "deterministic"  # Default, will be determined by model router
+        config_dict["task"] = task_dict
+
+    # Add missing evaluation fields that pipeline components expect
+    evaluation_dict = config_dict["evaluation"]
+    evaluation_dict["metrics"] = ["mae", "rmse", "mase", "mape"]  # Default metrics
+
+    return config_dict
+
+def get_config_manager() -> Optional[ConfigManager]:
+    """
+    Get the current global ConfigManager instance.
+
+    Returns:
+        The current ConfigManager instance, or None if not initialized
+    """
+    return _config_manager
 
 __all__ = [
     "BenchmarkConfig",
-    "TaskConfig", 
+    "TaskConfig",
     "DatasetConfig",
     "EvaluationConfig",
     "ModelConfig",
     "ModelSettingsConfig",
     "SystemsConfig",
-    "ConfigValidator",
+    "ConfigManager",
+    "ConfigValidationError",
     "load_config",
-    "validate_config_file"
+    "get_config_manager",
 ]
