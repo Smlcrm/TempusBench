@@ -1,7 +1,7 @@
 import os
 import subprocess
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+from .paths import get_project_root
 
 class CondaEnvManager:
     def __init__(self, name: str, python: str = None, requirements_path: str = None):
@@ -53,7 +53,7 @@ class CondaEnvManager:
 
         # Install tempus_bench package
         result = subprocess.run([
-            "conda", "run", "-n", self.env_name, "pip", "install", "-e", ROOT_DIR,
+            "conda", "run", "-n", self.env_name, "pip", "install", "-e", str(get_project_root()),
         ], capture_output=True, text=True)
 
         if result.returncode != 0:
