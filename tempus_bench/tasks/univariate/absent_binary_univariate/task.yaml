@@ -2,7 +2,7 @@ task:
   context_window: 512
   dataset:
     handle_missing: interpolate
-    name: absent_binary_univariate
+    name: univariate/absent_binary_univariate
     normalize: true
   forecast_horizon: 8
 ---

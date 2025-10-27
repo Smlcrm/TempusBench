@@ -2,7 +2,7 @@ task:
   context_window: 32
   dataset:
     handle_missing: interpolate
-    name: germanhouses_sales_univariate
+    name: univariate/germanhouses_sales_univariate
     normalize: true
   forecast_horizon: 8
 ---

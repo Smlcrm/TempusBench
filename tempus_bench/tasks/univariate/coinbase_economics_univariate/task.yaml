@@ -2,7 +2,7 @@ task:
   context_window: 1536
   dataset:
     handle_missing: interpolate
-    name: coinbase_economics_univariate
+    name: univariate/coinbase_economics_univariate
     normalize: true
   forecast_horizon: 8
 ---

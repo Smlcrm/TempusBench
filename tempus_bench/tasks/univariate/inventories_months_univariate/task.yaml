@@ -2,7 +2,7 @@ task:
   context_window: 128
   dataset:
     handle_missing: interpolate
-    name: inventories_months_univariate
+    name: univariate/inventories_months_univariate
     normalize: true
   forecast_horizon: 8
 ---
