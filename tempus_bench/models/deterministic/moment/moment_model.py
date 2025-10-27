@@ -69,8 +69,8 @@ class MomentDataset(Dataset):
 class MomentModel(BaseModel):
     """MOMENT model wrapper for time series forecasting, extending FoundationModel."""
 
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
-        super().__init__(config, logs_dir)
+    def __init__(self, config: UnifiedConfig, logs_path: str):
+        super().__init__(config_path, logs_path, hyperparameters)
         self.model_config["context_length"] = 512
 
         self.scaler = StandardScaler()

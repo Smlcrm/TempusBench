@@ -7,20 +7,20 @@ import re
 from .toto.model.toto import Toto
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
-from tempus_bench.models.stochastic_base_model import StochasticBaseModel
+from tempus_bench.models.base_model import BaseModel
 from typing import Optional, Union, Dict, Any
 
 
-class TotoModel(StochasticBaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+class TotoModel(BaseModel):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize TOTO model with configuration.
 
         Args:
             config: Configuration dictionary containing model parameters
-            logs_dir: Directory for storing log files (optional)
+            logs_path: Directory for storing log files (optional)
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 

@@ -12,15 +12,14 @@ with different context lengths and sampling strategies.
 import pdb
 import pandas as pd
 import numpy as np
-import torch
-from typing import Dict, Any, Union, Tuple, List, Optional
-from tempus_bench.models.stochastic_base_model import StochasticBaseModel
-from tempus_bench.utils.logger import get_logger
+
+from typing import Dict, Any
 from chronos import ChronosPipeline as BaseChronosPipeline
-from einops import rearrange
 
+from tempus_bench.config.models import UnifiedConfig
+from tempus_bench.models.base_model import BaseModel
 
-class ChronosModel(StochasticBaseModel):
+class ChronosModel(BaseModel):
     """
     Chronos foundation model wrapper for time series forecasting.
 
@@ -31,10 +30,9 @@ class ChronosModel(StochasticBaseModel):
         model_size: Size of the Chronos model ('tiny', 'mini', 'small', 'base', 'large')
         context_length: Number of past time steps used as context
         num_samples: Number of predictive samples to generate
-        pipeline: The underlying Chronos pipeline instance
     """
 
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize the Chronos model wrapper.
 
@@ -42,20 +40,13 @@ class ChronosModel(StochasticBaseModel):
             config: Configuration dictionary containing model parameters
                 - model_size: str, size of the Chronos model (default: 'small')
                 - context_length: int, number of past time steps for context (default: 8)
-                - num_samples: int, number of predictive samples (default: 5)
-            config_file: Path to a JSON configuration file
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config, logs_path)
 
-        self.model_config["model_size"] = (
-            "tiny"  # Valid model sizes = {'tiny', 'mini', 'small', 'base', 'large'}
+        self.set_params(
+            model_size="tiny",
+            context_length=2048 # maximum context length
         )
-        self.model_config["context_length"] = 512
-
-        # Initialize model state
-        self.is_fitted = False
-
-        # forecast_horizon is inherited from parent class (FoundationModel)
 
     def train(
         self,
@@ -142,15 +133,14 @@ class ChronosModel(StochasticBaseModel):
         forecasts = self.model.predict(
             context=y_context,
             prediction_length=forecast_horizon,
-            num_samples=self.config["evaluation"]["num_samples"],
+            num_samples=self.eval_config["num_samples"]
         )
         self.logger.debug("ChronosModel", f"Shape of Stochastic Forecasts {forecasts.shape}")
         forecasts = np.asarray(forecasts)
-        
+
         # Chronos returns shape (num_targets, num_samples, forecast_horizon)
         # We need to transpose to (num_samples, forecast_horizon, num_targets)
         forecasts = np.transpose(forecasts, (1, 2, 0))
-
         return forecasts
 
     def get_model_summary(self) -> Dict[str, Any]:

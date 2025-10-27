@@ -13,16 +13,16 @@ from tempus_bench.utils.logger import get_logger
 
 
 class ExponentialSmoothingModel(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize Exponential Smoothing model with a given configuration.
 
         Args:
             config: Configuration dictionary for model parameters.
                     e.g., {'trend': 'add', 'seasonal': 'add', 'seasonal_periods': 12, ...}
-            logs_dir: Directory for storing log files (required)
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
 
         # Cast parameters to correct types (no defaults - all must be in config)
         self.model_config["trend"] = self._cast_param("trend", self.model_config["trend"])
@@ -153,21 +153,18 @@ class ExponentialSmoothingModel(BaseModel):
         """
         num_targets = y_context.shape[1]
         
-        if self.logger:
-            self.logger.debug("ExponentialSmoothing Train Wrapper", f"Number of features/variates detected: {num_targets}")
+        self.logger.debug("ExponentialSmoothing Train Wrapper", f"Number of features/variates detected: {num_targets}")
         
         # Multivariate: more than one feature (column)
         if num_targets > 1:
-            if self.logger:
-                self.logger.debug("ExponentialSmoothing Train Wrapper", "Taking multivariate path - training separate Exponential Smoothing per variate")
+            self.logger.debug("ExponentialSmoothing Train Wrapper", "Taking multivariate path - training separate Exponential Smoothing per variate")
             self.models = []
             for k in range(num_targets):
-                if self.logger:
-                    self.logger.debug("ExponentialSmoothing Train Wrapper", f"Training variate k={k}")
+                self.logger.debug("ExponentialSmoothing Train Wrapper", f"Training variate k={k}")
                 yc = y_context[:, k]    # Already 1D
                 yt = y_target[:, k] if y_target is not None else None  # Already 1D
                 # Create new model instance for this variate
-                m = ExponentialSmoothingModel(self.config, logs_dir=self.logs_dir)
+                m = ExponentialSmoothingModel(self.config_path, logs_path=self.logs_path, hyperparameters=self.model_config)
                 m._train(
                     y_context=yc,
                     y_target=yt,
@@ -180,13 +177,11 @@ class ExponentialSmoothingModel(BaseModel):
             # For compatibility, mirror first model state to top-level attributes
             self.model = self.models[0].model
             self.is_fitted = True
-            if self.logger:
-                self.logger.info("ExponentialSmoothing Train Wrapper", f"Multivariate training completed for {num_targets} variates")
+            self.logger.info("ExponentialSmoothing Train Wrapper", f"Multivariate training completed for {num_targets} variates")
             return self
         else:
             # Univariate: input is always (num_steps, 1)
-            if self.logger:
-                self.logger.debug("ExponentialSmoothing Train Wrapper", "Taking univariate path")
+            self.logger.debug("ExponentialSmoothing Train Wrapper", "Taking univariate path")
             return self._train(
                 y_context=y_context,
                 y_target=y_target,
@@ -240,13 +235,11 @@ class ExponentialSmoothingModel(BaseModel):
         Anyvariate wrapper: predicts per variate and stacks columns.
         """
         if hasattr(self, "models") and self.models:
-            if self.logger:
-                self.logger.debug("ExponentialSmoothing Predict Wrapper", f"Multivariate prediction for {len(self.models)} variates")
+            self.logger.debug("ExponentialSmoothing Predict Wrapper", f"Multivariate prediction for {len(self.models)} variates")
             preds = []
             num_variates = len(self.models)
             for k, m in enumerate(self.models):
-                if self.logger:
-                    self.logger.debug("ExponentialSmoothing Predict Wrapper", f"Predicting for variate k={k}")
+                self.logger.debug("ExponentialSmoothing Predict Wrapper", f"Predicting for variate k={k}")
                 yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
                 pk = m._predict(
                     y_context=yc,
@@ -257,13 +250,11 @@ class ExponentialSmoothingModel(BaseModel):
                 )
                 preds.append(pk.reshape(-1, 1))
             result = np.concatenate(preds, axis=1)
-            if self.logger:
-                self.logger.debug("ExponentialSmoothing Predict Wrapper", f"Final concatenated prediction shape: {result.shape}")
-                self.logger.info("ExponentialSmoothing Predict Wrapper", "Multivariate prediction completed successfully")
+            self.logger.debug("ExponentialSmoothing Predict Wrapper", f"Final concatenated prediction shape: {result.shape}")
+            self.logger.info("ExponentialSmoothing Predict Wrapper", "Multivariate prediction completed successfully")
             return result
         # Univariate
-        if self.logger:
-            self.logger.debug("ExponentialSmoothing Predict Wrapper", "Univariate prediction")
+        self.logger.debug("ExponentialSmoothing Predict Wrapper", "Univariate prediction")
         return self._predict(
             y_context=y_context,
             timestamps_context=timestamps_context,

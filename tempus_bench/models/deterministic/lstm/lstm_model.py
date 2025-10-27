@@ -26,7 +26,7 @@ from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 
 
 class LSTMModel(BaseModel):
-    def __init__(self, config: Dict[str, Any], logs_dir: str):
+    def __init__(self, config: UnifiedConfig, logs_path: str):
         """
         Initialize Multivariate LSTM model with given configuration.
 
@@ -46,7 +46,7 @@ class LSTMModel(BaseModel):
                 - forecast_horizon: int, number of steps to forecast ahead
             config_file: Path to a JSON configuration file
         """
-        super().__init__(config, logs_dir)
+        super().__init__(config_path, logs_path, hyperparameters)
         if "units" not in self.model_config:
             raise ValueError("units must be specified in config")
         if "layers" not in self.model_config:
@@ -100,7 +100,7 @@ class LSTMModel(BaseModel):
                 beta_2=0.999,
                 epsilon=1e-7
             ),
-            loss=self.training_loss,
+            loss=self.tuning_loss,
             metrics=['mae']  # Add MAE for better monitoring
         )
 
