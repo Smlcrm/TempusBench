@@ -1,0 +1,8 @@
+task:
+  context_window: 128
+  dataset:
+    handle_missing: interpolate
+    name: invetories_manufacturing_univariate
+    normalize: true
+  forecast_horizon: 8
+---

@@ -1,0 +1,8 @@
+task:
+  context_window: 1536
+  dataset:
+    handle_missing: interpolate
+    name: nyccovid_healthcare_multivariate
+    normalize: true
+  forecast_horizon: 16
+---
