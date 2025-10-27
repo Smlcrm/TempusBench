@@ -6,70 +6,82 @@ A comprehensive framework for benchmarking time series forecasting models, inclu
 
 This project provides a unified benchmarking framework for evaluating the performance of various time series forecasting models. It supports:
 
-- **Traditional Models**: ARIMA, LSTM, XGBoost, SVR, Prophet, Random Forest, Theta, DeepAR, TabPFN
-- **Foundation Models**: Chronos, LagLlama, Moirai, TimesFM, Tiny Time Mixer, Toto
-- **Univariate and Multivariate Forecasting**: Automatic routing based on data characteristics
+- **Traditional Models**: ARIMA, LSTM, XGBoost, SVR, Prophet, Random Forest, Theta, DeepAR, Exponential Smoothing, Croston Classic, Seasonal Naive, TabPFN
+- **Foundation Models**: Chronos, LagLlama, Moirai, TimesFM, Tiny Time Mixer, Toto, Moment
+- **Deterministic and Stochastic Forecasting**: Automatic routing based on task type
+- **Univariate and Multivariate Forecasting**: All models handle both seamlessly
 - **Comprehensive Evaluation**: Multiple metrics and visualization tools
 - **Hyperparameter Tuning**: Automated optimization of model parameters
+- **Isolated Execution**: Each model runs in its own conda environment to avoid dependency conflicts
 
 ## Project Structure
 
 ```
 tempus_bench/
-├── __init__.py                 # Package initialization and documentation
-├── cli.py                     # Command-line interface
-├── configs/                   # Configuration files
-│   ├── all_model_multivariate.yaml
-│   ├── all_model_univariate.yaml
-│   └── CONFIG_DOCUMENTATION.md
-├── datasets/                  # Time series datasets
-│   ├── australian_electricity_demand/
-│   ├── azure_vm_traces_2017/
-│   ├── bitcoin_with_missing/
-│   ├── china_air_quality/
-│   ├── covid_deaths/
-│   ├── tourism_monthly/
-│   └── ... (many more)
+├── __init__.py                 # Package initialization
+├── run_benchmark.py           # Main entry point for benchmarks
+├── config/                    # Configuration system
+│   ├── benchmark.yaml         # Default configuration
+│   ├── settings.yaml          # System configuration
+│   ├── manager.py             # Configuration management
+│   ├── models.py              # Model configuration handling
+│   └── validator.py           # Configuration validation
+├── tasks/                     # Time series datasets
+│   ├── univariate/           # Univariate time series tasks
+│   │   ├── chickenpox_dense_univariate/
+│   │   ├── coinbase_days_univariate/
+│   │   └── ... (many more)
+│   └── multivariate/         # Multivariate time series tasks
+│       ├── baggage_100_multivariate/
+│       ├── madrid_transport_multivariate/
+│       └── ... (many more)
 ├── metrics/                   # Evaluation metrics
 │   ├── __init__.py
-│   ├── crps.py              # Continuous Ranked Probability Score
-│   ├── weighted_interval_score.py    # Weighted interval score for prediction intervals
-│   └── ... (other metrics)
+│   ├── crps.py                # Continuous Ranked Probability Score
+│   ├── weighted_interval_score.py
+│   ├── mae.py
+│   ├── mape.py
+│   ├── mase.py
+│   ├── rmse.py
+│   └── evaluation.py
 ├── models/                    # Model implementations
 │   ├── __init__.py
-│   ├── base_model.py        # Base class for traditional models
-│   ├── foundation_model.py  # Base class for foundation models
-│   ├── model_router.py      # Intelligent model routing
-│   ├── univariate/          # Univariate-only models
-│   │   ├── arima/
-│   │   ├── lstm/
-│   │   ├── prophet/
-│   │   └── ... (other models)
-│   ├── multivariate/        # Models with separate multivariate implementations
+│   ├── base_model.py          # Base class for all models
+│   ├── stochastic_base_model.py  # Base class for stochastic models
+│   ├── model_router.py        # Model routing system
+│   ├── deterministic/         # Point forecast models
 │   │   ├── arima/
 │   │   ├── lstm/
 │   │   ├── xgboost/
+│   │   ├── prophet/
+│   │   ├── timesfm/
+│   │   ├── tiny_time_mixer/
+│   │   ├── tabpfn/
 │   │   └── ... (other models)
-│   └── anyvariate/          # Models that handle both univariate and multivariate
-│       ├── chronos/         # Amazon Chronos foundation model
-│       ├── lagllama/        # LagLlama foundation model
-│       ├── moirai/          # Moirai foundation model
+│   └── stochastic/           # Probabilistic forecast models
+│       ├── chronos/
+│       ├── lagllama/
+│       ├── moirai/
+│       ├── moirai_moe/
+│       ├── toto/
+│       ├── moment/
+│       ├── deepar/
 │       └── ... (other models)
 ├── pipeline/                  # Core pipeline components
 │   ├── __init__.py
-│   ├── data_loader.py       # Data loading and preprocessing
-│   ├── data_types.py        # Data structures and types
-│   ├── evaluation.py        # Model evaluation (moved to metrics/)
-│   ├── logger.py            # Logging and metrics storage
-│   ├── preprocessor.py      # Data preprocessing
-│   ├── model_executor.py    # Model execution in isolated environments
-│   ├── visualizer.py        # Plots and visualizations
-│   └── ... (other components)
-├── trainer/                   # Training utilities
-│   └── hyperparameter_tuning.py
+│   ├── data_loader.py        # Data loading and preprocessing
+│   ├── data_types.py         # Data structures and types
+│   ├── preprocessor.py       # Data preprocessing
+│   ├── model_executor.py     # Model execution in isolated environments
+│   ├── hyperparameter_tuning.py
+│   └── visualizer.py
 └── utils/                     # Utility functions
     ├── __init__.py
-    └── config_validator.py   # Configuration validation
+    ├── envs.py               # Conda environment management
+    ├── logger.py             # Logging
+    ├── tf_logger.py          # TensorBoard logging
+    ├── model_config.py       # Model configuration handling
+    └── paths.py              # Path management
 ```
 
 ## Key Features
@@ -77,23 +89,29 @@ tempus_bench/
 ### 1. Intelligent Model Routing
 
 The `ModelRouter` automatically discovers available models and routes requests based on:
-- **Data characteristics** (univariate vs multivariate)
-- **Model capabilities** (univariate-only, multivariate-only, or anyvariate)
+- **Task type** (deterministic vs stochastic)
+- **Model categorization** (deterministic vs stochastic folders)
 - **Folder structure** (automatic discovery)
 
+All models handle both univariate and multivariate datasets internally.
+
 ```python
-from tempus_bench.models import model_router
+from tempus_bench.models.model_router import ModelRouter
+
+# Initialize router
+router = ModelRouter(logs_dir="./logs")
 
 # Get available models
-available = model_router.get_available_models()
+available = router.get_available_models()
 print(available)
-# Output: {'anyvariate': ['chronos', 'lagllama', 'moirai'], 
-#          'multivariate': ['arima', 'lstm', 'xgboost'], 
-#          'univariate_only': ['prophet', 'theta']}
+# Output: {
+#   'deterministic': ['arima', 'lstm', 'xgboost', 'prophet', ...],
+#   'stochastic': ['chronos', 'lagllama', 'moirai', 'deepar', ...]
+# }
 
-# Get model path for specific data
-folder_path, file_name, class_name = model_router.get_model_path_by_target_count(
-    'arima', num_targets=3, variant='multivariate'
+# Get model path for specific task type
+folder_path, file_name, class_name = router.get_model_path_by_task_type(
+    'arima', task_type='deterministic'
 )
 ```
 
@@ -101,84 +119,99 @@ folder_path, file_name, class_name = model_router.get_model_path_by_target_count
 
 All models implement a consistent interface through base classes:
 
-- **`BaseModel`**: For traditional statistical and ML models
-- **`FoundationModel`**: For large pre-trained foundation models
+- **`BaseModel`**: Base class for all models with standard methods
+- **`StochasticBaseModel`**: Enhanced base class for stochastic models
 
 ```python
-from tempus_bench.models import BaseModel, FoundationModel
+from tempus_bench.models.base_model import BaseModel
 
-# Traditional model
+# Deterministic model implementation
 class MyModel(BaseModel):
-    def train(self, y_context, x_context=None, **kwargs):
-        # Implementation
+    def train(self, y_context, y_target, **kwargs):
+        # Training implementation
         pass
     
-    def predict(self, y_context=None, x_target=None, **kwargs):
-        # Implementation
+    def predict(self, y_context, **kwargs):
+        # Prediction implementation
         pass
-
+    
+    def compute_loss(self, y_true, y_pred):
+        # Loss computation
+        pass
 ```
 
 ### 3. Comprehensive Data Handling
 
 The pipeline automatically handles:
-- **Multiple data formats** (CSV chunks with metadata)
-- **Automatic splitting** (train/validation/test)
-- **Missing data handling** (interpolation, deletion)
+- **Multiple task formats** (CSV with metadata)
+- **Flexible windowing** (context, train, validate splits)
+- **Automatic frequency detection** from data
 - **Data normalization** (optional)
-- **Frequency alignment** (automatic detection)
+- **Rolling window evaluation**
 
 ```python
-from tempus_bench.pipeline import DataLoader
+from tempus_bench.pipeline.data_loader import DataLoader
 
-# Load data
-data_loader = DataLoader(config)
-datasets = data_loader.load_several_chunks(3)
+# Initialize data loader
+data_loader = DataLoader(
+    config_path="config/benchmark.yaml",
+    tasks_dir="tempus_bench/tasks",
+    run_dir="./runs"
+)
 
-# Each dataset contains train/validation/test splits
-for dataset in datasets:
-    print(f"Train: {len(dataset.train.targets)} samples")
-    print(f"Validation: {len(dataset.validation.targets)} samples")
-    print(f"Test: {len(dataset.test.targets)} samples")
+# Generate rolling windows
+steps = [
+    ('context', 50),
+    ('train', 25),
+    ('validate', 25)
+]
+window_iter = data_loader.generate_dataset_split(
+    dataset_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate/chickenpox_dense_univariate.csv",
+    steps=steps,
+    stride=1
+)
+
+# Iterate over windows
+for window_idx, window in window_iter:
+    print(f"Context: {window.context}, Train: {window.train}, Validate: {window.validate}")
 ```
 
 ### 4. Flexible Configuration
 
 Configuration files support:
 - **Model-specific parameters** (hyperparameter grids)
-- **Dataset configuration** (paths, frequencies, split ratios)
-- **Evaluation settings** (metrics, validation strategies)
-- **Training parameters** (batch sizes, learning rates, epochs)
+- **Task configuration** (context window, forecast horizon)
+- **Evaluation settings** (metrics, loss functions)
+- **System configuration** (paths, logging, TensorBoard)
 
 ```yaml
-# Example configuration
-test_type: deterministic
-dataset:
-  name: china_air_quality
-  path: datasets/china_air_quality
-  frequency: H
-  forecast_horizon: [10, 25, 50]
-  split_ratio: [0.8, 0.1, 0.1]
-  normalize: false
-  handle_missing: interpolate
-
-model:
-  # Foundation models
-  chronos:
-    model_size: ['small', 'base']
-    context_length: [8, 16]
-    num_samples: [5, 10]
-  
-  # Traditional models
-  arima:
-    p: [0, 1, 2]
-    d: [0, 1]
-    q: [0, 1, 2]
-    s: [2, 4]
+# benchmark.yaml
+task_path: '*'  # Use all tasks
 
 evaluation:
-  type: deterministic
-  metrics: [mae, rmse, mape]
+  tuning_loss: mae
+  point_forecast_statistic: mean
+  max_num_variates: 4
+  max_windows: 5
+
+model:
+  # Traditional models with hyperparameter grids
+  arima:
+    p: [1, 2]
+    d: [1]
+    q: [1, 2]
+    s: [2]
+  
+  xgboost:
+    lookback_window: [30]
+    n_estimators: [200]
+    max_depth: [4]
+    learning_rate: [0.05]
+  
+  # Foundation models (no hyperparameters needed)
+  chronos: {}
+  lagllama: {}
+  moirai: {}
 ```
 
 ## Installation
@@ -187,6 +220,7 @@ evaluation:
 
 - Python 3.8+
 - Conda (recommended for environment management)
+- Git LFS (for large model checkpoints)
 
 ### Setup
 
@@ -198,86 +232,151 @@ evaluation:
 
 2. **Install dependencies**:
    ```bash
-   # Create conda environment
+   # Run the installation script
+   ./install.sh
+   
+   # Or manually create conda environment
    conda create -n sim.benchmarks python=3.11.13
    conda activate sim.benchmarks
-   
-   ./install.sh
+   pip install -e .
    ```
 
 3. **Verify installation**:
    ```bash
-   python -c "from tempus_bench import model_router; print('Installation successful!')"
+   python -c "from tempus_bench.models.model_router import ModelRouter; print('Installation successful!')"
    ```
 
 ## Usage
 
-### Basic Usage
-
-```python
-from tempus_bench.pipeline import DataLoader, ModelExecutor
-from tempus_bench.models import model_router
-
-# Load configuration
-import yaml
-with open('configs/all_model_multivariate.yaml', 'r') as f:
-    config = yaml.safe_load(f)
-
-# Load data
-data_loader = DataLoader(config)
-datasets = data_loader.load_several_chunks(3)
-
-# Train and evaluate models
-model_executor = ModelExecutor(config_path, run_dir, datasets_dir)
-results = model_executor.execute_model(model_name, hyperparameters, context_steps, train_steps, validate_steps, dataset_path, window_idx)
-```
-
-### Command Line Interface
+### Basic Usage via Command Line
 
 ```bash
+# Activate the conda environment
+conda activate sim.benchmarks
+
 # Run benchmark with default configuration
-python -m run_benchmark
+python -m tempus_bench.run_benchmark
 
 # Run with custom configuration
-python -m run_benchmark --config configs/my_config.yaml
+python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark.yaml
 
-# Specify output directory
-python -m run_benchmark --output-dir results/
+# The system will automatically:
+# 1. Discover all available models (deterministic and stochastic)
+# 2. Load all tasks from tempus_bench/tasks/
+# 3. Perform hyperparameter tuning for each model
+# 4. Evaluate models on rolling windows
+# 5. Store results in runs/ directory
+```
+
+### Python API Usage
+
+```python
+from tempus_bench.run_benchmark import BenchmarkRunner
+
+# Initialize and run benchmarks
+config_path = "tempus_bench/config/benchmark.yaml"
+runner = BenchmarkRunner(config_path=config_path)
+runner.run()
+
+# The system handles:
+# - Hyperparameter optimization
+# - Rolling window evaluation  
+# - Multiple model execution
+# - Result storage
+```
+
+### Running Individual Models
+
+```python
+from tempus_bench.pipeline.model_executor import ModelExecutor
+from tempus_bench.models.model_router import ModelRouter
+
+# Initialize executor
+executor = ModelExecutor(
+    config_path="tempus_bench/config/benchmark.yaml",
+    run_dir="./runs"
+)
+
+# Execute a single model with specific hyperparameters
+results = executor.execute_model(
+    model_name='arima',
+    hyperparameters={'p': 2, 'd': 1, 'q': 2, 's': 2},
+    context_steps=50,
+    train_steps=25,
+    validate_steps=25,
+    dataset_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate/chickenpox_dense_univariate.csv",
+    window_idx=0
+)
+```
+
+### Scripts and Automation
+
+```bash
+# Run all benchmarks for all models
+bash scripts/bash/run_all_benchmarks.sh
+
+# Clean up conda environments
+bash scripts/bash/cleanup_conda_envs.sh
+
+# Each model runs in isolation in its own conda environment
+# This prevents dependency conflicts between different models
 ```
 
 ### Adding New Models
 
-1. **Create model directory**:
+1. **Choose model category** (deterministic or stochastic):
+   - **Deterministic**: Point forecasts (mean/median predictions)
+   - **Stochastic**: Probabilistic forecasts (samples/quantiles)
+
+2. **Create model directory**:
    ```
-   models/univariate/my_model/
+   tempus_bench/models/deterministic/my_model/  # or stochastic/
    ├── my_model_model.py
-   └── requirements.txt
+   ├── requirements.txt
+   └── settings.yaml
    ```
 
-2. **Implement model class**:
+3. **Implement model class**:
    ```python
    from tempus_bench.models.base_model import BaseModel
    
    class MyModelModel(BaseModel):
-       def __init__(self, config=None, config_file=None):
-           super().__init__(config, config_file)
-           # Initialize model-specific parameters
+       def __init__(self, config, logs_dir=None):
+           super().__init__(config, logs_dir=logs_dir)
+           # Store model-specific config
+           self.model_config = config['model']['my_model']
        
-       def train(self, y_context, **kwargs):
+       def train(self, y_context, y_target, timestamps_context, timestamps_target, freq, **kwargs):
            # Training implementation
-           pass
+           # Must return self for method chaining
+           return self
        
-       def predict(self, **kwargs):
+       def predict(self, y_context, timestamps_context, timestamps_target, freq, **kwargs):
            # Prediction implementation
-           pass
+           # Return numpy array of predictions
+           return predictions
+       
+       def compute_loss(self, y_true, y_pred):
+           # Compute loss metrics
+           return {'mae': mae, 'rmse': rmse}
    ```
 
-3. **Add to configuration**:
+4. **Add to configuration**:
    ```yaml
+   # In tempus_bench/config/benchmark.yaml
    model:
      my_model:
        param1: [value1, value2]
        param2: [value3, value4]
+   ```
+
+5. **Specify Python version** (if needed):
+   ```python
+   # In tempus_bench/utils/model_config.py
+   MODEL_PYTHON_VERSIONS = {
+       'my_model': '3.11.13',
+       # ... other models
+   }
    ```
 
 ## Model Categories

@@ -7,29 +7,79 @@ import pandas as pd
 import random
 import re
 import ast
+import yaml
+import logging
 from typing import Dict, Any, Tuple, Optional
 from sklearn.preprocessing import StandardScaler
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class Preprocessor:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], task_path: Optional[str] = None):
         """
         Initialize preprocessor with configuration.
 
         Args:
             config: Configuration dictionary. Preprocessing-related keys are under 'task'.
                 Supports: normalize, handle_missing, max_num_variates.
+            task_path: Path to the specific task directory to load task-specific config
         """
         self.config = config
         
         # Extract configuration values without defaults
-        task_config = config.get('task')
-        dataset_config = task_config.get('dataset')
         evaluation_config = config.get('evaluation')
-        
-        self.normalize = dataset_config.get('normalize')
-        self.handle_missing = dataset_config.get('handle_missing')
         self.max_num_variates = evaluation_config.get('max_num_variates')
+        
+        # Load task-specific configuration if task_path is provided
+        if task_path:
+            self._load_task_config(task_path)
+        else:
+            # Use defaults if no task path provided
+            self.normalize = True
+            self.handle_missing = 'interpolate'
+    
+    def _load_task_config(self, task_path: str) -> None:
+        """Load task-specific configuration from task.yaml (uses first task definition)."""
+        task_dir = Path(task_path)
+        task_config_path = task_dir / "task.yaml"
+        
+        if not task_config_path.exists():
+            logger.warning(f"Task config not found: {task_config_path}, using defaults")
+            self.normalize = True
+            self.handle_missing = 'interpolate'
+            return
+        
+        try:
+            with open(task_config_path, 'r') as f:
+                # Load all YAML documents from the file
+                task_configs = list(yaml.safe_load_all(f))
+            
+            # Use the first valid task configuration
+            for task_config in task_configs:
+                if task_config is None or 'task' not in task_config:
+                    continue
+                
+                task_data = task_config['task']
+                if 'dataset' not in task_data:
+                    continue
+                
+                # Extract dataset configuration
+                dataset_config = task_data.get('dataset', {})
+                self.normalize = dataset_config.get('normalize', True)
+                self.handle_missing = dataset_config.get('handle_missing', 'interpolate')
+                return
+            
+            # If no valid task config found, use defaults
+            logger.warning(f"No valid task configuration found in {task_config_path}, using defaults")
+            self.normalize = True
+            self.handle_missing = 'interpolate'
+            
+        except Exception as e:
+            logger.warning(f"Failed to load task config from {task_config_path}: {e}, using defaults")
+            self.normalize = True
+            self.handle_missing = 'interpolate'
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """

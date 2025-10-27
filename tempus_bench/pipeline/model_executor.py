@@ -18,17 +18,20 @@ from typing import Dict, Any
 from tempus_bench.utils.logger import get_logger
 from tempus_bench.utils.envs import CondaEnvManager
 from tempus_bench.utils.tf_logger import get_tf_logger
+from tempus_bench.utils.paths import get_tasks_dir, get_models_dir
 from tempus_bench.models.model_router import ModelRouter
+from tempus_bench.utils.model_config import get_python_version_for_model
 from tempus_bench.config import load_config
 
 ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
 class ModelExecutor:
-    def __init__(self, config_path: str, run_dir: str, datasets_dir: str):
+    def __init__(self, config_path: str, run_dir: str):
         self.config = load_config(config_path)
         self.config_path = config_path
         self.run_dir = run_dir
-        self.datasets_dir = datasets_dir
+        self.tasks_dir = get_tasks_dir()
+        self.models_dir = get_models_dir()
         self.logger = get_logger(os.path.join(run_dir, 'logs'))
         self.tf_logger = get_tf_logger(os.path.join(run_dir, 'tensorboard'))
 
@@ -55,7 +58,7 @@ class ModelExecutor:
             def main():
                 data_loader = DataLoader(
                     config_path={repr(self.config_path)},
-                    datasets_dir={repr(self.datasets_dir)},
+                    tasks_dir={repr(self.tasks_dir)},
                     run_dir={repr(self.run_dir)}
                 )
 
@@ -175,7 +178,7 @@ class ModelExecutor:
 
         # Create Conda Environment
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = self.config['system']['python_version']
+        python_version = get_python_version_for_model(model_name)
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,

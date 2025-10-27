@@ -110,7 +110,7 @@ class ArimaModel(BaseModel):
 
         # Ensure endogenous series is 1D for statsmodels
         endog = y_context.squeeze()
-        
+
         if self.logger:
             self.logger.debug("ARIMA Train", f"Endogenous series shape after squeeze: {endog.shape}")
             self.logger.debug("ARIMA Train", f"Endogenous series sample values: {endog[:5] if len(endog) >= 5 else endog}")
@@ -153,14 +153,14 @@ class ArimaModel(BaseModel):
             self.logger.debug("ARIMA Train", f"Starting model fitting...")
 
         self.model_ = model.fit()
-        
+
         if self.logger:
             self.logger.debug("ARIMA Train", f"Model fitted successfully")
             self.logger.debug("ARIMA Train", f"Model summary: {self.model_.summary()}")
             self.logger.debug("ARIMA Train", f"Model AIC: {self.model_.aic}, BIC: {self.model_.bic}")
             self.logger.debug("ARIMA Train", f"Model coefficients: {self.model_.params}")
             self.logger.info("ARIMA Train", "Training completed successfully")
-        
+
         self.is_fitted = True
         return self
 
@@ -243,10 +243,10 @@ class ArimaModel(BaseModel):
         Assumes y_context and y_target are 2D ndarrays: (num_steps, num_targets), even for univariate.
         """
         num_targets = y_context.shape[1]
-        
+
         if self.logger:
             self.logger.debug("ARIMA Train Wrapper", f"Number of features/variates detected: {num_targets}")
-        
+
         # Multivariate: more than one feature (column)
         if num_targets > 1:
             if self.logger:
