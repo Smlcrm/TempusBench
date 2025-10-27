@@ -1,0 +1,8 @@
+task:
+  name: inventories_months_univariate
+  context_window: 128
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: inventories_months_univariate.csv

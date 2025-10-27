@@ -1,0 +1,8 @@
+task:
+  name: forestfires_continuous_univariate
+  context_window: 256
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: forestfires_continuous_univariate.csv

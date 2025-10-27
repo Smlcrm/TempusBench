@@ -1,0 +1,8 @@
+task:
+  name: patient_sparse_univariate
+  context_window: 2048
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: patient_sparse_univariate.csv

@@ -1,0 +1,8 @@
+task:
+  name: soil_nature_univariate
+  context_window: 256
+  forecast_horizon: 16
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: soil_nature_univariate.csv

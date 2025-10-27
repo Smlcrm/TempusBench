@@ -1,0 +1,8 @@
+task:
+  name: swjobpostings_software_univariate
+  context_window: 1536
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: swjobpostings_software_univariate.csv
