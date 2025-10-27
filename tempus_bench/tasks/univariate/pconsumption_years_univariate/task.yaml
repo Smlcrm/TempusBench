@@ -1,8 +1,8 @@
 task:
+  name: pconsumption_years_univariate
   context_window: 64
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
-    name: univariate/pconsumption_years_univariate
     normalize: true
-  forecast_horizon: 8
----
+    file_name: pconsumption_years_univariate.csv

@@ -1,8 +1,8 @@
 task:
+  name: multivariate_test
   context_window: 64
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
-    name: multivariate/multivariate_test
     normalize: true
-  forecast_horizon: 8
----
+    file_name: multivariate_test.csv

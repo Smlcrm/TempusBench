@@ -1,8 +1,8 @@
 task:
+  name: madrid_transport_univariate
   context_window: 2048
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
-    name: univariate/madrid_transport_univariate
     normalize: true
-  forecast_horizon: 64
----
+    file_name: madrid_transport_univariate.csv

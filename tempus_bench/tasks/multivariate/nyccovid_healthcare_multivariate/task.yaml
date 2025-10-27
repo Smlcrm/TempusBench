@@ -1,8 +1,8 @@
 task:
+  name: nyccovid_healthcare_multivariate
   context_window: 1536
+  forecast_horizon: 16
   dataset:
     handle_missing: interpolate
-    name: multivariate/nyccovid_healthcare_multivariate
     normalize: true
-  forecast_horizon: 16
----
+    file_name: nyccovid_healthcare_multivariate.csv

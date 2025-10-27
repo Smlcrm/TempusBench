@@ -1,8 +1,8 @@
 task:
+  name: synthetic_multiplticative_univariate
   context_window: 2048
+  forecast_horizon: 32
   dataset:
     handle_missing: interpolate
-    name: univariate/synthetic_multiplticative_univariate
     normalize: true
-  forecast_horizon: 32
----
+    file_name: synthetic_multiplticative_univariate.csv

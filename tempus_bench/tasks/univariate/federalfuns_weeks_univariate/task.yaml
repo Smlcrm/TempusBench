@@ -1,8 +1,8 @@
 task:
+  name: federalfuns_weeks_univariate
   context_window: 2048
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
-    name: univariate/federalfuns_weeks_univariate
     normalize: true
-  forecast_horizon: 64
----
+    file_name: federalfuns_weeks_univariate.csv

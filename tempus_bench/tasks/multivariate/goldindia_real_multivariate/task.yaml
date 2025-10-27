@@ -1,8 +1,8 @@
 task:
+  name: goldindia_real_multivariate
   context_window: 2048
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
-    name: multivariate/goldindia_real_multivariate
     normalize: true
-  forecast_horizon: 64
----
+    file_name: goldindia_real_multivariate.csv
