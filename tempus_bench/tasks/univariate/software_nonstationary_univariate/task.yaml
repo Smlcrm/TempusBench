@@ -2,7 +2,7 @@ task:
   context_window: 1536
   dataset:
     handle_missing: interpolate
-    name: software_nonstationary_univariate
+    name: univariate/software_nonstationary_univariate
     normalize: true
   forecast_horizon: 8
 ---

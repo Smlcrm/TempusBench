@@ -2,7 +2,7 @@ task:
   context_window: 256
   dataset:
     handle_missing: interpolate
-    name: electricity_energy_univariate
+    name: univariate/electricity_energy_univariate
     normalize: true
   forecast_horizon: 8
 ---

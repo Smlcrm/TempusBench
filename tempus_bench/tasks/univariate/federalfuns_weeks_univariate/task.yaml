@@ -2,7 +2,7 @@ task:
   context_window: 2048
   dataset:
     handle_missing: interpolate
-    name: federalfuns_weeks_univariate
+    name: univariate/federalfuns_weeks_univariate
     normalize: true
   forecast_horizon: 64
 ---
