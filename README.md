@@ -27,14 +27,14 @@ tempus_bench/
 │   ├── models.py              # Model configuration handling
 │   └── validator.py           # Configuration validation
 ├── tasks/                     # Time series datasets
-│   ├── univariate/           # Univariate time series tasks
+│   ├── univariate/           # 25 univariate time series tasks
 │   │   ├── chickenpox_dense_univariate/
 │   │   ├── coinbase_days_univariate/
-│   │   └── ... (many more)
-│   └── multivariate/         # Multivariate time series tasks
+│   │   └── ... (23 more)
+│   └── multivariate/         # 23 multivariate time series tasks
 │       ├── baggage_100_multivariate/
 │       ├── madrid_transport_multivariate/
-│       └── ... (many more)
+│       └── ... (21 more)
 ├── metrics/                   # Evaluation metrics
 │   ├── __init__.py
 │   ├── crps.py                # Continuous Ranked Probability Score
@@ -99,7 +99,7 @@ All models handle both univariate and multivariate datasets internally.
 from tempus_bench.models.model_router import ModelRouter
 
 # Initialize router
-router = ModelRouter(logs_dir="./logs")
+router = ModelRouter(logs_path="./logs")
 
 # Get available models
 available = router.get_available_models()
@@ -120,7 +120,7 @@ folder_path, file_name, class_name = router.get_model_path_by_task_type(
 All models implement a consistent interface through base classes:
 
 - **`BaseModel`**: Base class for all models with standard methods
-- **`StochasticBaseModel`**: Enhanced base class for stochastic models
+- **`BaseModel`**: Enhanced base class for stochastic models
 
 ```python
 from tempus_bench.models.base_model import BaseModel
@@ -341,8 +341,8 @@ bash scripts/bash/cleanup_conda_envs.sh
    from tempus_bench.models.base_model import BaseModel
    
    class MyModelModel(BaseModel):
-       def __init__(self, config, logs_dir=None):
-           super().__init__(config, logs_dir=logs_dir)
+       def __init__(self, config, logs_path=None):
+           super().__init__(config, logs_path=logs_path)
            # Store model-specific config
            self.model_config = config['model']['my_model']
        
