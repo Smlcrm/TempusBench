@@ -8,12 +8,15 @@ validation of benchmark configurations, model settings, task configurations, and
 
 import yaml
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from pydantic import ValidationError
 
-from tempus_bench.utils.paths import get_models_dir, get_tasks_dir, get_configs_dir
+from tempus_bench.utils.paths import get_dataset_path, get_models_dir, get_task_path, get_tasks_dir, get_configs_dir
 from tempus_bench.utils.logger import get_logger
-from .models import BenchmarkConfig, TaskConfig, ModelSettingsConfig, SystemsConfig
+from .models import BenchmarkConfig, TaskConfig, ModelSettingsConfig, SystemsConfig, UnifiedConfig
+
+# Global config manager instance
+_global_config_manager = None
 
 class ConfigValidationError(Exception):
     """Custom exception for configuration validation errors."""
@@ -37,7 +40,7 @@ class ConfigManager:
         settings (SystemsConfig): System settings from config/settings.yaml
         model_settings (Dict[str, ModelSettingsConfig]): Model execution settings (Python version, device, conda env)
         task_dirs (List[Path]): Task directories matching the task_path pattern
-        task (Dict[str, TaskConfig]): Validated task configurations
+        task (Dict[str, List[TaskConfig]]): Validated task configurations (each task can have multiple configs)
         model (Dict[str, Any]): Model hyperparameters from main config
     """
 
@@ -54,17 +57,17 @@ class ConfigManager:
             - self.settings: System settings (logging format, etc.)
             - self.model_settings: Model execution settings (Python version, device, conda env)
             - self.task_dirs: Task directories matching task_path pattern
-            - self.task: Task configurations (forecast horizon, dataset settings)
+            - self.task: Task configurations (forecast horizon, dataset settings) - supports multiple configs per task
             - self.model: Model hyperparameters extracted from main config
         """
         # Setup paths
         self.config_path = config_path
-        self.logger = get_logger(logs_path)
-        # Extract and validate configs
         self.main = self.validate_benchmark_config()
         self.settings = self.validate_benchmark_settings()
+        console_logging = self.settings.console_logging
+        file_logging = self.settings.file_logging
+        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
         self.model_settings = self.validate_model_settings()
-        self.task_dirs = self._find_task_directories()
         self.task = self.validate_task_configs()
 
     def validate_benchmark_config(self) -> BenchmarkConfig:
@@ -173,14 +176,29 @@ class ConfigManager:
 
         return validated_settings
 
-    def validate_task_configs(self) -> Dict[str, TaskConfig]:
+    def validate_task_configs(self) -> Dict[str, List[TaskConfig]]:
         """
         Validate all task.yaml files for task directories found based on the task_path pattern.
 
-        This method validates task configurations for all task directories that match the pattern specified in the main benchmark configuration. Each task's configuration is validated against the TaskConfig schema.
+        This method validates task configurations for all task directories that match the pattern specified in the main benchmark configuration. Each task's configuration is validated against the TaskConfig schema. Supports multiple TaskConfigs per task using YAML multi-document format (separated by '---').
+
+        Example task.yaml format:
+        ```yaml
+        task:
+            forecast_horizon: 24
+            context_window: 100
+            dataset:
+            name: dataset.csv
+        ---
+        task:
+            forecast_horizon: 48
+            context_window: 100
+            dataset:
+            name: dataset.csv
+        ```
 
         Returns:
-            Dictionary mapping task names to validated TaskConfig instances
+            Dictionary mapping task names to lists of validated TaskConfig instances
 
         Raises:
             ConfigValidationError: If validation fails
@@ -196,18 +214,45 @@ class ConfigManager:
 
             try:
                 with open(task_config_path, 'r') as f:
-                    task_config_data = yaml.safe_load(f)
+                    # Load all YAML documents (supports multi-document format)
+                    task_config_documents = list(yaml.safe_load_all(f))
 
-                # Extract the 'task' key if present
-                if isinstance(task_config_data, dict) and 'task' in task_config_data:
-                    task_data = task_config_data['task']
-                else:
-                    task_data = task_config_data
+                # Handle multiple task configs defined with '---' separator
+                task_configs = []
+                for doc in task_config_documents:
+                    if not doc: continue  # Skip empty documents
 
-                # Validate using TaskConfig
-                task_config = TaskConfig(**task_data)
-                validated_configs[task_name] = task_config
-                self.logger.debug("ConfigValidator", f"Task config validated: {task_config_path}")
+                    # Extract the 'task' key if present
+                    if isinstance(doc, dict) and 'task' in doc:
+                        task_data = doc['task']
+                    else:
+                        raise ConfigValidationError(
+                            f"All sections in {task_config_path} must contain a 'task' key."
+                        )
+
+                    # Validate and create TaskConfig
+                    task_config = TaskConfig(**task_data)
+
+                    # Validate that task name matches folder name
+                    if task_config.name != task_name:
+                        raise ConfigValidationError(
+                            f"Task name '{task_config.name}' in {task_config_path} does not match folder name '{task_name}'"
+                        )
+
+                    # Validate that CSV file exists and matches task name
+                    csv_file = task_dir / f"{task_name}.csv"
+                    if not csv_file.exists():
+                        raise ConfigValidationError(
+                            f"CSV file not found in {task_dir}. Expected: {csv_file.name}"
+                        )
+
+                    task_configs.append(task_config)
+
+                if not task_configs:
+                    raise ConfigValidationError(f"No valid task configurations found in {task_config_path}")
+
+                validated_configs[task_name] = task_configs
+                self.logger.debug("ConfigValidator", f"Task config validated: {task_config_path} ({len(task_configs)} config(s))")
 
             except ValidationError as e:
                 error_msg = self._convert_pydantic_errors(e)
@@ -217,6 +262,36 @@ class ConfigManager:
 
         return validated_configs
 
+    def generate_configs(self):
+        """
+        Yield unified configs for each task and each model. For each generated config,
+        a separate benchmark config is constructed with task_path set to the path for that task,
+        and the model dict containing only the model_name's hyperparameters.
+
+        Yields:
+            UnifiedConfig instances
+        """
+        from tempus_bench.config.models import BenchmarkConfig  # Avoid circular import if happens
+
+        for task_name, task_configs in self.task.items():
+            for task_config in task_configs:
+                # Build the updated task_path for this task
+                task_path = get_task_path(task_name)
+                for model_name, model_params in self.model.items():
+                    # Build a new BenchmarkConfig for this (task, model)
+                    benchmark_dict = self.main.model_dump()
+                    benchmark_dict["task_path"] = task_path
+                    benchmark_dict["model"] = {model_name: model_params}
+                    benchmark_dict["evaluation"]["metrics"] = 
+                    benchmark = BenchmarkConfig(**benchmark_dict)
+                    yield UnifiedConfig(
+                        benchmark=benchmark,
+                        settings=self.settings,
+                        model_settings={model_name: self.model_settings[model_name]},
+                        task_configs={task_name: [task_config]}
+                    )
+
+    @staticmethod
     def _load_config(config_path: str) -> Dict[str, Any]:
         """
         Load configuration from YAML file and return as dictionary.
@@ -264,8 +339,9 @@ class ConfigManager:
         # Check each model in the configuration
         available_models = self._get_available_models()
         self.model = config.model.model_dump()
+        # Only validate models that are actually specified (not None)
         for model_name, model_params in self.model.items():
-            if model_name not in available_models:
+            if model_params is not None and model_name not in available_models:
                 raise ConfigValidationError(
                     f"Model '{model_name}' is not available. "
                     f"Available models: {sorted(available_models)}"
