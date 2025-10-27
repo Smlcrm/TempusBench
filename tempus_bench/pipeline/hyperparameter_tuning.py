@@ -4,30 +4,33 @@ import json
 import numpy as np
 import pandas as pd
 from itertools import product
+from pathlib import Path
 from typing import Dict, List, Any, Tuple
 
 from tempus_bench.utils.logger import get_logger
 from tempus_bench.utils.tf_logger import get_tf_logger
-from tempus_bench.utils.paths import get_tasks_dir
+from tempus_bench.utils.paths import get_tasks_dir, get_project_root
 from tempus_bench.pipeline.data_loader import DataLoader
 from tempus_bench.config import load_config
 from tempus_bench.pipeline.model_executor import ModelExecutor
 
 class HyperparameterTuner:
-    def __init__(self, config_path: str, run_dir: str):
+    def __init__(self, config_path: str, run_path: str, task_config):
         """
         Initialize the hyperparameter tuner with configuration and directories.
 
         Args:
             config_path: Path to configuration file
-            run_dir: Directory for run outputs
+            run_path: Directory for run outputs
+            task_config: Task configuration (TaskConfig instance from ConfigManager)
         """
-        self.config = load_config(config_path)
+        self.config = load_config(config_path, str(Path(run_path) / 'logs'))
         self.config_path = config_path
         self.tasks_dir = get_tasks_dir()
-        self.run_dir = run_dir
-        self.logger = get_logger(os.path.join(run_dir, 'logs'))
-        self.tf_logger = get_tf_logger(os.path.join(run_dir, 'tensorboard'))
+        self.run_path = run_path
+        self.task_config = task_config
+        self.logger = get_logger(str(Path(run_path) / 'logs'))
+        self.tf_logger = get_tf_logger(str(Path(run_path) / 'tensorboard'))
 
     def _is_valid_combination(self, model_name: str, combination: dict) -> bool:
         """
@@ -144,13 +147,13 @@ class HyperparameterTuner:
         # Initialize data loader
         data_loader = DataLoader(
             config_path=self.config_path,
-            run_dir=self.run_dir
+            run_path=self.run_path
         )
 
         # Initialize model executor
         model_executor = ModelExecutor(
             config_path=self.config_path,
-            run_dir=self.run_dir
+            run_path=self.run_path
         )
 
         for model_name, hyperparameters in self.config["model"].items():
@@ -260,12 +263,12 @@ class HyperparameterTuner:
                     for metric in evaluation_metrics
                 }
 
-                # Write to evaluations CSV in run_dir/evals
+                # Write to evaluations CSV in run_path/evals
                 csv_filename = f"evaluations.csv"
-                evals_dir = os.path.join(self.run_dir, "evals")
-                os.makedirs(evals_dir, exist_ok=True)
-                csv_outpath = os.path.join(evals_dir, csv_filename)
-                file_exists = os.path.exists(csv_outpath)
+                evals_dir = Path(self.run_path) / "evals"
+                evals_dir.mkdir(exist_ok=True)
+                csv_outpath = evals_dir / csv_filename
+                file_exists = csv_outpath.exists()
                 row = [model_name, dataset_path] + [avg_test_loss[metric] for metric in evaluation_metrics] + [str(optimal_hyperparameters)]
                 with open(csv_outpath, "a", newline="") as csvfile:
                     writer = csv.writer(csvfile)
@@ -301,7 +304,7 @@ class HyperparameterTuner:
             # Create data loader to get the window data
             data_loader = DataLoader(
                 config_path=self.config_path,
-                run_dir=self.run_dir
+                run_path=self.run_path
             )
             
             # Get the specific window data
@@ -323,7 +326,7 @@ class HyperparameterTuner:
             # Create model executor to get predictions
             model_executor = ModelExecutor(
                 config_path=self.config_path,
-                run_dir=self.run_dir,
+                run_path=self.run_path,
                 datasets_dir=self.datasets_dir
             )
             
@@ -339,8 +342,8 @@ class HyperparameterTuner:
             )
             
             # Create plots directory
-            plots_dir = os.path.join(self.run_dir, 'tensorboard', 'plots', model_name)
-            os.makedirs(plots_dir, exist_ok=True)
+            plots_dir = Path(self.run_path) / 'tensorboard' / 'plots' / model_name
+            plots_dir.mkdir(parents=True, exist_ok=True)
             
             # Get data from window using indices
             context_data = window_data.target[window_data.context.start:window_data.context.end]
@@ -439,14 +442,14 @@ class HyperparameterTuner:
             fig.suptitle(f'Best Hyperparameters: {hyperparameters}', fontsize=12, y=0.98)
             
             # Save plot
-            plot_path = os.path.join(plots_dir, f'window_{window_idx}.png')
+            plot_path = plots_dir / f'window_{window_idx}.png'
             plt.tight_layout()
             plt.savefig(plot_path, dpi=150, bbox_inches='tight')
             plt.close()
             
             # Log to TensorBoard
             self.tf_logger.log_image_file(
-                image_path=plot_path,
+                image_path=str(plot_path),
                 tag=f'{model_name}/forecast',
                 step=window_idx
             )
