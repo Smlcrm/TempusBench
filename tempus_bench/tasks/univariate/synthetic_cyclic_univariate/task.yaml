@@ -1,0 +1,8 @@
+task:
+  name: synthetic_cyclic_univariate
+  context_window: 2048
+  forecast_horizon: 32
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: synthetic_cyclic_univariate.csv

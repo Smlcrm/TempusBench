@@ -1,0 +1,8 @@
+task:
+  name: goldindia_continuous_multivariate
+  context_window: 2048
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: goldindia_continuous_multivariate.csv

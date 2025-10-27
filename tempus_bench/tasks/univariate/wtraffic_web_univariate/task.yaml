@@ -1,0 +1,8 @@
+task:
+  name: wtraffic_web_univariate
+  context_window: 2048
+  forecast_horizon: 32
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: wtraffic_web_univariate.csv

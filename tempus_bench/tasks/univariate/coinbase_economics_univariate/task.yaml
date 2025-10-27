@@ -1,0 +1,8 @@
+task:
+  name: coinbase_economics_univariate
+  context_window: 1536
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: coinbase_economics_univariate.csv

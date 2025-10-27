@@ -1,0 +1,8 @@
+task:
+  name: baggage_100_multivariate
+  context_window: 32
+  forecast_horizon: 16
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: baggage_100_multivariate.csv
