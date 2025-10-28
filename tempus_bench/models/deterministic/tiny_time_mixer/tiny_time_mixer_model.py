@@ -16,21 +16,18 @@ class TinyTimeMixerParams(PydanticBaseModel):
 
 class TinyTimeMixerModel(BaseModel):
 
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize TinyTimeMixer model.
         
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = TinyTimeMixerParams(**self.model_config).model_dump()
+        super().__init__(params, settings, TinyTimeMixerParams)
 
         # forecast_horizon is inherited from parent class (BaseModel)
-        self.model = None
+        self._model = None
 
     def convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
@@ -87,22 +84,28 @@ class TinyTimeMixerModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> "TinyTimeMixerModel":
         """
         Train/fine-tune the foundation model on given data.
 
         Args:
             y_context: Past target values - training data during tuning time, training + validation data during testing time
-            x_context: Past exogenous variables - used during tuning and testing time
             y_target: Future target values - validation data during tuning time, None during testing time (avoid data leakage)
-            x_target: Future exogenous variables - if provided, can be used with x_context for training
-            y_start_date: The start date timestamp for y_context and y_target in string form
-            x_start_date: The start date timestamp for x_context and x_target in string form
+            timestamps_context: Timestamps for y_context (optional)
+            timestamps_target: Timestamps for y_target (optional)
+            **kwargs: Additional keyword arguments
 
         Returns:
             self: The fitted model instance
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        # TinyTimeMixer is a foundation model with minimal params
+        
         # TinyTimeMixer is a zero-shot model, so training is not needed
         self.is_fitted = True
         return self
@@ -112,9 +115,15 @@ class TinyTimeMixerModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ):
+
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        # TinyTimeMixer is a foundation model with minimal params
 
         forecast_horizon = timestamps_target.shape[0]
 

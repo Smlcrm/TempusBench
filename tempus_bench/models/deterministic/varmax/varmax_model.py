@@ -13,7 +13,6 @@ import pickle
 import warnings
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
-from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 warnings.filterwarnings("ignore")
@@ -22,24 +21,17 @@ warnings.filterwarnings("ignore")
 class VarmaxParams(PydanticBaseModel):
     p: int = Field(..., ge=0, description="Number of AR parameters")
     q: int = Field(..., ge=0, description="Number of MA parameters")
-    trend: Literal["c", "t", "ct"] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
+    trend: Optional[Literal["c", "t", "ct"]] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
 
 
 class VARMAXModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
-        Initialize VARMAX model with given configuration.
-
-        Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+        Initialize VARMAX model with model-specific parameters.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = VarmaxParams(**self.model_config).model_dump()
+        super().__init__(params, settings, VarmaxParams)
 
-        self.model = None
+        self._model = None
 
     def train(
         self,
@@ -47,8 +39,7 @@ class VARMAXModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
+        **kwargs: dict,
     ) -> "VARMAXModel":
         """
         Train the Multivariate VARMAX model on given data.
@@ -61,21 +52,30 @@ class VARMAXModel(BaseModel):
         Args:
             y_context: Past target values (time series) - used for training (can be DataFrame for multivariate)
             y_target: Future target values (optional, for extended training)
-            y_start_date: The start date timestamp for y_context and y_target
+            timestamps_context: Timestamps for y_context (optional)
+            timestamps_target: Timestamps for y_target (optional)
             **kwargs: Additional keyword arguments
 
         Returns:
             self: The fitted model instance
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        p = self.params.p
+        q = self.params.q
+        trend = self.params.trend
+        
         timestamps_context = self.convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
-            self.model = VARMAX(
+            self._model = VARMAX(
                 endog=y_context, exog=None, 
-                order=(self.model_config["p"], self.model_config["q"]), 
-                trend=self.model_config["trend"]
+                order=(p, q), 
+                trend=trend
             )
 
-        self.results = self.model.fit()
+        self.results = self._model.fit()
 
         return self
 
@@ -84,8 +84,7 @@ class VARMAXModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
+        **kwargs: dict,
     ) -> np.ndarray:
         """
         Make predictions using the trained Multivariate ARIMA model.
@@ -98,23 +97,26 @@ class VARMAXModel(BaseModel):
 
         Args:
             y_context: Past target values for prediction context
-            y_target: Future target values (used to determine prediction length)
-            x_context: Past exogenous variables (optional, ignored for now)
-            x_target: Future exogenous variables (optional, ignored for now)
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
             **kwargs: Additional keyword arguments
 
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
         """
-        if self.model is None:
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        p = self.params.p
+        q = self.params.q
+        trend = self.params.trend
+        
+        if self._model is None:
             raise ValueError("Model not fitted. Call train first.")
 
-        #forecast_horizon = timestamps_target.shape[0]
-        #lag_order = self.results.k_ar
-        #forecast_steps = len(timestamps_target)
-
-        #y_context = y_context[-lag_order:, :]
-        forecasts = self.results.forecast(steps=self.model_config["forecast_horizon"])
+        forecast_steps = len(timestamps_target)
+        forecasts = self.results.forecast(steps=forecast_steps)
 
         forecasts = np.array(forecasts)
         if len(forecasts.shape) == 1:
