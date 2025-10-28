@@ -72,8 +72,8 @@ class DataLoader:
         """
         self.config = config
         self.config_manager = get_config_manager()
-        console_logging = self.config_manager.settings.console_logging
-        file_logging = self.config_manager.settings.file_logging
+        console_logging = self.config_manager.benchmark_settings.console_logging
+        file_logging = self.config_manager.benchmark_settings.file_logging
         self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
         self.tasks_dir = get_tasks_dir()
         self.logs_path = logs_path

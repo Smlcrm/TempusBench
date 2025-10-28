@@ -31,10 +31,10 @@ class ModelExecutor:
         self.tasks_dir = get_tasks_dir()
         self.models_dir = get_models_dir()
         self.config_manager = get_config_manager()
-        console_logging = self.config_manager.settings.console_logging
-        file_logging = self.config_manager.settings.file_logging
+        console_logging = self.config_manager.benchmark_settings.console_logging
+        file_logging = self.config_manager.benchmark_settings.file_logging
         self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
-        self.tf_logger = get_tf_logger(str(Path(logs_path).parent / 'tensorboard'), tensorboard_logging=self.config_manager.settings.tensorboard_logging)
+        self.tf_logger = get_tf_logger(str(Path(logs_path).parent / 'tensorboard'), tensorboard_logging=self.config_manager.benchmark_settings.tensorboard_logging)
 
     def _generate_model_execution_script(self,
         model_name: str,
