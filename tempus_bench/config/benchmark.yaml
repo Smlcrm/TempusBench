@@ -12,82 +12,84 @@ evaluation:
   point_forecast_statistic: mean
 
 model:
-  # Traditional models with hyperparameter grids
+  # Deterministic
+  arima:
+    p: [1, 2]
+    d: [1]
+    q: [1, 2]
+    s: [2]
+
+  croston_classic:
+    alpha: [0.1, 0.3, 0.5]
+    gamma: [0.1, 0.3, 0.5]
+
   exponential_smoothing:
-    trend: [add]
-    seasonal: [null]
-    seasonal_periods: [null]
+    trend: [add, mul, null]
     damped_trend: [false, true]
 
-  # seasonal_naive:
-  #   sp: [24]
+  lstm:
+    units: [32]
+    layers: [1]
+    dropout: [0.1]
+    learning_rate: [0.001]
 
-  # croston_classic:
-  #   alpha: [0.1, 0.3, 0.5]
-  #   gamma: [0.1, 0.3, 0.5]
+  moment: {}
 
-  # theta:
-  #   sp: [12]
-  #   theta_method: [correlation_optimal]
+  prophet:
+    seasonality_mode: [additive]
+    changepoint_prior_scale: [0.05]
+    seasonality_prior_scale: [10.0]
+    # yearly_seasonality: [true]  # Moved to Optional with default True in Params
+    # weekly_seasonality: [true]  # Moved to Optional with default True in Params
+    # daily_seasonality: [false]  # Moved to Optional with default False in Params
 
-  # arima:
-  #   p: [1, 2]
-  #   d: [1]
-  #   q: [1, 2]
-  #   s: [2]
+  seasonal_naive:
+    sp: [24]
 
-  # xgboost:
-  #   lookback_window: [30]
-  #   n_estimators: [200]
-  #   max_depth: [4]
-  #   learning_rate: [0.05]
-  #   subsample: [0.9]
-  #   colsample_bytree: [0.9]
-  #   random_state: [42]
-  #   n_jobs: [1]
+  theta:
+    sp: [12]
+    theta_method: [correlation_optimal]
 
-  # random_forest:
-  #   lookback_window: [50]
-  #   n_estimators: [10]
-  #   max_depth: [2]
-  #   random_state: [42]
-  #   n_jobs: [1]
-  #   forecast_horizon: [50]
+  xgboost:
+    n_estimators: [200]
+    max_depth: [4]
+    learning_rate: [0.05]
+    # subsample: [0.9]  # Moved to Optional with default 0.9 in Params
+    # colsample_bytree: [0.9]  # Moved to Optional with default 0.9 in Params
+    # random_state: [42]  # Not important for hyperparameter tuning
+    # n_jobs: [1]  # Not important for hyperparameter tuning
 
-  # svr:
-  #   kernel: [rbf]
-  #   C: [1.0]
-  #   epsilon: [0.1]
-  #   gamma: [scale]
-  #   lookback_window: [30]
-  #   forecast_horizon: [25]
+  random_forest:
+    # lookback_window: [50]  # Moved to settings.yaml
+    n_estimators: [10]
+    max_depth: [2]
+    # min_samples_split: [2]  # Moved to Optional with default 2 in Params
+    # min_samples_leaf: [1]  # Moved to Optional with default 1 in Params
+    # max_features: [sqrt]  # Moved to Optional with default sqrt in Params
+    # random_state: [42]  # Not important for hyperparameter tuning
+    # n_jobs: [1]  # Not important for hyperparameter tuning
+    # forecast_horizon: [50]  # Not important for hyperparameter tuning
 
-  # prophet:
-  #   seasonality_mode: [additive]
-  #   changepoint_prior_scale: [0.05]
-  #   seasonality_prior_scale: [10.0]
-  #   # yearly_seasonality: [true]
-  #   weekly_seasonality: [true]
-  #   daily_seasonality: [false]
+  svr:
+    kernel: [rbf]
+    C: [1.0]
+    # epsilon: [0.1]  # Moved to Optional with default 0.1 in Params
+    # gamma: [scale]  # Moved to Optional with default scale in Params
+    # lookback_window: [30]  # Moved to settings.yaml
+    # forecast_horizon: [25]  # Not important for hyperparameter tuning
 
-  # lstm:
-  #   units: [32]
-  #   layers: [1]
-  #   dropout: [0.1]
-  #   learning_rate: [0.001]
-  #   batch_size: [16]
-  #   epochs: [30]
-  #   sequence_length: [10]
-  #   forecast_horizon: [25]
+  varmax:
+    p: [1, 2]
+    q: [1, 2]
+    # trend: [c]  # Moved to Optional with default "c" in Params
 
-  # # Foundation models (no hyperparameters)
-  # chronos: {}
-  # deepar: {}
-  # tiny_time_mixer: {}
-  # moirai: {}
-  # moirai_moe: {}
-  # moment: {}
-  # timesfm: {}
-  # lagllama: {}
-  # toto: {}
-  # tabpfn: {}
+  # Foundation models (no hyperparameters)
+  chronos: {}
+  deepar: {}
+  tiny_time_mixer: {}
+  moirai: {}
+  moirai_moe: {}
+  timesfm: {}
+  lagllama: {}
+  toto: {}
+  tabpfn: {}

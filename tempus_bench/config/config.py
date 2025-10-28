@@ -469,6 +469,7 @@ class ConfigAdapterMixin:
         self.eval_config = self.config.evaluation
         self.model_name, self.model_config = next(iter(self.config.model.model_dump(exclude_none=True).items()))
         self.tuning_loss = self.eval_config.tuning_loss
+        self.dataset_path = get_task_path(self.task_config.name) / self.task_config.dataset.file_name
         self._setup_logging()
 
     def _setup_logging(self):
