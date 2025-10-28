@@ -89,12 +89,8 @@ class ModelExecutor(ConfigAdapterMixin):
                         vstart, vend = window.validate.start, window.validate.end
                         freq = window.metadata['freq']
 
-                        # Create model with config_path and hyperparameters
-                        model = model_class(config_path={repr(self.config_path)}, logs_path={repr(self.logs_path)}, hyperparameters=hyperparameters)
-
-                        # Set the scaler for inverse transformation if available
-                        if hasattr(window, 'scaler') and window.scaler is not None:
-                            model.set_scaler(window.scaler)
+                        # Create model with params only
+                        model = model_class(params=hyperparameters)
 
                         trained_model = model.train(
                             y_context=target[cstart:cend],

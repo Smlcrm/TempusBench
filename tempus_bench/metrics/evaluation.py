@@ -3,11 +3,6 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
-from tempus_bench.config import load_config, get_config_manager
-from tempus_bench.config.config import ConfigAdapterMixin
-from tempus_bench.config.models import JobConfig
-from tempus_bench.utils.tf_logger import get_tf_logger
-
 from ..metrics.rmse import RMSE
 from ..metrics.mae import MAE
 from ..metrics.mase import MASE
@@ -20,8 +15,8 @@ from ..utils.logger import get_logger
 """
 Model evaluation.
 """
-class Evaluator(ConfigAdapterMixin):
-    def __init__(self, config: JobConfig, logs_path: str):
+class Evaluator:
+    def __init__(self):
         """
         Initialize evaluator with configuration.
 
@@ -29,9 +24,7 @@ class Evaluator(ConfigAdapterMixin):
             config: Configuration dictionary
             logs_path: Directory for storing log files (optional)
         """
-        super().__init__(config, logs_path)
-        self._setup_logging()
-
+        self.logger = get_logger()
         self.metric_registry = {
             "rmse": RMSE(),
             "mae": MAE(),
@@ -77,5 +70,5 @@ class Evaluator(ConfigAdapterMixin):
                 y_true=y_true,
                 y_pred=y_pred,
                 task_type=task_type,
-                point_forecast_statistic=self.eval_config['point_forecast_statistic'])
+                point_forecast_statistic=kwargs['point_forecast_statistic'])
         return results
