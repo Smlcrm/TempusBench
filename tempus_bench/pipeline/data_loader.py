@@ -27,14 +27,12 @@ import pandas as pd
 
 from pathlib import Path
 
-from tempus_bench.config.models import UnifiedConfig
-from tempus_bench.utils.logger import get_logger
-from tempus_bench.utils.paths import get_tasks_dir
-from tempus_bench.config import get_config_manager, load_config
+from tempus_bench.config.config import ConfigAdapterMixin
+from tempus_bench.config.models import JobConfig
 from tempus_bench.pipeline.preprocessor import Preprocessor
 from tempus_bench.pipeline.data_types import Dataset, DatasetSplit
 
-class DataLoader:
+class DataLoader(ConfigAdapterMixin):
     """
     Loads and processes complete time series datasets into Dataset objects.
 
@@ -53,7 +51,7 @@ class DataLoader:
         Targets are inferred from data structure and kept as raw arrays without
         artificial column naming for maximum flexibility.
     """
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig):
         """
         Initialize DataLoader with configuration and directory paths.
 
@@ -70,14 +68,7 @@ class DataLoader:
             - evaluation.max_windows: Maximum number of windows to generate
             - Other preprocessing and model parameters
         """
-        self.config = config
-        self.config_manager = get_config_manager()
-        console_logging = self.config_manager.benchmark_settings.console_logging
-        file_logging = self.config_manager.benchmark_settings.file_logging
-        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
-        self.tasks_dir = get_tasks_dir()
-        self.logs_path = logs_path
-        self.preprocessor = Preprocessor(config_path, logs_path)
+        self.preprocessor = Preprocessor(config)
 
     def _load_dataset(self, dataset_path: str) -> tuple:
         """

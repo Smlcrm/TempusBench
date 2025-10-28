@@ -22,11 +22,11 @@ class ModelRouter:
     All models must handle both univariate and multivariate datasets internally.
     """
 
-    def __init__(self, logs_path: str):
+    def __init__(self):
         """Initialize the router and discover available models."""
         self.deterministic_models: Set[str] = set()
         self.stochastic_models: Set[str] = set()
-        self.logger = get_logger(logs_path)
+        self.logger = get_logger()
 
         self._discover_models()
         self._validate_models()

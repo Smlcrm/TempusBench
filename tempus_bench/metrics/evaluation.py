@@ -1,9 +1,12 @@
+from pathlib import Path
 import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
 from tempus_bench.config import load_config, get_config_manager
-from tempus_bench.config.models import UnifiedConfig
+from tempus_bench.config.config import ConfigAdapterMixin
+from tempus_bench.config.models import JobConfig
+from tempus_bench.utils.tf_logger import get_tf_logger
 
 from ..metrics.rmse import RMSE
 from ..metrics.mae import MAE
@@ -17,8 +20,8 @@ from ..utils.logger import get_logger
 """
 Model evaluation.
 """
-class Evaluator:
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+class Evaluator(ConfigAdapterMixin):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize evaluator with configuration.
 
@@ -26,9 +29,9 @@ class Evaluator:
             config: Configuration dictionary
             logs_path: Directory for storing log files (optional)
         """
-        self.config = config.benchmark.model_dump()
-        self.logger = get_logger(logs_path)
-        self.eval_config = self.config['evaluation']
+        super().__init__(config, logs_path)
+        self._setup_logging()
+
         self.metric_registry = {
             "rmse": RMSE(),
             "mae": MAE(),
@@ -40,9 +43,9 @@ class Evaluator:
         }
         self.stochastic_metrics = ["crps", "quantile_score", "weighted_interval_score"]
         self.deterministic_metrics = ["rmse", "mae", "mase", "mape"]
+
         self.logger.debug("Evaluator", f"Evaluator initialized with Evaluation config: {self.eval_config}")
         self.logger.debug("Evaluator", f"Metrics to calculate: {self.metrics_to_calculate}")
-
 
     def evaluate(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs: Dict[str,Any]):
         """

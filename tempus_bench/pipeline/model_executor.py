@@ -15,26 +15,15 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, Any
 
-from tempus_bench.utils.logger import get_logger
+from tempus_bench.config.config import ConfigAdapterMixin
 from tempus_bench.utils.envs import CondaEnvManager
-from tempus_bench.utils.tf_logger import get_tf_logger
-from tempus_bench.utils.paths import get_tasks_dir, get_models_dir, get_project_root
 from tempus_bench.models.model_router import ModelRouter
 from tempus_bench.utils.model_config import get_python_version_for_model
-from tempus_bench.config import load_config, get_config_manager
+from tempus_bench.config import JobConfig
 
-class ModelExecutor:
-    def __init__(self, config_path: str, logs_path: str):
-        self.config = load_config(config_path, logs_path)
-        self.config_path = config_path
-        self.logs_path = logs_path
-        self.tasks_dir = get_tasks_dir()
-        self.models_dir = get_models_dir()
-        self.config_manager = get_config_manager()
-        console_logging = self.config_manager.benchmark_settings.console_logging
-        file_logging = self.config_manager.benchmark_settings.file_logging
-        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
-        self.tf_logger = get_tf_logger(str(Path(logs_path).parent / 'tensorboard'), tensorboard_logging=self.config_manager.benchmark_settings.tensorboard_logging)
+class ModelExecutor(ConfigAdapterMixin):
+    def __init__(self, config: JobConfig):
+        super().__init__(config)
 
     def _generate_model_execution_script(self,
         model_name: str,
@@ -83,7 +72,7 @@ class ModelExecutor:
                         target = window.target
 
                         # Import model here, so we know target shape
-                        router = ModelRouter(logs_path={repr(self.logs_path)})
+                        router = ModelRouter()
                         task_type = config['task']['task_type']
                         folder_path, file_name, class_name = router.get_model_path_by_task_type(
                             model_name, task_type
@@ -233,7 +222,7 @@ class ModelExecutor:
         task_type = self.config['task']['task_type']
 
         # Use model router to get the correct path
-        router = ModelRouter(logs_path=self.logs_path)
+        router = ModelRouter()
         folder_path, file_name, class_name = router.get_model_path_by_task_type(
             model_name, task_type
         )
