@@ -7,7 +7,7 @@ Uses sklearn's MultiOutputRegressor to handle multiple targets with advanced fea
 
 import os
 import pickle
-from typing import Dict, Any, Union, List, Tuple
+from typing import Dict, Any, Union, List, Tuple, Optional
 import numpy as np
 import pandas as pd
 from xgboost import XGBRegressor
@@ -23,30 +23,23 @@ class XgboostParams(PydanticBaseModel):
     n_estimators: int = Field(default=100, ge=1, description="Number of boosting rounds")
     max_depth: int = Field(default=6, ge=1, description="Maximum tree depth")
     learning_rate: float = Field(default=0.1, gt=0, description="Learning rate")
-    subsample: float = Field(default=1.0, gt=0, le=1, description="Subsample ratio")
-    colsample_bytree: float = Field(default=1.0, gt=0, le=1, description="Column sample ratio")
     reg_alpha: float = Field(default=0, ge=0, description="L1 regularization")
     reg_lambda: float = Field(default=1, ge=0, description="L2 regularization")
     max_features: Literal["sqrt", "log2", "auto"] = Field(default="sqrt", description="Number of features to consider for splits")
-    lookback_window: int = Field(..., ge=1, description="Number of past time steps to use as features")
+    subsample: Optional[float] = Field(default=0.9, gt=0, le=1, description="Subsample ratio")
+    colsample_bytree: Optional[float] = Field(default=0.9, gt=0, le=1, description="Column sample ratio")
 
 
 class XGBoostModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize XGBoost model with a given configuration.
 
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = XgboostParams(**self.model_config).model_dump()
-
-        # Add forecast_horizon to model_config
-        self.model_config["forecast_horizon"] = self.task_config["forecast_horizon"]
+        super().__init__(params, settings, XgboostParams)
         self._build_model()
 
     def _build_model(self):
@@ -54,7 +47,7 @@ class XGBoostModel(BaseModel):
         Build the XGBRegressor model instance from the configuration.
         """
         # Get hyperparameters from config.
-        model_config = self.model_config
+        model_config = self._model_config
 
         # Extract XGBoost-specific parameters
         xgb_params = {}
@@ -74,7 +67,7 @@ class XGBoostModel(BaseModel):
         if "random_state" not in xgb_params:
             xgb_params["random_state"] = 42
 
-        self.model = XGBRegressor(**xgb_params)
+        self._model = XGBRegressor(**xgb_params)
         self.is_fitted = False
 
     def _create_single_sample_features(self, y_series: np.ndarray) -> np.ndarray:
@@ -88,7 +81,7 @@ class XGBoostModel(BaseModel):
             np.ndarray: Feature vector for the single sample
         """
         num_targets = y_series.shape[1]
-        lookback_window = self.model_config["lookback_window"]
+        lookback_window = self.settings["lookback_window"]
         
         # Take the last lookback_window timesteps
         current_window = y_series[-lookback_window:, :]  # Shape: (lookback_window, num_targets)
@@ -147,7 +140,7 @@ class XGBoostModel(BaseModel):
         return np.array(sample_features)
 
     def _create_multivariate_features(
-        self, y_series: np.ndarray
+        self, y_series: np.ndarray, **kwargs: dict
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Create advanced multivariate time series features for XGBoost.
@@ -163,32 +156,39 @@ class XGBoostModel(BaseModel):
         num_steps = y_series.shape[0]    # num_steps
         num_targets = y_series.shape[1] # num_targets
         num_targets = num_targets  # For multivariate, num_targets = num_targets
+        
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        lookback_window = self.settings["lookback_window"]
+        
         n_samples = (
             num_steps
-            - self.model_config["lookback_window"]
-            - self.model_config["forecast_horizon"]
+            - lookback_window
+            - forecast_horizon
             + 1
         )
 
         if n_samples <= 0:
             raise ValueError(
-                f"Not enough data. Need at least {self.model_config['lookback_window'] + self.model_config['forecast_horizon']} samples."
+                f"Not enough data. Need at least {lookback_window + forecast_horizon} samples."
             )
 
         features = []
         targets = []
         
         # Calculate expected feature dimension for consistency
-        lag_features = self.model_config["lookback_window"] * num_targets
+        lag_features = lookback_window * num_targets
         rolling_stats = num_targets * 8  # 8 stats per target
         cross_corr = (num_targets * (num_targets - 1) // 2) * 2 if num_targets > 1 else 0
-        temporal = num_targets if self.model_config["lookback_window"] >= 7 else 0
+        temporal = num_targets if lookback_window >= 7 else 0
         expected_feature_dim = lag_features + rolling_stats + cross_corr + temporal
         
         # Debug: let's use the actual counts we're getting
         actual_feature_dim = lag_features + rolling_stats + cross_corr + temporal
-        print(f"Expected feature dim: {expected_feature_dim} (lag:{lag_features}, stats:{rolling_stats}, cross:{cross_corr}, temp:{temporal})")
-        print(f"Actual feature dim: {actual_feature_dim}")
+        self.logger.debug("XGBoostModel._create_features", f"Expected feature dim: {expected_feature_dim} (lag:{lag_features}, stats:{rolling_stats}, cross:{cross_corr}, temp:{temporal})")
+        self.logger.debug("XGBoostModel._create_features", f"Actual feature dim: {actual_feature_dim}")
         
         # Use the actual dimension for consistency
         expected_feature_dim = actual_feature_dim
@@ -198,7 +198,7 @@ class XGBoostModel(BaseModel):
 
             # Get lookback window for all targets
             lookback_data = y_series[
-                i : i + self.model_config["lookback_window"], :
+                i : i + lookback_window, :
             ]  # Shape: (lookback_window, num_targets)
 
             # 1. Lag features for each target (flattened)
@@ -267,7 +267,7 @@ class XGBoostModel(BaseModel):
                         cross_corr_count += 1
 
             # 4. Temporal features (if window is large enough)
-            if self.model_config["lookback_window"] >= 7:
+            if lookback_window >= 7:
                 # Weekly patterns (last 7 values for each target)
                 recent_data = lookback_data[-7:, :]  # Shape: (7, num_targets)
                 for target_idx in range(num_targets):
@@ -275,34 +275,34 @@ class XGBoostModel(BaseModel):
                     sample_features.append(recent_mean)
 
             # # 5. Add exogenous features if available
-            # if x_series is not None and len(x_series) > i + self.model_config['lookback_window']:
-            #     current_x = x_series[i + self.model_config['lookback_window']]
+            # if x_series is not None and len(x_series) > i + self._model_config['lookback_window']:
+            #     current_x = x_series[i + self._model_config['lookback_window']]
             #     sample_features.extend(current_x.flatten())
 
             # Debug feature counts
-            lag_count = self.model_config["lookback_window"] * num_targets
+            lag_count = lookback_window * num_targets
             stats_count = num_targets * 8
-            temp_count = num_targets if self.model_config["lookback_window"] >= 7 else 0
-            print(f"Sample {i}: lag={lag_count}, stats={stats_count}, cross={cross_corr_count}, temp={temp_count}, total={len(sample_features)}")
+            temp_count = num_targets if lookback_window >= 7 else 0
+            self.logger.debug("XGBoostModel._create_features", f"Sample {i}: lag={lag_count}, stats={stats_count}, cross={cross_corr_count}, temp={temp_count}, total={len(sample_features)}")
             
             features.append(sample_features)
 
             # Create target: next forecast_horizon steps for all targets, flattened
-            start_idx = i + self.model_config["lookback_window"]
-            end_idx = start_idx + self.model_config["forecast_horizon"]
+            start_idx = i + lookback_window
+            end_idx = start_idx + forecast_horizon
             future_values = y_series[
                 start_idx:end_idx, :
             ]  # Shape: (forecast_horizon, num_targets)
             target_flat = future_values.flatten()  # Shape: (forecast_horizon * num_targets,)
-            print(f"Sample {i} target shape: {future_values.shape}, flattened: {target_flat.shape}")
+            self.logger.debug("XGBoostModel._create_features", f"Sample {i} target shape: {future_values.shape}, flattened: {target_flat.shape}")
             targets.append(target_flat)
 
         # Ensure all arrays have consistent shapes
         features_array = np.array(features)
         targets_array = np.array(targets)
         
-        print(f"Features shape: {features_array.shape}")
-        print(f"Targets shape: {targets_array.shape}")
+        self.logger.debug("XGBoostModel._create_features", f"Features shape: {features_array.shape}")
+        self.logger.debug("XGBoostModel._create_features", f"Targets shape: {targets_array.shape}")
         
         return features_array, targets_array
 
@@ -312,9 +312,8 @@ class XGBoostModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
-    ) -> "MultivariateXGBoostModel":
+    ) -> "XGBoostModel":
         """
         Train the Multivariate XGBoost model for direct multi-output forecasting.
 
@@ -328,13 +327,21 @@ class XGBoostModel(BaseModel):
         Args:
             y_context: Past target values (DataFrame for multivariate)
             y_target: Future target values (optional, for validation)
-            y_start_date: The start date timestamp for y_context and y_target
+            timestamps_context: Timestamps for y_context (optional)
+            timestamps_target: Timestamps for y_target (optional)
             **kwargs: Additional keyword arguments
 
         Returns:
             self: The fitted model instance
         """
-        if self.model is None:
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        lookback_window = self.settings["lookback_window"]
+        
+        if self._model is None:
             self._build_model()
 
         # Use full target data if available and has more data than context
@@ -343,15 +350,15 @@ class XGBoostModel(BaseModel):
         else:
             training_data = y_context
             
-        print(f"XGBoost training data shape: {training_data.shape}")
-        print(f"Lookback window: {self.model_config['lookback_window']}")
-        print(f"Forecast horizon: {self.model_config['forecast_horizon']}")
+        self.logger.debug("XGBoostModel.train", f"XGBoost training data shape: {training_data.shape}")
+        self.logger.debug("XGBoostModel.train", f"Lookback window: {lookback_window}")
+        self.logger.debug("XGBoostModel.train", f"Forecast horizon: {forecast_horizon}")
             
         # Prepare features for training
-        X, y = self._create_multivariate_features(training_data)
+        X, y = self._create_multivariate_features(training_data, **kwargs)
 
         # Train the model
-        self.model.fit(X, y)
+        self._model.fit(X, y)
         self.is_fitted = True
 
         return self
@@ -361,7 +368,6 @@ class XGBoostModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -370,11 +376,19 @@ class XGBoostModel(BaseModel):
 
         Args:
             y_context: Historical context data with shape (timesteps, num_targets)
-            y_target: Target data to determine prediction length
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
+            **kwargs: Additional keyword arguments
 
         Returns:
-            np.ndarray: Predictions with shape (forecast_steps, num_targets)
+            np.ndarray: Predictions with shape (num_targets, forecast_steps)
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        lookback_window = self.settings["lookback_window"]
 
         preds = []
         # Use the entire context, maintaining the multivariate structure
@@ -384,10 +398,10 @@ class XGBoostModel(BaseModel):
         steps_done = 0
 
         while steps_done < total_steps:
-            steps = min(self.model_config["forecast_horizon"], total_steps - steps_done)
+            steps = min(forecast_horizon, total_steps - steps_done)
 
             # Take the last lookback_window timesteps for feature creation
-            current_window = context[-self.model_config["lookback_window"]:, :]  # Shape: (lookback_window, num_targets)
+            current_window = context[-lookback_window:, :]  # Shape: (lookback_window, num_targets)
 
             try:
                 # Create features using the same method as training
@@ -403,7 +417,7 @@ class XGBoostModel(BaseModel):
                         "Prediction features contain NaN values. This indicates data corruption."
                     )
 
-                pred_flat = self.model.predict(X_pred).flatten()
+                pred_flat = self._model.predict(X_pred).flatten()
 
                 # Fail fast on NaN predictions - don't silently replace
                 if np.isnan(pred_flat).any():
@@ -413,7 +427,7 @@ class XGBoostModel(BaseModel):
 
                 # Reshape predictions back to (num_targets, forecast_horizon)
                 pred_reshaped = pred_flat.reshape(
-                    num_targets, self.model_config["forecast_horizon"]
+                    num_targets, forecast_horizon
                 )
 
                 self.logger.debug(
@@ -443,7 +457,6 @@ class XGBoostModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -457,17 +470,26 @@ class XGBoostModel(BaseModel):
 
         Args:
             y_context: Historical context data
-            y_target: Target data (used to determine prediction length)
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
+            **kwargs: Additional keyword arguments
 
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        lookback_window = self.settings["lookback_window"]
+        
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
         # Use rolling prediction to cover the full test set (no exogenous variables)
         preds = self.rolling_predict(
-            y_context, timestamps_context, timestamps_target, freq
+            y_context, timestamps_context, timestamps_target, **kwargs
         )
         self.logger.debug("XGBoostModel.predict", f"Final rolling preds shape: {preds.shape}")
         return preds

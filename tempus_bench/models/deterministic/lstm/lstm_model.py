@@ -10,48 +10,147 @@ Design choices (all Option A):
 - Keep same LSTM architecture, just change input/output dimensions
 """
 
-import numpy as np
 import math
-import pandas as pd
-import tensorflow as tf
+import numpy as np
+
+from typing import Any, Dict, Tuple, Optional
+from pydantic import BaseModel as PydanticBaseModel, Field
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
-from typing import Dict, Any, Union, Tuple, Optional
-import pickle
-import os
-import time
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
-from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tensorflow.keras.callbacks import EarlyStopping
 
+from tempus_bench.models.base_model import BaseModel
 
 class LstmParams(PydanticBaseModel):
     units: int = Field(..., ge=1, description="Number of LSTM units")
     layers: int = Field(..., ge=1, description="Number of LSTM layers")
     dropout: float = Field(..., ge=0, le=1, description="Dropout rate")
     learning_rate: float = Field(..., gt=0, description="Learning rate for optimizer")
-    batch_size: int = Field(..., ge=1, description="Batch size for training")
-    epochs: int = Field(..., ge=1, description="Number of training epochs")
-    optimizer: Literal["adam", "rmsprop", "sgd"] = Field(default="adam", description="Optimizer to use")
+    ### Fixed Hyperparameters - Optional for User to override
+    batch_size: Optional[int] = Field(default=32, ge=1, description="Batch size for training")
+    epochs: Optional[int] = Field(default=50, ge=1, description="Number of training epochs")
 
 
 class LSTMModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        super().__init__(params, settings, LstmParams)
+
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ) -> "LSTMModel":
         """
-        Initialize Multivariate LSTM model with given configuration.
+        Train the Multivariate LSTM model on given data.
+
+        Uses sliding window, multi-step learning for multiple targets.
 
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
-        """
-        super().__init__(config, logs_path, LstmParams)
-        self.model = None
-        # num_targets will be calculated from data during training
+            y_context: Past target values, shape (num_steps, num_targets)
+            y_target: Future target values (for supervised labels)
+            timestamps_context: Timestamps for context (unused here)
+            timestamps_target: Timestamps for target (unused here)
+            **kwargs: Extra options (currently ignored)
 
-    def _build_model(self, input_shape: Tuple[int, int]) -> None:
+        Returns:
+            self: The fitted model instance
+        """
+
+        _, num_targets = y_context.shape
+
+        # Combine context and target to make training sequences
+        combined_data = np.concatenate([y_context, y_target], axis=0)
+        X_seq, y_seq = self._prepare_sequences(combined_data)
+
+        # Build model if not done yet
+        if not "_model" in self.__dict__:
+            self._build_model(
+                input_shape=(self.model_config["context_length"], num_targets)
+            )
+
+        # Setup early stopping
+        early_stopping = EarlyStopping(
+            monitor='loss',
+            patience=3,
+            restore_best_weights=True,
+            verbose=1
+        )
+
+        validation_split = 0.1 if len(X_seq) > 10 else 0.0
+        self.model.fit(
+            X_seq,
+            y_seq,
+            batch_size=self.params.batch_size,
+            epochs=self.params.epochs,
+            verbose=1,
+            callbacks=[early_stopping] if validation_split > 0 else [],
+            validation_split=validation_split
+        )
+
+        self.is_fitted = True
+        return self
+
+    def predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ) -> np.ndarray:
+        """
+        Make predictions with the trained Multivariate LSTM model.
+
+        Predicts the required number of steps ahead for all targets using non-overlapping multi-step windows.
+        Does not use own predictions as further inputs (no autoregressive feedback).
+
+        Args:
+            y_context: Context/history values (n_steps, n_targets)
+            timestamps_context: Timestamps for context (unused)
+            timestamps_target: Timestamps for target (unused)
+            freq: Frequency string (unused)
+
+        Returns:
+            np.ndarray: Model predictions with shape (forecast_steps, n_targets)
+        """
+        if self.model is None:
+            raise ValueError("Model not initialized. Call train first.")
+
+        forecast_length, num_targets = y_context.shape
+        context_length = kwargs["context_window"]
+        prediction_window = kwargs["forecast_horizon"]
+        num_windows = math.ceil(forecast_length / prediction_window)
+
+        all_predictions = []
+        current_sequence = y_context[-context_length:].reshape(
+            1, context_length, num_targets
+        )
+
+        for window in range(num_windows):
+            preds = self._model.predict(current_sequence, verbose=0)
+            preds_reshaped = preds[0].reshape(prediction_window, num_targets)
+            all_predictions.extend(preds_reshaped)
+
+            # Only update current_sequence if not last window
+            if window < num_windows - 1:
+                n = min(prediction_window, context_length)
+                # Create the next sequence by rolling and appending new predictions
+                current_sequence = np.roll(current_sequence, -prediction_window, axis=1)
+                current_sequence[0, -n:, :] = preds_reshaped[:n, :]
+
+        result = np.array(all_predictions[:forecast_length])
+
+        if result.ndim == 1:
+            result = np.expand_dims(result, axis=1)
+
+        return result
+
+    def _build_model(self,
+        input_shape: Tuple[int, int],
+        **kwargs: dict) -> None:
         """
         Build the Multivariate LSTM model architecture.
 
@@ -59,35 +158,35 @@ class LSTMModel(BaseModel):
             input_shape: Shape of input data (context_length, num_targets)
         """
 
-        context_length, num_targets = input_shape
-        self.model = Sequential()
+        _, num_targets = input_shape
+        self._model = Sequential()
 
         # Add LSTM layers
-        for i in range(self.model_config["layers"]):
-            return_sequences = i < self.model_config["layers"] - 1
-            self.model.add(
+        for layer_idx in range(self.params.layers):
+            return_sequences = layer_idx < self.params.layers - 1
+            self._model.add(
                 LSTM(
-                    units=self.model_config["units"],
+                    units=self.params.units,
                     return_sequences=return_sequences,
-                    input_shape=input_shape if i == 0 else None,
+                    input_shape=input_shape if layer_idx == 0 else None,
                 ),
             )
-            if self.model_config["dropout"] > 0:
-                self.model.add(Dropout(self.model_config["dropout"]))
+            if self.params.dropout > 0:
+                self._model.add(Dropout(self.params.dropout))
 
         # Add output layer - predicts prediction_window * num_targets values (flattened)
-        self.model.add(Dense(self.model_config["prediction_window"] * num_targets))
+        self._model.add(Dense(self.params.prediction_window * num_targets))
 
         # Compile model with optimized settings
-        self.model.compile(
+        self._model.compile(
             optimizer=Adam(
-                learning_rate=self.model_config["learning_rate"],
-                beta_1=0.9,
-                beta_2=0.999,
-                epsilon=1e-7
+                learning_rate=self.params.learning_rate,
+                beta_1=self.settings.beta_1,
+                beta_2=self.settings.beta_2,
+                epsilon=self.settings.epsilon
             ),
-            loss=self.tuning_loss,
-            metrics=['mae']  # Add MAE for better monitoring
+            loss=kwargs["tuning_loss"],
+            metrics=kwargs["tuning_loss"]
         )
 
     def _prepare_sequences(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -111,171 +210,21 @@ class LSTMModel(BaseModel):
         X_seq, y_seq = [], []
         for i in range(
             len(X)
-            - self.model_config["context_length"]
-            - self.model_config["prediction_window"]
+            - self.params.context_length
+            - self.params.prediction_window
             + 1
         ):
-            curr_X = X[i : (i + self.model_config["context_length"])]
+            curr_X = X[i : (i + self.params.context_length)]
             # curr_X = curr_X.flatten()
 
             X_seq.append(curr_X)
             # y_seq: flatten to 1D array of length prediction_window * num_targets
             future_values = X[
                 i
-                + self.model_config["context_length"] : i
-                + self.model_config["context_length"]
-                + self.model_config["prediction_window"]
+                + self.params.context_length : i
+                + self.params.context_length
+                + self.params.prediction_window
             ]
             future_values = future_values.flatten()
             y_seq.append(future_values)
         return np.array(X_seq), np.array(y_seq)
-
-    def train(
-        self,
-        y_context: np.ndarray,
-        y_target: np.ndarray,
-        timestamps_context: np.ndarray,
-        timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
-    ) -> "MultivariateLSTMModel":
-        """
-        Train the Multivariate LSTM model on given data.
-
-        TECHNIQUE: Sliding Window Multi-Step Learning for Multiple Targets
-        - Creates overlapping sequences of length context_length from historical data
-        - Each sequence predicts prediction_window future values for all targets simultaneously
-        - Training pairs: Input [t, t+1, ..., t+context_length-1] → Target [t+context_length, ..., t+context_length+prediction_window-1]
-        - Model learns to predict multiple future steps for multiple targets in a single forward pass
-        - Captures temporal dependencies across multiple future time steps and target variables
-
-        Args:
-            y_context: Past target values (time series) - used for training (can be DataFrame for multivariate)
-            y_target: Future target values (optional, for validation)
-            y_start_date: The start date timestamp for y_context and y_target in string form
-            **kwargs: Additional keyword arguments
-
-        Returns:
-            self: The fitted model instance
-        """
-        # Handle (num_steps, num_targets) format
-        if y_context.ndim == 1:
-            y_context = y_context.reshape(-1, 1)
-        if y_target.ndim == 1:
-            y_target = y_target.reshape(-1, 1)
-        num_steps, num_targets = y_context.shape
-        forecast_length = y_target.shape[0]
-
-        # Prepare sequences using the combined context + target data
-        # Concatenate context and target data for training
-        combined_data = np.concatenate([y_context, y_target], axis=0)
-        X_seq, y_seq = self._prepare_sequences(combined_data)
-
-        print("X shape:", X_seq.shape)
-        print("y shape:", y_seq.shape)
-
-        # Build model if not already built
-        if self.model is None:
-            self._build_model(
-                input_shape=(self.model_config["context_length"], num_targets)
-            )
-
-        # Train model with progress logging and early stopping
-        print(f"Training LSTM: units={self.model_config['units']}, layers={self.model_config['layers']}, lr={self.model_config['learning_rate']}")
-        print(f"Data shapes: X_seq={X_seq.shape}, y_seq={y_seq.shape}")
-        
-        # Add early stopping to prevent overfitting and reduce training time
-        early_stopping = EarlyStopping(
-            monitor='loss',
-            patience=3,
-            restore_best_weights=True,
-            verbose=1
-        )
-        
-        # Only use validation split if we have enough samples
-        validation_split = 0.1 if len(X_seq) > 10 else 0.0
-        
-        self.model.fit(
-            X_seq,
-            y_seq,
-            batch_size=self.model_config["batch_size"],
-            epochs=self.model_config["epochs"],
-            verbose=1,  # Enable verbose output to show epochs
-            callbacks=[early_stopping] if validation_split > 0 else [],
-            validation_split=validation_split
-        )
-
-        self.is_fitted = True
-        return self
-
-    def predict(
-        self,
-        y_context: np.ndarray,
-        timestamps_context: np.ndarray,
-        timestamps_target: np.ndarray,
-        freq: str,
-    ) -> np.ndarray:
-        """
-        Make predictions using the trained Multivariate LSTM model.
-        Predicts len(y_target) steps ahead for all targets using non-overlapping windows.
-
-        TECHNIQUE: Non-overlapping Multi-Step Windows for Multiple Targets
-        - Starts with last context_length historical values for all targets
-        - Predicts prediction_window steps at once for all targets (no autoregressive feedback)
-        - Advances window by prediction_window steps for next prediction
-        - Repeats until len(y_target) steps are predicted for all targets
-        - Fair comparison with non-autoregressive models (ARIMA, Exponential Smoothing)
-        - No data leakage from using own predictions as input
-
-        Returns:
-            np.ndarray: Model predictions with shape (forecast_steps, num_targets)
-        """
-
-        if self.model is None:
-            raise ValueError("Model not initialized. Call train first.")
-
-        forecast_length, num_targets = y_context.shape
-
-        # Calculate how many prediction windows we need
-        num_windows = math.ceil(
-            forecast_length / self.model_config["prediction_window"]
-        )
-
-        all_predictions = []
-        current_sequence = y_context[-self.model_config["context_length"]:].reshape(
-            1, self.model_config["context_length"], num_targets
-        )
-
-        for window in range(num_windows):
-            # Predict prediction_window steps at once for all targets
-            predictions = self.model.predict(current_sequence, verbose=0)
-            # Reshape predictions from (1, prediction_window * num_targets) to (prediction_window, num_targets)
-            predictions_reshaped = predictions[0].reshape(
-                self.model_config["prediction_window"], num_targets
-            )
-            all_predictions.extend(predictions_reshaped)
-
-            # Advance window by prediction_window steps and use predictions as input
-            if window < num_windows - 1:  # Don't update on last iteration
-                # Move window forward by prediction_window steps
-                current_sequence = np.roll(
-                    current_sequence, -self.model_config["prediction_window"], axis=1
-                )
-                # Only update as many as fit
-                n = min(
-                    self.model_config["prediction_window"],
-                    self.model_config["context_length"],
-                )
-                current_sequence[0, -n:, :] = predictions_reshaped[:n, :]
-
-        # Return only the requested number of predictions
-        result = np.array(all_predictions[:forecast_length])
-
-        if len(result.shape) == 1:
-            result = np.expand_dims(result, axis=1)
-
-        # Inverse transform predictions if scaler is available
-        if self.scaler is not None:
-            result = self.scaler.inverse_transform(result)
-
-        return result

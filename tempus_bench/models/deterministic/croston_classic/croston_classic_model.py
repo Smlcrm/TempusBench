@@ -2,12 +2,14 @@
 Croston's Classic Model implementation for intermittent demand forecasting.
 """
 
+import os
+import pickle
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Union
-import pickle
-import os
+
+from typing import Dict, Any
 from pydantic import BaseModel as PydanticBaseModel, Field
+
 from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
@@ -18,94 +20,70 @@ class CrostonClassicParams(PydanticBaseModel):
 
 
 class CrostonClassicModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
-        """
-        Initialize the Croston's Classic model with a given configuration.
-
-        Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
-        """
-        super().__init__(config, logs_path, CrostonClassicParams)
-        self.demand_level_ = None
-        self.interval_level_ = None
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        super().__init__(params, settings, CrostonClassicParams)
 
     def train(
         self,
         y_context: np.ndarray,
-        y_target: np.ndarray = None,
-        x_context: np.ndarray = None,
-        x_target: np.ndarray = None,
-        **kwargs,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict,
     ) -> "CrostonClassicModel":
         """
         Train the Croston's Classic model on the given time series data.
 
-        The method decomposes the series into non-zero demand values and the
-        time intervals between them, then applies Simple Exponential Smoothing
-        to both series.
+        Decomposes the series into non-zero demand values and the intervals between them,
+        and applies Simple Exponential Smoothing (SES) to both.
 
         Args:
-            y_context: Past target values - the training data for the time series.
-            y_target: Not used by the Croston's Classic model, but included for compatibility with the base class.
+            y_context (np.ndarray): Past target values for training (shape: [n_timesteps, n_variates]).
+            y_target (np.ndarray): Ignored; included for interface compatibility.
+            timestamps_context (np.ndarray): Ignored.
+            timestamps_target (np.ndarray): Ignored.
+            **kwargs: Expected to include 'alpha' and 'gamma'.
 
         Returns:
-            self: The fitted model instance.
+            CrostonClassicModel: Trained model.
         """
+        alpha = self.params.alpha
+        gamma = self.params.gamma
+        num_targets = y_context.shape[1]
 
-        alpha = self.model_config["alpha"]
-        gamma = self.model_config["gamma"]
-        num_variates = y_context.shape[1]
+        demand_levels = np.zeros(num_targets)
+        interval_levels = np.zeros(num_targets)
 
-        demand_levels = np.zeros(num_variates)
-        interval_levels = np.zeros(num_variates)
+        for target in range(num_targets):
+            serie = y_context[:, target]
+            non_zero_idx = np.nonzero(serie)[0]
 
-        for variate in range(num_variates):
+            if len(non_zero_idx) < 2:
+                demand_levels[target] = np.mean(serie) if serie.size > 0 else 0.0
+                interval_levels[target] = len(serie) if serie.size > 0 else 1.0
+                continue
 
-            serie = y_context[:, variate]
-            # Find indices of non-zero demand
-            non_zero_indices = np.nonzero(serie)
+            demands = serie[non_zero_idx]
+            intervals = np.diff(non_zero_idx)
 
-            # If there's no demand or only one demand point we cannot forecast
-            if len(non_zero_indices[0]) < 2:
+            # Initialize with the first non-zero demand and interval
+            current_demand_level = demands[0]
+            current_interval_level = intervals[0] if intervals.size > 0 else 1
 
-                # Set levels to a default state (e.g., average of the whole series)
-                demand_levels[variate] = np.mean(serie) if len(serie) > 0 else 0
-                interval_levels[variate] = len(serie) if len(serie) > 0 else 1
+            # Simple Exponential Smoothing for demands
+            for d in demands[1:]:
+                current_demand_level = alpha * d + (1 - alpha) * current_demand_level
 
-            else:
-                self.is_fitted = True
+            # Simple Exponential Smoothing for intervals
+            for v in intervals[1:]:
+                current_interval_level = gamma * v + (1 - gamma) * current_interval_level
 
-                # Get demand values and intervals
-                demands = serie[non_zero_indices]
-                intervals = np.diff(non_zero_indices[0])
+            demand_levels[target] = current_demand_level
+            interval_levels[target] = current_interval_level
 
-                # Demand level starts with the first non-zero demand
-                current_demand_level = demands[0]
-
-                # Interval level starts with the first interval
-                current_interval_level = intervals[0] if len(intervals) > 0 else 1
-
-                # Apply SES to the rest of the demands and intervals
-                for i in range(1, len(demands)):
-                    current_demand_level = (
-                        alpha * demands[i]
-                        + (1 - alpha) * current_demand_level
-                    )
-
-                for i in range(1, len(intervals)):
-                    current_interval_level = (
-                        gamma * intervals[i]
-                        + (1 - gamma) * current_interval_level
-                    )
-
-                demand_levels[variate] = current_demand_level
-                interval_levels[variate] = current_interval_level
-
-        self.demand_level_ = demand_levels
-        self.interval_level_ = interval_levels
+        self._demand_level = demand_levels
+        self._interval_level = interval_levels
         self.is_fitted = True
-
         return self
 
     def predict(
@@ -113,56 +91,47 @@ class CrostonClassicModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
-    ):
+        **kwargs: dict,
+    ) -> np.ndarray:
         """
-        Make predictions using the trained Croston's Classic model.
+        Predict future values using the trained Croston's Classic model.
 
         Args:
-            y_target: Used to determine the number of steps to forecast.
-            y_context, x_context, x_target: Not used.
+            y_context (np.ndarray): Ignored.
+            timestamps_context (np.ndarray): Ignored.
+            timestamps_target (np.ndarray): Used to determine forecast horizon.
+            **kwargs: Ignored.
 
         Returns:
-            np.ndarray: Model predictions with shape (num_series, forecast_horizon).
+            np.ndarray: Predictions with shape (forecast_horizon, num_targets).
         """
         if not self.is_fitted:
             raise ValueError("Model not fitted. Call train() first.")
 
         forecast_horizon = len(timestamps_target)
         forecast = np.divide(
-            self.demand_level_,
-            self.interval_level_,
-            out=np.zeros_like(self.demand_level_, dtype=float),
-            where=self.interval_level_ != 0,
+            self._demand_level,
+            self._interval_level,
+            out=np.zeros_like(self._demand_level, dtype=float),
+            where=self._interval_level != 0,
         )
-        # For multivariate data, broadcast each feature across forecast horizon
-        # Shape: (forecast_horizon, num_targets)
-        forecast = np.tile(forecast.reshape(1, -1), reps=(forecast_horizon, 1))
-
-        return forecast  # Return (forecast_horizon, num_targets)
+        forecast = np.tile(forecast, (forecast_horizon, 1))
+        return forecast
 
 
     def get_model_summary(self) -> Dict[str, Any]:
         """
-        Get a summary of the Croston's Classic model's properties.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing model summary information.
+        Returns a summary of the Croston's Classic model.
         """
         summary = {
             "model_type": "CrostonClassic",
-            "alpha": self.model_config["alpha"],
-            "gamma": self.model_config["gamma"],
-            "is_fitted": self.is_fitted
+            "alpha": self.params.alpha,
+            "gamma": self.params.gamma,
+            "is_fitted": self.is_fitted,
         }
 
         if self.is_fitted:
-            summary.update(
-                {
-                    "fitted_demand_level": self.demand_level_,
-                    "fitted_interval_level": self.interval_level_,
-                }
-            )
+            summary["fitted_demand_level"] = getattr(self, "_demand_level", None)
+            summary["fitted_interval_level"] = getattr(self, "_interval_level", None)
 
         return summary

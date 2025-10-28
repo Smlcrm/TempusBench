@@ -15,23 +15,20 @@ class TimesfmParams(PydanticBaseModel):
 
 
 class TimesFMModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize TimesFM model.
         
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = TimesfmParams(**self.model_config).model_dump()
+        super().__init__(params, settings, TimesfmParams)
         
         self.is_fitted = True
 
-        horizon = self.task_config["forecast_horizon"]
-        self.model = timesfm.TimesFm(
+        horizon = 1  # Will be set during training
+        self._model = timesfm.TimesFm(
             hparams=timesfm.TimesFmHparams(
                 backend="cpu",
                 input_patch_len=32,
@@ -59,12 +56,18 @@ class TimesFMModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> "TimesFMModel":
         """
         Foundation model: no training needed. Mark as fitted and return self.
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        # TimesFM is a foundation model with minimal params
+        
         self.is_fitted = True
         return self
 
@@ -73,14 +76,22 @@ class TimesFMModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ):
+        """
+        Make predictions using the trained TimesFM model.
+        """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        forecast_horizon = kwargs["forecast_horizon"]
+        
+        # Reference params, settings, device, python_version
+        # TimesFM is a foundation model with minimal params
 
         forecast_horizon = timestamps_target.shape[0]
 
         # Generate forecasts
-        forecasts = self.model.forecast(y_context)[0]
+        forecasts = self._model.forecast(y_context)[0]
         # print(forecasts)
         if len(forecasts) == 1:
             forecasts = np.expand_dims(forecasts, axis=0)

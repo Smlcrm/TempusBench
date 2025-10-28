@@ -23,7 +23,6 @@ from sklearn.decomposition import PCA
 from sktime.forecasting.theta import ThetaForecaster
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
-from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
@@ -34,21 +33,14 @@ class ThetaParams(PydanticBaseModel):
 
 
 class Theta(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
-        Initialize the Multivariate Theta model with a given configuration.
-
-        Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+        Initialize the Multivariate Theta model with model-specific parameters.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = ThetaParams(**self.model_config).model_dump()
+        super().__init__(params, settings, ThetaParams)
 
         # Note: theta_method should be in config, no defaults
-        self.univariate_models = {}
+        self._models = {}
         self.theta_matrix = None
         self.drift_vector = None
         self.is_fitted = False
@@ -169,11 +161,12 @@ class Theta(BaseModel):
 
     def train(
         self,
-        y_context: Union[pd.Series, np.ndarray, pd.DataFrame],
-        y_target: Union[pd.Series, np.ndarray, pd.DataFrame] = None,
-        y_start_date: Optional[str] = None,
-        **kwargs,
-    ) -> "MultivariateTheta":
+        y_context: np.ndarray,
+        y_target: Optional[np.ndarray],
+        timestamps_context: Optional[np.ndarray],
+        timestamps_target: Optional[np.ndarray],
+        **kwargs: dict,
+    ) -> "Theta":
         """
         Train the Multivariate Theta model on given data.
 
@@ -187,27 +180,36 @@ class Theta(BaseModel):
         Args:
             y_context: Historical target values (DataFrame for multivariate, Series for univariate)
             y_target: Target values for validation (ignored during training)
-            y_start_date: Start date for y_context (optional)
+            timestamps_context: Timestamps for y_context (optional)
+            timestamps_target: Timestamps for y_target (optional)
+            **kwargs: Additional keyword arguments
 
         Returns:
             self: The fitted model instance
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        sp = self.params.sp
+        theta_method = self.params.theta_method
+        use_reduced_rank = self.params.use_reduced_rank
 
         # Calculate num_targets from data
         num_targets = y_context.shape[1]
         self.num_targets = num_targets  # Store for use in predict
-        print(f"y_context shape: {y_context.shape}")
-        print(f"Training Multivariate Theta with {num_targets} targets...")
+        self.logger.debug("ThetaModel.train", f"y_context shape: {y_context.shape}")
+        self.logger.info("ThetaModel.train", f"Training Multivariate Theta with {num_targets} targets...")
 
         # Step 1: Estimate drift vector μ
         self.drift_vector = self._estimate_drift(y_context)
-        print(f"Estimated drift vector: {self.drift_vector}")
+        self.logger.debug("ThetaModel.train", f"Estimated drift vector: {self.drift_vector}")
 
         # Step 2: Detrend the data
         detrended_data = self._detrend_data(y_context, self.drift_vector)
 
         # Step 3: Estimate Θ parameter matrix
-        if self.model_config["theta_method"] == "correlation_optimal":
+        if theta_method == "correlation_optimal":
             self.theta_matrix = self._estimate_theta_matrix_correlation_optimal(
                 detrended_data, num_targets
             )
@@ -216,7 +218,7 @@ class Theta(BaseModel):
                 detrended_data, num_targets
             )
 
-        print(f"Estimated Θ matrix:\n{self.theta_matrix}")
+        self.logger.debug("ThetaModel.train", f"Estimated Θ matrix:\n{self.theta_matrix}")
 
         # Step 4: Create θ-lines
         theta_lines = self._create_theta_lines(detrended_data, self.theta_matrix)
@@ -230,7 +232,6 @@ class Theta(BaseModel):
             # If so, disable deseasonalization to avoid multiplicative seasonality errors
             has_non_positive = (theta_line_series <= 0).any()
             # Also disable deseasonalization if we don't have at least two full cycles
-            sp = int(self.model_config["sp"])
             insufficient_cycles = len(theta_line_series) < 2 * sp
             deseasonalize = (not has_non_positive) and (not insufficient_cycles)
             
@@ -242,10 +243,10 @@ class Theta(BaseModel):
             )
             theta_model.fit(y=theta_line_series)
 
-            self.univariate_models[i] = theta_model
+            self._models[i] = theta_model
 
         self.is_fitted = True
-        print("Multivariate Theta training complete.")
+        self.logger.info("ThetaModel.train", "Multivariate Theta training complete.")
         return self
 
     def predict(
@@ -253,8 +254,7 @@ class Theta(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
+        **kwargs: dict,
     ) -> np.ndarray:
         """
         Make predictions using the trained Multivariate Theta model.
@@ -266,13 +266,19 @@ class Theta(BaseModel):
 
         Args:
             y_context: Recent/past target values (ignored - uses training data)
-            x_context: Recent/past exogenous variables (ignored)
-            x_target: Future exogenous variables (ignored, used only for forecast length)
-            forecast_horizon: Number of steps to forecast
+            timestamps_context: Timestamps for context data (ignored)
+            timestamps_target: Timestamps for target data (used to determine forecast length)
+            **kwargs: Additional keyword arguments
 
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        sp = self.params.sp
+        
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
@@ -288,7 +294,7 @@ class Theta(BaseModel):
 
         for i in range(num_targets):
             # Get forecast from individual model
-            theta_forecast = self.univariate_models[i].predict(fh=fh)
+            theta_forecast = self._models[i].predict(fh=fh)
 
             # Add back the linear trend
             future_times = np.arange(1, forecast_horizon + 1)

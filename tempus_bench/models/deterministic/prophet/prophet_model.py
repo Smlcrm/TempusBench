@@ -1,68 +1,163 @@
-import os
-import json
-from typing import Dict, Any, Union, Optional
 import numpy as np
 import pandas as pd
+
+from typing import Literal
+
+from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
+from typing import Dict, Any, Union, Optional
 from prophet.serialize import model_to_json, model_from_json
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
 
+from tempus_bench.models.base_model import BaseModel
 
 class ProphetParams(PydanticBaseModel):
     seasonality_mode: Literal["additive", "multiplicative"] = Field(default="additive", description="Seasonality mode")
-    yearly_seasonality: bool = Field(default=True, description="Enable yearly seasonality")
-    weekly_seasonality: bool = Field(default=True, description="Enable weekly seasonality")
-    daily_seasonality: bool = Field(default=False, description="Enable daily seasonality")
-
+    yearly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable yearly seasonality (bool) or increase the number of Fourier terms (int)")
+    weekly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable weekly seasonality (bool or increase the number of Fourier terms (int)")
+    daily_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)")
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Enforce that only one of the seasonality options can be set (not None)
+        seasonality_options = [
+            self.yearly_seasonality,
+            self.weekly_seasonality,
+            self.daily_seasonality,
+        ]
+        set_options = [opt for opt in seasonality_options if opt is not None]
+        if len(set_options) > 1:
+            raise ValueError("Only one of yearly_seasonality, weekly_seasonality, or daily_seasonality can be set at the same time.")
 
 class ProphetModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
-        """
-        Initialize Prophet model with a given configuration.
-
-        Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
-        """
-        super().__init__(config, logs_path, ProphetParams)
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        super().__init__(params, settings, ProphetParams)
         self._build_model()
+        self._scaler = StandardScaler()
 
     def _build_model(self):
-        self.model = Prophet(**self.model_config)
+        self._model = Prophet(**self.params.model_dump())
         self.is_fitted = False
 
-    @staticmethod
-    def ensure_series_with_datetimeindex(y, start_date, freq):
+    def _train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ):
+        y_context = y_context.squeeze()
+        y_target = y_target.squeeze()
+        timestamps_context = self._convert_to_datetimeindex(timestamps_context)
+        timestamps_target = self._convert_to_datetimeindex(timestamps_target)
+
+        train_df = pd.DataFrame({"ds": timestamps_context, "y": y_context})
+
+        self._model.fit(train_df)
+        self.is_fitted = True
+        return self
+
+    def _predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ) -> np.ndarray:
         """
-        Ensure the input series has a proper datetime index.
+        Generate predictions using the trained Prophet model.
 
         Args:
-            y: Input series (can be numpy array, pandas series, or already indexed)
-            start_date: Start date to use for the index
-            freq: Frequency from CSV data - MUST be provided
+            y_context: Recent/past target values.
+            timestamps_context: Timestamps for context data.
+            timestamps_target: Timestamps for target/forecast steps.
 
         Returns:
-            pd.Series: Series with proper datetime index
-
-        Raises:
-            ValueError: If freq is None or empty
+            np.ndarray: Model predictions (num_steps, 1).
         """
-        if freq is None or freq == "":
-            raise ValueError(
-                "Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks."
-            )
-
-        if isinstance(y, pd.Series) and isinstance(y.index, pd.DatetimeIndex):
-            return y
-        return pd.Series(
-            y.values if hasattr(y, "values") else y,
-            index=pd.date_range(start_date, periods=len(y), freq=freq),
+        future_df = pd.DataFrame(
+            {"ds": self._convert_to_datetimeindex(timestamps_target)}
         )
 
-    def convert_to_datetimeindex(self, timestamps):
+        forecast_df = self._model.predict(future_df)
+        predictions = np.asarray(forecast_df["yhat"])
+        if predictions.ndim == 1: predictions = np.expand_dims(predictions, axis=1)
+
+        return predictions
+
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ):
+        """
+        Train the Prophet model. For multivariate data, fits one model per variate.
+
+        Args:
+            y_context: Training target values (shape: [n_samples] or [n_samples, n_variates])
+            y_target: Optional target values (same shape as y_context)
+            timestamps_context: Timestamps for training data
+            timestamps_target: Timestamps for target data
+            **kwargs: Additional arguments
+
+        Returns:
+            self
+        """
+        self._models = []
+        for i in range(y_context.shape[1]):
+            model = ProphetModel(params=self.params.dict())
+            model._train(
+                y_context=y_context[:, i],
+                y_target=y_target[:, i] if y_target is not None else None,
+                timestamps_context=timestamps_context,
+                timestamps_target=timestamps_target,
+                **kwargs
+            )
+            self._models.append(model)
+        self.is_fitted = True
+        return self
+
+    def predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ) -> np.ndarray:
+        """
+        Make predictions using the trained Prophet model(s).
+        Handles both univariate and multivariate time series.
+
+        Args:
+            y_context: Recent/past target values.
+            timestamps_context: Timestamps for context data.
+            timestamps_target: Timestamps for target (forecast) data.
+
+        Returns:
+            np.ndarray: Model predictions (shape: [n_forecast_steps, n_variates])
+        """
+        if not self.is_fitted:
+            raise ValueError("ProphetModel not fitted. Call train() first.")
+
+        self._scaler.fit(y_context)
+        y_scaled = self._scaler.transform(y_context)
+        predictions = [
+            model._predict(
+                y_context=y_scaled[:, idx],
+                timestamps_context=timestamps_context,
+                timestamps_target=timestamps_target,
+                **kwargs
+            )
+            for idx, model in enumerate(self._models)
+        ]
+        combined = np.column_stack(predictions)
+        combined = self._scaler.inverse_transform(combined)
+        return combined
+
+    def _convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
         timestamps = np.squeeze(timestamps)
         if not isinstance(timestamps, pd.DatetimeIndex):
@@ -118,201 +213,3 @@ class ProphetModel(BaseModel):
                     timestamps = pd.to_datetime(timestamps)
 
         return timestamps
-
-    def _train(
-        self,
-        y_context: Optional[np.ndarray],
-        y_target: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
-        **kwargs,
-    ):
-
-        if not self.is_fitted:
-            self.model = Prophet(**self.model_config)
-        # Use the provided timestamps to create a DatetimeIndex for y_context
-        # Ensure 1D series indexed by provided timestamps
-        y_context = y_context.squeeze()
-        y_target = y_target.squeeze()
-
-        timestamps_context = self.convert_to_datetimeindex(timestamps_context)
-        timestamps_target = self.convert_to_datetimeindex(timestamps_target)
-
-        train_df = pd.DataFrame({"ds": timestamps_context, "y": y_context})
-
-        self.model.fit(train_df)
-        # Store training statistics for fallback predictions
-        self.is_fitted = True
-        return self
-
-    def _predict(
-        self,
-        y_context: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
-    ) -> np.ndarray:
-        """
-        Make predictions using the trained Prophet model.
-
-        Args:
-            y_context: Recent/past target values
-            forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
-            y_context_timestamps: Timestamps for context data
-            y_target: Target values for evaluation (optional)
-            y_target_timestamps: Timestamps for target data (optional)
-            freq: Frequency string from CSV data - MUST be provided
-
-        Returns:
-            np.ndarray: Model predictions
-
-        Raises:
-            ValueError: If freq is None or if required data is missing
-        """
-
-        # Default forecast horizon if neither y_target nor y_target_timestamps provided
-
-        # Create future dataframe with the correct timestamps
-        future_df = pd.DataFrame(
-            {"ds": self.convert_to_datetimeindex(timestamps_target)}
-        )
-
-        # Make predictions
-        forecast = self.model.predict(future_df)
-
-        forecast = np.asarray(forecast["yhat"])
-
-        if len(forecast.shape) == 1:
-            forecast = np.expand_dims(forecast, axis=1)
-        # Return the predicted values
-
-        return forecast
-
-    def train(
-        self,
-        y_context: Optional[np.ndarray],
-        y_target: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
-        **kwargs,
-    ):
-        """
-        Train the Prophet model on multivariate time series data.
-        For multivariate data, this method applies the univariate Prophet model
-        to each variate separately.
-
-        Args:
-            y_context: Training target values (shape: [n_samples, n_variates])
-            y_target: Target values for evaluation (optional)
-            timestamps_context: Timestamps for context data
-            timestamps_target: Timestamps for target data
-            freq: Frequency string from CSV data
-            **kwargs: Additional arguments
-
-        Returns:
-            self: Trained model instance
-        """
-        # Handle multivariate data by training separate Prophet models for each variate
-        if y_context.ndim > 1 and y_context.shape[1] > 1:
-            # Multivariate case: train separate models for each variate
-            self.models = []  # Store list of Prophet models for each variate
-            
-            for variate_idx in range(y_context.shape[1]):
-                # Extract single variate data
-                y_context_variate = y_context[:, variate_idx]
-                y_target_variate = y_target[:, variate_idx] if y_target is not None else None
-                
-                # Create a temporary model instance for this variate
-                # Use the full config but replace the model section with the specific model config
-                inner_config = self.config.copy()
-                inner_config["model"] = {"prophet": self.model_config}
-                temp_model = ProphetModel(self.config_path, logs_path=self.logs_path, hyperparameters=self.model_config)
-                
-                # Train on this variate using the univariate method
-                temp_model._train(
-                    y_context=y_context_variate,
-                    y_target=y_target_variate,
-                    timestamps_context=timestamps_context,
-                    timestamps_target=timestamps_target,
-                    freq=freq,
-                    **kwargs
-                )
-                
-                self.models.append(temp_model)
-            
-            # Set the main model to the first variate for compatibility
-            self.model = self.models[0].model
-            self.is_fitted = True
-            
-        else:
-            # Univariate case: use the original univariate method
-            self._train(
-                y_context=y_context,
-                y_target=y_target,
-                timestamps_context=timestamps_context,
-                timestamps_target=timestamps_target,
-                freq=freq,
-                **kwargs
-            )
-        
-        return self
-
-    def predict(
-        self,
-        y_context: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
-    ) -> np.ndarray:
-        """
-        Make predictions using the trained Prophet model(s).
-        For multivariate data, this method applies the univariate Prophet model
-        to each variate separately and combines the results.
-
-        Args:
-            y_context: Recent/past target values
-            timestamps_context: Timestamps for context data
-            timestamps_target: Timestamps for target data
-            freq: Frequency string from CSV data
-
-        Returns:
-            np.ndarray: Model predictions (shape: [n_forecast_steps, n_variates])
-        """
-        # Handle multivariate data by predicting with separate Prophet models for each variate
-        if hasattr(self, 'models') and self.models:
-            # Multivariate case: predict with each variate model and combine
-            predictions = []
-            
-            for variate_idx, model in enumerate(self.models):
-                # Extract single variate context if provided
-                y_context_variate = y_context[:, variate_idx] if y_context is not None else None
-                
-                # Predict for this variate
-                variate_pred = model._predict(
-                    y_context=y_context_variate,
-                    timestamps_context=timestamps_context,
-                    timestamps_target=timestamps_target,
-                    freq=freq
-                )
-                
-                predictions.append(variate_pred)
-            
-            # Combine predictions from all variates
-            combined_predictions = np.column_stack(predictions)
-            
-            # Inverse transform predictions if scaler is available
-            if self.scaler is not None:
-                combined_predictions = self.scaler.inverse_transform(combined_predictions)
-            
-            return combined_predictions
-            
-        else:
-            # Univariate case: use the original univariate method
-            return self._predict(
-                y_context=y_context,
-                timestamps_context=timestamps_context,
-                timestamps_target=timestamps_target,
-                freq=freq
-            )
