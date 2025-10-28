@@ -20,27 +20,27 @@ class BenchmarkRunner:
         self.config_path = config_path
         self.config_name = os.path.splitext(os.path.basename(self.config_path))[0]
 
-    def initialize_run(self):
+    def _initialize_run(self):
         """Initialize and update all path-related attributes."""
         self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        # Load and validate configuration using ConfigManager
         self.config = load_config(self.config_path, self.logs_path)
         self.config_manager = get_config_manager()
 
         # Update runs_path from validated settings
-        self.runs_path = Path(self.config_manager.settings.runs_dir)
+        self.runs_path = Path(self.config_manager.benchmark_settings.runs_dir)
         self.run_path = self.runs_path / f"run_{self.config_name}_{self.run_timestamp}"
         self.logs_path = self.run_path / 'logs'
         self._setup_logging()
 
     def run(self):
         """Execute the end-to-end benchmarking pipeline."""
-        self.initialize_run()
+        self._initialize_run()
         self.logger.info("BenchmarkRunner", f"Run starts - {self.run_timestamp}")
         self.logger.info("BenchmarkRunner", f"Results stored at: {self.run_path}")
         self.logger.info("BenchmarkRunner", "Extracting Configs")
 
+        # Each task produces a separate config
         for config in self.config_manager.generate_configs():
             # Hyper-parameter Tuning
             self.logger.info("BenchmarkRunner", f"Hyperparameter Tuning Starts for task: {task_name} (config idx={idx+1}/{len(task_configs)})")
@@ -72,9 +72,9 @@ class BenchmarkRunner:
 
     def _setup_logging(self):
         """Setup logging for benchmark runner execution."""
-        console_logging = self.config_manager.settings.console_logging
-        file_logging = self.config_manager.settings.file_logging
-        tensorboard_logging = self.config_manager.settings.tensorboard_logging
+        console_logging = self.config_manager.benchmark_settings.console_logging
+        file_logging = self.config_manager.benchmark_settings.file_logging
+        tensorboard_logging = self.config_manager.benchmark_settings.tensorboard_logging
 
         # Setup Python logger for orchestration - always instantiate
         self.logger = get_logger(self.logs_path, console_logging=console_logging, file_logging=file_logging)

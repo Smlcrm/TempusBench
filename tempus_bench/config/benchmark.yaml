@@ -4,8 +4,7 @@
 task_path: 'multivariate/baggage_100_multivariate'
 
 evaluation:
-  deterministic_tuning_loss: mae
-  stochastic_tuning_loss: crps
+  tuning_loss: mae
   max_windows: 20
   max_num_variates: 10
   num_samples: 100

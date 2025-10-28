@@ -35,7 +35,7 @@ class HyperparameterTuner:
 
     def _setup_logging(self):
         self.logger = get_logger(self.logs_path)
-        tensorboard_logging = self.config.settings.tensorboard_logging
+        tensorboard_logging = self.config.benchmark_settings.tensorboard_logging
         self.tf_logger = get_tf_logger(str(self.tf_logs_path), tensorboard_logging=tensorboard_logging)
 
     def _is_valid_combination(self, model_name: str, combination: dict) -> bool:
