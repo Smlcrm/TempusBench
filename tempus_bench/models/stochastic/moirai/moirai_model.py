@@ -11,31 +11,28 @@ from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 
 class MoiraiParams(PydanticBaseModel):
-    model_name: str = Field(default="moirai", description="Model name")
+    model_name: Optional[str] = Field(default="moirai", description="Model name")
     size: Optional[str] = Field(default=None, description="Model size")
     ctx: Optional[int] = Field(default=None, description="Context length")
-    psz: int = Field(default=16, ge=1, description="Patch size")
-    bsz: int = Field(default=32, ge=1, description="Batch size")
-    test: int = Field(default=100, ge=1, description="Test parameter")
-    num_samples: int = Field(default=100, ge=1, description="Number of samples")
+    psz: Optional[int] = Field(default=16, ge=1, description="Patch size")
+    bsz: Optional[int] = Field(default=32, ge=1, description="Batch size")
+    test: Optional[int] = Field(default=100, ge=1, description="Test parameter")
+    num_samples: Optional[int] = Field(default=100, ge=1, description="Number of samples")
 
 
 class MoiraiModel(BaseModel):
 
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize Moirai model.
         
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = MoiraiParams(**self.model_config).model_dump()
+        super().__init__(params, settings, MoiraiParams)
 
-        self.model = None
+        self._model = None
         self.is_fitted = False
 
     def train(
@@ -44,7 +41,7 @@ class MoiraiModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> "MoiraiModel":
         """
         "Train" the Moirai model (no training required for foundation models).
@@ -54,24 +51,36 @@ class MoiraiModel(BaseModel):
             y_target: Future target values (not used for training, for compatibility)
             timestamps_context: Timestamps for y_context (not used)
             timestamps_target: Timestamps for y_target (not used)
-            freq: Frequency string (required by interface, not used)
+            **kwargs: Additional keyword arguments
 
         Returns:
             self: The fitted model instance (for compatibility)
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        model_name = self.params.model_name
+        size = self.params.size
+        ctx = self.params.ctx
+        psz = self.params.psz
+        bsz = self.params.bsz
+        test = self.params.test
+        num_samples = self.params.num_samples
+        
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
-            self.model_config["pdt"] = y_target.shape[0]
-            self.model_config["ctx"] = y_context.shape[0]
-            self.model = MoiraiForecast(
+            pdt = y_target.shape[0]
+            ctx = y_context.shape[0]
+            self._model = MoiraiForecast(
                 module=MoiraiModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/{self.model_config['model_name']}-1.1-R-{self.model_config['size']}"
+                    pretrained_model_name_or_path=f"Salesforce/{model_name}-1.1-R-{size}"
                 ),
-                prediction_length=self.model_config["pdt"],
-                context_length=self.model_config["ctx"],
-                patch_size=self.model_config["psz"],
-                num_samples=self.model_config["num_samples"],
+                prediction_length=pdt,
+                context_length=ctx,
+                patch_size=psz,
+                num_samples=num_samples,
                 target_dim=y_context.shape[1],
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
@@ -108,7 +117,7 @@ class MoiraiModel(BaseModel):
 
         context_steps, num_targets = y_context.shape
 
-        ctx = self.model_config["ctx"]
+        ctx = self._model_config["ctx"]
         # Create mask with the padded size (ctx, num_targets)
         observed_mask = np.ones((ctx, num_targets), dtype=bool)
 
@@ -124,7 +133,7 @@ class MoiraiModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
-        forecast = self.model(
+        forecast = self._model(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,

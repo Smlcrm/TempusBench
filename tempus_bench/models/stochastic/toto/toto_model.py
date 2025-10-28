@@ -29,7 +29,7 @@ class TotoModel(BaseModel):
         super().__init__(config, logs_path)
         
         # Validate and set model config using Pydantic
-        self.model_config = TotoParams(**self.model_config).model_dump()
+        self._model_config = TotoParams(**self._model_config).model_dump()
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
@@ -42,7 +42,7 @@ class TotoModel(BaseModel):
 
         # JIT compilation for faster inference
         toto.compile()
-        self.model = TotoForecaster(toto.model)
+        self._model = TotoForecaster(toto.model)
 
     def train(
         self,
@@ -107,7 +107,7 @@ class TotoModel(BaseModel):
         )
 
         # Generate forecasts for the next 336 timesteps
-        forecast = self.model.forecast(
+        forecast = self._model.forecast(
             inputs,
             prediction_length=forecast_horizon,
             num_samples=self.num_samples,  # Use configured number of samples

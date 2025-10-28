@@ -13,7 +13,7 @@ import pdb
 import pandas as pd
 import numpy as np
 import torch
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from chronos import ChronosPipeline as BaseChronosPipeline
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
@@ -22,8 +22,8 @@ from tempus_bench.models.base_model import BaseModel
 
 
 class ChronosParams(PydanticBaseModel):
-    model_size: Literal["tiny", "mini", "small", "base", "large"] = Field(default="tiny", description="Size of the Chronos model")
-    context_length: int = Field(default=2048, ge=1, description="Number of past time steps for context")
+    model_size: Optional[Literal["tiny", "mini", "small", "base", "large"]] = Field(default="tiny", description="Size of the Chronos model")
+    context_length: Optional[int] = Field(default=2048, ge=1, description="Number of past time steps for context")
 
 class ChronosModel(BaseModel):
     """
@@ -38,18 +38,15 @@ class ChronosModel(BaseModel):
         num_samples: Number of predictive samples to generate
     """
 
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize the Chronos model wrapper.
 
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = ChronosParams(**self.model_config).model_dump()
+        super().__init__(params, settings, ChronosParams)
 
     def train(
         self,
@@ -57,7 +54,7 @@ class ChronosModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> "ChronosModel":
         """
         Initialize the Chronos model (no training required for foundation models).
@@ -65,7 +62,9 @@ class ChronosModel(BaseModel):
         Args:
             y_context: Past target values (not used for training, for compatibility)
             y_target: Future target values (not used for training, for compatibility)
-            y_start_date: Start date for y_context (not used)
+            timestamps_context: Timestamps for y_context (not used)
+            timestamps_target: Timestamps for y_target (not used)
+            **kwargs: Additional keyword arguments
 
         Returns:
             self: The model instance
@@ -74,14 +73,21 @@ class ChronosModel(BaseModel):
             Chronos is a pre-trained foundation model that doesn't require training.
             This method just marks the model as ready for inference.
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        model_size = self.params.model_size
+        context_length = self.params.context_length
+        
         # For foundation models, we don't need to load the model here
         # It will be loaded fresh for each prediction (like it was in the working version)
         # Load the Chronos model fresh for each prediction (like the working version)
-        hf_model_name = f"amazon/chronos-t5-{self.model_config['model_size']}"
+        hf_model_name = f"amazon/chronos-t5-{model_size}"
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.logger.info("ChronosModel.train", f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
-        self.model = BaseChronosPipeline.from_pretrained(
+        self._model = BaseChronosPipeline.from_pretrained(
             hf_model_name,
             device_map="auto",
             torch_dtype=torch.bfloat16,
@@ -96,7 +102,6 @@ class ChronosModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -104,10 +109,8 @@ class ChronosModel(BaseModel):
 
         Args:
             y_context: Recent target values for context
-            y_target: Target values to predict (used to determine forecast length)
-            y_context_timestamps: Timestamps for context data
-            y_target_timestamps: Timestamps for target data
-            forecast_horizon: Number of steps to forecast (overrides y_target length if provided)
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
             **kwargs: Additional keyword arguments
 
         Returns:
@@ -116,13 +119,20 @@ class ChronosModel(BaseModel):
         Raises:
             ValueError: If model is not fitted or required data is missing
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        num_samples = kwargs["num_samples"]
+        
+        # Reference params, settings, device, python_version
+        model_size = self.params.model_size
+        context_length = self.params.context_length
 
         forecast_horizon = timestamps_target.shape[0]
 
-        padding_length = self.model_config["context_length"] - y_context.shape[0]
+        padding_length = context_length - y_context.shape[0]
         if padding_length <= 0:
             # Use the most recent context_length data points
-            y_context = y_context[-self.model_config["context_length"] :, :]
+            y_context = y_context[-context_length :, :]
         else:
             # If not enough data, pad with the last available value
             y_context = np.pad(
@@ -133,7 +143,7 @@ class ChronosModel(BaseModel):
 
         y_context = torch.tensor(y_context.T)
         # Generate forecasts
-        forecasts = self.model.predict(
+        forecasts = self._model.predict(
             context=y_context,
             prediction_length=forecast_horizon,
             num_samples=self.eval_config["num_samples"]
@@ -155,8 +165,8 @@ class ChronosModel(BaseModel):
         """
         return {
             "model_type": "Chronos",
-            "model_size": self.model_config["model_size"],
-            "context_length": self.model_config["context_length"],
+            "model_size": self._model_config["model_size"],
+            "context_length": self._model_config["context_length"],
             "num_samples": self.num_samples,
             "forecast_horizon": self.forecast_horizon,
             "is_fitted": self.is_fitted,
