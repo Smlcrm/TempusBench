@@ -12,27 +12,41 @@ import numpy as np
 import pandas as pd
 from xgboost import XGBRegressor
 from sklearn.multioutput import MultiOutputRegressor
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 from tempus_bench.utils.logger import get_logger
 
 
+class XgboostParams(PydanticBaseModel):
+    n_estimators: int = Field(default=100, ge=1, description="Number of boosting rounds")
+    max_depth: int = Field(default=6, ge=1, description="Maximum tree depth")
+    learning_rate: float = Field(default=0.1, gt=0, description="Learning rate")
+    subsample: float = Field(default=1.0, gt=0, le=1, description="Subsample ratio")
+    colsample_bytree: float = Field(default=1.0, gt=0, le=1, description="Column sample ratio")
+    reg_alpha: float = Field(default=0, ge=0, description="L1 regularization")
+    reg_lambda: float = Field(default=1, ge=0, description="L2 regularization")
+    max_features: Literal["sqrt", "log2", "auto"] = Field(default="sqrt", description="Number of features to consider for splits")
+    lookback_window: int = Field(..., ge=1, description="Number of past time steps to use as features")
+
+
 class XGBoostModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize XGBoost model with a given configuration.
 
         Args:
-            config: Configuration dictionary for XGBoostRegressor parameters.
-                    e.g., {'n_estimators': 100, 'learning_rate': 0.1, 'lookback_window': 10}
+            config: JobConfig instance containing model and task configuration
             logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-
-        if "lookback_window" not in self.model_config:
-            raise ValueError("lookback_window must be specified in config")
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = XgboostParams(**self.model_config).model_dump()
 
         # Add forecast_horizon to model_config
-        self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
+        self.model_config["forecast_horizon"] = self.task_config["forecast_horizon"]
         self._build_model()
 
     def _build_model(self):
@@ -403,7 +417,7 @@ class XGBoostModel(BaseModel):
                 )
 
                 self.logger.debug(
-                    "XGBoostModel",
+                    "XGBoostModel.rolling_predict",
                     f"Rolling predict X_pred shape: {X_pred.shape}, pred_reshaped shape: {pred_reshaped.shape}"
                 )
 
@@ -455,5 +469,5 @@ class XGBoostModel(BaseModel):
         preds = self.rolling_predict(
             y_context, timestamps_context, timestamps_target, freq
         )
-        self.logger.debug("XGBoostModel", f"Final rolling preds shape: {preds.shape}")
+        self.logger.debug("XGBoostModel.predict", f"Final rolling preds shape: {preds.shape}")
         return preds

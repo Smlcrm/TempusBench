@@ -20,48 +20,34 @@ from tensorflow.keras.optimizers import Adam
 from typing import Dict, Any, Union, Tuple, Optional
 import pickle
 import os
-from tempus_bench.models.base_model import BaseModel
 import time
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
+
+
+class LstmParams(PydanticBaseModel):
+    units: int = Field(..., ge=1, description="Number of LSTM units")
+    layers: int = Field(..., ge=1, description="Number of LSTM layers")
+    dropout: float = Field(..., ge=0, le=1, description="Dropout rate")
+    learning_rate: float = Field(..., gt=0, description="Learning rate for optimizer")
+    batch_size: int = Field(..., ge=1, description="Batch size for training")
+    epochs: int = Field(..., ge=1, description="Number of training epochs")
+    optimizer: Literal["adam", "rmsprop", "sgd"] = Field(default="adam", description="Optimizer to use")
 
 
 class LSTMModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize Multivariate LSTM model with given configuration.
 
         Args:
-            config: Configuration dictionary containing model parameters
-                - units: int, number of LSTM units
-                - layers: int, number of LSTM layers
-                - dropout: float, dropout rate
-                - learning_rate: float, learning rate for optimizer
-                - batch_size: int, batch size for training
-                - epochs: int, number of training epochs
-                - context_length: int, length of input sequences
-                - target_cols: list of str, names of target columns (for multivariate)
-                - feature_cols: list of str, names of feature columns
-                - loss_functions: List[str], list of loss function names to use
-                - primary_loss: str, primary loss function for training
-                - forecast_horizon: int, number of steps to forecast ahead
-            config_file: Path to a JSON configuration file
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-        if "units" not in self.model_config:
-            raise ValueError("units must be specified in config")
-        if "layers" not in self.model_config:
-            raise ValueError("layers must be specified in config")
-        if "dropout" not in self.model_config:
-            raise ValueError("dropout must be specified in config")
-        if "learning_rate" not in self.model_config:
-            raise ValueError("learning_rate must be specified in config")
-        if "batch_size" not in self.model_config:
-            raise ValueError("batch_size must be specified in config")
-        if "epochs" not in self.model_config:
-            raise ValueError("epochs must be specified in config")
-        # Get context_length and prediction_window from task config
-        self.model_config["context_length"] = config["task"]["context_window"]
-        self.model_config["prediction_window"] = config["task"]["forecast_horizon"]
+        super().__init__(config, logs_path, LstmParams)
         self.model = None
         # num_targets will be calculated from data during training
 

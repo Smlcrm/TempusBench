@@ -12,25 +12,18 @@ from pathlib import Path
 from typing import Tuple, Optional
 from sklearn.preprocessing import StandardScaler
 
-from tempus_bench.config import load_config, get_config_manager
-from tempus_bench.utils.logger import get_logger
+from tempus_bench.config.config import ConfigAdapterMixin
+from tempus_bench.config.models import JobConfig
 
-class Preprocessor:
-    def __init__(self, config_path: str, logs_path: str):
+class Preprocessor(ConfigAdapterMixin):
+    def __init__(self, config: JobConfig):
         """
         Initialize preprocessor with configuration.
 
         Args:
             config_path: Path to the configuration YAML file
-            logs_path: Directory for log files
         """
-        self.config = load_config(config_path, logs_path)
-        self.config_manager = get_config_manager()
-        console_logging = self.config_manager.benchmark_settings.console_logging
-        file_logging = self.config_manager.benchmark_settings.file_logging
-        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
-        evaluation_config = self.config['evaluation']
-        self.max_num_variates = evaluation_config['max_num_variates']
+        super().__init__(config)
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """

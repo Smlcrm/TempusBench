@@ -4,15 +4,33 @@ import numpy as np
 import torch
 import timesfm
 from typing import Dict, Any, Optional, List, Union
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
+class TimesfmParams(PydanticBaseModel):
+    # Foundation model with minimal parameters
+    pass
+
+
 class TimesFMModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
-        super().__init__(config_path, logs_path, hyperparameters)
+    def __init__(self, config: JobConfig, logs_path: str):
+        """
+        Initialize TimesFM model.
+        
+        Args:
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
+        """
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = TimesfmParams(**self.model_config).model_dump()
+        
         self.is_fitted = True
 
-        horizon = self.config["task"]["forecast_horizon"]
+        horizon = self.task_config["forecast_horizon"]
         self.model = timesfm.TimesFm(
             hparams=timesfm.TimesFmHparams(
                 backend="cpu",

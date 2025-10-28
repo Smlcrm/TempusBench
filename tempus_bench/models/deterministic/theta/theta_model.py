@@ -21,27 +21,31 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.decomposition import PCA
 from sktime.forecasting.theta import ThetaForecaster
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
+class ThetaParams(PydanticBaseModel):
+    sp: int = Field(..., ge=1, description="Seasonal period")
+    use_reduced_rank: bool = Field(default=False, description="Whether to use cointegration/reduced rank")
+    theta_method: Literal["least_squares", "correlation_optimal"] = Field(default="least_squares", description="Method for theta estimation")
+
+
 class Theta(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize the Multivariate Theta model with a given configuration.
 
         Args:
-            config: Configuration dictionary for model parameters.
-                    Example Format:
-                    {
-                        'sp': 12,  # seasonal period
-                        'use_reduced_rank': False,  # whether to use cointegration/reduced rank
-                        'theta_method': 'least_squares'  # 'least_squares' or 'correlation_optimal'
-                    }
-            config_file: Path to a JSON configuration file.
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-        if "sp" not in self.model_config:
-            raise ValueError("sp must be specified in config")
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = ThetaParams(**self.model_config).model_dump()
 
         # Note: theta_method should be in config, no defaults
         self.univariate_models = {}
