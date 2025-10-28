@@ -12,17 +12,20 @@ the required abstract methods.
 import numpy as np
 import pandas as pd
 
-from pathlib import Path
+from itertools import product
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Type, Union, Optional
+from pydantic import BaseModel as PydanticBaseModel
 
-from tempus_bench.utils.logger import get_logger
-from tempus_bench.config import get_config_manager
-from tempus_bench.config.models import UnifiedConfig
+from tempus_bench.config.models import JobConfig
 from tempus_bench.metrics.evaluation import Evaluator
-from tempus_bench.utils.tf_logger import get_tf_logger
+from tempus_bench.config.config import ConfigAdapterMixin
+from tempus_bench.config.models import JobConfig
 
-class BaseModel(ABC):
+class BaseModelParams(PydanticBaseModel):
+    pass
+
+class BaseModel(ABC, ConfigAdapterMixin):
     """
     Abstract base class for traditional time series forecasting models.
 
@@ -38,7 +41,7 @@ class BaseModel(ABC):
         evaluator: Evaluator instance for computing metrics
     """
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str, ParamsClass: PydanticBaseModel):
         """
         Initialize the base model.
 
@@ -47,20 +50,15 @@ class BaseModel(ABC):
             logs_path: Directory for storing log files (required)
             hyperparameters: Model-specific hyperparameters to inject into config
         """
-        self.config = config.benchmark.model_dump()
-        self.model_name = self.__class__.__name__.replace('Model', '').lower()
-        if len(self.config['model']) > 1:
-            raise ValueError("Only one model is allowed to be defined in the config")
-        # check if self.config['model'] unique key coincides with the model name
-        if self.model_name not in self.config['model']:
-            raise ValueError(f"Model parameters for {self.model_name} not found in config")
-        self.model_config = self.config["model"][self.model_name]
-        self.model_settings = config.model_settings[self.model_name].model_dump()
-        self.eval_config = self.config["benchmark"]["evaluation"]
-        self.stochastic_tuning_loss = self.eval_config['stochastic_tuning_loss']
-        self.deterministic_tuning_loss = self.eval_config['deterministic_tuning_loss']
-        self.logger = get_logger(logs_path)
-        self.tf_logger = get_tf_logger(Path(logs_path).parent / 'tensorboard')
+
+        super().__init__(config, logs_path)
+        self.params_class = ParamsClass
+        self.hyperparameter_grid = self.get_hyperparameter_grid(self.params_class)
+        self._setup_logging()
+
+        self.model_class_name = self.__class__.__name__
+        if self.model_name != self.model_class_name.replace('Model', '').lower():
+            raise ValueError(f"Model Class {self.model_class_name} is not compatible with the model name in the config: {self.model_name}")
         self.evaluator = Evaluator(config, logs_path)
         self.is_fitted = False
 
@@ -187,3 +185,29 @@ class BaseModel(ABC):
             "is_fitted": self.is_fitted,
             "parameters": self.get_params(),
         }
+
+    def get_hyperparameter_grid(self, ParamsClass: PydanticBaseModel = None) -> list[dict]:
+        """
+        Generate a hyperparameter grid using Cartesian product of lists in self.model_config.
+
+        This method uses the already initialized model_config (dict of parameter name: list of values)
+        to build all combinations of hyperparameters.
+        """
+        params = self.model_config
+        if ParamsClass is None: ParamsClass = self.params_class
+        # Foundation models may have no hyperparameters configured
+        if not params: return [{}]
+
+        def _is_valid_combination(combination: dict) -> bool:
+            return True
+
+        values_lists = [params[k] for k in params.keys()]
+        grid: list[dict] = []
+        param_keys = list(params.keys())  # Explicitly capture the parameter keys in order
+        for values_tuple in product(*values_lists):
+            combo = dict(zip(param_keys, values_tuple))
+            combo = ParamsClass(**combo).model_dump()
+            if _is_valid_combination(combo):
+                grid.append(combo)
+
+        return grid
