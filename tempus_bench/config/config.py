@@ -12,9 +12,11 @@ from pathlib import Path
 from typing import Dict, Any, List
 from pydantic import ValidationError
 
-from .models import BenchmarkConfig, TaskConfig, ModelSettingsConfig, SystemsConfig, UnifiedConfig
-from tempus_bench.utils.paths import get_models_dir, get_task_path, get_tasks_dir, get_configs_dir
 from tempus_bench.utils.logger import get_logger
+from tempus_bench.utils.tf_logger import get_tf_logger
+
+from .models import BenchmarkConfig, JobConfig, TaskConfig, ModelSettingsConfig, BenchmarkSettingsConfig
+from tempus_bench.utils.paths import get_models_dir, get_task_path, get_tasks_dir, get_configs_dir
 
 # Global config manager instance
 _global_config_manager = None
@@ -36,7 +38,6 @@ class ConfigManager:
 
     Attributes:
         config_path (str): Path to the main benchmark configuration YAML file
-        logger: Logger instance for configuration validation messages
         benchmark_config (BenchmarkConfig): Validated main benchmark configuration
         benchmark_settings (SystemsConfig): System settings from config/settings.yaml
         model_settings (Dict[str, ModelSettingsConfig]): Model execution settings (Python version, device, conda env)
@@ -50,12 +51,11 @@ class ConfigManager:
         Initialize the configuration manager.
 
         This method performs initialization in the following order:
-        1. Initializes logger (uses global logger instance)
-        2. Validates the main benchmark configuration (benchmark_config)
-        3. Validates system settings (benchmark_settings)
-        4. Validates model settings (only for models defined in benchmark_config)
-        5. Finds task directories based on task_path pattern
-        6. Validates task configurations for found task directories
+        1. Validates the main benchmark configuration (benchmark_config)
+        2. Validates system settings (benchmark_settings)
+        3. Validates model settings (only for models defined in benchmark_config)
+        4. Finds task directories based on task_path pattern
+        5. Validates task configurations for found task directories
 
         Args:
             config_path: Path to the main benchmark configuration YAML file
@@ -65,20 +65,30 @@ class ConfigManager:
             - self.config_path: Configuration file path
             - self.benchmark_config: Main benchmark configuration with model hyperparameters
             - self.benchmark_settings: System settings (logging format, tensorboard, etc.)
-            - self.logger: Logger instance for configuration validation messages
             - self.task_paths: Task directories matching the task_path pattern from benchmark_config
             - self.model_settings: Model execution settings (Python version, device, conda env) for models in benchmark_config
             - self.task: Validated task configurations (each task can have multiple configs)
             - self.model: Model hyperparameters extracted from benchmark_config
         """
-        # Setup paths
+        # Setup paths and settings
         self.config_path = config_path
-        self.logger = get_logger(logs_path)
-        self.benchmark_config = self.validate_benchmark_config()
+        self.logs_path = logs_path
         self.benchmark_settings = self.validate_benchmark_settings()
+        self._setup_logging()
+
+        self.benchmark_config = self.validate_benchmark_config()
         self.model_settings = self.validate_model_settings()
         self.task_paths = self._find_task_directories()
         self.task_configs = self.validate_task_configs()
+
+    def _setup_logging(self):
+        self.logger = get_logger(
+            logs_path=self.logs_path,
+            console_logging=self.benchmark_settings.console_logging,
+            file_logging=self.benchmark_settings.file_logging,
+            console_log_level=self.benchmark_settings.console_log_level,
+            file_log_level=self.benchmark_settings.file_log_level
+        )
 
     def validate_benchmark_config(self) -> BenchmarkConfig:
         """
@@ -98,23 +108,21 @@ class ConfigManager:
             config = self._load_config(self.config_path)
             config = BenchmarkConfig(**config)
             self._validate_model_availability(config)
-            self.logger.info("ConfigValidator", "Configuration validation passed")
             return config
 
         except ValidationError as e:
             error_msg = self._convert_pydantic_errors(e)
-            self.logger.error("ConfigValidator", f"Configuration validation failed: {error_msg}")
             raise ConfigValidationError(error_msg)
 
-    def validate_benchmark_settings(self) -> SystemsConfig:
+    def validate_benchmark_settings(self) -> BenchmarkSettingsConfig:
         """
         Validate the benchmark settings.yaml file.
 
         This method loads and validates the system settings configuration file located at
-        config/settings.yaml against the SystemsConfig schema.
+        config/settings.yaml against the BenchmarkSettingsConfig schema.
 
         Returns:
-            SystemsConfig: Validated system settings instance
+            BenchmarkSettingsConfig: Validated system settings instance
 
         Raises:
             FileNotFoundError: If settings.yaml doesn't exist
@@ -130,14 +138,12 @@ class ConfigManager:
             with open(benchmark_settings_dir, 'r') as f:
                 benchmark_settings_data = yaml.safe_load(f)
 
-            # Validate using SystemsConfig
-            benchmark_settings = SystemsConfig(**benchmark_settings_data)
-            self.logger.debug("ConfigValidator", f"Systems config validated: {benchmark_settings_dir}")
+            # Validate using BenchmarkSettingsConfig
+            benchmark_settings = BenchmarkSettingsConfig(**benchmark_settings_data)
             return benchmark_settings
 
         except ValidationError as e:
             error_msg = self._convert_pydantic_errors(e)
-            self.logger.error("ConfigValidator", f"Systems config validation failed: {error_msg}")
             raise ConfigValidationError(f"Invalid systems config at {benchmark_settings_dir}: {error_msg}")
         except Exception as e:
             raise ConfigValidationError(f"Invalid systems config at {benchmark_settings_dir}: {e}")
@@ -159,13 +165,14 @@ class ConfigManager:
                 or a model settings file is invalid
         """
         models_dir = get_models_dir()
+        model_config = self.benchmark_config.model.model_dump()
         validated_settings = {}
         # Find all model settings.yaml files recursively in models_dir and use their parent folders as model names
         settings_files = list(models_dir.glob("**/settings.yaml"))
         for model_settings_path in settings_files:
-            model_folder = model_settings_path.parent
-            model_name = model_folder.name
-            if model_name not in self.benchmark_config.model: continue
+            model_path = model_settings_path.parent
+            model_name = model_path.name
+            if model_config[model_name] is None: continue
 
             try:
                 with open(model_settings_path, 'r') as f:
@@ -174,7 +181,7 @@ class ConfigManager:
                 # Validate using ModelSettingsConfig
                 model_settings = ModelSettingsConfig(**model_settings_data)
                 validated_settings[model_name] = model_settings.model_dump()
-                self.logger.debug("ConfigValidator", f"Model settings validated: {model_settings_path}")
+                validated_settings[model_name].update(model_path=str(model_path))
 
             except Exception as e:
                 error_msg = self._convert_pydantic_errors(e) if isinstance(e, ValidationError) else str(e)
@@ -268,8 +275,7 @@ class ConfigManager:
                 if not task_configs:
                     raise ConfigValidationError(f"No valid task configurations found in {task_config_path}")
 
-                validated_configs[task_name] = task_configs
-                self.logger.debug("ConfigValidator", f"Task config validated: {task_config_path} ({len(task_configs)} config(s))")
+                validated_configs[str(task_path)] = task_configs
 
             except Exception as e:
                 error_msg = self._convert_pydantic_errors(e) if isinstance(e, ValidationError) else str(e)
@@ -277,7 +283,7 @@ class ConfigManager:
 
         return validated_configs
 
-    def generate_configs(self):
+    def generate_run_configs(self):
         """
         Generate unified configurations for each task-model combination.
 
@@ -295,23 +301,21 @@ class ConfigManager:
             UnifiedConfig: Unified configuration combining benchmark config, settings,
                 model settings, and task configs for a single task-model combination
         """
-        for task_name, task_configs in self.task.items():
-            for task_config in task_configs:
+        for task_name, task_configs in self.task_configs.items():
+            for task_idx, task_config in enumerate(task_configs):
                 # Build the updated task_path for this task
                 task_path = get_task_path(task_name)
                 for model_name, model_params in self.model.items():
                     # Build a new BenchmarkConfig for this (task, model)
                     benchmark_dict = self.benchmark_config.model_dump()
-                    benchmark_dict["task_path"] = task_path
+                    benchmark_dict["task_path"] = str(task_path)
                     benchmark_dict["model"] = {model_name: model_params}
-                    benchmark_dict["evaluation"]["metrics"] = self.benchmark_config.evaluation.metrics
-                    benchmark = BenchmarkConfig(**benchmark_dict)
-                    yield UnifiedConfig(
-                        benchmark=benchmark,
-                        settings=self.benchmark_settings,
+                    yield JobConfig(
+                        benchmark_config=BenchmarkConfig(**benchmark_dict),
+                        benchmark_settings=self.benchmark_settings,
                         model_settings={model_name: self.model_settings[model_name]},
-                        task_configs={task_name: [task_config]}
-                    )
+                        task_config=task_config
+                    ), task_idx
 
     def _validate_model_availability(self, config: BenchmarkConfig) -> None:
         """
@@ -454,3 +458,19 @@ class ConfigManager:
             field_path = " -> ".join(str(loc) for loc in error['loc'])
             error_messages.append(f"{field_path}: {error['msg']}")
         return "; ".join(error_messages)
+
+class ConfigAdapterMixin:
+    def __init__(self, config: JobConfig):
+        self.job_config = config
+        self.config = config.benchmark_config
+        self.benchmark_settings = config.benchmark_settings
+        self.model_settings = config.model_settings
+        self.task_config = config.task_config
+        self.eval_config = self.config.evaluation
+        self.model_name, self.model_config = next(iter(self.config.model.model_dump(exclude_none=True).items()))
+        self.tuning_loss = self.eval_config.tuning_loss
+        self._setup_logging()
+
+    def _setup_logging(self):
+        self.logger = get_logger()
+        self.tf_logger = get_tf_logger()

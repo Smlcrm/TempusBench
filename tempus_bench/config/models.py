@@ -5,7 +5,8 @@ This module defines all configuration models using Pydantic for comprehensive
 validation, type checking, and documentation of the benchmarking pipeline.
 """
 
-from typing import Dict, List, Optional, Any, Literal
+from pathlib import Path
+from typing import Dict, List, Optional, Any, Literal, Union
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 from tempus_bench.utils.paths import get_models_dir
@@ -21,13 +22,13 @@ class EvaluationConfig(BaseModel):
                     "Only deterministic (point) metrics are allowed: mae, mase, mape, rmse."
     )
     max_windows: int = Field(
-        ...,
+        default=10,
         ge=1,
         description="Maximum number of rolling windows to generate for evaluation"
     )
-    max_num_variates: int = Field(
+    max_num_variates: Optional[int] = Field(
         default=None,
-        description="Maximum number of variates to extract from dataset for evaluation (inf for all)"
+        description="Maximum number of variates to extract from dataset for evaluation (use None for all variates)"
     )
     num_samples: int = Field(
         default=100,
@@ -48,8 +49,7 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def validate_max_num_variates(cls, v):
         """Validate max_num_variates is either inf or a positive number."""
-        if v == float('inf'):
-            return v
+        if v == None: return v
         if isinstance(v, (int, float)) and v < 1:
             raise ValueError("max_num_variates must be at least 1 or inf")
         return v
@@ -58,11 +58,10 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def validate_tuning_loss(cls, v):
         """Validate that tuning_loss is a deterministic metric."""
-        allowed_metrics = {"mae", "mse", "rmse", "smape", "mape", "mdape", "medae", "r2"}
+        allowed_metrics = {"mae", "mase", "mape", "rmse"}
         if v is not None and v not in allowed_metrics:
             raise ValueError(f"tuning_loss must be one of: {', '.join(sorted(allowed_metrics))}")
         return v
-
 
 class ModelConfig(BaseModel):
     """Model configuration model."""
@@ -99,7 +98,7 @@ class ModelConfig(BaseModel):
     def validate_model_parameters(cls, v, info):
         # For foundation models, parameters should be simple key-value pairs
         foundation_models = {
-            'chronos', 'deepar', 'tiny_time_mixer', 'moirai', 'moirai_moe',
+            'chronos', 'tiny_time_mixer', 'moirai', 'moirai_moe',
             'moment', 'timesfm', 'lagllama', 'toto', 'tabpfn'
         }
 
@@ -134,10 +133,10 @@ class ModelConfig(BaseModel):
     @model_validator(mode='after')
     def validate_tuning_loss_usage(self):
         """
-        Ensure that 'tuning_loss' is only defined for models that actually use it
-        for training/optimization, not for inference or evaluation.
+        Ensure that 'tuning_loss' is properly defined for models that require it
+        for training/optimization, and not defined for models that don't use it.
         """
-        # Only these models implement training procedures depending on tuning_loss
+        # Only these specific models implement training procedures depending on tuning_loss
         tuning_loss_training_models = {'arima', 'lstm', 'deepar', 'svr'}
 
         for model_name, model_config in self.model_dump().items():
@@ -150,6 +149,13 @@ class ModelConfig(BaseModel):
                         f"loss-based training with a selectable loss (ARIMA, LSTM, DeepAR, SVR) "
                         f"may define 'tuning_loss'."
                     )
+            else:
+                # Check if this specific model requires tuning_loss but doesn't have it defined
+                if model_name in tuning_loss_training_models:
+                    raise ValueError(
+                        f"Model '{model_name}' requires 'tuning_loss' parameter for training "
+                        f"but it is not defined. Please add 'tuning_loss' to the model configuration."
+                    )
         return self
 
 class BenchmarkConfig(BaseModel):
@@ -160,47 +166,6 @@ class BenchmarkConfig(BaseModel):
     task_path: str = Field(..., description="Task path pattern (supports wildcards like '*', 'univariate/*', etc.)")
     evaluation: EvaluationConfig = Field(..., description="Evaluation configuration")
     model: ModelConfig = Field(..., description="Model configuration")
-
-    @model_validator(mode='after')
-    def validate_tuning_loss_model_compatibility(self):
-        """
-        Validate that tuning losses are compatible with the models being run.
-
-        Rules:
-        1. If only deterministic_tuning_loss is defined, it must work with deterministic models
-        2. If only stochastic_tuning_loss is defined, it must work with stochastic models
-        3. If stochastic_tuning_loss is defined and only deterministic models are in the config,
-            then deterministic_tuning_loss must also be defined
-        """
-        # Get models directory
-        models_dir = get_models_dir()
-
-        # Categorize models based on their folder location
-        deterministic_models = set()
-
-        # Scan deterministic directory
-        deterministic_dir = models_dir / 'deterministic'
-        if deterministic_dir.exists():
-            for model_folder in deterministic_dir.iterdir():
-                if model_folder.is_dir():
-                    # Check if model file exists
-                    model_file = model_folder / f"{model_folder.name}_model.py"
-                    if model_file.exists():
-                        deterministic_models.add(model_folder.name)
-
-        # Get models defined in the config (non-None models)
-        defined_models = [name for name, config in self.model.model_dump().items() if config is not None]
-
-        # Categorize defined models
-        has_deterministic = any(model in deterministic_models for model in defined_models)
-        # Validation logic
-        if has_deterministic and self.evaluation.deterministic_tuning_loss is None:
-            raise ValueError(
-                f"Configuration requires 'deterministic_tuning_loss' (models: {defined_models}) "
-                f"but it is not specified. Please set 'deterministic_tuning_loss' when using deterministic models."
-            )
-
-        return self
 
 class DatasetConfig(BaseModel):
     """Dataset configuration model for individual task folders."""
@@ -260,55 +225,59 @@ class ModelSettingsConfig(BaseModel):
         default="cpu",
         description="Device to use for model execution"
     )
+    model_path: Optional[str] = Field(
+        default=None,
+        description="Path to the model directory"
+    )
 
 class BenchmarkSettingsConfig(BaseModel):
     """Systems configuration model."""
 
     model_config = ConfigDict(extra="forbid")
 
-    logging_format: str = Field(
-        ...,
-        description="Log message format"
-    )
     file_logging: bool = Field(
         ...,
         description="Enable file logging"
+    )
+    file_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="DEBUG",
+        description="File logging level (DEBUG, INFO, WARNING, ERROR)"
     )
     console_logging: bool = Field(
         ...,
         description="Enable console logging"
     )
+    console_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO",
+        description="Console logging level (DEBUG, INFO, WARNING, ERROR)"
+    )
     tensorboard_logging: bool = Field(
         ...,
         description="Enable TensorBoard logging"
-    )
-    runs_dir: str = Field(
-        ...,
-        description="Directory for storing run outputs"
     )
     conda_env_prefix: str = Field(
         ...,
         description="Prefix for conda environment names"
     )
 
-class UnifiedConfig(BaseModel):
+class JobConfig(BaseModel):
     """Unified configuration model for the benchmarking pipeline (single-model only)."""
 
     model_config = ConfigDict(extra="forbid")
 
     benchmark_config: BenchmarkConfig = Field(..., description="Benchmark configuration (must reference a single model)")
     benchmark_settings: BenchmarkSettingsConfig = Field(..., description="Benchmark settings")
-    model_settings: Dict[str, ModelSettingsConfig] = Field(..., description="Model execution settings (must be for a single model)")
-    task_configs: Dict[str, List[TaskConfig]] = Field(..., description="Task configurations")
+    model_settings: Dict[str, ModelSettingsConfig] = Field(..., description="Model execution settings (for a single model)")
+    task_config: TaskConfig = Field(..., description="Task configuration")
 
     @model_validator(mode="after")
     def validate_single_model_and_existence(cls, values):
-        benchmark_config = values.get('benchmark_config')
-        model_settings = values.get('model_settings')
+        benchmark_config = values.benchmark_config
+        model_settings = values.model_settings
 
         # Check that only a single model is referenced in both places
         # model_in_benchmark is an instance of ModelConfig; extract the list of models with non-None config
-        model_config = benchmark_config.model.model_dump()
+        model_config = benchmark_config.model.model_dump(exclude_none=True)
         if len(model_config) != 1:
             raise ValueError("benchmark_config must reference exactly one model")
         model_in_benchmark = list(model_config.keys())[0]
@@ -319,15 +288,14 @@ class UnifiedConfig(BaseModel):
 
         if model_in_benchmark != model_in_settings:
             raise ValueError(
-                f"Model names do not match in UnifiedConfig: model in benchmark_config is '{model_in_benchmark}', "
+                f"Model names do not match in JobConfig: model in benchmark_config is '{model_in_benchmark}', "
                 f"but in model_settings is '{model_in_settings}'"
             )
 
-        models_dir = get_models_dir()
-        model_dir = models_dir / model_in_benchmark
-        model_file = model_dir / f"{model_in_benchmark}_model.py"
-        if not (model_dir.exists() and model_dir.is_dir()):
-            raise ValueError(f"Model directory does not exist: {model_dir}")
+        model_path = Path(model_settings[model_in_benchmark].model_path)
+        model_file = model_path / f"{model_in_benchmark}_model.py"
+        if not (model_path.exists() and model_path.is_dir()):
+            raise ValueError(f"Model directory does not exist: {model_path}")
         if not model_file.exists():
             raise ValueError(f"Model file does not exist: {model_file}")
 
