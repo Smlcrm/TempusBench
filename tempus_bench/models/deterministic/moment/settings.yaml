@@ -1,2 +1,8 @@
 python_version: "3.11"
 device: "cpu"
+settings:
+  head_dropout: 0.1
+  weight_decay: 0
+  freeze_encoder: true
+  freeze_embedder: true
+  freeze_head: false
