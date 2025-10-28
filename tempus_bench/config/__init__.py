@@ -57,18 +57,18 @@ def load_config(config_path: str, logs_path: str) -> Dict[str, Any]:
     # Return backward-compatible dict structure
     config_dict = {
         # Backward compatibility - flatten main config to top level
-        "evaluation": _config_manager.main.evaluation.model_dump(),
+        "evaluation": _config_manager.benchmark_config.evaluation.model_dump(),
         "model": _config_manager.model,
 
         # System settings (flattened for backward compatibility)
         "logging": {
-            "console_logging": _config_manager.settings.console_logging,
-            "file_logging": _config_manager.settings.file_logging,
-            "tensorboard_logging": _config_manager.settings.tensorboard_logging,
+            "console_logging": _config_manager.benchmark_settings.console_logging,
+            "file_logging": _config_manager.benchmark_settings.file_logging,
+            "tensorboard_logging": _config_manager.benchmark_settings.tensorboard_logging,
         },
 
         # Additional validated configs
-        "settings": _config_manager.settings.model_dump(),
+        "settings": _config_manager.benchmark_settings.model_dump(),
         "model_settings": {name: config.model_dump() for name, config in _config_manager.model_settings.items()},
         "task_configs": {name: [task.model_dump() for task in tasks] for name, tasks in _config_manager.task.items()},
     }

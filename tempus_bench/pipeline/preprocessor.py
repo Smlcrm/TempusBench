@@ -26,8 +26,8 @@ class Preprocessor:
         """
         self.config = load_config(config_path, logs_path)
         self.config_manager = get_config_manager()
-        console_logging = self.config_manager.settings.console_logging
-        file_logging = self.config_manager.settings.file_logging
+        console_logging = self.config_manager.benchmark_settings.console_logging
+        file_logging = self.config_manager.benchmark_settings.file_logging
         self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
         evaluation_config = self.config['evaluation']
         self.max_num_variates = evaluation_config['max_num_variates']
