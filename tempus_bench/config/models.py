@@ -229,6 +229,10 @@ class ModelSettingsConfig(BaseModel):
         default=None,
         description="Path to the model directory"
     )
+    kwargs: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Model kwargs"
+    )
 
 class BenchmarkSettingsConfig(BaseModel):
     """Systems configuration model."""

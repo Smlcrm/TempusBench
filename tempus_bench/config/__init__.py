@@ -51,20 +51,6 @@ def load_config_manager(config_path: str, logs_path: str) -> "ConfigManager":
 
     return _config_manager
 
-# Backward-compatibility helpers
-def load_config(config_path: str, logs_path: str):
-    """
-    Backward-compatible alias that returns the ConfigManager singleton.
-
-    Previous versions returned a flattened dict; call sites should migrate
-    to use ConfigManager/JobConfig accessors. This shim preserves imports.
-    """
-    return load_config_manager(config_path, logs_path)
-
-def get_config_manager() -> Optional[ConfigManager]:
-    """Return the current ConfigManager singleton if initialized."""
-    return _config_manager
-
 __all__ = [
     "BenchmarkConfig",
     "TaskConfig",
