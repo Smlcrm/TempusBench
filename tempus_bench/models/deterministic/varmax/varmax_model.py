@@ -10,38 +10,34 @@ from statsmodels.tsa.statespace.varmax import VARMAX
 from statsmodels.tsa.stattools import adfuller
 from typing import Dict, Any, Union, Tuple, Optional
 import pickle
-from tempus_bench.models.base_model import BaseModel
 import warnings
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
 
 warnings.filterwarnings("ignore")
 
 
+class VarmaxParams(PydanticBaseModel):
+    p: int = Field(..., ge=0, description="Number of AR parameters")
+    q: int = Field(..., ge=0, description="Number of MA parameters")
+    trend: Literal["c", "t", "ct"] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
+
+
 class VARMAXModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize VARMAX model with given configuration.
 
         Args:
-            config: Configuration dictionary containing model parameters
-                - p: int, the number of AR parameters to use
-                - d: int, the number of MA parameters to use
-                - trend: string or iterable of ints, handles the deterministic trend
-                         polynomail  (can be one of the following: 'c' - constant trend;
-                         't' - linear trend with time; 'ct' - both 'c' and 't'; 
-                         iterable of ints - represents the coefficients of each 
-                         term of a polynomial that goes in increasing order. For example,
-                         [1, 0, 1, 1] gives us a trend polynomial of a + ct^2 + dt^3).
-                - training_loss: str, primary loss function for training
-                - forecast_horizon: int, number of steps to forecast ahead
-            config_file: Path to a JSON configuration file
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-        if "trend" not in self.model_config:
-            raise ValueError("trend must be specified in config")
-        if "p" not in self.model_config:
-            raise ValueError("p must be specified in config")
-        if "q" not in self.model_config:
-            raise ValueError("q must be specified in config")
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = VarmaxParams(**self.model_config).model_dump()
 
         self.model = None
 

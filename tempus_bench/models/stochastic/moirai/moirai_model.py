@@ -4,30 +4,36 @@ import numpy as np
 from typing import Dict, Any
 from typing import Optional, List, Union
 from einops import rearrange
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 
+class MoiraiParams(PydanticBaseModel):
+    model_name: str = Field(default="moirai", description="Model name")
+    size: Optional[str] = Field(default=None, description="Model size")
+    ctx: Optional[int] = Field(default=None, description="Context length")
+    psz: int = Field(default=16, ge=1, description="Patch size")
+    bsz: int = Field(default=32, ge=1, description="Batch size")
+    test: int = Field(default=100, ge=1, description="Test parameter")
+    num_samples: int = Field(default=100, ge=1, description="Number of samples")
+
+
 class MoiraiModel(BaseModel):
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
+        Initialize Moirai model.
+        
         Args:
-          config: Configuration dictionary containing model parameters
-          logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-
-        super().__init__(config_path, logs_path, hyperparameters)
-
-        # Set reasonable defaults for all model-specific parameters if not provided in config
-        # As in https://arxiv.org/pdf/2402.02592
-        self.model_config["model_name"] = "moirai"
-        self.model_config["size"] = self.model_config.get("size")
-        self.model_config["ctx"] = None
-        self.model_config["psz"] = 16
-        self.model_config["bsz"] = 32
-        self.model_config["test"] = 100
-        self.model_config["num_samples"] = 100
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = MoiraiParams(**self.model_config).model_dump()
 
         self.model = None
         self.is_fitted = False

@@ -5,8 +5,16 @@ import warnings
 import os
 import math
 from tabpfn import TabPFNRegressor
-from tempus_bench.models.base_model import BaseModel
 import torch
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
+
+
+class TabpfnParams(PydanticBaseModel):
+    allow_large_cpu_dataset: bool = Field(default=False, description="Allow large CPU datasets")
+    max_sequence_length: int = Field(default=1000, ge=1, description="Maximum sequence length")
+    device: str = Field(default="cpu", description="Device to use for computation")
 
 
 def make_time_features(n: int) -> pd.DataFrame:
@@ -27,21 +35,21 @@ def make_time_features(n: int) -> pd.DataFrame:
 
 class TabpfnModel(BaseModel):
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initializes a TabPFN-TS forecaster
 
         Args:
-            config: Configuration dictionary containing model parameters
-            logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-
-        # self.model_config["allow_large_cpu_dataset"]
-        # self.model_config["max_sequence_length"]
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = TabpfnParams(**self.model_config).model_dump()
 
         # Set device - default to CPU for TabPFN
-        # self.device = model_config.get("device", "cpu")
+        self.device = self.model_config.get("device", "cpu")
         self.model = None
         self.is_fitted = False
 

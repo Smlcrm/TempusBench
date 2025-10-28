@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from tempus_bench.config.models import UnifiedConfig
 import torch
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
@@ -10,6 +9,8 @@ import subprocess
 import sys
 from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 # Add the lagllama directory to the Python path for absolute imports
@@ -19,6 +20,12 @@ if lagllama_dir not in sys.path:
 
 from lag_llama.gluon.estimator import LagLlamaEstimator
 
+
+class LagllamaParams(PydanticBaseModel):
+    context_length: int = Field(default=2048, ge=1, description="Context window size")
+    num_samples: int = Field(default=10, ge=1, description="Number of probabilistic samples")
+    batch_size: int = Field(default=1, ge=1, description="Batch size")
+
 # Try to import lag_llama, install if not available
 class LagllamaModel(BaseModel):
     """
@@ -26,32 +33,29 @@ class LagllamaModel(BaseModel):
     Works seamlessly like TimesFM with automatic setup.
     """
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize Lag-Llama model with BaseModel interface.
 
         Args:
-            config: Configuration dictionary containing:
-                - checkpoint_path: str, path to checkpoint (default: "lag-llama.ckpt")
-                - context_length: int, context window size (default: 128)
-                - prediction_length: int, number of time series elements to predict (30)
-                - num_samples: int, number of probabilistic samples (default: 5)
-                - device: str, device to use (default: "auto")
-            logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-
         # Initialize base model
         super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = LagllamaParams(**self.model_config).model_dump()
 
         # Model-specific attributes
         self.set_params(
-            context_length=2048,
-            num_samples=10,
-            batch_size=1,
+            context_length=self.model_config["context_length"],
+            num_samples=self.model_config["num_samples"],
+            batch_size=self.model_config["batch_size"],
         )
 
         self.model = None
-        self.logger.info("LagllamaModel", f"🦙 Lag-Llama initialized - Context: {self.model_config['context_length']}")
+        self.logger.info("LagllamaModel.__init__", f"🦙 Lag-Llama initialized - Context: {self.model_config['context_length']}")
 
     def _create_predictor_for_horizon(self, forecast_horizon: int):
         """Create a predictor for a specific forecast horizon."""

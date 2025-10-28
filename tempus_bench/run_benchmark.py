@@ -1,13 +1,13 @@
 import os
-import sys
 import datetime
 import argparse
+
 from pathlib import Path
 
 from tempus_bench.utils.logger import get_logger
 from tempus_bench.utils.tf_logger import get_tf_logger
 from tempus_bench.utils.paths import get_project_root, get_configs_dir
-from tempus_bench.config import load_config, get_config_manager
+from tempus_bench.config import load_config_manager
 from tempus_bench.pipeline.hyperparameter_tuning import HyperparameterTuner
 
 class BenchmarkRunner:
@@ -23,14 +23,10 @@ class BenchmarkRunner:
     def _initialize_run(self):
         """Initialize and update all path-related attributes."""
         self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-
-        self.config = load_config(self.config_path, self.logs_path)
-        self.config_manager = get_config_manager()
-
-        # Update runs_path from validated settings
-        self.runs_path = Path(self.config_manager.benchmark_settings.runs_dir)
+        self.runs_path = get_project_root() / 'runs'
         self.run_path = self.runs_path / f"run_{self.config_name}_{self.run_timestamp}"
         self.logs_path = self.run_path / 'logs'
+        self.config_manager = load_config_manager(self.config_path, str(self.logs_path))
         self._setup_logging()
 
     def run(self):
@@ -38,26 +34,25 @@ class BenchmarkRunner:
         self._initialize_run()
         self.logger.info("BenchmarkRunner", f"Run starts - {self.run_timestamp}")
         self.logger.info("BenchmarkRunner", f"Results stored at: {self.run_path}")
-        self.logger.info("BenchmarkRunner", "Extracting Configs")
 
-        # Each task produces a separate config
-        for config in self.config_manager.generate_configs():
+        # We execute multiple jobs per run, each with a different configuration (JobConfig).
+        for job_idx, (job_config, task_idx) in enumerate(self.config_manager.generate_run_configs()):
+            task_config = job_config.task_config
+            task_name = job_config.task_config.name
+
             # Hyper-parameter Tuning
-            self.logger.info("BenchmarkRunner", f"Hyperparameter Tuning Starts for task: {task_name} (config idx={idx+1}/{len(task_configs)})")
-            hyperparameter_tuner = HyperparameterTuner(
-                config=config,
-                logs_path=self.logs_path
-            )
+            self.logger.info("BenchmarkRunner", f"Hyperparameter Tuning Starts for job: {job_idx}, task: {task_name}, task config idx: {task_idx}")
+            hyperparameter_tuner = HyperparameterTuner(config=job_config, logs_path=self.logs_path)
 
             # Hyperparameter Tuning - Context + Train + Validate Losses (Rolling Window with strides of validate_steps)
             evals, hyperparameters = hyperparameter_tuner.optimize_hyperparameters(
-                context_steps=config['task']['context_window'],
-                train_steps=config['task']['forecast_horizon'],
-                validate_steps=config['task']['forecast_horizon']
-            ) # For all models in config
+                context_steps=task_config.context_window,
+                train_steps=task_config.forecast_horizon,
+                validate_steps=task_config.forecast_horizon
+            )
 
-            self.logger.success("BenchmarkRunner", f"Hyperparameters Optimized for task: {task_name}")
-            self.logger.success("BenchmarkRunner", f"Final Model Evaluation Executed for task: {task_name}")
+            self.logger.success("BenchmarkRunner", f"Hyperparameters Optimized for task: {job_config.task_config.name}")
+            self.logger.success("BenchmarkRunner", f"Final Model Evaluation Executed for task: {job_config.task_config.name}")
 
         self.cleanup()
 
@@ -72,14 +67,16 @@ class BenchmarkRunner:
 
     def _setup_logging(self):
         """Setup logging for benchmark runner execution."""
-        console_logging = self.config_manager.benchmark_settings.console_logging
-        file_logging = self.config_manager.benchmark_settings.file_logging
+        self.logger = get_logger(
+            logs_path=str(self.logs_path),
+            console_logging=self.config_manager.benchmark_settings.console_logging,
+            file_logging=self.config_manager.benchmark_settings.file_logging,
+            console_log_level=self.config_manager.benchmark_settings.console_log_level,
+            file_log_level=self.config_manager.benchmark_settings.file_log_level
+        )
         tensorboard_logging = self.config_manager.benchmark_settings.tensorboard_logging
-
-        # Setup Python logger for orchestration - always instantiate
-        self.logger = get_logger(self.logs_path, console_logging=console_logging, file_logging=file_logging)
-        if file_logging:
-            self.logger.info("BenchmarkRunner", f"Python logs saved at: {self.logs_path}")
+        self.logger.info("BenchmarkRunner", f"Python logs saved at: {self.logs_path}")
+        self.logger.debug("BenchmarkRunner", "Debug logging is working!")
 
         # Setup TensorBoard logger - always instantiate
         try:
@@ -87,12 +84,8 @@ class BenchmarkRunner:
             self.tf_logger = get_tf_logger(self.tensorboard_dir, tensorboard_logging=tensorboard_logging)
             if tensorboard_logging:
                 self.logger.info("BenchmarkRunner", f"TensorBoard logging enabled at: {self.tensorboard_dir}")
-        except ImportError:
-            self.logger.warning("BenchmarkRunner", "TensorBoard not available, benchmark logging disabled")
-            self.tf_logger = None
         except Exception as e:
-            self.logger.warning("BenchmarkRunner", f"Failed to setup benchmark TensorBoard logging: {e}")
-            self.tf_logger = None
+            raise RuntimeError(f"Failed to setup benchmark TensorBoard logging: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
