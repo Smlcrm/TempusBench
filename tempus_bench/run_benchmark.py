@@ -37,14 +37,14 @@ class BenchmarkRunner:
 
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
         for job_idx, (job_config, task_idx) in enumerate(self.config_manager.generate_run_configs()):
-            task_config = job_config.task_config
-            task_name = job_config.task_config.name
+            hyperparameter_tuner = HyperparameterTuner(config=job_config)
 
             # Hyper-parameter Tuning
+            task_name = job_config.task_config.name
             self.logger.info("BenchmarkRunner", f"Hyperparameter Tuning Starts for job: {job_idx}, task: {task_name}, task config idx: {task_idx}")
-            hyperparameter_tuner = HyperparameterTuner(config=job_config, logs_path=self.logs_path)
 
             # Hyperparameter Tuning - Context + Train + Validate Losses (Rolling Window with strides of validate_steps)
+            task_config = job_config.task_config
             evals, hyperparameters = hyperparameter_tuner.optimize_hyperparameters(
                 context_steps=task_config.context_window,
                 train_steps=task_config.forecast_horizon,

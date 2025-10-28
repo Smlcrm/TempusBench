@@ -51,7 +51,7 @@ class DataLoader(ConfigAdapterMixin):
         Targets are inferred from data structure and kept as raw arrays without
         artificial column naming for maximum flexibility.
     """
-    def __init__(self, config: JobConfig):
+    def __init__(self, job_config: JobConfig):
         """
         Initialize DataLoader with configuration and directory paths.
 
@@ -68,7 +68,7 @@ class DataLoader(ConfigAdapterMixin):
             - evaluation.max_windows: Maximum number of windows to generate
             - Other preprocessing and model parameters
         """
-        self.preprocessor = Preprocessor(config)
+        self.preprocessor = Preprocessor(job_config)
 
     def _load_dataset(self, dataset_path: str) -> tuple:
         """

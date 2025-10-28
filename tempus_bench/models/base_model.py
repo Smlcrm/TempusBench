@@ -12,20 +12,17 @@ the required abstract methods.
 import numpy as np
 import pandas as pd
 
-from itertools import product
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Type, Union, Optional
+from typing import Dict, Any, Union, Optional
 from pydantic import BaseModel as PydanticBaseModel
 
 from tempus_bench.config.models import JobConfig
 from tempus_bench.metrics.evaluation import Evaluator
 from tempus_bench.config.config import ConfigAdapterMixin
 from tempus_bench.config.models import JobConfig
+from tempus_bench.utils.logger import get_logger
 
-class BaseModelParams(PydanticBaseModel):
-    pass
-
-class BaseModel(ABC, ConfigAdapterMixin):
+class BaseModel(ABC):
     """
     Abstract base class for traditional time series forecasting models.
 
@@ -41,7 +38,7 @@ class BaseModel(ABC, ConfigAdapterMixin):
         evaluator: Evaluator instance for computing metrics
     """
 
-    def __init__(self, config: JobConfig, logs_path: str, ParamsClass: PydanticBaseModel):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any], ParamsClass: PydanticBaseModel):
         """
         Initialize the base model.
 
@@ -50,17 +47,18 @@ class BaseModel(ABC, ConfigAdapterMixin):
             logs_path: Directory for storing log files (required)
             hyperparameters: Model-specific hyperparameters to inject into config
         """
-
-        super().__init__(config, logs_path)
+        super().__init__()
+        self.logger = get_logger()
+        # Setup parameters
         self.params_class = ParamsClass
-        self.hyperparameter_grid = self.get_hyperparameter_grid(self.params_class)
-        self._setup_logging()
+        self.model_name = self.model_class_name.replace('Model', '').lower()
+        self.evaluator = Evaluator()
+        self.set_params(params)
+        # Setup settings
+        self.settings = settings.settings
+        for key, value in settings.items():
+            if key != "settings": setattr(self, key, value)
 
-        self.model_class_name = self.__class__.__name__
-        if self.model_name != self.model_class_name.replace('Model', '').lower():
-            raise ValueError(f"Model Class {self.model_class_name} is not compatible with the model name in the config: {self.model_name}")
-        self.evaluator = Evaluator(config, logs_path)
-        self.is_fitted = False
 
     @abstractmethod
     def train(
@@ -69,7 +67,7 @@ class BaseModel(ABC, ConfigAdapterMixin):
         y_target: Optional[np.ndarray] = None,
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
+        **kwargs: dict
     ) -> "BaseModel":
         """
         Train the model on given data.
@@ -90,7 +88,7 @@ class BaseModel(ABC, ConfigAdapterMixin):
         y_context: Optional[np.ndarray] = None,
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
+        **kwargs: dict
     ) -> np.ndarray:
         """
         Make predictions using the trained model.
@@ -156,7 +154,7 @@ class BaseModel(ABC, ConfigAdapterMixin):
         Returns:
             Dict[str, Any]: Dictionary of model parameters
         """
-        return self.model_config
+        return self.params
 
     def set_params(self, **params: Dict[str, Any]) -> "BaseModel":
         """
@@ -168,7 +166,7 @@ class BaseModel(ABC, ConfigAdapterMixin):
         Returns:
             self: The model instance with updated parameters
         """
-        self.model_config.update(params)
+        self.params = self.params_class(**params)
         self.is_fitted = False  # Mark as unfitted if parameters change
 
         return self
@@ -185,29 +183,3 @@ class BaseModel(ABC, ConfigAdapterMixin):
             "is_fitted": self.is_fitted,
             "parameters": self.get_params(),
         }
-
-    def get_hyperparameter_grid(self, ParamsClass: PydanticBaseModel = None) -> list[dict]:
-        """
-        Generate a hyperparameter grid using Cartesian product of lists in self.model_config.
-
-        This method uses the already initialized model_config (dict of parameter name: list of values)
-        to build all combinations of hyperparameters.
-        """
-        params = self.model_config
-        if ParamsClass is None: ParamsClass = self.params_class
-        # Foundation models may have no hyperparameters configured
-        if not params: return [{}]
-
-        def _is_valid_combination(combination: dict) -> bool:
-            return True
-
-        values_lists = [params[k] for k in params.keys()]
-        grid: list[dict] = []
-        param_keys = list(params.keys())  # Explicitly capture the parameter keys in order
-        for values_tuple in product(*values_lists):
-            combo = dict(zip(param_keys, values_tuple))
-            combo = ParamsClass(**combo).model_dump()
-            if _is_valid_combination(combo):
-                grid.append(combo)
-
-        return grid
