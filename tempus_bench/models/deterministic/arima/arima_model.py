@@ -9,6 +9,7 @@ The model supports both seasonal and non-seasonal ARIMA variants and can handle
 exogenous variables for enhanced forecasting performance.
 """
 
+from typing import Any, Dict
 import numpy as np
 
 from statsmodels.tsa.arima.model import ARIMA
@@ -39,8 +40,8 @@ class ArimaModel(BaseModel):
     The trained model is stored as a statsmodels ARIMA result object in self._model.
     """
 
-    def __init__(self, params: dict):
-        super().__init__(params, ParamsClass=ArimaParams)
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        super().__init__(params, settings, ArimaParams)
 
     def _train(
         self,
@@ -182,7 +183,7 @@ class ArimaModel(BaseModel):
         num_targets = y_context.shape[1]
         self.logger.debug("ArimaModel.train", f"Number of features/variates detected: {num_targets}")
 
-        self.models = []
+        self._models = []
         for k in range(num_targets):
             self.logger.debug("ArimaModel.train", f"Training variate k={k}")
             model = ArimaModel(params=self.params.model_dump())
@@ -193,7 +194,7 @@ class ArimaModel(BaseModel):
                 timestamps_target=timestamps_target,
                 **kwargs
             )
-            self.models.append(model)
+            self._models.append(model)
         self.is_fitted = True
 
         self.logger.info("ArimaModel.train", f"Training completed for {num_targets} variates")
@@ -226,11 +227,11 @@ class ArimaModel(BaseModel):
 
         self.logger.debug(
             "ArimaModel.predict",
-            f"Multivariate prediction for {len(self.models)} variates"
+            f"Multivariate prediction for {len(self._models)} variates"
         )
 
         preds = []
-        for idx, model in enumerate(self.models):
+        for idx, model in enumerate(self._models):
             self.logger.debug("ArimaModel.predict", f"Predicting for variate {idx}")
             prediction = model._predict(
                 y_context=y_context[:, idx],

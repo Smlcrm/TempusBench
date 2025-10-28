@@ -1,20 +1,17 @@
-import pandas as pd
 import numpy as np
-from typing import List, Tuple, Dict, Any, Optional, Union
-import warnings
-import os
-import math
+import pandas as pd
+
+from typing import Dict, Any, Optional
 from tabpfn import TabPFNRegressor
-import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tempus_bench.config.models import JobConfig
+
 from tempus_bench.models.base_model import BaseModel
 
 
 class TabpfnParams(PydanticBaseModel):
-    allow_large_cpu_dataset: bool = Field(default=False, description="Allow large CPU datasets")
-    max_sequence_length: int = Field(default=1000, ge=1, description="Maximum sequence length")
-    device: str = Field(default="cpu", description="Device to use for computation")
+    allow_large_cpu_dataset: Optional[bool] = Field(default=False, description="Allow large CPU datasets")
+    max_sequence_length: Optional[int] = Field(default=1000, ge=1, description="Maximum sequence length")
+    device: Optional[str] = Field(default="cpu", description="Device to use for computation")
 
 
 def make_time_features(n: int) -> pd.DataFrame:
@@ -35,22 +32,15 @@ def make_time_features(n: int) -> pd.DataFrame:
 
 class TabpfnModel(BaseModel):
 
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
-        Initializes a TabPFN-TS forecaster
-
-        Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+        Initializes a TabPFN-TS forecaster with model-specific parameters
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self.model_config = TabpfnParams(**self.model_config).model_dump()
+        super().__init__(params, settings, TabpfnParams)
 
         # Set device - default to CPU for TabPFN
-        self.device = self.model_config.get("device", "cpu")
-        self.model = None
+        self.device = self.params.device
+        self._model = None
         self.is_fitted = False
 
     def _train(
@@ -59,7 +49,6 @@ class TabpfnModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> "TabpfnModel":
         # Zero-shot TabPFN uses context during predict; mark as fitted
@@ -72,20 +61,11 @@ class TabpfnModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
+        **kwargs: dict
     ):
         # Map legacy keys to expected ones for backward compatibility
-        context_window = (
-            int(self.model_config.get("context_window")
-                if self.model_config.get("context_window") is not None
-                else self.model_config.get("max_sequence_length"))
-        )
-        forecast_window = (
-            int(self.model_config.get("forecast_window")
-                if self.model_config.get("forecast_window") is not None
-                else self.model_config.get("prediction_length"))
-        )
+        context_window = int(kwargs.get("context_window", self.params.max_sequence_length))
+        forecast_window = int(kwargs.get("forecast_window", kwargs.get("prediction_length", self.params.max_sequence_length)))
 
         # Determine total horizon from target timestamps
         forecast_horizon = int(getattr(timestamps_target, "shape", [0])[0])
@@ -99,7 +79,7 @@ class TabpfnModel(BaseModel):
         # Build time features and fit TabPFN on the context window
         X_hist = make_time_features(len(y_hist)).values
         regressor = TabPFNRegressor()
-        print("Fitting TabPFN")
+        self.logger.info("TabPFNModel.predict", "Fitting TabPFN")
         regressor.fit(X_hist, y_hist)
 
         # Roll out forecasts in chunks
@@ -124,36 +104,46 @@ class TabpfnModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
+        **kwargs: dict
     ) -> "TabpfnModel":
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        max_sequence_length = self.params.max_sequence_length
+        
         if y_context.ndim > 1 and y_context.shape[1] > 1:
-            self.models = []
+            self._models = []
             num_targets = y_context.shape[1]
             for k in range(num_targets):
-                m = TabpfnModel(self.config_path, logs_path=self.logs_path, hyperparameters=self.model_config)
+                m = TabpfnModel(params=self.params.dict(), settings=self.settings)
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
-                m._train(y_context=yc, y_target=yt, timestamps_context=timestamps_context, timestamps_target=timestamps_target, freq=freq, **kwargs)
-                self.models.append(m)
+                m._train(y_context=yc, y_target=yt, timestamps_context=timestamps_context, timestamps_target=timestamps_target, **kwargs)
+                self._models.append(m)
             self.is_fitted = True
             return self
-        return self._train(y_context, y_target, timestamps_context, timestamps_target, freq, **kwargs)
+        return self._train(y_context, y_target, timestamps_context, timestamps_target, **kwargs)
 
     def predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
-        **kwargs,
+        **kwargs: dict
     ):
-        if hasattr(self, "models") and self.models:
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        max_sequence_length = self.params.max_sequence_length
+        
+        if hasattr(self, "models") and self._models:
             preds = []
-            for k, m in enumerate(self.models):
+            for k, m in enumerate(self._models):
                 yc = y_context[k, :] if y_context is not None and y_context.ndim > 1 else y_context
                 pk = m._predict(y_context=yc, timestamps_context=timestamps_context,
-                                timestamps_target=timestamps_target, freq=freq, **kwargs)
+                                timestamps_target=timestamps_target, **kwargs)
                 preds.append(pk.reshape(-1, 1) if pk.ndim == 1 else pk)
             return np.concatenate(preds, axis=1)
-        return self._predict(y_context, timestamps_context, timestamps_target, freq, **kwargs)
+        return self._predict(y_context, timestamps_context, timestamps_target, **kwargs)
