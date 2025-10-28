@@ -9,32 +9,42 @@ import numpy as np
 import pandas as pd
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
-from tempus_bench.models.base_model import BaseModel
 from sklearn.multioutput import MultiOutputRegressor
 import matplotlib.pyplot as plt
 import io
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
+
+
+class SvrParams(PydanticBaseModel):
+    kernel: Literal["linear", "poly", "rbf", "sigmoid"] = Field(default="rbf", description="SVR kernel type")
+    C: float = Field(default=1.0, gt=0, description="Regularization parameter")
+    epsilon: float = Field(default=0.1, ge=0, description="Epsilon parameter for epsilon-SVR")
+    gamma: Literal["scale", "auto"] = Field(default="scale", description="Kernel coefficient for 'rbf', 'poly' and 'sigmoid'")
+    lookback_window: int = Field(..., ge=1, description="Number of past time steps to use as features")
 
 
 class SVRModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize Support Vector Regression (SVR) model with a given configuration.
         Uses direct multi-output strategy via sklearn's MultiOutputRegressor.
 
         Args:
-            config: Configuration dictionary
-            config_file: Path to configuration file
-            logger: Logger instance for TensorBoard logging
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = SvrParams(**self.model_config).model_dump()
 
         self.scaler = StandardScaler()  # SVR is sensitive to feature scaling
-
-        if "lookback_window" not in self.model_config:
-            self.model_config["lookback_window"] = 10
         
         # Add forecast_horizon from task config
-        self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
+        self.model_config["forecast_horizon"] = self.task_config["forecast_horizon"]
 
         # Extract SVR-specific parameters for the underlying SVR model
         svr_params = {}

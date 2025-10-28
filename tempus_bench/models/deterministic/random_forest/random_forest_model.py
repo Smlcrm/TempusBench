@@ -9,27 +9,40 @@ from typing import Dict, Any, Union, Tuple, List, Optional
 import json
 import os
 import pickle
-from tempus_bench.models.base_model import BaseModel
 from sklearn.ensemble import RandomForestRegressor
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
 from tempus_bench.utils.logger import get_logger
 
 
+class RandomForestParams(PydanticBaseModel):
+    n_estimators: int = Field(default=100, ge=1, description="Number of trees in the forest")
+    max_depth: int = Field(default=None, ge=1, description="Maximum depth of trees")
+    min_samples_split: int = Field(default=2, ge=2, description="Minimum samples to split a node")
+    min_samples_leaf: int = Field(default=1, ge=1, description="Minimum samples in a leaf")
+    max_features: Literal["sqrt", "log2", "auto"] = Field(default="sqrt", description="Number of features to consider for splits")
+    random_state: int = Field(default=42, description="Random state for reproducibility")
+    lookback_window: int = Field(..., ge=1, description="Number of past time steps to use as features")
+
+
 class RandomForestModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize Random Forest model with given configuration.
 
         Args:
-            config: Configuration dictionary for RandomForestRegressor parameters.
-                    e.g., {'n_estimators': 100, 'max_depth': 10, 'random_state': 42, 'lookback_window': 10}
+            config: JobConfig instance containing model and task configuration
             logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-        if "lookback_window" not in self.model_config:
-            raise ValueError("lookback_window must be specified in config")
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = RandomForestParams(**self.model_config).model_dump()
         
         # Add forecast_horizon to model_config
-        self.model_config["forecast_horizon"] = config["task"]["forecast_horizon"]
+        self.model_config["forecast_horizon"] = self.task_config["forecast_horizon"]
         
         # Store scaler for inverse transformation
         self.scaler = None
@@ -41,7 +54,7 @@ class RandomForestModel(BaseModel):
         Build the RandomForestRegressor model instance from the configuration.
         """
 
-        self.logger.debug("RandomForestModel", "building model")
+        self.logger.debug("RandomForestModel._build_model", "building model")
         # Get hyperparameters from config, excluding model-level parameters
         model_params = {}
         for key, value in self.model_config.items():
@@ -246,13 +259,13 @@ class RandomForestModel(BaseModel):
         )
         full_timestamps = np.squeeze(full_timestamps)
 
-        self.logger.debug("RandomForestModel", "Creating features")
+        self.logger.debug("RandomForestModel._train", "Creating features")
         # Create features and targets (no exogenous variables)
         X, y = self._create_features(full_y_data, full_timestamps)
-        self.logger.info("RandomForestModel", "Started training random forest")
+        self.logger.info("RandomForestModel._train", "Started training random forest")
         # y is shape (n_samples, forecast_horizon)
         self.model.fit(X, y)
-        self.logger.info("RandomForestModel", "Ended training random forest")
+        self.logger.info("RandomForestModel._train", "Ended training random forest")
         self.is_fitted = True
         return self
 
@@ -328,7 +341,7 @@ class RandomForestModel(BaseModel):
 
         X_last = feature_row[-1:].reshape(1, -1)
 
-        self.logger.debug("RandomForestModel", f"X_last shape: {X_last.shape}")
+        self.logger.debug("RandomForestModel._predict", f"X_last shape: {X_last.shape}")
 
         # Predict all steps at once
         preds = self.model.predict(X_last)

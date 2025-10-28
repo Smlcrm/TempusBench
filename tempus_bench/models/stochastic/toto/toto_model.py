@@ -3,24 +3,33 @@ import torch
 import numpy as np
 import pandas as pd
 import re
-
+from typing import Optional, Union, Dict, Any
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
 from .toto.model.toto import Toto
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
-from tempus_bench.models.base_model import BaseModel
-from typing import Optional, Union, Dict, Any
+
+
+class TotoParams(PydanticBaseModel):
+    # Foundation model with minimal parameters
+    pass
 
 
 class TotoModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize TOTO model with configuration.
 
         Args:
-            config: Configuration dictionary containing model parameters
-            logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = TotoParams(**self.model_config).model_dump()
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 

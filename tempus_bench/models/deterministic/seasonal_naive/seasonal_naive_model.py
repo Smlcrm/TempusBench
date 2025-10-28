@@ -8,20 +8,28 @@ from typing import Dict, Any, Union
 import numpy as np
 import pandas as pd
 from sktime.forecasting.naive import NaiveForecaster
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
+class SeasonalNaiveParams(PydanticBaseModel):
+    sp: int = Field(..., ge=1, description="Seasonal period")
+
+
 class SeasonalNaiveModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize Seasonal Naive model with a given configuration.
 
         Args:
-            config_path: Path to the configuration YAML file
+            config: JobConfig instance containing model and task configuration
             logs_path: Directory for storing log files (required)
-            hyperparameters: Model-specific hyperparameters
         """
-        super().__init__(config_path, logs_path, hyperparameters)
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = SeasonalNaiveParams(**self.model_config).model_dump()
 
     def train(
         self,

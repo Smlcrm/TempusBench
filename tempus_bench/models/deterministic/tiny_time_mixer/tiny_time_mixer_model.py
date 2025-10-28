@@ -1,23 +1,35 @@
 import numpy as np
 import pandas as pd
+
 from typing import Dict, Any, Union, Tuple, Optional
-import pickle
-import os
+from pydantic import BaseModel as PydanticBaseModel, Field
+
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 
+class TinyTimeMixerParams(PydanticBaseModel):
+    # Foundation model with minimal parameters
+    pass
+
+
 class TinyTimeMixerModel(BaseModel):
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
+        Initialize TinyTimeMixer model.
+        
         Args:
-          prediction length: any positive integer that shows many steps to forecast
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self.model_config = TinyTimeMixerParams(**self.model_config).model_dump()
 
-        super().__init__(config_path, logs_path, hyperparameters)
-
-        # forecast_horizon is inherited from parent class (FoundationModel)
+        # forecast_horizon is inherited from parent class (BaseModel)
         self.model = None
 
     def convert_to_datetimeindex(self, timestamps):

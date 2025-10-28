@@ -12,10 +12,26 @@ from pytorch_forecasting import DeepAR, TimeSeriesDataSet
 from typing import Dict, Any, Union, Tuple, Optional, List
 import pickle
 import os
-from tempus_bench.models.base_model import BaseModel
-from pytorch_lightning.loggers import TensorBoardLogger
 import time
 import math
+from pytorch_lightning.loggers import TensorBoardLogger
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
+from tempus_bench.models.base_model import BaseModel
+
+
+class DeeparParams(PydanticBaseModel):
+    hidden_size: int = Field(default=32, ge=1, description="Hidden size of RNN")
+    rnn_layers: int = Field(default=2, ge=1, description="Number of RNN layers")
+    dropout: float = Field(default=0.1, ge=0, le=1, description="Dropout rate")
+    learning_rate: float = Field(default=0.001, gt=0, description="Learning rate")
+    batch_size: int = Field(default=64, ge=1, description="Batch size")
+    max_encoder_length: int = Field(default=24, ge=1, description="Maximum encoder length")
+    max_prediction_length: int = Field(default=6, ge=1, description="Maximum prediction length")
+    epochs: int = Field(default=10, ge=1, description="Number of training epochs")
+    gradient_clip_val: float = Field(default=0.01, gt=0, description="Gradient clipping value")
+    optimizer: Literal["adam", "adamw", "sgd"] = Field(default="adam", description="Optimizer to use")
 
 # Using this link to assist in building this model file implementation:
 # https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/deepar.html
@@ -27,27 +43,18 @@ import math
 # If you only have one time series, you can set group to be 0.
 
 class DeepARModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize DeepAR model with given configuration.
         
         Args:
-            config_path: Path to the configuration YAML file
+            config: JobConfig instance containing model and task configuration
             logs_path: Directory for storing log files (required)
-            hyperparameters: Model-specific hyperparameters
         """
-        super().__init__(config_path, logs_path, hyperparameters)
+        super().__init__(config, logs_path)
         
-        # Extract DeepAR-specific parameters with defaults
-        self.model_config["hidden_size"] = self.model_config.get("hidden_size", 32)
-        self.model_config["rnn_layers"] = self.model_config.get("rnn_layers", 2)
-        self.model_config["dropout"] = self.model_config.get("dropout", 0.1)
-        self.model_config["learning_rate"] = self.model_config.get("learning_rate", 0.001)
-        self.model_config["batch_size"] = self.model_config.get("batch_size", 64)
-        self.model_config["max_encoder_length"] = self.model_config.get("max_encoder_length", 24)
-        self.model_config["max_prediction_length"] = self.model_config.get("max_prediction_length", 6)
-        self.model_config["epochs"] = self.model_config.get("epochs", 10)
-        self.model_config["gradient_clip_val"] = self.model_config.get("gradient_clip_val", 0.01)
+        # Validate and set model config using Pydantic
+        self.model_config = DeeparParams(**self.model_config).model_dump()
         self.model_config["num_workers"] = self.model_config.get("num_workers", 0)
         
         self.model = None

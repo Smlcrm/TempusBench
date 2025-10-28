@@ -7,25 +7,26 @@ import pandas as pd
 from typing import Dict, Any, Union
 import pickle
 import os
-
-
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
+class CrostonClassicParams(PydanticBaseModel):
+    alpha: float = Field(..., gt=0, lt=1, description="Smoothing parameter for demand level")
+    gamma: float = Field(..., gt=0, lt=1, description="Smoothing parameter for interval level")
+
+
 class CrostonClassicModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize the Croston's Classic model with a given configuration.
 
         Args:
-            config: Configuration dictionary containing model parameters.
-                - alpha: float, smoothing parameter for demand level (0 < alpha < 1)
-                - gamma: float, smoothing parameter for interval level (0 < gamma < 1)
-            config_file: Path to a JSON configuration file.
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
-
-        # Parameters, initialized to None
+        super().__init__(config, logs_path, CrostonClassicParams)
         self.demand_level_ = None
         self.interval_level_ = None
 
@@ -151,8 +152,9 @@ class CrostonClassicModel(BaseModel):
         """
         summary = {
             "model_type": "CrostonClassic",
-            "alpha": self.alpha,
-            "is_fitted": self.is_fitted,
+            "alpha": self.model_config["alpha"],
+            "gamma": self.model_config["gamma"],
+            "is_fitted": self.is_fitted
         }
 
         if self.is_fitted:

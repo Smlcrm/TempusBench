@@ -5,9 +5,15 @@ from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Optional, Union, Any
 import warnings
 from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
+from pydantic import BaseModel as PydanticBaseModel, Field
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 from momentfm import MOMENTPipeline
-from tqdm import tqdm
+
+
+class MomentParams(PydanticBaseModel):
+    pass
 
 
 class MomentDataset(Dataset):
@@ -69,15 +75,16 @@ class MomentDataset(Dataset):
 class MomentModel(BaseModel):
     """MOMENT model wrapper for time series forecasting, extending FoundationModel."""
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
-        super().__init__(config_path, logs_path, hyperparameters)
-        self.model_config["context_length"] = 512
+    def __init__(self, config: JobConfig, logs_path: str):
+        """
+        Initialize MOMENT model.
 
+        Args:
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
+        """
+        super().__init__(config, logs_path, MomentParams)
         self.scaler = StandardScaler()
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        print(f"MOMENT Model initialized - Device: {self.device}")
-        print(f"Context length: {self.model_config['context_length']}")
 
     def _load_model(self, forecast_horizon: int):
         print(f"Loading MOMENT model for forecast horizon: {forecast_horizon}")

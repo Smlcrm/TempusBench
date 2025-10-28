@@ -5,20 +5,29 @@ import numpy as np
 import pandas as pd
 from prophet import Prophet
 from prophet.serialize import model_to_json, model_from_json
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
+class ProphetParams(PydanticBaseModel):
+    seasonality_mode: Literal["additive", "multiplicative"] = Field(default="additive", description="Seasonality mode")
+    yearly_seasonality: bool = Field(default=True, description="Enable yearly seasonality")
+    weekly_seasonality: bool = Field(default=True, description="Enable weekly seasonality")
+    daily_seasonality: bool = Field(default=False, description="Enable daily seasonality")
+
+
 class ProphetModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize Prophet model with a given configuration.
 
         Args:
-            config: Configuration dictionary for Prophet parameters.
-                    e.g., {'model_params': {'seasonality_mode': 'multiplicative'}}
-            logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
+        super().__init__(config, logs_path, ProphetParams)
         self._build_model()
 
     def _build_model(self):

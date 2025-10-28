@@ -12,12 +12,18 @@ with different context lengths and sampling strategies.
 import pdb
 import pandas as pd
 import numpy as np
-
+import torch
 from typing import Dict, Any
 from chronos import ChronosPipeline as BaseChronosPipeline
-
-from tempus_bench.config.models import UnifiedConfig
+from pydantic import BaseModel as PydanticBaseModel, Field
+from typing import Literal
+from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
+
+
+class ChronosParams(PydanticBaseModel):
+    model_size: Literal["tiny", "mini", "small", "base", "large"] = Field(default="tiny", description="Size of the Chronos model")
+    context_length: int = Field(default=2048, ge=1, description="Number of past time steps for context")
 
 class ChronosModel(BaseModel):
     """
@@ -32,21 +38,18 @@ class ChronosModel(BaseModel):
         num_samples: Number of predictive samples to generate
     """
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize the Chronos model wrapper.
 
         Args:
-            config: Configuration dictionary containing model parameters
-                - model_size: str, size of the Chronos model (default: 'small')
-                - context_length: int, number of past time steps for context (default: 8)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
         super().__init__(config, logs_path)
-
-        self.set_params(
-            model_size="tiny",
-            context_length=2048 # maximum context length
-        )
+        
+        # Validate and set model config using Pydantic
+        self.model_config = ChronosParams(**self.model_config).model_dump()
 
     def train(
         self,
@@ -77,13 +80,13 @@ class ChronosModel(BaseModel):
         hf_model_name = f"amazon/chronos-t5-{self.model_config['model_size']}"
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.logger.info("ChronosModel", f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
+        self.logger.info("ChronosModel.train", f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
         self.model = BaseChronosPipeline.from_pretrained(
             hf_model_name,
             device_map="auto",
             torch_dtype=torch.bfloat16,
         )
-        self.logger.info("ChronosModel", "Chronos model loaded successfully!")
+        self.logger.info("ChronosModel.train", "Chronos model loaded successfully!")
 
         self.is_fitted = True
         return self
@@ -135,7 +138,7 @@ class ChronosModel(BaseModel):
             prediction_length=forecast_horizon,
             num_samples=self.eval_config["num_samples"]
         )
-        self.logger.debug("ChronosModel", f"Shape of Stochastic Forecasts {forecasts.shape}")
+        self.logger.debug("ChronosModel.predict", f"Shape of Stochastic Forecasts {forecasts.shape}")
         forecasts = np.asarray(forecasts)
 
         # Chronos returns shape (num_targets, num_samples, forecast_horizon)
