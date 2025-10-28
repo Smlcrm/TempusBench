@@ -5,7 +5,7 @@ This module provides Pydantic-based configuration models for all global settings
 including task configuration, model parameters, evaluation metrics, and system settings.
 """
 
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from .models import (
     BenchmarkConfig,
@@ -14,38 +14,33 @@ from .models import (
     EvaluationConfig,
     ModelConfig,
     ModelSettingsConfig,
-    SystemsConfig,
+    BenchmarkSettingsConfig,
+    JobConfig,
 )
-from .manager import ConfigManager, ConfigValidationError
+from .config import ConfigManager, ConfigValidationError
 
 # Global ConfigManager instance for singleton pattern
 _config_manager: Optional[ConfigManager] = None
 _current_config_path: Optional[str] = None
 
-def load_config(config_path: str, logs_path: str) -> Dict[str, Any]:
+def load_config_manager(config_path: str, logs_path: str) -> "ConfigManager":
     """
-    Load and validate configuration using ConfigManager singleton.
+    Load and validate benchmark configuration as a singleton.
 
-    This function ensures that configuration is validated before any execution.
-    It maintains a global ConfigManager instance to avoid redundant validation
-    of the same config file.
+    This function uses a global ConfigManager instance to ensure that configuration files
+    are parsed, validated, and cached efficiently. Only re-initializes the configuration
+    manager if `config_path` changes.
 
     Args:
-        config_path: Path to the main benchmark configuration YAML file
-        logs_path: Directory for log files
+        config_path (str): Absolute or relative path to the benchmark YAML configuration file.
+        logs_path (str): Path to the logs directory to associate with this configuration.
 
     Returns:
-        Dictionary containing validated configuration with backward-compatible structure:
-        - logging: System logging settings (from settings)
-        - evaluation: Evaluation configuration (from main.evaluation)
-        - task: Task configuration (from main.task - first task's config)
-        - model: Model hyperparameters (from main.model)
-        - settings: System settings (from settings)
-        - model_settings: Model execution settings
-        - task_configs: All task configurations
+        ConfigManager: Singleton instance with validated configs and accessors
+            for all loaded configs and helper methods.
 
     Raises:
-        ConfigValidationError: If configuration validation fails
+        ConfigValidationError: If configuration schema validation fails, or required files are missing.
     """
     global _config_manager, _current_config_path
 
@@ -54,34 +49,20 @@ def load_config(config_path: str, logs_path: str) -> Dict[str, Any]:
         _config_manager = ConfigManager(config_path, logs_path)
         _current_config_path = config_path
 
-    # Return backward-compatible dict structure
-    config_dict = {
-        # Backward compatibility - flatten main config to top level
-        "evaluation": _config_manager.benchmark_config.evaluation.model_dump(),
-        "model": _config_manager.model,
+    return _config_manager
 
-        # System settings (flattened for backward compatibility)
-        "logging": {
-            "console_logging": _config_manager.benchmark_settings.console_logging,
-            "file_logging": _config_manager.benchmark_settings.file_logging,
-            "tensorboard_logging": _config_manager.benchmark_settings.tensorboard_logging,
-        },
+# Backward-compatibility helpers
+def load_config(config_path: str, logs_path: str):
+    """
+    Backward-compatible alias that returns the ConfigManager singleton.
 
-        # Additional validated configs
-        "settings": _config_manager.benchmark_settings.model_dump(),
-        "model_settings": {name: config.model_dump() for name, config in _config_manager.model_settings.items()},
-        "task_configs": {name: [task.model_dump() for task in tasks] for name, tasks in _config_manager.task.items()},
-    }
-
-    return config_dict
+    Previous versions returned a flattened dict; call sites should migrate
+    to use ConfigManager/JobConfig accessors. This shim preserves imports.
+    """
+    return load_config_manager(config_path, logs_path)
 
 def get_config_manager() -> Optional[ConfigManager]:
-    """
-    Get the current global ConfigManager instance.
-
-    Returns:
-        The current ConfigManager instance, or None if not initialized
-    """
+    """Return the current ConfigManager singleton if initialized."""
     return _config_manager
 
 __all__ = [
@@ -91,7 +72,8 @@ __all__ = [
     "EvaluationConfig",
     "ModelConfig",
     "ModelSettingsConfig",
-    "SystemsConfig",
+    "BenchmarkSettingsConfig",
+    "JobConfig",
     "ConfigManager",
     "ConfigValidationError",
     "load_config",

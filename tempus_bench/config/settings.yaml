@@ -1,5 +1,6 @@
-runs_dir: "runs"
 file_logging: true
+file_log_level: DEBUG
 console_logging: true
+console_log_level: DEBUG
 tensorboard_logging: true
 conda_env_prefix: "benchmark"
