@@ -69,3 +69,10 @@ models/*/checkpoints/
 **/checkpoints/
 
 runs/*runs/
+
+# Credentials and secrets
+gcp_credentials.json
+*credentials*.json
+*.key
+*.pem
+*.p12
