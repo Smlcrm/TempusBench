@@ -1,6 +1,6 @@
 file_logging: true
 console_logging: true
 tensorboard_logging: true
-console_log_level: DEBUG
+console_log_level: INFO
 file_log_level: DEBUG
 conda_env_prefix: "benchmark"

@@ -23,6 +23,7 @@ class Preprocessor(ConfigAdapterMixin):
             config_path: Path to the configuration YAML file
         """
         super().__init__(config)
+        self.max_num_variates = self.config.evaluation.max_num_variates
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """

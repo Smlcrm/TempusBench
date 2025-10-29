@@ -33,23 +33,17 @@ class HyperparameterTuner(ConfigAdapterMixin):
         Generate hyperparameter grid for the single configured model by calling the
         instantiated model's get_hyperparameter_grid() API (uses self.model_config).
         """
-        if len(self.config.model) > 1:
+        model_map = self.config.model.model_dump(exclude_none=True)
+        if len(model_map) > 1:
             raise ValueError("Hyperparameter tuning is not supported for multiple models")
 
-        model_name = list(self.config.model.keys())[0]
+        model_name = list(model_map.keys())[0]
 
-        # Import the model class via router and instantiate the model
+        # Route resolves model location, but we don't need to import the class to build the grid
         router = ModelRouter()
-        task_type = self.config['task']['task_type']
-        folder_path, file_name, class_name = router.get_model_path_by_task_type(model_name, task_type)
-        #TODO - simplify - 3 lines of code
-        module_path = str(Path(folder_path) / f"{file_name}.py")
-        spec = importlib.util.spec_from_file_location(file_name, module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        model_class = getattr(module, class_name)
+        _ = router.get_model_path_by_task_type(model_name, "deterministic")
         # Build grid from config directly without constructing the model
-        params_space = self.config.model[model_name]
+        params_space = model_map[model_name]
         keys = list(params_space.keys())
         values_lists = [params_space[k] for k in keys]
         grid: list[dict] = []
@@ -74,8 +68,14 @@ class HyperparameterTuner(ConfigAdapterMixin):
         all_evals = {}
         best_hyperparameters = {}
 
-        # Initialize model executor
-        model_executor = ModelExecutor(self.job_config)
+        # Initialize model executor with minimal config
+        model_executor = ModelExecutor(
+            model_settings=self.model_settings,
+            config_path=self.job_config.benchmark_config.task_path,  # This will be passed to CLI but not used much
+            logs_path=str(Path(self.dataset_path).parent.parent.parent / "logs"),
+            task_type="univariate" if self.task_config.name.endswith("_univariate") else "multivariate",
+            enable_logging=self.benchmark_settings.console_logging
+        )
         # Generate windows for this dataset
         steps = [('context', context_steps), ('train', train_steps), ('validate', validate_steps)]
         window_generator = self.data_loader.generate_dataset_split(
@@ -108,7 +108,7 @@ class HyperparameterTuner(ConfigAdapterMixin):
                         context_steps=context_steps,
                         train_steps=train_steps,
                         validate_steps=validate_steps,
-                        dataset_path=self.dataset_path,
+                        task_path=self.dataset_path,
                         window_idx=window_idx
                     )
 
@@ -173,9 +173,10 @@ class HyperparameterTuner(ConfigAdapterMixin):
         csv_outpath = evals_dir / csv_filename
         file_exists = csv_outpath.exists()
         row = [self.model_name, self.dataset_path] + [avg_test_loss[metric] for metric in evaluation_metrics] + [str(optimal_hyperparameters)]
+        # Append a new line to evaluations.csv if it already exists
         with open(csv_outpath, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            if not file_exists:  # write header
+            if not file_exists:  # write header on the first line
                 writer.writerow(["model_name", "dataset_path"] + [f"avg_test_{metric}" for metric in evaluation_metrics] + ["best_params"])
             writer.writerow(row)
 
@@ -202,7 +203,7 @@ class HyperparameterTuner(ConfigAdapterMixin):
             import matplotlib.pyplot as plt
 
             # Create data loader to get the window data
-            data_loader = DataLoader(config=self.job_config)
+            data_loader = DataLoader(self.job_config)
 
             # Get the specific window data
             steps = [('context', context_steps), ('train', train_steps), ('validate', validate_steps)]
@@ -220,7 +221,13 @@ class HyperparameterTuner(ConfigAdapterMixin):
                 return
 
             # Create model executor to get predictions
-            model_executor = ModelExecutor(self.job_config)
+            model_executor = ModelExecutor(
+                model_settings=self.model_settings,
+                config_path=self.job_config.benchmark_config.task_path,
+                logs_path=str(Path(dataset_path).parent.parent.parent / "logs"),
+                task_type="univariate" if self.task_config.name.endswith("_univariate") else "multivariate",
+                enable_logging=False  # Don't need logging for plot generation
+            )
 
             # Execute model to get predictions
             eval_results = model_executor.execute_model(
@@ -229,7 +236,7 @@ class HyperparameterTuner(ConfigAdapterMixin):
                 context_steps=context_steps,
                 train_steps=train_steps,
                 validate_steps=validate_steps,
-                dataset_path=dataset_path,
+                task_path=dataset_path,
                 window_idx=window_idx
             )
 

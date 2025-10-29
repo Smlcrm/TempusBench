@@ -108,52 +108,6 @@ class DataLoader(ConfigAdapterMixin):
 
         return time_start, time_freq, target_raw
 
-    def _load_task_config(self, task_path: str) -> tuple[bool, str]:
-        """
-        Load task-specific configuration from task.yaml (uses first task definition).
-
-        Args:
-            task_path: Path to the task directory containing task.yaml
-
-        Returns:
-            Tuple of (normalize, handle_missing) with defaults (True, 'interpolate')
-        """
-        import yaml
-
-        task_dir = Path(task_path)
-        task_config_path = task_dir / "task.yaml"
-
-        if not task_config_path.exists():
-            self.logger.warning("DataLoader", f"Task config file not found: {task_config_path}, using defaults")
-            return True, 'interpolate'
-
-        try:
-            with open(task_config_path, 'r') as f:
-                # Load all YAML documents from the file
-                task_configs = list(yaml.safe_load_all(f))
-
-            # Use the first valid task configuration
-            for task_config in task_configs:
-                if task_config is None or 'task' not in task_config:
-                    continue
-
-                task_data = task_config['task']
-                if 'dataset' not in task_data: continue
-
-                # Extract dataset configuration
-                dataset_config = task_data.get('dataset', {})
-                normalize = dataset_config.get('normalize', True)
-                handle_missing = dataset_config.get('handle_missing', 'interpolate')
-                return normalize, handle_missing
-
-            # If no valid task config found, use defaults
-            self.logger.warning(f"No valid task configuration found in {task_config_path}, using defaults")
-            return True, 'interpolate'
-
-        except Exception as e:
-            self.logger.warning(f"Failed to load task config from {task_config_path}: {e}, using defaults")
-            return True, 'interpolate'
-
     def generate_dataset_split(self, dataset_path: str, steps: list[tuple[str, int]], stride: int):
         """
         Generate rolling windows over a time series with configurable segments.
@@ -193,17 +147,20 @@ class DataLoader(ConfigAdapterMixin):
         """
         self.logger.debug("DataLoader", f"Extracting data from {dataset_path}")
 
-        # Determine task path from dataset path
-        task_path = Path(dataset_path) / 'task.yaml'
+        dataset_file_path = self.dataset_file_path
 
-        # Load task-specific configuration
-        normalize, handle_missing = self._load_task_config(task_path)
+        # Load task-specific configuration from task.yaml in the task directory
+        normalize = self.task_config.dataset.normalize
+        handle_missing = self.task_config.dataset.handle_missing
 
         # All targets are 2D after cleaning: (n_steps, n_variates)
-        timestamps, _, time_freq, target, scaler = self.preprocessor.clean(*self._load_dataset(dataset_path), normalize, handle_missing)
+        timestamps, _, time_freq, target, scaler = self.preprocessor.clean(
+            *self._load_dataset(str(dataset_file_path)),
+            normalize,
+            handle_missing)
         num_steps = target.shape[0]  # (n_steps, n_features): first dim is time-steps
         window_size = sum(seg_len for (_, seg_len) in steps)
-        max_windows = self.config['evaluation']['max_windows']
+        max_windows = self.config.evaluation.max_windows
 
         win = 0
         while win < max_windows:
@@ -224,7 +181,7 @@ class DataLoader(ConfigAdapterMixin):
                 target=target,
                 scaler=scaler,
                 metadata={
-                    "dataset_path": dataset_path,
+                    "dataset_path": str(dataset_file_path),
                     "window": win,
                     "freq": time_freq
                 }
