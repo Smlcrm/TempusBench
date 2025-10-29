@@ -1,19 +1,20 @@
 """
 Multivariate VARMAX model.
 """
-
-import os
-import numpy as np
 import math
-import pandas as pd
-from statsmodels.tsa.statespace.varmax import VARMAX
-from statsmodels.tsa.stattools import adfuller
-from typing import Dict, Any, Union, Tuple, Optional
+import os
 import pickle
 import warnings
+
+from typing import Any, Dict, Literal, Optional, Tuple
+
+import numpy as np
+import pandas as pd
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from statsmodels.tsa.statespace.varmax import VARMAX
+from statsmodels.tsa.stattools import adfuller
+
+from ...base_model import BaseModel, validate_inputs
 
 warnings.filterwarnings("ignore")
 

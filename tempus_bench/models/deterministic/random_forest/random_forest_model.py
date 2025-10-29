@@ -1,16 +1,14 @@
 """
 Random Forest model implementation for time series forecasting
 """
-
 import numpy as np
 import pandas as pd
 
-from typing import Dict, Any, Tuple, Optional
-from sklearn.ensemble import RandomForestRegressor
+from typing import Any, Dict, Literal, Optional, Tuple
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
+from sklearn.ensemble import RandomForestRegressor
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 
 class RandomForestHyperparams(PydanticBaseModel):

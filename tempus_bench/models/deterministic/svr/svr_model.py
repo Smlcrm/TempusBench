@@ -1,20 +1,19 @@
 """
 SVR model implementation.
 """
-
 import os
 import pickle
-from typing import Dict, Any, Union, Optional
+
+from typing import Any, Dict, Literal, Optional
+
 import numpy as np
 import pandas as pd
-from sklearn.svm import SVR
-from sklearn.preprocessing import StandardScaler
-from sklearn.multioutput import MultiOutputRegressor
-import matplotlib.pyplot as plt
-import io
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class SvrHyperparams(PydanticBaseModel):

@@ -1,14 +1,13 @@
 """
 Exponential Smoothing model implementation.
 """
+from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
-
-from typing import Dict, Any, Literal, Optional, Union
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from pydantic import BaseModel as PydanticBaseModel, Field
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 class ExponentialSmoothingHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters

@@ -1,12 +1,14 @@
 import os
-import pandas as pd
+
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
-import torch
+import pandas as pd
 import timesfm
-from typing import Dict, Any, Optional, List, Union
+import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class TimesfmHyperparams(PydanticBaseModel):
