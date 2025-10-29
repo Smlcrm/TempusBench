@@ -80,6 +80,7 @@ class ModelConfig(BaseModel):
     prophet: Optional[Dict[str, List[Any]]] = None
     lstm: Optional[Dict[str, List[Any]]] = None
     varmax: Optional[Dict[str, List[Any]]] = None
+    lafn: Optional[Dict[str, Any]] = None
 
     # Foundation models (no hyperparameters)
     chronos: Optional[Dict[str, Any]] = None
@@ -130,34 +131,6 @@ class ModelConfig(BaseModel):
                     )
         return v
 
-    @model_validator(mode='after')
-    def validate_tuning_loss_usage(self):
-        """
-        Ensure that 'tuning_loss' is properly defined for models that require it
-        for training/optimization, and not defined for models that don't use it.
-        """
-        # Only these specific models implement training procedures depending on tuning_loss
-        tuning_loss_training_models = {'arima', 'lstm', 'deepar', 'svr'}
-
-        for model_name, model_config in self.model_dump().items():
-            if model_config is None: continue
-
-            if 'tuning_loss' in model_config:
-                if model_name not in tuning_loss_training_models:
-                    raise ValueError(
-                        f"Model '{model_name}' cannot define 'tuning_loss'. Only models that support "
-                        f"loss-based training with a selectable loss (ARIMA, LSTM, DeepAR, SVR) "
-                        f"may define 'tuning_loss'."
-                    )
-            else:
-                # Check if this specific model requires tuning_loss but doesn't have it defined
-                if model_name in tuning_loss_training_models:
-                    raise ValueError(
-                        f"Model '{model_name}' requires 'tuning_loss' parameter for training "
-                        f"but it is not defined. Please add 'tuning_loss' to the model configuration."
-                    )
-        return self
-
 class BenchmarkConfig(BaseModel):
     """Root configuration model for the benchmarking pipeline."""
 
@@ -167,6 +140,24 @@ class BenchmarkConfig(BaseModel):
     evaluation: EvaluationConfig = Field(..., description="Evaluation configuration")
     model: ModelConfig = Field(..., description="Model configuration")
 
+
+    @model_validator(mode='after')
+    def validate_tuning_loss_usage(self):
+        """
+        Ensure that 'tuning_loss' is properly defined for models that require it
+        for training/optimization, and not defined for models that don't use it.
+        """
+        # Only these specific models implement training procedures depending on tuning_loss
+        tuning_loss_training_models = {'arima', 'lstm', 'deepar', 'svr'}
+
+        for model_name, _ in self.model.model_dump(exclude_none=True).items():
+            if model_name in tuning_loss_training_models:
+                if self.evaluation.tuning_loss is None:
+                    raise ValueError(
+                        f"Model '{model_name}' requires 'tuning_loss' parameter for training "
+                        f"but it is not defined. Please add 'tuning_loss' to the model configuration."
+                    )
+        return self
 class DatasetConfig(BaseModel):
     """Dataset configuration model for individual task folders."""
 
@@ -212,16 +203,6 @@ class TaskConfig(BaseModel):
         description="Dataset configuration for this task"
     )
 
-class ModelSettingsConfig(BaseModel):
-    """Model execution settings configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    python_version: str = Field(
-        ...,
-        description="Python version required for this model"
-    )
-
 class BenchmarkSettingsConfig(BaseModel):
     """Systems configuration model."""
 
@@ -261,6 +242,7 @@ class JobConfig(BaseModel):
     benchmark_settings: BenchmarkSettingsConfig = Field(..., description="Benchmark settings")
     model_settings: Dict[str, Any] = Field(..., description="Model execution settings")
     task_config: TaskConfig = Field(..., description="Task configuration")
+    task_paths: Dict[str, str] = Field(..., description="Task paths")
 
     @model_validator(mode="after")
     def validate_single_model_and_existence(cls, values):
@@ -284,7 +266,7 @@ class JobConfig(BaseModel):
                 f"but in model_settings is '{model_in_settings}'"
             )
 
-        model_path = Path(model_settings[model_in_benchmark].model_path)
+        model_path = Path(model_settings[model_in_benchmark]["model_path"])
         model_file = model_path / f"{model_in_benchmark}_model.py"
         if not (model_path.exists() and model_path.is_dir()):
             raise ValueError(f"Model directory does not exist: {model_path}")
