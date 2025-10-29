@@ -1,14 +1,12 @@
+from typing import Any, Dict, Literal, Optional, Union
+
 import numpy as np
 import pandas as pd
-
-from typing import Literal
-
-from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
-from typing import Dict, Any, Union, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
+from sklearn.preprocessing import StandardScaler
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 class ProphetHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters

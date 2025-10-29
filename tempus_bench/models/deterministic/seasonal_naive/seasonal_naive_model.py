@@ -1,14 +1,14 @@
 """
 Seasonal Naive model implementation.
 """
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
-
-from typing import Dict, Any
-from tempus_bench.models.base_model import BaseModel, validate_inputs
-from sktime.forecasting.naive import NaiveForecaster
 from pydantic import BaseModel as PydanticBaseModel, Field
+from sktime.forecasting.naive import NaiveForecaster
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class SeasonalNaiveHyperparams(PydanticBaseModel):

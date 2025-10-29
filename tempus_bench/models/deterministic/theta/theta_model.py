@@ -12,18 +12,19 @@ Since Theta is mainly a univariate model, the structure had to be changed for mu
 Source of the method:
 https://onlinelibrary.wiley.com/doi/full/10.1002/for.2334 ( Forecasting Multivariate Time Series with the Theta Method )
 """
-
 import os
 import pickle
-from typing import Dict, Any, Union, Optional, List
+
+from typing import Any, Dict, List, Literal, Optional
+
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.decomposition import PCA
-from sktime.forecasting.theta import ThetaForecaster
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LinearRegression
+from sktime.forecasting.theta import ThetaForecaster
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class ThetaHyperparams(PydanticBaseModel):

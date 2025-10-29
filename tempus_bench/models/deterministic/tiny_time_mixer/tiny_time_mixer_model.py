@@ -1,12 +1,11 @@
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-
-from typing import Dict, Any, Union, Tuple, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
-
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel, validate_inputs
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class TinyTimeMixerHyperparams(PydanticBaseModel):

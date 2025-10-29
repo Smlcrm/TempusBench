@@ -1,11 +1,11 @@
+from typing import Any, Dict, Optional
+
 import numpy as np
 import pandas as pd
-
-from typing import Dict, Any, Optional
-from tabpfn import TabPFNRegressor
 from pydantic import BaseModel as PydanticBaseModel, Field
+from tabpfn import TabPFNRegressor
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 
 class TabpfnHyperparams(PydanticBaseModel):

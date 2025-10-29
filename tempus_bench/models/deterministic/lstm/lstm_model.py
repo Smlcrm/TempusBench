@@ -9,18 +9,18 @@ Design choices (all Option A):
 - Predict all targets simultaneously in one forward pass
 - Keep same LSTM architecture, just change input/output dimensions
 """
-
 import math
+
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
-
-from typing import Any, Dict, Tuple, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 class LstmHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
