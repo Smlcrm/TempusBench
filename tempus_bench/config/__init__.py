@@ -13,7 +13,6 @@ from .models import (
     DatasetConfig,
     EvaluationConfig,
     ModelConfig,
-    ModelSettingsConfig,
     BenchmarkSettingsConfig,
     JobConfig,
 )
@@ -57,7 +56,6 @@ __all__ = [
     "DatasetConfig",
     "EvaluationConfig",
     "ModelConfig",
-    "ModelSettingsConfig",
     "BenchmarkSettingsConfig",
     "JobConfig",
     "ConfigManager",

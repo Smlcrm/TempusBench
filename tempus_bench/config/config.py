@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 
 from pydantic import ValidationError
 
-from .models import BenchmarkConfig, BenchmarkSettingsConfig, JobConfig, ModelSettingsConfig, TaskConfig
+from .models import BenchmarkConfig, BenchmarkSettingsConfig, JobConfig, TaskConfig
 from ..utils.logger import get_logger
 from ..utils.paths import get_configs_dir, get_models_dir, get_task_path, get_tasks_dir
 from ..utils.tf_logger import get_tf_logger
@@ -39,7 +39,7 @@ class ConfigManager:
         config_path (str): Path to the main benchmark configuration YAML file
         benchmark_config (BenchmarkConfig): Validated main benchmark configuration
         benchmark_settings (SystemsConfig): System settings from config/settings.yaml
-        model_settings (Dict[str, ModelSettingsConfig]): Model execution settings (Python version, device, conda env)
+        model_settings (Dict[str, Any]): Model execution settings (model execution settings.yaml)
         task_paths (List[Path]): Task paths matching the task_path pattern
         task (Dict[str, List[TaskConfig]]): Validated task configurations (each task can have multiple configs)
         model (Dict[str, Any]): Model hyperparameters from main config
@@ -147,7 +147,7 @@ class ConfigManager:
         except Exception as e:
             raise ConfigValidationError(f"Invalid systems config at {benchmark_settings_dir}: {e}")
 
-    def validate_model_settings(self) -> Dict[str, ModelSettingsConfig]:
+    def validate_model_settings(self) -> Dict[str, Any]:
         """
         Validate model execution settings for models specified in benchmark_config.
 
@@ -156,7 +156,7 @@ class ConfigManager:
         self.benchmark_config.model.
 
         Returns:
-            Dict[str, ModelSettingsConfig]: Dictionary mapping model names to their validated
+            Dict[str, Any]: Dictionary mapping model names to their validated
                 execution settings (Python version, device, conda environment)
 
         Raises:
@@ -177,9 +177,9 @@ class ConfigManager:
                 with open(model_settings_path, 'r') as f:
                     model_settings_data = yaml.safe_load(f)
 
-                # Validate using ModelSettingsConfig
-                model_settings = ModelSettingsConfig(**model_settings_data)
-                validated_settings[model_name] = model_settings.model_dump()
+                model_settings_data.update(model_path=str(model_path))
+                model_settings = dict[str, Any](**model_settings_data)
+                validated_settings[model_name] = model_settings
                 validated_settings[model_name].update(model_path=str(model_path))
 
             except Exception as e:
@@ -230,12 +230,10 @@ class ConfigManager:
         """
         validated_configs = {}
 
-        for task_path in self.task_paths:
-            task_config_path = task_path / "task.yaml"
+        for task_name, task_path in self.task_paths.items():
+            task_config_path = Path(task_path) / "task.yaml"
             if not task_config_path.exists():
                 raise ConfigValidationError(f"Task config not found: {task_config_path}")
-
-            task_name = task_path.name
 
             try:
                 with open(task_config_path, 'r') as f:
@@ -263,7 +261,7 @@ class ConfigManager:
                         )
 
                     # Validate that CSV file exists and matches task name
-                    csv_file = task_path / task_config.dataset.file_name
+                    csv_file = Path(task_path) / task_config.dataset.file_name
                     if not csv_file.exists():
                         raise ConfigValidationError(
                             f"CSV file not found in {task_path}. Expected: {csv_file.name}"
@@ -313,7 +311,8 @@ class ConfigManager:
                         benchmark_config=BenchmarkConfig(**benchmark_dict),
                         benchmark_settings=self.benchmark_settings,
                         model_settings={model_name: self.model_settings[model_name]},
-                        task_config=task_config
+                        task_config=task_config,
+                        task_paths=self.task_paths
                     ), task_idx
 
     def _validate_model_availability(self, config: BenchmarkConfig) -> None:
@@ -379,7 +378,7 @@ class ConfigManager:
             List[Path]: List of Path objects pointing to task directories that match the pattern
         """
         tasks_dir = get_tasks_dir()
-        task_paths = []
+        task_paths = {}
 
         pattern = self.benchmark_config.task_path
 
@@ -389,7 +388,7 @@ class ConfigManager:
                 if subdir.is_dir():
                     for task_path in subdir.iterdir():
                         if task_path.is_dir():
-                            task_paths.append(task_path)
+                            task_paths[task_path.name] = str(task_path)
         elif pattern.endswith("/*"):
             # Find directories in specific subdirectory
             subdir_name = pattern[:-2]
@@ -397,12 +396,12 @@ class ConfigManager:
             if subdir_path.exists():
                 for task_path in subdir_path.iterdir():
                     if task_path.is_dir():
-                        task_paths.append(task_path)
+                        task_paths[task_path.name] = str(task_path)
         else:
             # Specific task directory
             task_path = tasks_dir / pattern
             if task_path.exists():
-                task_paths.append(task_path)
+                task_paths[task_path.name] = str(task_path)
 
         return task_paths
 
@@ -468,7 +467,7 @@ class ConfigAdapterMixin:
         self.eval_config = self.config.evaluation
         self.model_name, self.model_config = next(iter(self.config.model.model_dump(exclude_none=True).items()))
         self.tuning_loss = self.eval_config.tuning_loss
-        self.dataset_path = get_task_path(self.task_config.name) / self.task_config.dataset.file_name
+        self.dataset_path = config.task_paths[self.task_config.name]
         self._setup_logging()
 
     def _setup_logging(self):
