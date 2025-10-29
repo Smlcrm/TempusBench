@@ -102,7 +102,7 @@ def get_task_path(task_name: str) -> Path:
     """
     task_path = get_tasks_dir() / task_name
     if not task_path.exists():
-        raise FileNotFoundError(f"Task directory not found: {task_path}")
+        raise FileNotFoundError(f"Task directory not found: {str(task_path)}")
     return task_path
 
 
