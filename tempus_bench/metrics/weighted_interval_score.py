@@ -1,7 +1,3 @@
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, Union
-
 """
 Calculates the Weighted Interval Score (WIS) for deciles.
 
@@ -21,6 +17,9 @@ Where:
 The score rewards narrow intervals (sharpness) and penalizes when the true value
 falls outside the prediction interval (calibration).
 """
+import numpy as np
+
+
 class WeightedIntervalScore:
     def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
         """

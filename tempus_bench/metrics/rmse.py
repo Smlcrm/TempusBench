@@ -1,10 +1,9 @@
-import numpy as np
-
-from tempus_bench.metrics.base_metric import BaseMetric
-
 """
 Calculates Root Mean Squared Error.
 """
+import numpy as np
+
+from .base_metric import BaseMetric
 
 
 class RMSE(BaseMetric):

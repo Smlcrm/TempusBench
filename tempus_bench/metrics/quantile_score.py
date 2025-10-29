@@ -1,12 +1,11 @@
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, Union
-
-from tempus_bench.metrics.base_metric import BaseMetric
-
 """
 Calculates Quantile Score (QS) for deciles using the tilted ℓ₁ loss.
 """
+import numpy as np
+
+from .base_metric import BaseMetric
+
+
 class QuantileScore(BaseMetric):
     def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
         """
