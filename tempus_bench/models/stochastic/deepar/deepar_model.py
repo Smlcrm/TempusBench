@@ -18,7 +18,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
 from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class DeeparHyperparams(PydanticBaseModel):
@@ -113,6 +113,7 @@ class DeepARModel(BaseModel):
                                            rnn_layers=self.rnn_layers,
                                            dropout=self.dropout)
 
+    @validate_inputs
     def train(self,
               y_context: np.ndarray,
               y_target: np.ndarray,
@@ -263,6 +264,7 @@ class DeepARModel(BaseModel):
 
         return np.array(all_predictions[self.max_prediction_length:self.max_prediction_length+val_length])
 
+    @validate_inputs
     def predict(
         self,
         y_context: Optional[np.ndarray] = None,

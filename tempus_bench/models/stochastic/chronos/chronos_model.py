@@ -98,6 +98,7 @@ class ChronosModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
