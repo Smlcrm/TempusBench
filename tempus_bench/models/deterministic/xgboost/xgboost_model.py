@@ -4,19 +4,18 @@ Multivariate XGBoost model implementation for time series forecasting.
 This model extends the univariate XGBoost to handle multiple target variables simultaneously.
 Uses sklearn's MultiOutputRegressor to handle multiple targets with advanced feature engineering.
 """
-
 import os
 import pickle
-from typing import Dict, Any, Union, List, Tuple, Optional
+
+from typing import Any, Dict, List, Literal, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-from xgboost import XGBRegressor
-from sklearn.multioutput import MultiOutputRegressor
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel, validate_inputs
-from tempus_bench.utils.logger import get_logger
+from sklearn.multioutput import MultiOutputRegressor
+from xgboost import XGBRegressor
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class XgboostHyperparams(PydanticBaseModel):

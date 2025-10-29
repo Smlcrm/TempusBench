@@ -8,15 +8,13 @@ capture temporal dependencies in time series data.
 The model supports both seasonal and non-seasonal ARIMA variants and can handle
 exogenous variables for enhanced forecasting performance.
 """
+from typing import Any, Dict
 
-from ast import Dict
 import numpy as np
-from typing import Any
-
-from statsmodels.tsa.arima.model import ARIMA
 from pydantic import BaseModel as PydanticBaseModel, Field
+from statsmodels.tsa.arima.model import ARIMA
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 class ArimaHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters

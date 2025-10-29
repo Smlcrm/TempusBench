@@ -1,13 +1,12 @@
 """
 Croston's Classic Model implementation for intermittent demand forecasting.
 """
+from typing import Any, Dict
 
 import numpy as np
-
-from typing import Dict, Any
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from ...base_model import BaseModel, validate_inputs
 
 
 class CrostonClassicHyperparams(PydanticBaseModel):
