@@ -164,14 +164,14 @@ class ConfigManager:
                 or a model settings file is invalid
         """
         models_dir = get_models_dir()
-        model_config = self.benchmark_config.model.model_dump()
+        model_config = self.benchmark_config.model.model_dump(exclude_none=True)
         validated_settings = {}
         # Find all model settings.yaml files recursively in models_dir and use their parent folders as model names
         settings_files = list(models_dir.glob("**/settings.yaml"))
         for model_settings_path in settings_files:
             model_path = model_settings_path.parent
             model_name = model_path.name
-            if model_config[model_name] is None: continue
+            if model_name not in model_config: continue
 
             try:
                 with open(model_settings_path, 'r') as f:
@@ -331,7 +331,7 @@ class ConfigManager:
         """
         # Check each model in the configuration
         available_models = self._get_available_models()
-        self.model = config.model.model_dump()
+        self.model = config.model.model_dump(exclude_none=True)
         # Only validate models that are actually specified (not None)
         for model_name, model_params in self.model.items():
             if model_name not in available_models:
@@ -468,6 +468,7 @@ class ConfigAdapterMixin:
         self.model_name, self.model_config = next(iter(self.config.model.model_dump(exclude_none=True).items()))
         self.tuning_loss = self.eval_config.tuning_loss
         self.dataset_path = config.task_paths[self.task_config.name]
+        self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
         self._setup_logging()
 
     def _setup_logging(self):
