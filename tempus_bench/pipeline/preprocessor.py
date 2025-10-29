@@ -1,36 +1,29 @@
 """
 Data preprocessing utilities.
 """
-
-import re
 import ast
-import yaml
-import numpy as np
-import pandas as pd
+import re
 
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Optional, Tuple
+
+import numpy as np
+import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from tempus_bench.config import load_config, get_config_manager
-from tempus_bench.utils.logger import get_logger
+from ..config.config import ConfigAdapterMixin
+from ..config.models import JobConfig
 
-class Preprocessor:
-    def __init__(self, config_path: str, logs_path: str):
+class Preprocessor(ConfigAdapterMixin):
+    def __init__(self, config: JobConfig):
         """
         Initialize preprocessor with configuration.
 
         Args:
             config_path: Path to the configuration YAML file
-            logs_path: Directory for log files
         """
-        self.config = load_config(config_path, logs_path)
-        self.config_manager = get_config_manager()
-        console_logging = self.config_manager.settings.console_logging
-        file_logging = self.config_manager.settings.file_logging
-        self.logger = get_logger(logs_path, console_logging=console_logging, file_logging=file_logging)
-        evaluation_config = self.config['evaluation']
-        self.max_num_variates = evaluation_config['max_num_variates']
+        super().__init__(config)
+        self.max_num_variates = self.config.evaluation.max_num_variates
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """
@@ -43,8 +36,8 @@ class Preprocessor:
             Cleaned numpy array in (num_steps, num_targets) format
         """
         # Clean the target string to handle empty values before parsing
-        print(f"[DEBUG] Raw target string length: {len(target_raw)}")
-        print(f"[DEBUG] Raw target preview: {target_raw[:200]}...")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Raw target string length: {len(target_raw)}")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Raw target preview: {target_raw[:200]}...")
 
         # Replace empty values (consecutive commas) with None
         target_cleaned_str = target_raw
@@ -55,28 +48,28 @@ class Preprocessor:
         # Handle trailing empty values like "[1, 2, ]" -> "[1, 2, None]"
         target_cleaned_str = re.sub(r',\s*\]', ', None]', target_cleaned_str)
 
-        print(f"[DEBUG] Cleaned target string length: {len(target_cleaned_str)}")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Cleaned target string length: {len(target_cleaned_str)}")
 
         try:
             target_parsed = ast.literal_eval(target_cleaned_str)
-            print(f"[DEBUG] Successfully parsed target with ast.literal_eval")
+            self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Successfully parsed target with ast.literal_eval")
         except SyntaxError as e:
-            print(f"[DEBUG] ast.literal_eval failed: {e}")
+            self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] ast.literal_eval failed: {e}")
             # If still fails, try more aggressive cleaning
             target_cleaned_str = target_cleaned_str.replace('""', 'None').replace("''", 'None')
             target_parsed = ast.literal_eval(target_cleaned_str)
-            print(f"[DEBUG] Successfully parsed after aggressive cleaning")
+            self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Successfully parsed after aggressive cleaning")
 
-        print(f"[DEBUG] Parsed target type: {type(target_parsed)}")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Parsed target type: {type(target_parsed)}")
 
         if isinstance(target_parsed, list) and len(target_parsed) > 0:
-            print(f"[DEBUG] First element type: {type(target_parsed[0])}")
+            self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] First element type: {type(target_parsed[0])}")
             if isinstance(target_parsed[0], list):
-                print(f"[DEBUG] First row length: {len(target_parsed[0])}")
+                self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] First row length: {len(target_parsed[0])}")
 
         # Detect if parsed as univariate: [v1, v2, ...] (1D list)
         is_univariate = isinstance(target_parsed, list) and len(target_parsed) > 0 and not isinstance(target_parsed[0], list)
-        print(f"[DEBUG] Is univariate: {is_univariate}")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Is univariate: {is_univariate}")
 
         if is_univariate:
             # Convert 1D list to column vector of shape (num_steps, 1)
@@ -90,7 +83,7 @@ class Preprocessor:
                     except (ValueError, TypeError):
                         target_cleaned.append([np.nan])
                 if i < 3:
-                    print(f"[DEBUG] Row {i} first value: {target_cleaned[-1][0]}")
+                    self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Row {i} first value: {target_cleaned[-1][0]}")
             target = np.array(target_cleaned)  # shape (num_steps, 1)
         else:
             # It is a list of lists: [[feature1], [feature2], ...] -> shape (num_targets, num_steps)
@@ -107,14 +100,14 @@ class Preprocessor:
                         except (ValueError, TypeError):
                             cleaned_seq.append(np.nan)
                     if fi < 2 and ti < 3:
-                        print(f"[DEBUG] Feature {fi}, time {ti}, value: {cleaned_seq[-1]}")
+                        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Feature {fi}, time {ti}, value: {cleaned_seq[-1]}")
                 cleaned_features.append(cleaned_seq)
             # Transpose: (num_targets, num_steps) -> (num_steps, num_targets)
             target = np.array(cleaned_features, dtype=float).T
 
-        print(f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_targets))")
-        print(f"[DEBUG] Target dtype: {target.dtype}")
-        print(f"[DEBUG] NaN count: {np.isnan(target).sum()}")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_targets))")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] Target dtype: {target.dtype}")
+        self.logger.debug("Preprocessor._parse_and_clean_target", f"[DEBUG] NaN count: {np.isnan(target).sum()}")
 
         return target
 
@@ -257,9 +250,9 @@ class Preprocessor:
             return target
 
         if target.shape[1] > self.max_num_variates:
-            print(f"[DEBUG] Capping num_targets from {target.shape[1]} to {self.max_num_variates}")
+            self.logger.debug("Preprocessor._cap_variates", f"[DEBUG] Capping num_targets from {target.shape[1]} to {self.max_num_variates}")
             target = target[:, :self.max_num_variates]
-            print(f"[DEBUG] After capping, target shape: {target.shape}")
+            self.logger.debug("Preprocessor._cap_variates", f"[DEBUG] After capping, target shape: {target.shape}")
 
         return target
 
@@ -278,7 +271,7 @@ class Preprocessor:
             Tuple of (timestamps, time_start, freq, target) - cleaned timestamps, time_start, freq, and target
             Where target is a 2D ndarray of shape (num_steps, num_targets)
         """
-        print(f"[DEBUG] Starting preprocessor.clean() with time_start={time_start}, freq={freq}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] Starting preprocessor.clean() with time_start={time_start}, freq={freq}")
 
         # 1. Parse and clean the raw target string
         target = self._parse_and_clean_target(target_raw)
@@ -287,7 +280,7 @@ class Preprocessor:
         if target.size == 0:
             raise ValueError("Target array is empty in Preprocessor.clean().")
 
-        print(f"[DEBUG] After parsing, target shape: {target.shape}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] After parsing, target shape: {target.shape}")
 
         # Target is already in desired shape (num_steps, num_targets)
         if target.ndim != 2:
@@ -295,7 +288,7 @@ class Preprocessor:
 
         # 2. Cap the number of variates/features if specified
         target = self._cap_variates(target)
-        print(f"[DEBUG] After variate capping, target shape: {target.shape}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] After variate capping, target shape: {target.shape}")
 
         # 3. Validate/fix time_start
         try:
@@ -318,19 +311,19 @@ class Preprocessor:
             raise ValueError(f"Invalid or missing frequency from data: {freq!r}. Original error: {e}")
 
         # 5. Handle missing values (creates timestamps internally)
-        print(f"[DEBUG] Before missing value handling, target shape: {target.shape}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] Before missing value handling, target shape: {target.shape}")
         timestamps_cleaned, target_cleaned = self._handle_missing_values(target, time_start, freq, handle_missing)
-        print(f"[DEBUG] After missing value handling, target shape: {target_cleaned.shape}")
-        print(f"[DEBUG] Timestamps shape: {timestamps_cleaned.shape}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] After missing value handling, target shape: {target_cleaned.shape}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] Timestamps shape: {timestamps_cleaned.shape}")
 
         # 6. Normalize if configured
         scaler = None
         if normalize:
-            print(f"[DEBUG] Normalizing data...")
+            self.logger.debug("Preprocessor.clean", f"[DEBUG] Normalizing data...")
             # target_cleaned: (num_steps, num_targets)
             scaler = StandardScaler()
             target_cleaned = scaler.fit_transform(target_cleaned)
-            print(f"[DEBUG] After normalization, target shape: {target_cleaned.shape}")
+            self.logger.debug("Preprocessor.clean", f"[DEBUG] After normalization, target shape: {target_cleaned.shape}")
 
-        print(f"[DEBUG] Final result - timestamps: {timestamps_cleaned.shape}, target: {target_cleaned.shape}")
+        self.logger.debug("Preprocessor.clean", f"[DEBUG] Final result - timestamps: {timestamps_cleaned.shape}, target: {target_cleaned.shape}")
         return timestamps_cleaned, time_start, freq, target_cleaned, scaler

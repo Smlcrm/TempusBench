@@ -1,16 +1,19 @@
-import pandas as pd
-import numpy as np
-from tempus_bench.config.models import UnifiedConfig
-import torch
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union, Any
-import warnings
 import os
 import subprocess
 import sys
+import warnings
+
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
+import torch
 from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
-from tempus_bench.models.base_model import BaseModel
+from pydantic import BaseModel as PydanticBaseModel, Field
+
+from ...base_model import BaseModel, validate_inputs
 
 # Add the lagllama directory to the Python path for absolute imports
 lagllama_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +22,12 @@ if lagllama_dir not in sys.path:
 
 from lag_llama.gluon.estimator import LagLlamaEstimator
 
+
+class LagllamaHyperparams(PydanticBaseModel):
+    context_length: Optional[int] = Field(default=2048, ge=1, description="Context window size")
+    num_samples: Optional[int] = Field(default=10, ge=1, description="Number of probabilistic samples")
+    batch_size: Optional[int] = Field(default=1, ge=1, description="Batch size")
+
 # Try to import lag_llama, install if not available
 class LagllamaModel(BaseModel):
     """
@@ -26,43 +35,36 @@ class LagllamaModel(BaseModel):
     Works seamlessly like TimesFM with automatic setup.
     """
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize Lag-Llama model with BaseModel interface.
 
         Args:
-            config: Configuration dictionary containing:
-                - checkpoint_path: str, path to checkpoint (default: "lag-llama.ckpt")
-                - context_length: int, context window size (default: 128)
-                - prediction_length: int, number of time series elements to predict (30)
-                - num_samples: int, number of probabilistic samples (default: 5)
-                - device: str, device to use (default: "auto")
-            logs_path: Directory for storing log files (optional)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-
         # Initialize base model
-        super().__init__(config, logs_path)
+        super().__init__(params, settings, LagllamaHyperparams)
 
         # Model-specific attributes
-        self.set_params(
-            context_length=2048,
-            num_samples=10,
-            batch_size=1,
-        )
-
-        self.model = None
-        self.logger.info("LagllamaModel", f"🦙 Lag-Llama initialized - Context: {self.model_config['context_length']}")
+        self._model = None
+        self.logger.info("LagllamaModel.__init__", f"🦙 Lag-Llama initialized - Context: {self.context_length}")
 
     def _create_predictor_for_horizon(self, forecast_horizon: int):
         """Create a predictor for a specific forecast horizon."""
+        
+        # Reference params, settings, device, python_version
+        context_length = self.context_length
+        batch_size = self.batch_size
+        num_samples = self.num_samples
 
         # Create the estimator with the specified horizon
         estimator = LagLlamaEstimator(
             prediction_length=forecast_horizon,
-            context_length=self.model_config["context_length"],
-            batch_size=self.model_config["batch_size"],
-            num_parallel_samples=self.model_config["num_samples"],
-            device=self.model_settings["device"],
+            context_length=context_length,
+            batch_size=batch_size,
+            num_parallel_samples=num_samples,
+            device=self.device,
         )
 
         # Create predictor from estimator
@@ -121,6 +123,7 @@ class LagllamaModel(BaseModel):
 
         return timestamps
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -146,12 +149,12 @@ class LagllamaModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -161,7 +164,7 @@ class LagllamaModel(BaseModel):
             y_context: Recent/past target values
             timestamps_context: Timestamps for context data
             timestamps_target: Timestamps for target data
-            freq: Frequency string (e.g., 'H', 'D', 'M') - MUST be provided from CSV data
+            **kwargs: Additional keyword arguments
 
         Returns:
             np.ndarray: Model prediction samples with shape (num_samples, forecast_horizon, num_targets)
@@ -169,7 +172,14 @@ class LagllamaModel(BaseModel):
         Raises:
             ValueError: If freq is None or empty - frequency must always be read from CSV data
         """
-
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        num_samples = kwargs["num_samples"]
+        
+        # Reference params, settings, device, python_version
+        context_length = self.context_length
+        batch_size = self.batch_size
+        
         forecast_horizon = timestamps_target.shape[0]
         # Create predictor for this horizon
         predictor = self._create_predictor_for_horizon(forecast_horizon)
@@ -205,7 +215,7 @@ class LagllamaModel(BaseModel):
         forecast_it, ts_it = make_evaluation_predictions(
             dataset=context_df,
             predictor=predictor,
-            num_samples=self.model_config["num_samples"],
+            num_samples=self._model_config["num_samples"],
         )
 
         forecasts = list(forecast_it)
@@ -221,10 +231,10 @@ class LagllamaModel(BaseModel):
                 mean = forecast.mean
                 std = getattr(forecast, 'std', None)
                 if std is not None:
-                    samples = np.random.normal(mean, std, (self.model_config["num_samples"], len(mean)))
+                    samples = np.random.normal(mean, std, (self._model_config["num_samples"], len(mean)))
                 else:
                     # If no std, create samples by adding small noise to mean
-                    samples = np.tile(mean, (self.model_config["num_samples"], 1))
+                    samples = np.tile(mean, (self._model_config["num_samples"], 1))
                     samples += np.random.normal(0, 0.01, samples.shape)
 
             samples_list.append(samples)
@@ -241,25 +251,34 @@ class LagllamaModel(BaseModel):
             return samples
         else:
             # Fallback: return zeros with correct shape
-            return np.zeros((self.model_config["num_samples"], forecast_horizon, 1))
+            return np.zeros((num_samples, forecast_horizon, 1))
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> "LagllamaModel":
         """
         Anyvariate wrapper: for multivariate, no separate fitting is needed; we keep separate handles.
         """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        
+        # Reference params, settings, device, python_version
+        context_length = self.context_length
+        num_samples = self.num_samples
+        batch_size = self.batch_size
+        
         if y_context.ndim > 1 and y_context.shape[1] > 1:
             # Treat each feature (column) as an independent series
-            self.models = []
+            self._models = []
             num_targets = y_context.shape[1]
             for k in range(num_targets):
-                m = LagllamaModel(self.config_path, logs_path=self.logs_path, hyperparameters=self.model_config)
+                m = LagllamaModel(params=self.model_dump(), settings=self.settings)
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
                 m._train(
@@ -268,22 +287,42 @@ class LagllamaModel(BaseModel):
                     timestamps_context=timestamps_context,
                     timestamps_target=timestamps_target,
                     freq=freq)
-                self.models.append(m)
+                self._models.append(m)
             self.is_fitted = True
             return self
         return self._train(y_context, y_target, timestamps_context, timestamps_target, freq)
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> np.ndarray:
-        if hasattr(self, "models") and self.models:
+        """
+        Make predictions using the trained Lag-Llama model.
+
+        Args:
+            y_context: Past target values (time series data)
+            timestamps_context: Timestamps for context data
+            timestamps_target: Timestamps for target data
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            np.ndarray: Model predictions with shape (num_samples, forecast_horizon, num_targets)
+        """
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        freq = kwargs["freq"]
+        num_samples = kwargs["num_samples"]
+        
+        # Reference params, settings, device, python_version
+        context_length = self.context_length
+        batch_size = self.batch_size
+        
+        if hasattr(self, "models") and self._models:
             preds = []
-            for k, m in enumerate(self.models):
+            for k, m in enumerate(self._models):
                 yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
                 pk = m._predict(y_context=yc, timestamps_context=timestamps_context,
                                 timestamps_target=timestamps_target, freq=freq, **kwargs)
