@@ -1,14 +1,16 @@
-import pandas as pd
+from typing import Any, Dict, Optional
+
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Optional, Union, Any
-import warnings
-from sklearn.preprocessing import StandardScaler
-from tempus_bench.models.base_model import BaseModel
 from momentfm import MOMENTPipeline
-from tqdm import tqdm
+from pydantic import BaseModel as PydanticBaseModel
+from sklearn.preprocessing import StandardScaler
+from torch.utils.data import Dataset
 
+from ...base_model import BaseModel, validate_inputs
+
+class MomentHyperparams(PydanticBaseModel):
+    pass
 
 class MomentDataset(Dataset):
     """Dataset class for MOMENT model training and inference."""
@@ -17,19 +19,15 @@ class MomentDataset(Dataset):
         self,
         data: np.ndarray,
         context_length: int,
-        prediction_length: int,
-        scaler: Optional[StandardScaler] = None,
+        prediction_length: int
     ):
         self.data = data
         self.model_config["context_length"] = context_length
         self.prediction_length = prediction_length
         self.n_series, self.n_timesteps = data.shape
-        if scaler is None:
-            self.scaler = StandardScaler()
-            self.scaler.fit(data.T)
-        else:
-            self.scaler = scaler
-        self.scaled_data = self.scaler.transform(data.T).T
+        self._scaler = StandardScaler()
+        self._scaler.fit(data.T)
+        self.scaled_data = self._scaler.transform(data.T).T
 
     def __len__(self):
         samples_per_series = max(
@@ -65,129 +63,97 @@ class MomentDataset(Dataset):
             torch.FloatTensor(input_mask),
         )
 
-
 class MomentModel(BaseModel):
     """MOMENT model wrapper for time series forecasting, extending FoundationModel."""
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
-        super().__init__(config_path, logs_path, hyperparameters)
-        self.model_config["context_length"] = 512
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        super().__init__(params, settings, MomentHyperparams)
+        self._scaler = StandardScaler()
 
-        self.scaler = StandardScaler()
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        print(f"MOMENT Model initialized - Device: {self.device}")
-        print(f"Context length: {self.model_config['context_length']}")
-
-    def _load_model(self, forecast_horizon: int):
-        print(f"Loading MOMENT model for forecast horizon: {forecast_horizon}")
-        self.model = MOMENTPipeline.from_pretrained(
-            "AutonLab/MOMENT-1-large",
-            model_kwargs={
-                "task_name": "forecasting",
-                "forecast_horizon": forecast_horizon,
-                "n_channels": self.model_config["num_y_features"],
-                "head_dropout": 0.1,
-                "weight_decay": 0,
-                "freeze_encoder": True,
-                "freeze_embedder": True,
-                "freeze_head": False,
-            },
-        )
-        self.model.init()
-        self.model = self.model.to(self.device)
-        print("MOMENT model loaded successfully!")
-
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs: dict
     ) -> "MomentModel":
-        """
-        Train/fine-tune the MOMENT model on given data.
-
-        Args:
-            y_context: Past target values
-            y_target: Future target values (not used for MOMENT)
-            y_start_date: Start date timestamp (not used for MOMENT)
-
-        Returns:
-            self: The fitted model instance
-        """
-
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str = None,
-        **kwargs,
+        **kwargs: dict
     ) -> np.ndarray:
         """
         Make predictions using the trained MOMENT model.
 
         Args:
             y_context: Recent/past target values
-            y_target: Future target values (not used for MOMENT)
-            y_context_timestamps: Timestamps for context data (not used for MOMENT)
-            y_target_timestamps: Timestamps for target data (not used for MOMENT)
-            forecast_horizon: Number of steps to forecast (defaults to model config if not provided)
-            **kwargs: Additional arguments (ignored)
+            timestamps_context: Timestamps for context data (not used)
+            timestamps_target: Timestamps for target data (used for determining forecast_horizon)
+            **kwargs: Additional arguments (unused)
 
         Returns:
-            np.ndarray: Model predictions with shape (forecast_horizon,)
+            np.ndarray: Model predictions with shape (channels, forecast_horizon)
         """
-
+        context_length = kwargs["context_window"]
         forecast_horizon = timestamps_target.shape[0]
 
-        # Ensure 2D input: (num_steps, num_targets)
+        # Ensure y_context is 2D (num_steps, num_targets)
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
+        _, num_targets = y_context.shape
 
-        num_steps, num_targets = y_context.shape
-        self.model_config["num_y_features"] = num_targets
-
-        # Fixed context length per model config
-        context_length = int(self.model_config.get("context_length"))
-
-        # Load model with correct metadata
         self._load_model(forecast_horizon)
-        self.model.eval()
+        self._model.eval()
 
         with torch.no_grad():
-            # Scale in (num_steps, num_targets)
-            self.scaler.fit(y_context)
-            y_context = self.scaler.transform(y_context)
+            self._scaler.fit(y_context)
+            y_context_scaled = self._scaler.transform(y_context)
 
-            # Trim/pad along time dimension to context_length
-            if y_context.shape[0] >= context_length:
-                y_context = y_context[-context_length:, :]
+            # Adjust input length to context_length
+            if y_context_scaled.shape[0] >= context_length:
+                y_context_trimmed = y_context_scaled[-context_length:, :]
             else:
-                pad_rows = context_length - y_context.shape[0]
-                y_context = np.concatenate([np.zeros((pad_rows, num_targets)), y_context], axis=0)
-                warnings.warn(
-                    f"Time Series is shorter than context_length {context_length}. Padded with zeros.",
-                    UserWarning,
+                pad_rows = context_length - y_context_scaled.shape[0]
+                y_context_trimmed = np.concatenate(
+                    [np.zeros((pad_rows, num_targets)), y_context_scaled], axis=0
                 )
+                self.logger.warning("MomentModel.predict", f"Time Series is shorter than context_length {context_length}. Padded with zeros.")
 
-            # To MOMENT format (batch, channels, seq_len) = (1, num_targets, context_length)
-            y_context_tensor = torch.from_numpy(y_context.T.copy()).float().unsqueeze(0).to(self.device)
+            y_context_tensor = torch.from_numpy(
+                y_context_trimmed.T.copy()
+            ).float().unsqueeze(0).to(self.device)
             input_mask = torch.ones(1, context_length, device=self.device)
 
-            # Debug
-            print("[BEFORE] y_context shape:", y_context_tensor.shape)
-            print(f"input_mask shape: {input_mask.shape}, dtype: {input_mask.dtype}")
-
-            output = self.model(x_enc=y_context_tensor, input_mask=input_mask)
-
-            # Forecast shape expected (batch, forecast_horizon, channels)
+            output = self._model(x_enc=y_context_tensor, input_mask=input_mask)
+            # Output: (batch, forecast_horizon, channels)
             forecast_scaled = output.forecast.cpu().numpy()
-            forecast = self.scaler.inverse_transform(forecast_scaled[0, :, :])  # (forecast_horizon, channels)
+            forecast = self._scaler.inverse_transform(forecast_scaled[0, :, :])  # (forecast_horizon, channels)
             forecast = forecast.T  # (channels, forecast_horizon)
 
         return forecast
+
+    def _load_model(self, forecast_horizon: int):
+        self.logger.info("MomentModel._load_model", f"Loading MOMENT model for forecast horizon: {forecast_horizon}")
+        self._model = MOMENTPipeline.from_pretrained(
+            "AutonLab/MOMENT-1-large",
+            model_kwargs={
+                "task_name": "forecasting",
+                "forecast_horizon": forecast_horizon,
+                "n_channels": self.num_y_features,
+                "head_dropout": self.head_dropout,
+                "weight_decay": self.weight_decay,
+                "freeze_encoder": self.freeze_encoder,
+                "freeze_embedder": self.freeze_embedder,
+                "freeze_head": self.freeze_head
+            },
+        )
+        self._model.init()
+        self._model = self._model.to(self.device)
+        self.logger.info("MomentModel._load_model", "MOMENT model loaded successfully!")

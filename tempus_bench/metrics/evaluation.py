@@ -1,24 +1,20 @@
-import pandas as pd
-import numpy as np
-from typing import Dict, Any
-
-from tempus_bench.config import load_config, get_config_manager
-from tempus_bench.config.models import UnifiedConfig
-
-from ..metrics.rmse import RMSE
-from ..metrics.mae import MAE
-from ..metrics.mase import MASE
-from ..metrics.crps import CRPS
-from ..metrics.quantile_score import QuantileScore
-from ..metrics.weighted_interval_score import WeightedIntervalScore
-from ..metrics.mape import MAPE
-from ..utils.logger import get_logger
-
 """
 Model evaluation.
 """
+from typing import Any, Dict
+
+import numpy as np
+
+from ..metrics.crps import CRPS
+from ..metrics.mae import MAE
+from ..metrics.mape import MAPE
+from ..metrics.mase import MASE
+from ..metrics.quantile_score import QuantileScore
+from ..metrics.rmse import RMSE
+from ..metrics.weighted_interval_score import WeightedIntervalScore
+from ..utils.logger import get_logger
 class Evaluator:
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self):
         """
         Initialize evaluator with configuration.
 
@@ -26,9 +22,7 @@ class Evaluator:
             config: Configuration dictionary
             logs_path: Directory for storing log files (optional)
         """
-        self.config = config.benchmark.model_dump()
-        self.logger = get_logger(logs_path)
-        self.eval_config = self.config['evaluation']
+        self.logger = get_logger()
         self.metric_registry = {
             "rmse": RMSE(),
             "mae": MAE(),
@@ -40,9 +34,9 @@ class Evaluator:
         }
         self.stochastic_metrics = ["crps", "quantile_score", "weighted_interval_score"]
         self.deterministic_metrics = ["rmse", "mae", "mase", "mape"]
+
         self.logger.debug("Evaluator", f"Evaluator initialized with Evaluation config: {self.eval_config}")
         self.logger.debug("Evaluator", f"Metrics to calculate: {self.metrics_to_calculate}")
-
 
     def evaluate(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs: Dict[str,Any]):
         """
@@ -74,5 +68,6 @@ class Evaluator:
                 y_true=y_true,
                 y_pred=y_pred,
                 task_type=task_type,
-                point_forecast_statistic=self.eval_config['point_forecast_statistic'])
+                point_forecast_statistic=kwargs['point_forecast_statistic'],
+                num_quantiles=kwargs['num_quantiles'])
         return results

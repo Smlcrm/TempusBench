@@ -1,26 +1,37 @@
 import os
-import torch
-import numpy as np
-import pandas as pd
 import re
 
-from .toto.model.toto import Toto
+from typing import Any, Dict, Optional, Union
+
+import numpy as np
+import pandas as pd
+import torch
+from pydantic import BaseModel as PydanticBaseModel, Field
+
+from ...base_model import BaseModel
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
-from tempus_bench.models.base_model import BaseModel
-from typing import Optional, Union, Dict, Any
+from .toto.model.toto import Toto
+
+
+class TotoHyperparams(PydanticBaseModel):
+    # Foundation model with minimal parameters
+    pass
 
 
 class TotoModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
         Initialize TOTO model with configuration.
 
         Args:
-            config: Configuration dictionary containing model parameters
-            logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
-        super().__init__(config_path, logs_path, hyperparameters)
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self._model_config = TotoHyperparams(**self._model_config).model_dump()
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
@@ -33,7 +44,7 @@ class TotoModel(BaseModel):
 
         # JIT compilation for faster inference
         toto.compile()
-        self.model = TotoForecaster(toto.model)
+        self._model = TotoForecaster(toto.model)
 
     def train(
         self,
@@ -98,7 +109,7 @@ class TotoModel(BaseModel):
         )
 
         # Generate forecasts for the next 336 timesteps
-        forecast = self.model.forecast(
+        forecast = self._model.forecast(
             inputs,
             prediction_length=forecast_horizon,
             num_samples=self.num_samples,  # Use configured number of samples

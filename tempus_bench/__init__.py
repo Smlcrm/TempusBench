@@ -27,9 +27,17 @@ Usage:
     data_loader = DataLoader(config)
     datasets = data_loader.load_several_chunks(3)
     
-    # Execute models
-    model_executor = ModelExecutor(config_path, run_dir, datasets_dir)
-    results = model_executor.execute_model(model_name, hyperparameters, context_steps, train_steps, validate_steps, dataset_path, window_idx)
+    # Execute models (runs in isolated conda environment via CLI)
+    model_executor = ModelExecutor(job_config)
+    results = model_executor.execute_model(
+        model_name='arima',
+        hyperparameters={'p': 2, 'd': 1, 'q': 2},
+        context_steps=50,
+        train_steps=100,
+        validate_steps=20,
+        task_path='path/to/task.csv',
+        window_idx=0
+    )
 """
 
 __version__ = "1.0.0"

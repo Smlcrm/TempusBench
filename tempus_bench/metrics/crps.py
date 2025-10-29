@@ -1,9 +1,9 @@
-import numpy as np
-from typing import Dict, Any, Union
-
 """
 Calculates Continuous Ranked Probability Score.
 """
+import numpy as np
+
+
 class CRPS:
     def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
         """
