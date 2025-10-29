@@ -1,17 +1,19 @@
-import pandas as pd
-import numpy as np
-import torch
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union, Any
-import warnings
 import os
 import subprocess
 import sys
+import warnings
+
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
+import torch
 from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+
+from ...base_model import BaseModel, validate_inputs
 
 # Add the lagllama directory to the Python path for absolute imports
 lagllama_dir = os.path.dirname(os.path.abspath(__file__))
@@ -121,6 +123,7 @@ class LagllamaModel(BaseModel):
 
         return timestamps
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -146,6 +149,7 @@ class LagllamaModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
@@ -249,6 +253,7 @@ class LagllamaModel(BaseModel):
             # Fallback: return zeros with correct shape
             return np.zeros((num_samples, forecast_horizon, 1))
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -287,6 +292,7 @@ class LagllamaModel(BaseModel):
             return self
         return self._train(y_context, y_target, timestamps_context, timestamps_target, freq)
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
