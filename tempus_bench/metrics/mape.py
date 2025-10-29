@@ -1,10 +1,7 @@
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, Union
-
 """
 Calculates Mean Absolute Percentage Error.
 """
+import numpy as np
 
 
 class MAPE:
