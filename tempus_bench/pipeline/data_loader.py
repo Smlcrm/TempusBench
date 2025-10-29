@@ -68,6 +68,7 @@ class DataLoader(ConfigAdapterMixin):
             - evaluation.max_windows: Maximum number of windows to generate
             - Other preprocessing and model parameters
         """
+        super().__init__(job_config)
         self.preprocessor = Preprocessor(job_config)
 
     def _load_dataset(self, dataset_path: str) -> tuple:
@@ -107,31 +108,18 @@ class DataLoader(ConfigAdapterMixin):
 
         return time_start, time_freq, target_raw
 
-    def _get_task_path_from_dataset_path(self, dataset_path: str) -> str:
-        """
-        Extract task directory path from dataset CSV file path.
-        
-        Args:
-            dataset_path: Path to the CSV dataset file
-            
-        Returns:
-            Path to the task directory containing the dataset file
-        """
-        dataset_file = Path(dataset_path)
-        return str(dataset_file.parent)
-
     def _load_task_config(self, task_path: str) -> tuple[bool, str]:
         """
         Load task-specific configuration from task.yaml (uses first task definition).
-        
+
         Args:
             task_path: Path to the task directory containing task.yaml
-            
+
         Returns:
             Tuple of (normalize, handle_missing) with defaults (True, 'interpolate')
         """
         import yaml
-        
+
         task_dir = Path(task_path)
         task_config_path = task_dir / "task.yaml"
 
@@ -150,8 +138,7 @@ class DataLoader(ConfigAdapterMixin):
                     continue
 
                 task_data = task_config['task']
-                if 'dataset' not in task_data:
-                    continue
+                if 'dataset' not in task_data: continue
 
                 # Extract dataset configuration
                 dataset_config = task_data.get('dataset', {})
@@ -207,7 +194,7 @@ class DataLoader(ConfigAdapterMixin):
         self.logger.debug("DataLoader", f"Extracting data from {dataset_path}")
 
         # Determine task path from dataset path
-        task_path = self._get_task_path_from_dataset_path(dataset_path)
+        task_path = Path(dataset_path) / 'task.yaml'
 
         # Load task-specific configuration
         normalize, handle_missing = self._load_task_config(task_path)

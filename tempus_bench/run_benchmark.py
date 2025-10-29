@@ -37,7 +37,7 @@ class BenchmarkRunner:
 
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
         for job_idx, (job_config, task_idx) in enumerate(self.config_manager.generate_run_configs()):
-            hyperparameter_tuner = HyperparameterTuner(config=job_config)
+            hyperparameter_tuner = HyperparameterTuner(job_config=job_config)
 
             # Hyper-parameter Tuning
             task_name = job_config.task_config.name
