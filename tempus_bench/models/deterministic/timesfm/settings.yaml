@@ -1,2 +1,1 @@
-python_version: "3.11"
-device: "cpu"
+python_version: '3.11'

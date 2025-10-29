@@ -20,9 +20,10 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
-class LstmParams(PydanticBaseModel):
+class LstmHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     units: int = Field(..., ge=1, description="Number of LSTM units")
     layers: int = Field(..., ge=1, description="Number of LSTM layers")
     dropout: float = Field(..., ge=0, le=1, description="Dropout rate")
@@ -34,8 +35,9 @@ class LstmParams(PydanticBaseModel):
 
 class LSTMModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, LstmParams)
+        super().__init__(params, settings, LstmHyperparams)
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -84,8 +86,8 @@ class LSTMModel(BaseModel):
         self.model.fit(
             X_seq,
             y_seq,
-            batch_size=self.params.batch_size,
-            epochs=self.params.epochs,
+            batch_size=self.batch_size,
+            epochs=self.epochs,
             verbose=1,
             callbacks=[early_stopping] if validation_split > 0 else [],
             validation_split=validation_split
@@ -94,6 +96,7 @@ class LSTMModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -162,28 +165,28 @@ class LSTMModel(BaseModel):
         self._model = Sequential()
 
         # Add LSTM layers
-        for layer_idx in range(self.params.layers):
-            return_sequences = layer_idx < self.params.layers - 1
+        for layer_idx in range(self.layers):
+            return_sequences = layer_idx < self.layers - 1
             self._model.add(
                 LSTM(
-                    units=self.params.units,
+                    units=self.units,
                     return_sequences=return_sequences,
                     input_shape=input_shape if layer_idx == 0 else None,
                 ),
             )
-            if self.params.dropout > 0:
-                self._model.add(Dropout(self.params.dropout))
+            if self.dropout > 0:
+                self._model.add(Dropout(self.dropout))
 
         # Add output layer - predicts prediction_window * num_targets values (flattened)
-        self._model.add(Dense(self.params.prediction_window * num_targets))
+        self._model.add(Dense(self.prediction_window * num_targets))
 
         # Compile model with optimized settings
         self._model.compile(
             optimizer=Adam(
-                learning_rate=self.params.learning_rate,
-                beta_1=self.settings.beta_1,
-                beta_2=self.settings.beta_2,
-                epsilon=self.settings.epsilon
+                learning_rate=self.learning_rate,
+                beta_1=self.beta_1,
+                beta_2=self.beta_2,
+                epsilon=self.epsilon
             ),
             loss=kwargs["tuning_loss"],
             metrics=kwargs["tuning_loss"]
@@ -210,20 +213,20 @@ class LSTMModel(BaseModel):
         X_seq, y_seq = [], []
         for i in range(
             len(X)
-            - self.params.context_length
-            - self.params.prediction_window
+            - self.context_length
+            - self.prediction_window
             + 1
         ):
-            curr_X = X[i : (i + self.params.context_length)]
+            curr_X = X[i : (i + self.context_length)]
             # curr_X = curr_X.flatten()
 
             X_seq.append(curr_X)
             # y_seq: flatten to 1D array of length prediction_window * num_targets
             future_values = X[
                 i
-                + self.params.context_length : i
-                + self.params.context_length
-                + self.params.prediction_window
+                + self.context_length : i
+                + self.context_length
+                + self.prediction_window
             ]
             future_values = future_values.flatten()
             y_seq.append(future_values)

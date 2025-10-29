@@ -23,10 +23,10 @@ from sklearn.decomposition import PCA
 from sktime.forecasting.theta import ThetaForecaster
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class ThetaParams(PydanticBaseModel):
+class ThetaHyperparams(PydanticBaseModel):
     sp: int = Field(..., ge=1, description="Seasonal period")
     use_reduced_rank: bool = Field(default=False, description="Whether to use cointegration/reduced rank")
     theta_method: Literal["least_squares", "correlation_optimal"] = Field(default="least_squares", description="Method for theta estimation")
@@ -37,7 +37,7 @@ class Theta(BaseModel):
         """
         Initialize the Multivariate Theta model with model-specific parameters.
         """
-        super().__init__(params, settings, ThetaParams)
+        super().__init__(params, settings, ThetaHyperparams)
 
         # Note: theta_method should be in config, no defaults
         self._models = {}
@@ -159,6 +159,7 @@ class Theta(BaseModel):
         theta_lines = detrended_data @ theta_matrix.T  # (T, num_targets)
         return theta_lines
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -191,9 +192,9 @@ class Theta(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        sp = self.params.sp
-        theta_method = self.params.theta_method
-        use_reduced_rank = self.params.use_reduced_rank
+        sp = self.sp
+        theta_method = self.theta_method
+        use_reduced_rank = self.use_reduced_rank
 
         # Calculate num_targets from data
         num_targets = y_context.shape[1]
@@ -249,6 +250,7 @@ class Theta(BaseModel):
         self.logger.info("ThetaModel.train", "Multivariate Theta training complete.")
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -277,7 +279,7 @@ class Theta(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        sp = self.params.sp
+        sp = self.sp
         
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")

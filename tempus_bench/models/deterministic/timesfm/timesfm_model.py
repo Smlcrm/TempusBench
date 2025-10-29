@@ -6,10 +6,10 @@ import timesfm
 from typing import Dict, Any, Optional, List, Union
 from pydantic import BaseModel as PydanticBaseModel, Field
 from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class TimesfmParams(PydanticBaseModel):
+class TimesfmHyperparams(PydanticBaseModel):
     # Foundation model with minimal parameters
     pass
 
@@ -23,7 +23,7 @@ class TimesFMModel(BaseModel):
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(params, settings, TimesfmParams)
+        super().__init__(params, settings, TimesfmHyperparams)
         
         self.is_fitted = True
 
@@ -50,6 +50,7 @@ class TimesFMModel(BaseModel):
             ),
         )
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -71,6 +72,7 @@ class TimesFMModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,

@@ -7,9 +7,9 @@ from typing import Any, Dict, Optional
 from sklearn.preprocessing import StandardScaler
 from pydantic import BaseModel as PydanticBaseModel
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
-class MomentParams(PydanticBaseModel):
+class MomentHyperparams(PydanticBaseModel):
     pass
 
 class MomentDataset(Dataset):
@@ -67,9 +67,10 @@ class MomentModel(BaseModel):
     """MOMENT model wrapper for time series forecasting, extending FoundationModel."""
 
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, MomentParams)
+        super().__init__(params, settings, MomentHyperparams)
         self._scaler = StandardScaler()
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -80,6 +81,7 @@ class MomentModel(BaseModel):
     ) -> "MomentModel":
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -144,12 +146,12 @@ class MomentModel(BaseModel):
             model_kwargs={
                 "task_name": "forecasting",
                 "forecast_horizon": forecast_horizon,
-                "n_channels": self.params.num_y_features,
-                "head_dropout": self.settings.head_dropout,
-                "weight_decay": self.settings.weight_decay,
-                "freeze_encoder": self.settings.freeze_encoder,
-                "freeze_embedder": self.settings.freeze_embedder,
-                "freeze_head": self.settings.freeze_head
+                "n_channels": self.num_y_features,
+                "head_dropout": self.head_dropout,
+                "weight_decay": self.weight_decay,
+                "freeze_encoder": self.freeze_encoder,
+                "freeze_embedder": self.freeze_embedder,
+                "freeze_head": self.freeze_head
             },
         )
         self._model.init()

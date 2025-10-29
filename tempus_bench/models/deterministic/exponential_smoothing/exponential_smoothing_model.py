@@ -8,9 +8,10 @@ from typing import Dict, Any, Literal, Optional, Union
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
-class ExponentialSmoothingParams(PydanticBaseModel):
+class ExponentialSmoothingHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     trend: Optional[Literal["add", "mul", "null"]] = Field(
         ..., description="Trend component: 'add', 'mul', or None (no trend)"
     )
@@ -23,6 +24,27 @@ class ExponentialSmoothingParams(PydanticBaseModel):
         default=None, ge=1, description="Number of seasonal periods (None if no seasonality)"
     )
 
+    @classmethod
+    def validate(cls, value):
+        # Only check *combinations* of values; field types/ranges handled by pydantic
+        trend = value.get('trend')
+        seasonal = value.get('seasonal')
+        seasonal_periods = value.get('seasonal_periods')
+        damped_trend = value.get('damped_trend')
+
+        # 1. seasonal is set but seasonal_periods is not set
+        if seasonal in ("add", "mul") and (seasonal_periods is None or seasonal_periods == "null"):
+            raise ValueError("You must specify 'seasonal_periods' when using a seasonal component.")
+
+        # 2. seasonal is None but seasonal_periods is set
+        if (seasonal in (None, "null")) and (seasonal_periods not in (None, "null")):
+            raise ValueError("You cannot specify 'seasonal_periods' without a 'seasonal' component.")
+
+        # 3. damped_trend=True but no trend
+        if (trend in (None, "null")) and damped_trend:
+            raise ValueError("Cannot use 'damped_trend' without a trend component (trend=None/'null').")
+
+        return value
 
     def __init__(self, **data):
         # Handle string "null" values by converting them to None
@@ -32,11 +54,11 @@ class ExponentialSmoothingParams(PydanticBaseModel):
         super().__init__(**data)
 
 
-
 class ExponentialSmoothingModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, ExponentialSmoothingParams)
+        super().__init__(params, settings, ExponentialSmoothingHyperparams)
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -53,10 +75,10 @@ class ExponentialSmoothingModel(BaseModel):
             f"y_context type: {type(y_context)}, shape: {getattr(y_context, 'shape', 'N/A')}"
         )
 
-        trend = self.params.trend
-        seasonal = self.params.seasonal
-        seasonal_periods = self.params.seasonal_periods
-        damped_trend = self.params.damped_trend
+        trend = self.trend
+        seasonal = self.seasonal
+        seasonal_periods = self.seasonal_periods
+        damped_trend = self.damped_trend
 
         endog = y_context.squeeze()
 
@@ -87,6 +109,7 @@ class ExponentialSmoothingModel(BaseModel):
 
         return self
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -106,7 +129,7 @@ class ExponentialSmoothingModel(BaseModel):
         self._models = []
         for idx in range(num_targets):
             self.logger.debug("ExponentialSmoothingModel.train", f"Training variate index {idx}")
-            model = ExponentialSmoothingModel(params=self.params.dict())
+            model = ExponentialSmoothingModel(params=self.dict())
             model._train(
                 y_context=y_context[:, idx],
                 y_target=y_target[:, idx],
@@ -122,6 +145,7 @@ class ExponentialSmoothingModel(BaseModel):
         )
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
@@ -157,6 +181,7 @@ class ExponentialSmoothingModel(BaseModel):
             )
             raise
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,

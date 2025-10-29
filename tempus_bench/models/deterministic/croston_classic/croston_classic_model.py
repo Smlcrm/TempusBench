@@ -2,27 +2,25 @@
 Croston's Classic Model implementation for intermittent demand forecasting.
 """
 
-import os
-import pickle
 import numpy as np
-import pandas as pd
 
 from typing import Dict, Any
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class CrostonClassicParams(PydanticBaseModel):
+class CrostonClassicHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     alpha: float = Field(..., gt=0, lt=1, description="Smoothing parameter for demand level")
     gamma: float = Field(..., gt=0, lt=1, description="Smoothing parameter for interval level")
 
 
 class CrostonClassicModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, CrostonClassicParams)
+        super().__init__(params, settings, CrostonClassicHyperparams)
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -47,8 +45,8 @@ class CrostonClassicModel(BaseModel):
         Returns:
             CrostonClassicModel: Trained model.
         """
-        alpha = self.params.alpha
-        gamma = self.params.gamma
+        alpha = self.alpha
+        gamma = self.gamma
         num_targets = y_context.shape[1]
 
         demand_levels = np.zeros(num_targets)
@@ -86,6 +84,7 @@ class CrostonClassicModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -118,15 +117,14 @@ class CrostonClassicModel(BaseModel):
         forecast = np.tile(forecast, (forecast_horizon, 1))
         return forecast
 
-
     def get_model_summary(self) -> Dict[str, Any]:
         """
         Returns a summary of the Croston's Classic model.
         """
         summary = {
             "model_type": "CrostonClassic",
-            "alpha": self.params.alpha,
-            "gamma": self.params.gamma,
+            "alpha": self.alpha,
+            "gamma": self.gamma,
             "is_fitted": self.is_fitted,
         }
 
