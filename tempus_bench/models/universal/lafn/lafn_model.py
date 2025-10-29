@@ -20,10 +20,6 @@ from benchmarking_pipeline.models.base_model import BaseModel
 from tempus_bench.config.models import UnifiedConfig
 from tempus_bench.models.base_model import BaseModel
 
-# lafn_dir = os.path.dirname(os.path.abspath(__file__))
-# if lafn_dir not in sys.path:
-#     sys.path.insert(0, lafn_dir)
-
 from chronarium import Chronarium
 
 
@@ -45,16 +41,6 @@ class LAFNModel(BaseModel):
             model_version=self.model_version,
         )
 
-        self.data_processor = DataProcessor(
-            scaling_method="none",
-            in_length=2048,
-            out_length=128,
-            in_features=10,
-            out_features=10,
-        )
-
-        self.is_fitted = True
-
     def train(
         self,
         y_context: Optional[np.ndarray],
@@ -64,7 +50,7 @@ class LAFNModel(BaseModel):
         freq: str = None,
     ) -> "LAFNModel":
         """Pre-trained model – no fine-tuning required."""
-        self.is_fitted = True
+
         return self
 
     def predict(
@@ -76,8 +62,30 @@ class LAFNModel(BaseModel):
     ) -> np.ndarray:
         self.model.eval()
 
-        forecasts = self.model.forecast(forecast_embed)
+        forecast_horizon = timestamps_target.shape[0]
+        num_forecast_features = y_context.shape[-1]
+
+        y_context = np.expand_dims(y_context, axis=0)
+        timestamps_context = np.expand_dims(timestamps_context, axis=(0, -1))
+        timestamps_target = np.expand_dims(timestamps_target, axis=(0, -1))
+
+        forecasts = inferer.forecast(
+            context_y=y_context,
+            context_x=timestamps_context,
+            context_target=timestamps_target,
+        )
         forecasts = forecasts[:, :forecast_horizon, :num_forecast_features]
         forecasts = jnp.squeeze(forecasts, axis=0)
+        forecasts = np.asarray(forecasts)
 
-        return np.asarray(forecasts)
+        samples = inferer.sample(
+            context_y=y_context,
+            context_x=timestamps_context,
+            context_target=timestamps_target,
+            num_samples=self.num_samples,
+        )
+        samples = samples[:, :forecast_horizon, :num_forecast_features]
+        samples = jnp.squeeze(samples, axis=1)
+        samples = np.asarray(samples)
+
+        return forecasts, samples
