@@ -5,21 +5,18 @@ This module provides the ModelExecutor class that executes individual models
 in isolated conda environments to avoid dependency conflicts.
 It handles model execution with specific hyperparameters and returns evaluation results.
 """
-
+import json
 import os
-import textwrap
-import importlib
 import tempfile
-import pandas as pd
+import textwrap
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-from tempus_bench.config.config import ConfigAdapterMixin
-from tempus_bench.utils.envs import CondaEnvManager
-from tempus_bench.models.model_router import ModelRouter
-from tempus_bench.utils.model_config import get_python_version_for_model
-from tempus_bench.config import JobConfig
+from ..config import JobConfig
+from ..config.config import ConfigAdapterMixin
+from ..models.model_router import ModelRouter
+from ..utils.envs import CondaEnvManager
 
 class ModelExecutor(ConfigAdapterMixin):
     def __init__(self, config: JobConfig):
@@ -160,7 +157,7 @@ class ModelExecutor(ConfigAdapterMixin):
 
         # Create Conda Environment
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = get_python_version_for_model(model_name)
+        python_version = self.model_settings[model_name]['python_version']
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,
@@ -190,7 +187,6 @@ class ModelExecutor(ConfigAdapterMixin):
             if logging:
                 self.logger.success("ModelExecutor", f'Script ran successfully for model {model_name}')
             # Parse the JSON output from the script
-            import json
             # Find the last line that contains JSON (the script outputs debug info first)
             lines = result.stdout.strip().split('\n')
             json_line = None
