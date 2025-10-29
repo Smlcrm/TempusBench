@@ -1,2 +1,10 @@
-python_version: "3.11"
-device: "cpu"
+python_version: '3.11'
+device: 'cpu'
+input_patch_len: 32
+num_layers: 20
+model_dims: 1280
+output_patch_len: 128
+use_positional_embedding: true
+context_len: 128
+huggingface_repo_id: "google/timesfm-1.0-200m-pytorch"
+version: "jax"

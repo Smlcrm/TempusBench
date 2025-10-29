@@ -1,12 +1,10 @@
 """
 Core data types used throughout the benchmarking pipeline.
 """
-import os
-import numpy as np
-import pandas as pd
-
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional
+
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 
 @dataclass

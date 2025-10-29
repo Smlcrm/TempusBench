@@ -1,37 +1,44 @@
-import torch
-import pandas as pd
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
-from typing import Dict, Any
-from typing import Optional, List, Union
+import pandas as pd
+import torch
 from einops import rearrange
-from tempus_bench.models.base_model import BaseModel
+from pydantic import BaseModel as PydanticBaseModel, Field
 from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
+
+from ...base_model import BaseModel, validate_inputs
+
+
+class MoiraiMoeHyperparams(PydanticBaseModel):
+    model_name: Optional[str] = Field(default="moirai-moe", description="Model name")
+    size: Optional[str] = Field(default=None, description="Model size")
+    ctx: Optional[int] = Field(default=None, description="Context length")
+    psz: Optional[int] = Field(default=16, ge=1, description="Patch size")
+    bsz: Optional[int] = Field(default=32, ge=1, description="Batch size")
+    test: Optional[int] = Field(default=100, ge=1, description="Test parameter")
+    num_samples: Optional[int] = Field(default=100, ge=1, description="Number of samples")
 
 
 class MoiraiMoeModel(BaseModel):
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+    def __init__(self, config: JobConfig, logs_path: str):
         """
+        Initialize MoiraiMoE model.
+        
         Args:
-          config: Configuration dictionary containing model parameters
-          logs_path: Directory for storing log files (optional)
+            config: JobConfig instance containing model and task configuration
+            logs_path: Directory for storing log files (required)
         """
+        super().__init__(config, logs_path)
+        
+        # Validate and set model config using Pydantic
+        self._model_config = MoiraiMoeHyperparams(**self._model_config).model_dump()
 
-        super().__init__(config_path, logs_path, hyperparameters)
-
-        # Set reasonable defaults for all model-specific parameters if not provided in config
-        # As in https://arxiv.org/pdf/2402.02592
-        self.model_config["model_name"] = "moirai-moe"
-        self.model_config["size"] = self.model_config.get("size")
-        self.model_config["ctx"] = None
-        self.model_config["psz"] = 16
-        self.model_config["bsz"] = 32
-        self.model_config["test"] = 100
-        self.model_config["num_samples"] = 100
-
-        self.model = None
+        self._model = None
         self.is_fitted = False
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -56,17 +63,17 @@ class MoiraiMoeModel(BaseModel):
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
-            self.model_config["pdt"] = y_target.shape[0]
-            self.model_config["ctx"] = y_context.shape[0]
-            print(f"[DEBUG TRAINING] pdt: {self.model_config['pdt']}")
-            self.model = MoiraiMoEForecast(
+            self._model_config["pdt"] = y_target.shape[0]
+            self._model_config["ctx"] = y_context.shape[0]
+            self.logger.debug("MoiraiMoEModel.train", f"[DEBUG TRAINING] pdt: {self._model_config['pdt']}")
+            self._model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/{self.model_config['model_name']}-1.0-R-{self.model_config['size']}"
+                    pretrained_model_name_or_path=f"Salesforce/{self._model_config['model_name']}-1.0-R-{self._model_config['size']}"
                 ),
-                prediction_length=self.model_config["pdt"],
-                context_length=self.model_config["ctx"],
-                patch_size=self.model_config["psz"],
-                num_samples=self.model_config["num_samples"],
+                prediction_length=self._model_config["pdt"],
+                context_length=self._model_config["ctx"],
+                patch_size=self._model_config["psz"],
+                num_samples=self._model_config["num_samples"],
                 target_dim=y_context.shape[1],
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
@@ -74,6 +81,7 @@ class MoiraiMoeModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -103,7 +111,7 @@ class MoiraiMoeModel(BaseModel):
 
         context_steps, num_targets = y_context.shape
 
-        ctx = self.model_config["ctx"]
+        ctx = self._model_config["ctx"]
         # Create mask with the padded size (ctx, num_targets)
         observed_mask = np.ones((ctx, num_targets), dtype=bool)
 
@@ -119,7 +127,7 @@ class MoiraiMoeModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
-        forecast = self.model(
+        forecast = self._model(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,
