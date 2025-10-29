@@ -1,22 +1,21 @@
-import os
 import csv
-import json
-import numpy as np
-import pandas as pd
+import importlib.util
+
 from itertools import product
 from pathlib import Path
 from typing import List, Tuple
 
-from tempus_bench.config.models import UnifiedConfig
-from tempus_bench.utils.logger import get_logger
-from tempus_bench.utils.tf_logger import get_tf_logger
-from tempus_bench.utils.paths import get_dataset_path, get_task_path, get_tasks_dir, get_project_root
-from tempus_bench.pipeline.data_loader import DataLoader
-from tempus_bench.config import TaskConfig, get_config_manager, load_config
-from tempus_bench.pipeline.model_executor import ModelExecutor
+import numpy as np
 
-class HyperparameterTuner:
-    def __init__(self, config: UnifiedConfig, logs_path: str):
+from ..config.config import ConfigAdapterMixin
+from ..config.models import JobConfig
+from ..models.model_router import ModelRouter
+from ..utils.paths import get_task_path
+from .data_loader import DataLoader
+from .model_executor import ModelExecutor
+
+class HyperparameterTuner(ConfigAdapterMixin):
+    def __init__(self, job_config: JobConfig):
         """
         Initialize the hyperparameter tuner with configuration and directories.
 
@@ -26,114 +25,35 @@ class HyperparameterTuner:
             task_config: Task configuration (TaskConfig instance from ConfigManager)
         """
         # Setup config and paths
-        self.config = config
-        self.logs_path = Path(logs_path)
-        self.run_path = self.logs_path.parent
-        self.tf_logs_path = self.run_path / 'tensorboard'
-        self.data_loader = DataLoader(config=config, logs_path=logs_path)
-        self._setup_logging()
-
-    def _setup_logging(self):
-        self.logger = get_logger(self.logs_path)
-        tensorboard_logging = self.config.settings.tensorboard_logging
-        self.tf_logger = get_tf_logger(str(self.tf_logs_path), tensorboard_logging=tensorboard_logging)
-
-    def _is_valid_combination(self, model_name: str, combination: dict) -> bool:
-        """
-        Check if a hyperparameter combination is valid for the given model.
-
-        Args:
-            model_name: Name of the model
-            combination: Dictionary of hyperparameter values
-
-        Returns:
-            bool: True if combination is valid, False otherwise
-        """
-        if model_name == "exponential_smoothing":
-            # For exponential smoothing, if seasonal is not null, seasonal_periods must not be null
-            seasonal = combination.get("seasonal")
-            seasonal_periods = combination.get("seasonal_periods")
-
-            if seasonal is not None and seasonal != "null" and seasonal_periods is None:
-                return False
-            if seasonal is None or seasonal == "null":
-                if seasonal_periods is not None and seasonal_periods != "null":
-                    return False
-
-            # At least one of trend or seasonal must be specified (not null)
-            trend = combination.get("trend")
-            if (trend is None or trend == "null") and (seasonal is None or seasonal == "null"):
-                return False
-
-        elif model_name == "arima":
-            # For ARIMA, if seasonal component s > 0, then p, d, q should be reasonable
-            s = combination.get("s")
-            p = combination.get("p")
-            d = combination.get("d")
-            q = combination.get("q")
-
-            # Basic validation: p, d, q should be non-negative
-            if p < 0 or d < 0 or q < 0 or s < 0:
-                return False
-
-        elif model_name == "theta":
-            # For theta, sp should be positive
-            sp = combination.get("sp")
-            if sp is not None and sp <= 0:
-                return False
-
-        elif model_name == "seasonal_naive":
-            # For seasonal naive, sp should be positive
-            sp = combination.get("sp")
-            if sp is not None and sp <= 0:
-                return False
-
-        elif model_name == "croston_classic":
-            # For croston classic, alpha and gamma should be between 0 and 1
-            alpha = combination.get("alpha")
-            gamma = combination.get("gamma")
-            if alpha is not None and (alpha <= 0 or alpha >= 1):
-                return False
-            if gamma is not None and (gamma <= 0 or gamma >= 1):
-                return False
-
-        return True
+        super().__init__(job_config)
+        self.data_loader = DataLoader(job_config)
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
         """
-        Generate hyperparameter grid for a model.
-
-        Args:
-            model_name: Name of the model
-
-        Returns:
-            List of valid hyperparameter combinations
+        Generate hyperparameter grid for the single configured model by calling the
+        instantiated model's get_hyperparameter_grid() API (uses self.model_config).
         """
-        hyper_grid = []
-        if len(self.config.model) > 1:
+        model_map = self.config.model.model_dump(exclude_none=True)
+        if len(model_map) > 1:
             raise ValueError("Hyperparameter tuning is not supported for multiple models")
-        model_name = list(self.config.model.keys())[0]
-        hyperparameters = self.config.model[model_name]
-        if hyperparameters:
-            keys = list(hyperparameters.keys())
-            values_lists = [hyperparameters[k] for k in keys]
-            # Compute the Cartesian product of all hyperparameter value lists.
-            # For each combination, create a dictionary mapping each key to its value.
-            for values_tuple in product(*values_lists):
-                combination = dict(zip(keys, values_tuple))
-                # Check for incompatible combinations and log warnings
-                if self._is_valid_combination(model_name, combination):
-                    hyper_grid.append(combination)
-                else:
-                    self.logger.warning("HyperparameterTuner", f"Skipping incompatible parameter combination for {model_name}: {combination}")
-        else:
-            # For foundation models with no hyperparameters, use empty dict
-            hyper_grid = [{}]
-            self.logger.warning("HyperparameterTuner", f"No hyperparameters found for {model_name} (probably afoundation model)")
-        self.logger.info("HyperparameterTuner", f"Generated hyperparameter grid for {model_name}: number of combinations = {len(hyper_grid)}")
-        return hyper_grid
+
+        model_name = list(model_map.keys())[0]
+
+        # Route resolves model location, but we don't need to import the class to build the grid
+        router = ModelRouter()
+        _ = router.get_model_path_by_task_type(model_name, "deterministic")
+        # Build grid from config directly without constructing the model
+        params_space = model_map[model_name]
+        keys = list(params_space.keys())
+        values_lists = [params_space[k] for k in keys]
+        grid: list[dict] = []
+        for combo in product(*values_lists):
+            grid.append(dict(zip(keys, combo)))
+        self.logger.info("HyperparameterTuner", f"Generated hyperparameter grid for {model_name}: number of combinations = {len(grid)}")
+        return grid
 
     def optimize_hyperparameters(self, context_steps: int, train_steps: int, validate_steps: int) -> Tuple[dict, dict]:
+        #TODO - review @deni@smlcrm.com
         """
         Optimize hyperparameters for all models in the configuration.
 
@@ -145,129 +65,132 @@ class HyperparameterTuner:
         Returns:
             Tuple of (all_evals, best_hyperparameters) - evaluation results and best hyperparameters
         """
-        logging = self.config['logging']['console_logging']
         all_evals = {}
         best_hyperparameters = {}
-        # extract evaluation metrics from
-        evaluation_metrics = self.config.evaluation['metrics']
 
-        # Extract configuration parameters
-        tuning_loss = self.config['evaluation']['tuning_loss']
+        # Initialize model executor with minimal config
+        model_executor = ModelExecutor(
+            model_settings=self.model_settings,
+            config_path=self.job_config.benchmark_config.task_path,  # This will be passed to CLI but not used much
+            logs_path=str(Path(self.dataset_path).parent.parent.parent / "logs"),
+            task_type="univariate" if self.task_config.name.endswith("_univariate") else "multivariate",
+            enable_logging=self.benchmark_settings.console_logging
+        )
+        # Generate windows for this dataset
+        steps = [('context', context_steps), ('train', train_steps), ('validate', validate_steps)]
+        window_generator = self.data_loader.generate_dataset_split(
+            dataset_path=self.dataset_path,
+            steps=steps,
+            stride=validate_steps
+        )
 
-        for model_name in self.config["model"].keys():
-            # Initialize model executor
-            model_executor = ModelExecutor(
-                config_path=self.config_path,
-                logs_path=self.logs_path
-            )
+        # Store results for each window
+        window_results = []
+        optimal_hyperparameters = []
+        evaluations = []
+        num_windows = 0
 
-            # Generate windows for this dataset
-            steps = [('context', context_steps), ('train', train_steps), ('validate', validate_steps)]
-            window_iter = self.data_loader.generate_dataset_split(
-                self.dataset_path, steps, stride=validate_steps
-            )
+        # For each rolling window
+        for window_idx, dataset in window_generator:
+            self.logger.debug("HyperparameterTuner", f"Processing window {window_idx} for dataset {self.task_config.dataset.file_name}")
 
-            # Store results for each window
-            window_results = []
-            optimal_hyperparameters = []
-            evaluations = []
-            num_windows = 0
+            tuning_losses = {}
+            eval_metrics = {}
+            evaluation_metrics = None
 
-            # For each rolling window
-            for window_idx, window in window_iter:
-                if logging:
-                    self.logger.debug("HyperparameterTuner", f"Processing window {window_idx} for dataset {self.dataset_path}")
-
-                tuning_losses = {}
-                eval_metrics = {}
-
-                # Try each hyperparameter combination
-                for params in self._generate_hyperparameter_grid(model_name):
-                    try:
-                        # Execute model with these hyperparameters
-                        eval_losses = model_executor.execute_model(
-                            model_name=model_name,
-                            hyperparameters=params,
-                            context_steps=context_steps,
-                            train_steps=train_steps,
-                            validate_steps=validate_steps,
-                            dataset_path=self.dataset_path,
-                            window_idx=window_idx
-                        )
-
-                        immutable_params = tuple(sorted(params.items()))
-                        tuning_losses[immutable_params] = eval_losses[tuning_loss]
-                        eval_metrics[immutable_params] = eval_losses
-
-                        self.logger.debug("HyperparameterTuner", f"Evaluated model {model_name} with params {params}: {eval_losses}")
-                        # Log hyperparameters and metrics to TensorBoard
-                        self.tf_logger.log_hparams(params, eval_losses)
-
-                    except Exception as e:
-                        if logging:
-                            self.logger.error("HyperparameterTuner", f"Error executing model {model_name} with params {params}: {e}")
-                        continue
-
-                # Find the hyperparams with lowest tuning_loss for this window
-                if tuning_losses:
-                    best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
-                    optimal_hyperparameters.append(best_params)
-                    evaluations.append(eval_metrics)
-                    num_windows += 1
-
-                    # Generate forecast plot for best hyperparameters
-                    self._generate_forecast_plot(
-                        model_name=model_name,
-                        hyperparameters=dict(best_params),
+            # Try each hyperparameter combination
+            for params in self._generate_hyperparameter_grid():
+                try:
+                    # Execute model with these hyperparameters
+                    eval_losses = model_executor.execute_model(
+                        model_name=self.model_name,
+                        hyperparameters=params,
                         context_steps=context_steps,
                         train_steps=train_steps,
                         validate_steps=validate_steps,
-                        dataset_path=self.dataset_path,
+                        task_path=self.dataset_path,
                         window_idx=window_idx
                     )
 
-            if num_windows == 0:
-                if logging:
-                    self.logger.warning("HyperparameterTuner", f"No valid windows for dataset {dataset_path}")
-                continue
+                    immutable_params = tuple(sorted(params.items()))
+                    # Set evaluation metrics list on first successful eval
+                    if evaluation_metrics is None:
+                        evaluation_metrics = list(eval_losses.keys())
+                    tuning_losses[immutable_params] = eval_losses[self.tuning_loss]
+                    eval_metrics[immutable_params] = eval_losses
 
-            # Aggregate test loss over all windows, for each metric
-            test_loss = {metric: [] for metric in evaluation_metrics}
-            for window_j in range(num_windows-1):
-                best_params_prev = optimal_hyperparameters[window_j]
-                for metric in evaluation_metrics:
-                    if best_params_prev in evaluations[window_j+1]:
-                        test_loss[metric].append(
-                            evaluations[window_j+1][best_params_prev][metric]
-                        )
+                    self.logger.debug("HyperparameterTuner", f"Evaluated model {self.model_name} with params {params}: {eval_losses}")
+                    # Log hyperparameters and metrics to TensorBoard
+                    self.tf_logger.log_hparams(params, eval_losses)
 
-            avg_test_loss = {
-                metric: float(np.mean(test_loss[metric])) if test_loss[metric] else float('nan')
-                for metric in evaluation_metrics
-            }
+                except Exception as e:
+                    if self.benchmark_settings.console_logging:
+                        self.logger.error("HyperparameterTuner", f"Error executing model {self.model_name} with params {params}: {e}")
+                    continue
 
-            # Write to evaluations CSV in parent directory
-            csv_filename = f"evaluations.csv"
-            evals_dir = Path(self.logs_path).parent / "evals"
-            evals_dir.mkdir(exist_ok=True)
-            csv_outpath = evals_dir / csv_filename
-            file_exists = csv_outpath.exists()
-            row = [model_name, dataset_path] + [avg_test_loss[metric] for metric in evaluation_metrics] + [str(optimal_hyperparameters)]
-            with open(csv_outpath, "a", newline="") as csvfile:
-                writer = csv.writer(csvfile)
-                if not file_exists:  # write header
-                    writer.writerow(["model_name", "dataset_path"] + [f"avg_test_{metric}" for metric in evaluation_metrics] + ["best_params"])
-                writer.writerow(row)
+            # Find the hyperparams with lowest tuning_loss for this window
+            if tuning_losses:
+                best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
+                optimal_hyperparameters.append(best_params)
+                evaluations.append(eval_metrics)
+                num_windows += 1
 
-            # Store results for this dataset
-            model_evals[dataset_path] = avg_test_loss
-            model_best_params[dataset_path] = optimal_hyperparameters
+                # Generate forecast plot for best hyperparameters
+                self._generate_forecast_plot(
+                    model_name=self.model_name,
+                    hyperparameters=dict(best_params),
+                    context_steps=context_steps,
+                    train_steps=train_steps,
+                    validate_steps=validate_steps,
+                    dataset_path=self.dataset_path,
+                    window_idx=window_idx
+                )
 
-            # Store results for this model
-            all_evals[model_name] = model_evals
-            best_hyperparameters[model_name] = model_best_params
+        if num_windows == 0:
+            if self.benchmark_settings.console_logging:
+                self.logger.warning("HyperparameterTuner", f"No valid windows for dataset {self.dataset_path}")
+            return {}, {}
 
-        if logging:
+        # Aggregate test loss over all windows, for each metric
+        test_loss = {metric: [] for metric in evaluation_metrics}
+        for window_j in range(num_windows-1):
+            best_params_prev = optimal_hyperparameters[window_j]
+            for metric in evaluation_metrics:
+                if best_params_prev in evaluations[window_j+1]:
+                    test_loss[metric].append(
+                        evaluations[window_j+1][best_params_prev][metric]
+                    )
+
+        avg_test_loss = {
+            metric: float(np.mean(test_loss[metric])) if test_loss[metric] else float('nan')
+            for metric in evaluation_metrics
+        }
+
+        # Write to evaluations CSV in parent directory
+        csv_filename = f"evaluations.csv"
+        evals_dir = Path(self.logs_path).parent / "evals"
+        evals_dir.mkdir(exist_ok=True)
+        csv_outpath = evals_dir / csv_filename
+        file_exists = csv_outpath.exists()
+        row = [self.model_name, self.dataset_path] + [avg_test_loss[metric] for metric in evaluation_metrics] + [str(optimal_hyperparameters)]
+        # Append a new line to evaluations.csv if it already exists
+        with open(csv_outpath, "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            if not file_exists:  # write header on the first line
+                writer.writerow(["model_name", "dataset_path"] + [f"avg_test_{metric}" for metric in evaluation_metrics] + ["best_params"])
+            writer.writerow(row)
+
+        # Store results for this dataset
+        model_evals = {}
+        model_best_params = {}
+        model_evals[self.dataset_path] = avg_test_loss
+        model_best_params[self.dataset_path] = optimal_hyperparameters
+
+        # Store results for this model
+        all_evals[self.model_name] = model_evals
+        best_hyperparameters[self.model_name] = model_best_params
+
+        if self.benchmark_settings.console_logging:
             self.logger.success("HyperparameterTuner", "Hyperparameter optimization completed")
 
         return all_evals, best_hyperparameters
@@ -277,18 +200,10 @@ class HyperparameterTuner:
         Generate time series forecast plot showing context, train, validate data and predictions.
         """
         try:
-            # Import here to avoid circular imports
-            from .data_loader import DataLoader
-            from .model_executor import ModelExecutor
             import matplotlib.pyplot as plt
-            import numpy as np
-            import pandas as pd
 
             # Create data loader to get the window data
-            data_loader = DataLoader(
-                config_path=self.config_path,
-                logs_path=self.logs_path
-            )
+            data_loader = DataLoader(self.job_config)
 
             # Get the specific window data
             steps = [('context', context_steps), ('train', train_steps), ('validate', validate_steps)]
@@ -307,8 +222,11 @@ class HyperparameterTuner:
 
             # Create model executor to get predictions
             model_executor = ModelExecutor(
-                config_path=self.config_path,
-                logs_path=self.logs_path
+                model_settings=self.model_settings,
+                config_path=self.job_config.benchmark_config.task_path,
+                logs_path=str(Path(dataset_path).parent.parent.parent / "logs"),
+                task_type="univariate" if self.task_config.name.endswith("_univariate") else "multivariate",
+                enable_logging=False  # Don't need logging for plot generation
             )
 
             # Execute model to get predictions
@@ -318,7 +236,7 @@ class HyperparameterTuner:
                 context_steps=context_steps,
                 train_steps=train_steps,
                 validate_steps=validate_steps,
-                dataset_path=dataset_path,
+                task_path=dataset_path,
                 window_idx=window_idx
             )
 
