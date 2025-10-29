@@ -42,7 +42,7 @@ class HyperparameterTuner(ConfigAdapterMixin):
         router = ModelRouter()
         task_type = self.config['task']['task_type']
         folder_path, file_name, class_name = router.get_model_path_by_task_type(model_name, task_type)
-
+        #TODO - simplify - 3 lines of code
         import importlib.util
         module_path = str(Path(folder_path) / f"{file_name}.py")
         spec = importlib.util.spec_from_file_location(file_name, module_path)
@@ -60,6 +60,7 @@ class HyperparameterTuner(ConfigAdapterMixin):
         return grid
 
     def optimize_hyperparameters(self, context_steps: int, train_steps: int, validate_steps: int) -> Tuple[dict, dict]:
+        #TODO - review @deni@smlcrm.com
         """
         Optimize hyperparameters for all models in the configuration.
 
