@@ -18,10 +18,10 @@ from chronos import ChronosPipeline as BaseChronosPipeline
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
 from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class ChronosParams(PydanticBaseModel):
+class ChronosHyperparams(PydanticBaseModel):
     model_size: Optional[Literal["tiny", "mini", "small", "base", "large"]] = Field(default="tiny", description="Size of the Chronos model")
     context_length: Optional[int] = Field(default=2048, ge=1, description="Number of past time steps for context")
 
@@ -46,8 +46,9 @@ class ChronosModel(BaseModel):
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(params, settings, ChronosParams)
+        super().__init__(params, settings, ChronosHyperparams)
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -77,8 +78,8 @@ class ChronosModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        model_size = self.params.model_size
-        context_length = self.params.context_length
+        model_size = self.model_size
+        context_length = self.context_length
         
         # For foundation models, we don't need to load the model here
         # It will be loaded fresh for each prediction (like it was in the working version)
@@ -124,8 +125,8 @@ class ChronosModel(BaseModel):
         num_samples = kwargs["num_samples"]
         
         # Reference params, settings, device, python_version
-        model_size = self.params.model_size
-        context_length = self.params.context_length
+        model_size = self.model_size
+        context_length = self.context_length
 
         forecast_horizon = timestamps_target.shape[0]
 
