@@ -4,12 +4,12 @@ Pydantic models for configuration validation and type safety.
 This module defines all configuration models using Pydantic for comprehensive
 validation, type checking, and documentation of the benchmarking pipeline.
 """
-
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Literal, Union
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from typing import Any, Dict, List, Literal, Optional
 
-from tempus_bench.utils.paths import get_models_dir
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from ..utils.paths import get_models_dir
 
 class EvaluationConfig(BaseModel):
     """Evaluation configuration model."""
@@ -210,6 +210,16 @@ class TaskConfig(BaseModel):
     dataset: DatasetConfig = Field(
         ...,
         description="Dataset configuration for this task"
+    )
+
+class ModelSettingsConfig(BaseModel):
+    """Model execution settings configuration model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    python_version: str = Field(
+        ...,
+        description="Python version required for this model"
     )
 
 class BenchmarkSettingsConfig(BaseModel):
