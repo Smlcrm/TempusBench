@@ -212,28 +212,6 @@ class TaskConfig(BaseModel):
         description="Dataset configuration for this task"
     )
 
-class ModelSettingsConfig(BaseModel):
-    """Model settings configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    python_version: str = Field(
-        default="3.11",
-        description="Python version for conda environment"
-    )
-    device: Literal["cpu", "gpu"] = Field(
-        default="cpu",
-        description="Device to use for model execution"
-    )
-    model_path: Optional[str] = Field(
-        default=None,
-        description="Path to the model directory"
-    )
-    kwargs: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Model kwargs"
-    )
-
 class BenchmarkSettingsConfig(BaseModel):
     """Systems configuration model."""
 
@@ -271,7 +249,7 @@ class JobConfig(BaseModel):
 
     benchmark_config: BenchmarkConfig = Field(..., description="Benchmark configuration (must reference a single model)")
     benchmark_settings: BenchmarkSettingsConfig = Field(..., description="Benchmark settings")
-    model_settings: Dict[str, ModelSettingsConfig] = Field(..., description="Model execution settings (for a single model)")
+    model_settings: Dict[str, Any] = Field(..., description="Model execution settings")
     task_config: TaskConfig = Field(..., description="Task configuration")
 
     @model_validator(mode="after")

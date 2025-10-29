@@ -39,9 +39,10 @@ model:
     seasonality_mode: [additive]
     changepoint_prior_scale: [0.05]
     seasonality_prior_scale: [10.0]
-    # yearly_seasonality: [true]  # Moved to Optional with default True in Params
-    # weekly_seasonality: [true]  # Moved to Optional with default True in Params
-    # daily_seasonality: [false]  # Moved to Optional with default False in Params
+
+  random_forest:
+    n_estimators: [10]
+    max_depth: [2]
 
   seasonal_naive:
     sp: [24]
@@ -59,16 +60,6 @@ model:
     # random_state: [42]  # Not important for hyperparameter tuning
     # n_jobs: [1]  # Not important for hyperparameter tuning
 
-  random_forest:
-    # lookback_window: [50]  # Moved to settings.yaml
-    n_estimators: [10]
-    max_depth: [2]
-    # min_samples_split: [2]  # Moved to Optional with default 2 in Params
-    # min_samples_leaf: [1]  # Moved to Optional with default 1 in Params
-    # max_features: [sqrt]  # Moved to Optional with default sqrt in Params
-    # random_state: [42]  # Not important for hyperparameter tuning
-    # n_jobs: [1]  # Not important for hyperparameter tuning
-    # forecast_horizon: [50]  # Not important for hyperparameter tuning
 
   svr:
     kernel: [rbf]
