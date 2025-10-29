@@ -1,2 +1,2 @@
-python_version: "3.11"
-device: "cpu"
+python_version: "3.12"
+lookback_window: 2048

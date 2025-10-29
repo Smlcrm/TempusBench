@@ -11,7 +11,7 @@ class BaseMetric:
             raise ValueError(f"Shape mismatch: y_true has shape {y_true.shape}, but expected ({T}, {M}) to match y_pred (num_samples={S}, time_steps={T}, num_targets={M})")
         if len(y_pred.shape) > 2:
             raise ValueError("y_pred can't have more than 2 dimensions for deterministic evaluation")
-        
+
         if task_type == 'stochastic':
             point_forecast_statistic = kwargs['point_forecast_statistic']
             if point_forecast_statistic == 'mean':

@@ -8,315 +8,244 @@ capture temporal dependencies in time series data.
 The model supports both seasonal and non-seasonal ARIMA variants and can handle
 exogenous variables for enhanced forecasting performance.
 """
+from typing import Any, Dict
 
-import pdb
 import numpy as np
-import pandas as pd
+from pydantic import BaseModel as PydanticBaseModel, Field
 from statsmodels.tsa.arima.model import ARIMA
-from typing import Dict, Any, Union, Tuple, Optional
-import pickle
-import os
-from tempus_bench.models.base_model import BaseModel
-from tempus_bench.utils.logger import get_logger
+
+from ...base_model import BaseModel, validate_inputs
+
+class ArimaHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
+    p: int = Field(..., ge=0, description="AR order (autoregressive)")
+    d: int = Field(..., ge=0, description="Differencing order (integration)")
+    q: int = Field(..., ge=0, description="MA order (moving average)")
+    s: int = Field(..., ge=1, description="Seasonality period")
 
 class ArimaModel(BaseModel):
     """
     ARIMA model for univariate time series forecasting.
 
-    This class implements the ARIMA model with support for:
-    - Non-seasonal ARIMA(p,d,q) models
-    - Seasonal ARIMA(p,d,q)(P,D,Q,s) models
-    - Exogenous variable support
-    - Rolling window predictions
-    - Model persistence and loading
+    Supports both standard ARIMA(p, d, q) and seasonal ARIMA by specifying a seasonality period s.
+    Implements traditional statsmodels ARIMA fitting, with future expandability to exogenous variables and
+    rolling window forecasts.
 
     Attributes:
-        p: AR order (autoregressive)
-        d: Differencing order (integration)
-        q: MA order (moving average)
-        s: Seasonality period
-        model_: Fitted ARIMA model instance
-        loss_function: Loss function for training
+        p: int - Autoregressive order
+        d: int - Differencing order
+        q: int - Moving average order
+        s: int - Seasonality period (s=1 disables seasonal ARIMA)
+
+    The trained model is stored as a statsmodels ARIMA result object in self._model.
     """
 
-    def __init__(self, config: UnifiedConfig, logs_path: str):
-        """
-        Initialize ARIMA model with given configuration.
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        super().__init__(params, settings, ArimaHyperparams)
 
-        Args:
-            config_path: Path to the configuration YAML file
-            logs_path: Directory for storing log files (required)
-            hyperparameters: Model-specific hyperparameters
-        """
-        super().__init__(config_path, logs_path, hyperparameters)
-        self.full_config = self.config
-
-        # Extract ARIMA-specific parameters
-        if "p" not in self.model_config:
-            raise ValueError("p must be specified in config")
-        if "d" not in self.model_config:
-            raise ValueError("d must be specified in config")
-        if "q" not in self.model_config:
-            raise ValueError("q must be specified in config")
-        if "s" not in self.model_config:
-            raise ValueError("s must be specified in config")
-
-        # Log initialization parameters
-
-        self.logger.debug("ARIMA Init", f"Initializing ARIMA model with parameters: p={self.model_config['p']}, d={self.model_config['d']}, q={self.model_config['q']}, s={self.model_config['s']}")
-            self.logger.debug("ARIMA Init", f"Full config received: {self.full_config}")
-
-        # Initialize model state
-        self.model_ = None
-        self.is_fitted = False
-
-        # forecast_horizon is inherited from parent class (BaseModel)
-
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs: dict,
     ) -> "ArimaModel":
         """
-        Train the ARIMA model on given data.
+        Fit the ARIMA model on the provided context data.
 
         Args:
-            y_context: Past target values - training data (required)
-            y_target: Future target values (not used in training, for compatibility)
-            timestamps_context: Timestamps for y_context (not used in ARIMA)
-            timestamps_target: Timestamps for y_target (not used in ARIMA)
-            freq: Frequency string (required by interface, not used in ARIMA)
+            y_context (np.ndarray): Historical target values for model fitting.
+            y_target (np.ndarray): Future target values (unused; included for compatibility).
+            timestamps_context (np.ndarray): Timestamps corresponding to y_context (unused).
+            timestamps_target (np.ndarray): Timestamps corresponding to y_target (unused).
+            freq (str): Frequency string (required for interface, unused by ARIMA).
 
         Returns:
-            self: The fitted model instance
+            ArimaModel: The fitted model instance.
 
-        Note:
-            ARIMA models only use y_context for training.
-            y_target, timestamps_context, timestamps_target, and freq are ignored to prevent data leakage.
+        Notes:
+            Only y_context is used for fitting the ARIMA model. All other arguments are ignored to avoid data leakage.
         """
 
-        self.logger.debug("ARIMA Train", f"Starting training with input shapes: y_context={y_context.shape}, y_target={y_target.shape if y_target is not None else None}")
-            self.logger.debug("ARIMA Train", f"Timestamps context range: {timestamps_context[0] if len(timestamps_context) > 0 else 'empty'} to {timestamps_context[-1] if len(timestamps_context) > 0 else 'empty'}")
-            self.logger.debug("ARIMA Train", f"Timestamps target range: {timestamps_target[0] if len(timestamps_target) > 0 else 'empty'} to {timestamps_target[-1] if len(timestamps_target) > 0 else 'empty'}")
-            self.logger.debug("ARIMA Train", f"Frequency parameter: {freq}")
+        freq = kwargs["freq"]
 
-        # Ensure endogenous series is 1D for statsmodels
+        self.logger.debug(
+            "ArimaModel._train",
+            f"Start training: y_context={y_context.shape}, y_target={getattr(y_target, 'shape', None)}"
+        )
+
+        if len(timestamps_context) > 0:
+            self.logger.debug(
+                "ArimaModel._train",
+                f"Timestamps context: {timestamps_context[0]} to {timestamps_context[-1]}"
+            )
+        if len(timestamps_target) > 0:
+            self.logger.debug(
+                "ArimaModel._train",
+                f"Timestamps target: {timestamps_target[0]} to {timestamps_target[-1]}"
+            )
+        self.logger.debug("ArimaModel._train", f"Frequency: {freq}")
+
         endog = y_context.squeeze()
+        self.logger.debug(
+            "ArimaModel._train",
+            f"Endogenous shape: {endog.shape}, sample: {endog[:5] if endog.size >= 5 else endog}"
+        )
 
-
-        self.logger.debug("ARIMA Train", f"Endogenous series shape after squeeze: {endog.shape}")
-            self.logger.debug("ARIMA Train", f"Endogenous series sample values: {endog[:5] if len(endog) >= 5 else endog}")
-
-        # No exogenous variables supported
-        exog = None
-
-        self.logger.debug("ARIMA Train", f"Exogenous variables: {exog} (None - not supported)")
-
-        # Use seasonal_order only if seasonal period is greater than 1
-        if self.model_config["s"] > 1:
-
-            self.logger.debug("ARIMA Train", f"Using seasonal ARIMA with seasonal period s={self.model_config['s']}")
+        if self.s > 1:
+            self.logger.debug("ArimaModel._train", f"Seasonal ARIMA (s={self.s})")
             model = ARIMA(
                 endog=endog,
-                order=(
-                    self.model_config["p"],
-                    self.model_config["d"],
-                    self.model_config["q"],
-                ),
-                seasonal_order=(0, 0, 0, self.model_config["s"]),
-                exog=exog,
+                order=(self.p, self.d, self.q),
+                seasonal_order=(0, 0, 0, self.s),
+                exog=None,
             )
         else:
-            # Non-seasonal ARIMA
-
-            self.logger.debug("ARIMA Train", f"Using non-seasonal ARIMA")
+            self.logger.debug("ArimaModel._train", "Non-seasonal ARIMA")
             model = ARIMA(
                 endog=endog,
-                order=(
-                    self.model_config["p"],
-                    self.model_config["d"],
-                    self.model_config["q"],
-                ),
-                exog=exog,
+                order=(self.p, self.d, self.q),
+                exog=None,
             )
 
+        self.logger.debug("ArimaModel._train", f"ARIMA params: {self.params}")
+        self.logger.debug("ArimaModel._train", "Fitting model...")
 
-        self.logger.debug("ARIMA Train", f"Model order parameters: p={self.model_config['p']}, d={self.model_config['d']}, q={self.model_config['q']}, s={self.model_config['s']}")
-            self.logger.debug("ARIMA Train", f"Starting model fitting...")
+        self._model = model.fit()
 
-        self.model_ = model.fit()
-
-
-        self.logger.debug("ARIMA Train", f"Model fitted successfully")
-            self.logger.debug("ARIMA Train", f"Model summary: {self.model_.summary()}")
-            self.logger.debug("ARIMA Train", f"Model AIC: {self.model_.aic}, BIC: {self.model_.bic}")
-            self.logger.debug("ARIMA Train", f"Model coefficients: {self.model_.params}")
-            self.logger.info("ARIMA Train", "Training completed successfully")
-
+        self.logger.debug("ArimaModel._train", "Model fitted")
+        self.logger.debug("ArimaModel._train", f"AIC: {self._model.aic}, BIC: {self._model.bic}")
+        self.logger.debug("ArimaModel._train", f"Coefficients: {self._model.params}")
+        self.logger.info("ArimaModel._train", "Training complete")
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs: dict
     ) -> np.ndarray:
         """
-        Make predictions using the trained ARIMA model, rolling forward using the fitted model.
+        Predicts future values using the trained ARIMA model.
 
         Args:
-            y_context: Recent/past target values (not used for ARIMA prediction)
-            timestamps_context: Timestamps for y_context (not used for ARIMA prediction)
-            timestamps_target: Timestamps for the prediction horizon (used to determine forecast length)
-            freq: Frequency string (must be provided from CSV data, required)
+            y_context: Past target values (unused, present for interface consistency)
+            timestamps_context: Context timestamps (unused)
+            timestamps_target: Timestamps for the forecast horizon
+            freq: Frequency string (must be provided in kwargs)
 
         Returns:
-            np.ndarray: Model predictions with shape (forecast_horizon, 1)
+            np.ndarray: Predictions with shape (forecast_horizon, 1)
 
         Raises:
-            ValueError: If model is not fitted, freq is not provided, or forecast length cannot be determined
+            ValueError: If the model is not fitted, freq is missing/empty, or forecast horizon is invalid.
         """
-
-        self.logger.debug("ARIMA Predict", f"Starting prediction with context shape: {y_context.shape}")
-            self.logger.debug("ARIMA Predict", f"Timestamps context: {timestamps_context[0] if len(timestamps_context) > 0 else 'empty'} to {timestamps_context[-1] if len(timestamps_context) > 0 else 'empty'}")
-            self.logger.debug("ARIMA Predict", f"Timestamps target: {timestamps_target[0] if len(timestamps_target) > 0 else 'empty'} to {timestamps_target[-1] if len(timestamps_target) > 0 else 'empty'}")
+        self.logger.debug(
+            "ArimaModel._predict",
+            f"Context shape: {y_context.shape}, "
+            f"Timestamps context: {timestamps_context[0] if len(timestamps_context) > 0 else 'empty'} to "
+            f"{timestamps_context[-1] if len(timestamps_context) > 0 else 'empty'}, "
+            f"Timestamps target: {timestamps_target[0] if len(timestamps_target) > 0 else 'empty'} to "
+            f"{timestamps_target[-1] if len(timestamps_target) > 0 else 'empty'}"
+        )
 
         if not self.is_fitted:
-            raise ValueError("Model not fitted. Call train() first.")
-        if freq is None or freq == "":
-            raise ValueError(
-                "Frequency (freq) must be provided from CSV data. Cannot use defaults or fallbacks."
-            )
+            raise ValueError("ArimaModel not fitted. Call train() first.")
 
-        if timestamps_target is None:
-            raise ValueError(
-                "timestamps_target must be provided to determine forecast horizon for ARIMA."
-            )
+        if timestamps_target is None or len(timestamps_target) == 0:
+            raise ValueError("timestamps_target must be provided and non-empty for ARIMA prediction.")
+
         forecast_steps = len(timestamps_target)
-        if forecast_steps <= 0:
-            raise ValueError(
-                "Forecast horizon must be positive (timestamps_target must be non-empty)."
-            )
+        forecast = self._model.forecast(steps=forecast_steps)
+        y_pred = np.asarray(forecast).reshape(-1, 1)
 
+        self.logger.debug("ArimaModel._predict", f"Prediction shape: {y_pred.shape}")
+        self.logger.info("ArimaModel._predict", "Prediction completed")
 
-        self.logger.debug("ARIMA Predict", f"Frequency validation passed: {freq}")
-            self.logger.debug("ARIMA Predict", f"Forecast steps calculated from timestamps_target: {forecast_steps}")
-            self.logger.debug("ARIMA Predict", f"Generating forecast...")
+        return y_pred
 
-        forecast = self.model_.forecast(steps=forecast_steps, exog=None)
-        forecast_array = np.asarray(forecast)
-
-
-        self.logger.debug("ARIMA Predict", f"Forecast values generated: {forecast_array}")
-            self.logger.debug("ARIMA Predict", f"Forecast array shape: {forecast_array.shape}")
-
-        self._last_y_pred = forecast_array.reshape(-1, 1)
-
-
-        self.logger.debug("ARIMA Predict", f"Final prediction shape: {self._last_y_pred.shape}")
-            self.logger.info("ARIMA Predict", "Prediction completed successfully")
-
-        return self._last_y_pred
-
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs: dict
     ) -> "ArimaModel":
         """
-        Anyvariate wrapper: trains a separate ARIMA per variate if multivariate,
-        or a single ARIMA in the univariate case.
+        Trains a separate ARIMA model for each variate in a (potentially multivariate) time series.
 
-        Assumes y_context and y_target are 2D ndarrays: (num_steps, num_targets), even for univariate.
+        Expects y_context and y_target as 2D arrays: (num_steps, num_targets).
         """
         num_targets = y_context.shape[1]
+        self.logger.debug("ArimaModel.train", f"Number of features/variates detected: {num_targets}")
 
-
-        self.logger.debug("ARIMA Train Wrapper", f"Number of features/variates detected: {num_targets}")
-
-        # Multivariate: more than one feature (column)
-        if num_targets > 1:
-
-            self.logger.debug("ARIMA Train Wrapper", "Taking multivariate path - training separate ARIMA per variate")
-            self.models = []
-            for k in range(num_targets):
-
-                self.logger.debug("ARIMA Train Wrapper", f"Training variate k={k}")
-                yc = y_context[:, k]    # Already 1D
-                yt = y_target[:, k] if y_target is not None else None  # Already 1D
-                # No need to reshape to 2D column; _train can handle 1D array for this variate
-                m = ArimaModel(self.config_path, logs_path=self.logs_path, hyperparameters=self.model_config)
-                m._train(
-                    y_context=yc,
-                    y_target=yt,
-                    timestamps_context=timestamps_context,
-                    timestamps_target=timestamps_target,
-                    freq=freq,
-                )
-                self.models.append(m)
-            # For compatibility, mirror first model state to top-level attributes
-            self.model_ = self.models[0].model_
-            self.is_fitted = True
-
-            self.logger.info("ARIMA Train Wrapper", f"Multivariate training completed for {num_targets} variates")
-            return self
-        else:
-            # Univariate: input is always (num_steps, 1)
-
-            self.logger.debug("ARIMA Train Wrapper", "Taking univariate path")
-            return self._train(
-                y_context=y_context,
-                y_target=y_target,
+        self._models = []
+        for k in range(num_targets):
+            self.logger.debug("ArimaModel.train", f"Training variate k={k}")
+            model = ArimaModel(params=self.model_dump())
+            model._train(
+                y_context=y_context[:, k],
+                y_target=y_target[:, k],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
-                freq=freq,
+                **kwargs
             )
+            self._models.append(model)
+        self.is_fitted = True
 
+        self.logger.info("ArimaModel.train", f"Training completed for {num_targets} variates")
+        return self
+
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs: dict
     ) -> np.ndarray:
         """
-        Anyvariate wrapper: predicts per variate and stacks columns.
+        Predicts future values for each variate and concatenates the results.
+
+        Args:
+            y_context (np.ndarray): Context values, shape (num_steps, num_variates).
+            timestamps_context (np.ndarray): Timestamps for context data.
+            timestamps_target (np.ndarray): Timestamps for target/future data.
+            **kwargs: Should include 'freq' key.
+
+        Returns:
+            np.ndarray: Predictions with shape (forecast_horizon, num_variates).
+
+        Raises:
+            ValueError: If the model has not been fitted.
         """
-        if hasattr(self, "models") and self.models:
+        if not self.is_fitted:
+            raise ValueError("ArimaModel not fitted. Call train() first.")
 
-            self.logger.debug("ARIMA Predict Wrapper", f"Multivariate prediction for {len(self.models)} variates")
-            preds = []
-            num_variates = len(self.models)
-            for k, m in enumerate(self.models):
-
-                self.logger.debug("ARIMA Predict Wrapper", f"Predicting for variate k={k}")
-                yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
-                pk = m._predict(
-                    y_context=yc,
-                    timestamps_context=timestamps_context,
-                    timestamps_target=timestamps_target,
-                    freq=freq,
-                )
-                preds.append(pk.reshape(-1, 1))
-            result = np.concatenate(preds, axis=1)
-
-            self.logger.debug("ARIMA Predict Wrapper", f"Final concatenated prediction shape: {result.shape}")
-                self.logger.info("ARIMA Predict Wrapper", "Multivariate prediction completed successfully")
-            return result
-        # Univariate
-
-        self.logger.debug("ARIMA Predict Wrapper", "Univariate prediction")
-        return self._predict(
-            y_context=y_context,
-            timestamps_context=timestamps_context,
-            timestamps_target=timestamps_target,
-            freq=freq,
+        self.logger.debug(
+            "ArimaModel.predict",
+            f"Multivariate prediction for {len(self._models)} variates"
         )
+
+        preds = []
+        for idx, model in enumerate(self._models):
+            self.logger.debug("ArimaModel.predict", f"Predicting for variate {idx}")
+            prediction = model._predict(
+                y_context=y_context[:, idx],
+                timestamps_context=timestamps_context,
+                timestamps_target=timestamps_target,
+                **kwargs
+            )
+            preds.append(prediction)
+        result = np.hstack(preds)
+
+        self.logger.debug("ArimaModel.predict", f"Prediction shape: {result.shape}")
+        self.logger.info("ArimaModel.predict", "Prediction completed successfully")
+        return result
