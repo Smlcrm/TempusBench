@@ -15,11 +15,11 @@ from sklearn.multioutput import MultiOutputRegressor
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
 from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 from tempus_bench.utils.logger import get_logger
 
 
-class XgboostParams(PydanticBaseModel):
+class XgboostHyperparams(PydanticBaseModel):
     n_estimators: int = Field(default=100, ge=1, description="Number of boosting rounds")
     max_depth: int = Field(default=6, ge=1, description="Maximum tree depth")
     learning_rate: float = Field(default=0.1, gt=0, description="Learning rate")
@@ -39,7 +39,7 @@ class XGBoostModel(BaseModel):
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(params, settings, XgboostParams)
+        super().__init__(params, settings, XgboostHyperparams)
         self._build_model()
 
     def _build_model(self):
@@ -81,7 +81,7 @@ class XGBoostModel(BaseModel):
             np.ndarray: Feature vector for the single sample
         """
         num_targets = y_series.shape[1]
-        lookback_window = self.settings["lookback_window"]
+        lookback_window = self."lookback_window"]
         
         # Take the last lookback_window timesteps
         current_window = y_series[-lookback_window:, :]  # Shape: (lookback_window, num_targets)
@@ -161,7 +161,7 @@ class XGBoostModel(BaseModel):
         forecast_horizon = kwargs["forecast_horizon"]
         
         # Reference params, settings, device, python_version
-        lookback_window = self.settings["lookback_window"]
+        lookback_window = self."lookback_window"]
         
         n_samples = (
             num_steps
@@ -306,6 +306,7 @@ class XGBoostModel(BaseModel):
         
         return features_array, targets_array
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -339,7 +340,7 @@ class XGBoostModel(BaseModel):
         forecast_horizon = kwargs["forecast_horizon"]
         
         # Reference params, settings, device, python_version
-        lookback_window = self.settings["lookback_window"]
+        lookback_window = self."lookback_window"]
         
         if self._model is None:
             self._build_model()
@@ -388,7 +389,7 @@ class XGBoostModel(BaseModel):
         forecast_horizon = kwargs["forecast_horizon"]
         
         # Reference params, settings, device, python_version
-        lookback_window = self.settings["lookback_window"]
+        lookback_window = self."lookback_window"]
 
         preds = []
         # Use the entire context, maintaining the multivariate structure
@@ -452,6 +453,7 @@ class XGBoostModel(BaseModel):
         result = np.concatenate(preds, axis=1)  # Shape: (num_targets, total_steps)
         return result
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -482,7 +484,7 @@ class XGBoostModel(BaseModel):
         forecast_horizon = kwargs["forecast_horizon"]
         
         # Reference params, settings, device, python_version
-        lookback_window = self.settings["lookback_window"]
+        lookback_window = self."lookback_window"]
         
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")

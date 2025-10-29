@@ -5,11 +5,11 @@ from typing import Dict, Any, Union, Tuple, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
 
 from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 
-class TinyTimeMixerParams(PydanticBaseModel):
+class TinyTimeMixerHyperparams(PydanticBaseModel):
     # Foundation model with minimal parameters
     pass
 
@@ -19,12 +19,12 @@ class TinyTimeMixerModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize TinyTimeMixer model.
-        
+
         Args:
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(params, settings, TinyTimeMixerParams)
+        super().__init__(params, settings, TinyTimeMixerHyperparams)
 
         # forecast_horizon is inherited from parent class (BaseModel)
         self._model = None
@@ -78,6 +78,7 @@ class TinyTimeMixerModel(BaseModel):
 
         return timestamps
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -102,14 +103,15 @@ class TinyTimeMixerModel(BaseModel):
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
         forecast_horizon = kwargs["forecast_horizon"]
-        
+
         # Reference params, settings, device, python_version
         # TinyTimeMixer is a foundation model with minimal params
-        
+
         # TinyTimeMixer is a zero-shot model, so training is not needed
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -121,7 +123,7 @@ class TinyTimeMixerModel(BaseModel):
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
         forecast_horizon = kwargs["forecast_horizon"]
-        
+
         # Reference params, settings, device, python_version
         # TinyTimeMixer is a foundation model with minimal params
 
@@ -130,7 +132,7 @@ class TinyTimeMixerModel(BaseModel):
         # Handle (num_steps, num_targets) format
         if y_context.ndim == 1:
             y_context = y_context.reshape(-1, 1)
-            
+
         num_steps, num_targets = y_context.shape
 
         # Construct DataFrame - Tiny Time Mixer expects (timesteps, num_targets)
@@ -142,7 +144,7 @@ class TinyTimeMixerModel(BaseModel):
 
         results = self._sub_predict(df, forecast_horizon)
         results = np.asarray(results)
-        
+
         # Convert to (forecast_horizon, num_targets) format
         if results.ndim == 1:
             # Univariate case
@@ -150,7 +152,7 @@ class TinyTimeMixerModel(BaseModel):
         elif results.ndim == 2 and results.shape[1] == forecast_horizon:
             # Results are (num_targets, forecast_horizon), transpose to (forecast_horizon, num_targets)
             results = results.T
-        
+
         return results
 
     def _sub_predict(self, dataframe: pd.DataFrame, forecast_horizon):

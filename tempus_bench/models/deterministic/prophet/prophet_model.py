@@ -6,13 +6,16 @@ from typing import Literal
 from sklearn.preprocessing import StandardScaler
 from prophet import Prophet
 from typing import Dict, Any, Union, Optional
-from prophet.serialize import model_to_json, model_from_json
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
-class ProphetParams(PydanticBaseModel):
+class ProphetHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     seasonality_mode: Literal["additive", "multiplicative"] = Field(default="additive", description="Seasonality mode")
+    changepoint_prior_scale: float = Field(default=0.05, ge=0, le=1, description="Changepoint prior scale")
+    seasonality_prior_scale: float = Field(default=10.0, ge=0, description="Seasonality prior scale")
+    # Fixed Hyperparameters - Optional for User to override
     yearly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable yearly seasonality (bool) or increase the number of Fourier terms (int)")
     weekly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable weekly seasonality (bool or increase the number of Fourier terms (int)")
     daily_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)")
@@ -30,14 +33,15 @@ class ProphetParams(PydanticBaseModel):
 
 class ProphetModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, ProphetParams)
+        super().__init__(params, settings, ProphetHyperparams)
         self._build_model()
         self._scaler = StandardScaler()
 
     def _build_model(self):
-        self._model = Prophet(**self.params.model_dump())
+        self._model = Prophet(**self.params.model_dump(exclude_none=True))
         self.is_fitted = False
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -57,6 +61,7 @@ class ProphetModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
@@ -85,6 +90,7 @@ class ProphetModel(BaseModel):
 
         return predictions
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -108,7 +114,7 @@ class ProphetModel(BaseModel):
         """
         self._models = []
         for i in range(y_context.shape[1]):
-            model = ProphetModel(params=self.params.dict())
+            model = ProphetModel(params=self.dict())
             model._train(
                 y_context=y_context[:, i],
                 y_target=y_target[:, i] if y_target is not None else None,
@@ -120,6 +126,7 @@ class ProphetModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,

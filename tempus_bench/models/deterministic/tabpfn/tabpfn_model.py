@@ -5,10 +5,10 @@ from typing import Dict, Any, Optional
 from tabpfn import TabPFNRegressor
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class TabpfnParams(PydanticBaseModel):
+class TabpfnHyperparams(PydanticBaseModel):
     allow_large_cpu_dataset: Optional[bool] = Field(default=False, description="Allow large CPU datasets")
     max_sequence_length: Optional[int] = Field(default=1000, ge=1, description="Maximum sequence length")
     device: Optional[str] = Field(default="cpu", description="Device to use for computation")
@@ -36,13 +36,14 @@ class TabpfnModel(BaseModel):
         """
         Initializes a TabPFN-TS forecaster with model-specific parameters
         """
-        super().__init__(params, settings, TabpfnParams)
+        super().__init__(params, settings, TabpfnHyperparams)
 
         # Set device - default to CPU for TabPFN
-        self.device = self.params.device
+        self.device = self.device
         self._model = None
         self.is_fitted = False
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -56,6 +57,7 @@ class TabpfnModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
@@ -64,8 +66,8 @@ class TabpfnModel(BaseModel):
         **kwargs: dict
     ):
         # Map legacy keys to expected ones for backward compatibility
-        context_window = int(kwargs.get("context_window", self.params.max_sequence_length))
-        forecast_window = int(kwargs.get("forecast_window", kwargs.get("prediction_length", self.params.max_sequence_length)))
+        context_window = int(kwargs.get("context_window", self.max_sequence_length))
+        forecast_window = int(kwargs.get("forecast_window", kwargs.get("prediction_length", self.max_sequence_length)))
 
         # Determine total horizon from target timestamps
         forecast_horizon = int(getattr(timestamps_target, "shape", [0])[0])
@@ -98,6 +100,7 @@ class TabpfnModel(BaseModel):
 
         return np.concatenate(preds, axis=0)
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -110,13 +113,13 @@ class TabpfnModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        max_sequence_length = self.params.max_sequence_length
+        max_sequence_length = self.max_sequence_length
         
         if y_context.ndim > 1 and y_context.shape[1] > 1:
             self._models = []
             num_targets = y_context.shape[1]
             for k in range(num_targets):
-                m = TabpfnModel(params=self.params.dict(), settings=self.settings)
+                m = TabpfnModel(params=self.dict(), settings=self.settings)
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
                 m._train(y_context=yc, y_target=yt, timestamps_context=timestamps_context, timestamps_target=timestamps_target, **kwargs)
@@ -125,6 +128,7 @@ class TabpfnModel(BaseModel):
             return self
         return self._train(y_context, y_target, timestamps_context, timestamps_target, **kwargs)
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -136,7 +140,7 @@ class TabpfnModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        max_sequence_length = self.params.max_sequence_length
+        max_sequence_length = self.max_sequence_length
         
         if hasattr(self, "models") and self._models:
             preds = []

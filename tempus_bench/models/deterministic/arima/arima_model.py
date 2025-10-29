@@ -9,15 +9,17 @@ The model supports both seasonal and non-seasonal ARIMA variants and can handle
 exogenous variables for enhanced forecasting performance.
 """
 
-from typing import Any, Dict
+from ast import Dict
 import numpy as np
+from typing import Any
 
 from statsmodels.tsa.arima.model import ARIMA
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
-class ArimaParams(PydanticBaseModel):
+class ArimaHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     p: int = Field(..., ge=0, description="AR order (autoregressive)")
     d: int = Field(..., ge=0, description="Differencing order (integration)")
     q: int = Field(..., ge=0, description="MA order (moving average)")
@@ -41,8 +43,9 @@ class ArimaModel(BaseModel):
     """
 
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, ArimaParams)
+        super().__init__(params, settings, ArimaHyperparams)
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -93,19 +96,19 @@ class ArimaModel(BaseModel):
             f"Endogenous shape: {endog.shape}, sample: {endog[:5] if endog.size >= 5 else endog}"
         )
 
-        if self.params.s > 1:
-            self.logger.debug("ArimaModel._train", f"Seasonal ARIMA (s={self.params.s})")
+        if self.s > 1:
+            self.logger.debug("ArimaModel._train", f"Seasonal ARIMA (s={self.s})")
             model = ARIMA(
                 endog=endog,
-                order=(self.params.p, self.params.d, self.params.q),
-                seasonal_order=(0, 0, 0, self.params.s),
+                order=(self.p, self.d, self.q),
+                seasonal_order=(0, 0, 0, self.s),
                 exog=None,
             )
         else:
             self.logger.debug("ArimaModel._train", "Non-seasonal ARIMA")
             model = ARIMA(
                 endog=endog,
-                order=(self.params.p, self.params.d, self.params.q),
+                order=(self.p, self.d, self.q),
                 exog=None,
             )
 
@@ -121,6 +124,7 @@ class ArimaModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
@@ -167,6 +171,7 @@ class ArimaModel(BaseModel):
 
         return y_pred
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -186,7 +191,7 @@ class ArimaModel(BaseModel):
         self._models = []
         for k in range(num_targets):
             self.logger.debug("ArimaModel.train", f"Training variate k={k}")
-            model = ArimaModel(params=self.params.model_dump())
+            model = ArimaModel(params=self.model_dump())
             model._train(
                 y_context=y_context[:, k],
                 y_target=y_target[:, k],
@@ -200,6 +205,7 @@ class ArimaModel(BaseModel):
         self.logger.info("ArimaModel.train", f"Training completed for {num_targets} variates")
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
