@@ -12,7 +12,7 @@ evaluation:
   point_forecast_statistic: mean
 
 model:
-  # Deterministic
+  # Deterministic Models
   arima:
     p: [1, 2]
     d: [1]
@@ -47,40 +47,33 @@ model:
   seasonal_naive:
     sp: [24]
 
+  svr:
+    kernel: [rbf]
+    C: [1.0]
+
+  tabpfn: {}
+
   theta:
     sp: [12]
     theta_method: [correlation_optimal]
+
+  timesfm: {}
+
+  tiny_time_mixer: {}
+
+  varmax:
+    p: [1, 2]
+    q: [1, 2]
 
   xgboost:
     n_estimators: [200]
     max_depth: [4]
     learning_rate: [0.05]
-    # subsample: [0.9]  # Moved to Optional with default 0.9 in Params
-    # colsample_bytree: [0.9]  # Moved to Optional with default 0.9 in Params
-    # random_state: [42]  # Not important for hyperparameter tuning
-    # n_jobs: [1]  # Not important for hyperparameter tuning
 
-
-  svr:
-    kernel: [rbf]
-    C: [1.0]
-    # epsilon: [0.1]  # Moved to Optional with default 0.1 in Params
-    # gamma: [scale]  # Moved to Optional with default scale in Params
-    # lookback_window: [30]  # Moved to settings.yaml
-    # forecast_horizon: [25]  # Not important for hyperparameter tuning
-
-  varmax:
-    p: [1, 2]
-    q: [1, 2]
-    # trend: [c]  # Moved to Optional with default "c" in Params
-
-  # Foundation models (no hyperparameters)
-  chronos: {}
-  deepar: {}
-  tiny_time_mixer: {}
-  moirai: {}
-  moirai_moe: {}
-  timesfm: {}
-  lagllama: {}
-  toto: {}
-  tabpfn: {}
+  # Stochastic models
+  # chronos: {}
+  # deepar: {}
+  # moirai: {}
+  # moirai_moe: {}
+  # lagllama: {}
+  # toto: {}
