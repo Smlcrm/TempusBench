@@ -20,19 +20,16 @@ warnings.filterwarnings("ignore")
 
 
 class VarmaxHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     p: int = Field(..., ge=0, description="Number of AR parameters")
     q: int = Field(..., ge=0, description="Number of MA parameters")
-    trend: Optional[Literal["c", "t", "ct"]] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
+    # Fixed Hyperparameters - Optional for User to override
+    trend: Literal["c", "t", "ct"] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
 
 
-class VARMAXModel(BaseModel):
+class VarmaxModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        """
-        Initialize VARMAX model with model-specific parameters.
-        """
         super().__init__(params, settings, VarmaxHyperparams)
-
-        self._model = None
 
     @validate_inputs
     def train(
@@ -42,7 +39,7 @@ class VARMAXModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         **kwargs: dict,
-    ) -> "VARMAXModel":
+    ) -> "VarmaxModel":
         """
         Train the Multivariate VARMAX model on given data.
 
@@ -61,23 +58,19 @@ class VARMAXModel(BaseModel):
         Returns:
             self: The fitted model instance
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
         p = self.p
         q = self.q
         trend = self.trend
-        
-        timestamps_context = self.convert_to_datetimeindex(timestamps_context)
+
+        timestamps_context = self._convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
-            self._model = VARMAX(
-                endog=y_context, exog=None, 
-                order=(p, q), 
+            model = VARMAX(
+                endog=y_context, exog=None,
+                order=(p, q),
                 trend=trend
             )
 
-        self.results = self._model.fit()
+            self._model = model.fit()
 
         return self
 
@@ -107,27 +100,15 @@ class VARMAXModel(BaseModel):
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
-        p = self.p
-        q = self.q
-        trend = self.trend
-        
+
         if self._model is None:
             raise ValueError("Model not fitted. Call train first.")
 
-        forecast_steps = len(timestamps_target)
-        forecasts = self.results.forecast(steps=forecast_steps)
+        forecast_steps = timestamps_target.shape[0]
+        forecasts = self._model.forecast(steps=forecast_steps)
+        return np.asarray(forecasts).T # (forecast_steps, num_targets)
 
-        forecasts = np.array(forecasts)
-        if len(forecasts.shape) == 1:
-            forecasts = np.expand_dims(forecasts, axis=-1)
-
-        return forecasts
-
-    def convert_to_datetimeindex(self, timestamps):
+    def _convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
         timestamps = np.squeeze(timestamps)
         if not isinstance(timestamps, pd.DatetimeIndex):
