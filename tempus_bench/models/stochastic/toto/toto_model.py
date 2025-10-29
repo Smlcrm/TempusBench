@@ -1,15 +1,17 @@
 import os
-import torch
+import re
+
+from typing import Any, Dict, Optional, Union
+
 import numpy as np
 import pandas as pd
-import re
-from typing import Optional, Union, Dict, Any
+import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
-from .toto.model.toto import Toto
+
+from ...base_model import BaseModel
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
+from .toto.model.toto import Toto
 
 
 class TotoHyperparams(PydanticBaseModel):

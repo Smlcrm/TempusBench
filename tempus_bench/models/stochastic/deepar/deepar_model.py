@@ -4,21 +4,21 @@ DeepAR model implementation for stochastic time series forecasting.
 This module provides a DeepAR model implementation that inherits from BaseModel
 and returns probabilistic forecasts through sampling.
 """
+import math
+import os
+import pickle
+import time
 
+from typing import Any, Dict, List, Literal, Optional, Tuple
+
+import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
-import lightning.pytorch as pl
-from pytorch_forecasting import DeepAR, TimeSeriesDataSet
-from typing import Dict, Any, Union, Tuple, Optional, List
-import pickle
-import os
-import time
-import math
-from pytorch_lightning.loggers import TensorBoardLogger
 from pydantic import BaseModel as PydanticBaseModel, Field
-from typing import Literal
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from pytorch_forecasting import DeepAR, TimeSeriesDataSet
+from pytorch_lightning.loggers import TensorBoardLogger
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class DeeparHyperparams(PydanticBaseModel):

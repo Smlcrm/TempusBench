@@ -1,13 +1,13 @@
-import torch
-import pandas as pd
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
-from typing import Dict, Any
-from typing import Optional, List, Union
+import pandas as pd
+import torch
 from einops import rearrange
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tempus_bench.config.models import JobConfig
-from tempus_bench.models.base_model import BaseModel
 from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
+
+from ...base_model import BaseModel, validate_inputs
 
 
 class MoiraiMoeHyperparams(PydanticBaseModel):
@@ -38,6 +38,7 @@ class MoiraiMoeModel(BaseModel):
         self._model = None
         self.is_fitted = False
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -80,6 +81,7 @@ class MoiraiMoeModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
