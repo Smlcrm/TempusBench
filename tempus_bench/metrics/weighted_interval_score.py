@@ -43,7 +43,7 @@ class WeightedIntervalScore:
             raise ValueError(f"WeightedIntervalScore can only be used with 'stochastic' task_type, got '{task_type}'.")
 
         WIS = np.zeros(y_true.shape)
-        for a in np.arange(0.1, 1.1, 0.1):
+        for a in np.linspace(0.0, 1.0, num=kwargs['num_quantiles']):
             l = np.quantile(y_pred, a/2, axis=0)      # Lower bound: F⁻¹(α/2)
             u = np.quantile(y_pred, 1 - a/2, axis=0)  # Upper bound: F⁻¹(1 - α/2)
             dist = np.maximum(0, np.maximum(l - y_true, y_true - u))

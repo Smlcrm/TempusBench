@@ -25,7 +25,7 @@ class QuantileScore(BaseMetric):
         y_ppred = self.process_y_pred(y_true, y_pred, **kwargs)
         rho = lambda u, tau: np.maximum(tau * u, (tau - 1) * u)
         QS = np.zeros(y_true.shape)
-        for tau in np.arange(0.0, 1.1, 0.1):
+        for tau in np.linspace(0.0, 1.0, num=kwargs['num_quantiles']):
             q_tau = np.quantile(y_ppred, tau, axis=0)
             QS += rho(y_true-q_tau, tau)
         return np.mean(QS)

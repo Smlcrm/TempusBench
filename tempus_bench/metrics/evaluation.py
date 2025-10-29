@@ -68,5 +68,6 @@ class Evaluator:
                 y_true=y_true,
                 y_pred=y_pred,
                 task_type=task_type,
-                point_forecast_statistic=kwargs['point_forecast_statistic'])
+                point_forecast_statistic=kwargs['point_forecast_statistic'],
+                num_quantiles=kwargs['num_quantiles'])
         return results
