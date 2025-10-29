@@ -1,15 +1,14 @@
 """
 Seasonal Naive model implementation.
 """
-from typing import Any, Dict
-
 import numpy as np
 import pandas as pd
+
+from typing import Any, Dict
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sktime.forecasting.naive import NaiveForecaster
 
 from ...base_model import BaseModel, validate_inputs
-
 
 class SeasonalNaiveHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
@@ -50,21 +49,13 @@ class SeasonalNaiveModel(BaseModel):
         sp = self.sp
 
         if not self.is_fitted:
-            # Handle multivariate data by creating separate models for each feature
-            if isinstance(y_context, np.ndarray) and y_context.ndim == 2:
-                num_targets = y_context.shape[1]
-                self._models = []
-                for i in range(num_targets):
-                    model = NaiveForecaster(strategy="last", sp=sp)
-                    series_data = pd.Series(y_context[:, i])
-                    model.fit(y=series_data, X=None)
-                    self._models.append(model)
-            else:
-                # Handle univariate data
-                if not isinstance(y_context, pd.Series):
-                    y_context = pd.Series(y_context)
-                self._model = NaiveForecaster(strategy="last", sp=sp)
-                self._model.fit(y=y_context, X=None)
+            num_targets = y_context.shape[1]
+            self._models = []
+            for i in range(num_targets):
+                model = NaiveForecaster(strategy="last", sp=sp)
+                series_data = pd.Series(y_context[:, i])
+                model.fit(y=series_data, X=None)
+                self._models.append(model)
 
         self.is_fitted = True
         return self
@@ -94,25 +85,14 @@ class SeasonalNaiveModel(BaseModel):
             raise ValueError("Model is not trained yet. Call train() first.")
 
         # extract freq (validated by base pattern elsewhere if needed)
-        forecast_horizon = len(timestamps_target)
+        forecast_horizon, num_targets = timestamps_target.shape
         fh = np.arange(1, forecast_horizon + 1)
 
-        # Handle multivariate data
-        if hasattr(self, 'models') and self._models:
-            # Multivariate case: predict for each feature
-            num_targets = len(self._models)
-            predictions = np.zeros((forecast_horizon, num_targets))
+        predictions = np.zeros((forecast_horizon, num_targets))
 
-            for i, model in enumerate(self._models):
-                pred = model.predict(fh=fh)
-                if len(pred.shape) == 1:
-                    pred = np.asarray(pred)
-                predictions[:, i] = pred
-        else:
-            # Univariate case
-            predictions = self._model.predict(fh=fh)
-            if len(predictions.shape) == 1:
-                predictions = np.asarray(predictions)
-                predictions = np.expand_dims(predictions, axis=0)  # Make it (1, forecast_horizon)
-
+        for i, model in enumerate(self._models):
+            pred = model.predict(fh=fh)
+            if len(pred.shape) == 1:
+                pred = np.asarray(pred)
+            predictions[:, i] = pred
         return predictions
