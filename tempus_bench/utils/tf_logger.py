@@ -1,23 +1,20 @@
+"""
+TensorBoard logging utilities for metrics, plots, and hyperparameters.
+This logger only writes to TensorBoard files - no console output.
+"""
 import io
 import os
+
+import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
+from tensorboard.plugins.hparams import api as hp
+from typing import Optional
 
 # Configure TensorFlow threading before import
 os.environ.setdefault('TF_NUM_INTEROP_THREADS', '1')
 os.environ.setdefault('TF_NUM_INTRAOP_THREADS', '1')
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
-
-import tensorflow as tf
-import matplotlib.pyplot as plt
-
-from typing import Optional
-from datetime import datetime
-from tensorboard.plugins.hparams import api as hp
-
-"""
-TensorBoard logging utilities for metrics, plots, and hyperparameters.
-This logger only writes to TensorBoard files - no console output.
-"""
 
 class TFLogger:
     def __init__(self, tf_logs_path: str, name: str = "TFLogger", tensorboard_logging: Optional[bool] = None):

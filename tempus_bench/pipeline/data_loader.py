@@ -23,14 +23,14 @@ Example:
     ... ):
     ...     # Process dataset...
 """
-import pandas as pd
-
 from pathlib import Path
 
-from tempus_bench.config.config import ConfigAdapterMixin
-from tempus_bench.config.models import JobConfig
-from tempus_bench.pipeline.preprocessor import Preprocessor
-from tempus_bench.pipeline.data_types import Dataset, DatasetSplit
+import pandas as pd
+
+from ..config.config import ConfigAdapterMixin
+from ..config.models import JobConfig
+from .data_types import Dataset, DatasetSplit
+from .preprocessor import Preprocessor
 
 class DataLoader(ConfigAdapterMixin):
     """
