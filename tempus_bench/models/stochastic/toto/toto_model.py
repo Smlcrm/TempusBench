@@ -12,7 +12,7 @@ from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
 
 
-class TotoParams(PydanticBaseModel):
+class TotoHyperparams(PydanticBaseModel):
     # Foundation model with minimal parameters
     pass
 
@@ -29,7 +29,7 @@ class TotoModel(BaseModel):
         super().__init__(config, logs_path)
         
         # Validate and set model config using Pydantic
-        self._model_config = TotoParams(**self._model_config).model_dump()
+        self._model_config = TotoHyperparams(**self._model_config).model_dump()
 
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 

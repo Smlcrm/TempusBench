@@ -21,7 +21,7 @@ if lagllama_dir not in sys.path:
 from lag_llama.gluon.estimator import LagLlamaEstimator
 
 
-class LagllamaParams(PydanticBaseModel):
+class LagllamaHyperparams(PydanticBaseModel):
     context_length: Optional[int] = Field(default=2048, ge=1, description="Context window size")
     num_samples: Optional[int] = Field(default=10, ge=1, description="Number of probabilistic samples")
     batch_size: Optional[int] = Field(default=1, ge=1, description="Batch size")
@@ -42,19 +42,19 @@ class LagllamaModel(BaseModel):
             settings: Settings dictionary containing device, python_version, etc.
         """
         # Initialize base model
-        super().__init__(params, settings, LagllamaParams)
+        super().__init__(params, settings, LagllamaHyperparams)
 
         # Model-specific attributes
         self._model = None
-        self.logger.info("LagllamaModel.__init__", f"🦙 Lag-Llama initialized - Context: {self.params.context_length}")
+        self.logger.info("LagllamaModel.__init__", f"🦙 Lag-Llama initialized - Context: {self.context_length}")
 
     def _create_predictor_for_horizon(self, forecast_horizon: int):
         """Create a predictor for a specific forecast horizon."""
         
         # Reference params, settings, device, python_version
-        context_length = self.params.context_length
-        batch_size = self.params.batch_size
-        num_samples = self.params.num_samples
+        context_length = self.context_length
+        batch_size = self.batch_size
+        num_samples = self.num_samples
 
         # Create the estimator with the specified horizon
         estimator = LagLlamaEstimator(
@@ -173,8 +173,8 @@ class LagllamaModel(BaseModel):
         num_samples = kwargs["num_samples"]
         
         # Reference params, settings, device, python_version
-        context_length = self.params.context_length
-        batch_size = self.params.batch_size
+        context_length = self.context_length
+        batch_size = self.batch_size
         
         forecast_horizon = timestamps_target.shape[0]
         # Create predictor for this horizon
@@ -264,16 +264,16 @@ class LagllamaModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        context_length = self.params.context_length
-        num_samples = self.params.num_samples
-        batch_size = self.params.batch_size
+        context_length = self.context_length
+        num_samples = self.num_samples
+        batch_size = self.batch_size
         
         if y_context.ndim > 1 and y_context.shape[1] > 1:
             # Treat each feature (column) as an independent series
             self._models = []
             num_targets = y_context.shape[1]
             for k in range(num_targets):
-                m = LagllamaModel(params=self.params.model_dump(), settings=self.settings)
+                m = LagllamaModel(params=self.model_dump(), settings=self.settings)
                 yc = y_context[:, k]
                 yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
                 m._train(
@@ -311,8 +311,8 @@ class LagllamaModel(BaseModel):
         num_samples = kwargs["num_samples"]
         
         # Reference params, settings, device, python_version
-        context_length = self.params.context_length
-        batch_size = self.params.batch_size
+        context_length = self.context_length
+        batch_size = self.batch_size
         
         if hasattr(self, "models") and self._models:
             preds = []
