@@ -13,12 +13,12 @@ import pickle
 import warnings
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 warnings.filterwarnings("ignore")
 
 
-class VarmaxParams(PydanticBaseModel):
+class VarmaxHyperparams(PydanticBaseModel):
     p: int = Field(..., ge=0, description="Number of AR parameters")
     q: int = Field(..., ge=0, description="Number of MA parameters")
     trend: Optional[Literal["c", "t", "ct"]] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
@@ -29,10 +29,11 @@ class VARMAXModel(BaseModel):
         """
         Initialize VARMAX model with model-specific parameters.
         """
-        super().__init__(params, settings, VarmaxParams)
+        super().__init__(params, settings, VarmaxHyperparams)
 
         self._model = None
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -63,9 +64,9 @@ class VARMAXModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        p = self.params.p
-        q = self.params.q
-        trend = self.params.trend
+        p = self.p
+        q = self.q
+        trend = self.trend
         
         timestamps_context = self.convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
@@ -79,6 +80,7 @@ class VARMAXModel(BaseModel):
 
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -108,9 +110,9 @@ class VARMAXModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        p = self.params.p
-        q = self.params.q
-        trend = self.params.trend
+        p = self.p
+        q = self.q
+        trend = self.trend
         
         if self._model is None:
             raise ValueError("Model not fitted. Call train first.")

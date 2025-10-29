@@ -1,6 +1,5 @@
-python_version: "3.11"
+python_version: "3.12"
 device: "cpu"
-settings:
-  beta_1: 0.9
-  beta_2: 0.999
-  epsilon: 1e-7
+beta_1: 0.9
+beta_2: 0.999
+epsilon: 1e-7

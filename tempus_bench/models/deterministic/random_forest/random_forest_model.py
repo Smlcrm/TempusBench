@@ -10,10 +10,10 @@ from sklearn.ensemble import RandomForestRegressor
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
 
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class RandomForestParams(PydanticBaseModel):
+class RandomForestHyperparams(PydanticBaseModel):
     n_estimators: int = Field(default=100, ge=1, description="Number of trees in the forest")
     max_depth: int = Field(default=None, ge=1, description="Maximum depth of trees")
     min_samples_split: Optional[int] = Field(default=2, ge=2, description="Minimum samples to split a node")
@@ -26,7 +26,7 @@ class RandomForestModel(BaseModel):
         """
         Initialize Random Forest model with model-specific parameters.
         """
-        super().__init__(params, settings, RandomForestParams)
+        super().__init__(params, settings, RandomForestHyperparams)
         self._build_model()
 
     def _build_model(self):
@@ -37,7 +37,7 @@ class RandomForestModel(BaseModel):
         self.logger.debug("RandomForestModel._build_model", "building model")
         # Get hyperparameters from params, excluding non-estimator parameters
         model_params = {}
-        for key, value in self.params.dict().items():
+        for key, value in self.dict().items():
             if key not in ["lookback_window"]:
                 model_params[key] = value
 
@@ -194,6 +194,7 @@ class RandomForestModel(BaseModel):
 
         return np.array(features), np.array(targets)
 
+    @validate_inputs
     def _train(
         self,
         y_context: np.ndarray,
@@ -254,6 +255,7 @@ class RandomForestModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -270,6 +272,7 @@ class RandomForestModel(BaseModel):
             **kwargs,
         )
 
+    @validate_inputs
     def _predict(
         self,
         y_context: np.ndarray,
@@ -343,6 +346,7 @@ class RandomForestModel(BaseModel):
 
         return preds_reshaped
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,

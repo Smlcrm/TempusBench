@@ -14,10 +14,10 @@ import matplotlib.pyplot as plt
 import io
 from pydantic import BaseModel as PydanticBaseModel, Field
 from typing import Literal
-from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
-class SvrParams(PydanticBaseModel):
+class SvrHyperparams(PydanticBaseModel):
     kernel: Literal["linear", "poly", "rbf", "sigmoid"] = Field(default="rbf", description="SVR kernel type")
     C: float = Field(default=1.0, gt=0, description="Regularization parameter")
     epsilon: Optional[float] = Field(default=0.1, ge=0, description="Epsilon parameter for epsilon-SVR")
@@ -30,7 +30,7 @@ class SVRModel(BaseModel):
         Initialize Support Vector Regression (SVR) model with model-specific parameters.
         Uses direct multi-output strategy via sklearn's MultiOutputRegressor.
         """
-        super().__init__(params, settings, SvrParams)
+        super().__init__(params, settings, SvrHyperparams)
         self._scaler = StandardScaler()  # SVR is sensitive to feature scaling
         self._build_model()
 
@@ -39,7 +39,7 @@ class SVRModel(BaseModel):
         Build the SVR model instance from the configuration using MultiOutputRegressor for direct multi-output forecasting.
         """
         # Build base SVR from params fields relevant to estimator
-        base_svr = SVR(kernel=self.params.kernel, C=self.params.C, epsilon=self.params.epsilon, gamma=self.params.gamma)
+        base_svr = SVR(kernel=self.kernel, C=self.C, epsilon=self.epsilon, gamma=self.gamma)
         self._model = MultiOutputRegressor(base_svr)
         self.is_fitted = False
 
@@ -77,6 +77,7 @@ class SVRModel(BaseModel):
 
         return X, y
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -119,6 +120,7 @@ class SVRModel(BaseModel):
 
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,

@@ -2,17 +2,17 @@
 Seasonal Naive model implementation.
 """
 
-import os
-import pickle
-from typing import Dict, Any, Union
 import numpy as np
 import pandas as pd
+
+from typing import Dict, Any
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 from sktime.forecasting.naive import NaiveForecaster
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tempus_bench.models.base_model import BaseModel
 
 
-class SeasonalNaiveParams(PydanticBaseModel):
+class SeasonalNaiveHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     sp: int = Field(..., ge=1, description="Seasonal period")
 
 
@@ -21,8 +21,9 @@ class SeasonalNaiveModel(BaseModel):
         """
         Initialize Seasonal Naive model with model-specific parameters.
         """
-        super().__init__(params, settings, SeasonalNaiveParams)
+        super().__init__(params, settings, SeasonalNaiveHyperparams)
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -45,11 +46,8 @@ class SeasonalNaiveModel(BaseModel):
         Returns:
             self: The fitted model instance.
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
-        sp = self.params.sp
+
+        sp = self.sp
 
         if not self.is_fitted:
             # Handle multivariate data by creating separate models for each feature
@@ -71,6 +69,7 @@ class SeasonalNaiveModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
@@ -90,25 +89,20 @@ class SeasonalNaiveModel(BaseModel):
         Returns:
             np.ndarray: Model predictions with shape (num_series, forecast_horizon).
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
-        sp = self.params.sp
-        
+
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
         # extract freq (validated by base pattern elsewhere if needed)
         forecast_horizon = len(timestamps_target)
         fh = np.arange(1, forecast_horizon + 1)
-        
+
         # Handle multivariate data
         if hasattr(self, 'models') and self._models:
             # Multivariate case: predict for each feature
             num_targets = len(self._models)
             predictions = np.zeros((forecast_horizon, num_targets))
-            
+
             for i, model in enumerate(self._models):
                 pred = model.predict(fh=fh)
                 if len(pred.shape) == 1:
