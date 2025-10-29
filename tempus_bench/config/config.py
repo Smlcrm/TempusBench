@@ -5,18 +5,17 @@ This module provides comprehensive validation and management of configuration fi
 to ensure they comply with the expected schema before execution. The ConfigManager class handles
 validation of benchmark configurations, model settings, task configurations, and system settings.
 """
-
 import yaml
 
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 from pydantic import ValidationError
 
-from tempus_bench.utils.logger import get_logger
-from tempus_bench.utils.tf_logger import get_tf_logger
-
-from .models import BenchmarkConfig, JobConfig, TaskConfig, ModelSettingsConfig, BenchmarkSettingsConfig
-from tempus_bench.utils.paths import get_models_dir, get_task_path, get_tasks_dir, get_configs_dir
+from .models import BenchmarkConfig, BenchmarkSettingsConfig, JobConfig, ModelSettingsConfig, TaskConfig
+from ..utils.logger import get_logger
+from ..utils.paths import get_configs_dir, get_models_dir, get_task_path, get_tasks_dir
+from ..utils.tf_logger import get_tf_logger
 
 # Global config manager instance
 _global_config_manager = None

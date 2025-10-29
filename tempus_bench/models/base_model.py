@@ -8,21 +8,20 @@ evaluation, and model persistence.
 All traditional models (ARIMA, LSTM, XGBoost, etc.) should inherit from this class and implement
 the required abstract methods.
 """
-
-import numpy as np
-import pandas as pd
-
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Union, Optional
-from pydantic import BaseModel as PydanticBaseModel
-from functools import wraps
 import inspect
 
-from tempus_bench.config.models import JobConfig
-from tempus_bench.metrics.evaluation import Evaluator
-from tempus_bench.config.config import ConfigAdapterMixin
-from tempus_bench.config.models import JobConfig
-from tempus_bench.utils.logger import get_logger
+from abc import ABC, abstractmethod
+from functools import wraps
+from typing import Any, Dict, Optional
+
+import numpy as np
+
+from pydantic import BaseModel as PydanticBaseModel
+
+from ..config.config import ConfigAdapterMixin
+from ..config.models import JobConfig
+from ..metrics.evaluation import Evaluator
+from ..utils.logger import get_logger
 
 class BaseModel(ABC):
     """
