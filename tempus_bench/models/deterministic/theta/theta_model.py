@@ -14,11 +14,10 @@ https://onlinelibrary.wiley.com/doi/full/10.1002/for.2334 ( Forecasting Multivar
 """
 import os
 import pickle
-
-from typing import Any, Dict, List, Literal, Optional
-
 import numpy as np
 import pandas as pd
+
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
@@ -28,23 +27,19 @@ from ...base_model import BaseModel, validate_inputs
 
 
 class ThetaHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
     sp: int = Field(..., ge=1, description="Seasonal period")
+    theta_method: Literal["least_squares", "correlation_optimal"] = Field(..., description="Method for theta estimation")
+    # Fixed Hyperparameters - Optional for User to override
     use_reduced_rank: bool = Field(default=False, description="Whether to use cointegration/reduced rank")
-    theta_method: Literal["least_squares", "correlation_optimal"] = Field(default="least_squares", description="Method for theta estimation")
 
 
-class Theta(BaseModel):
+class ThetaModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize the Multivariate Theta model with model-specific parameters.
         """
         super().__init__(params, settings, ThetaHyperparams)
-
-        # Note: theta_method should be in config, no defaults
-        self._models = {}
-        self.theta_matrix = None
-        self.drift_vector = None
-        self.is_fitted = False
 
     def _estimate_drift(self, y_context: np.ndarray) -> np.ndarray:
         """
@@ -56,9 +51,7 @@ class Theta(BaseModel):
         Returns:
             np.ndarray: Drift vector of shape (num_targets,)
         """
-        # Calculate first differences
         diff_data = np.diff(y_context, axis=0)
-        # Drift is mean of first differences
         return np.mean(diff_data, axis=0)
 
     def _detrend_data(
@@ -102,7 +95,6 @@ class Theta(BaseModel):
             # Regress diff_i on all lagged levels
             y = diff_data[:, i]  # dependent variable
             X = lagged_data  # independent variables (all targets)
-
             # Fit regression
             reg = LinearRegression(fit_intercept=False)
             reg.fit(X, y)
@@ -124,22 +116,12 @@ class Theta(BaseModel):
         """
         # Calculate first differences
         diff_data = np.diff(detrended_data, axis=0)
-
-        # Estimate correlation matrices
-        cov_matrix = np.cov(diff_data.T)
-
-        # For simplicity, use the correlation structure to set off-diagonals
-        # In practice, this would involve more complex optimization as in the paper
-        theta_matrix = np.eye(num_targets)  # Start with identity
-
-        # Set off-diagonal elements based on correlations
+        theta_matrix = np.eye(num_targets)
         corr_matrix = np.corrcoef(diff_data.T)
         for i in range(num_targets):
             for j in range(num_targets):
                 if i != j:
-                    # Use correlation as proxy for optimal theta (simplified)
                     theta_matrix[i, j] = 0.5 * corr_matrix[i, j]
-
         return theta_matrix
 
     def _create_theta_lines(
@@ -164,11 +146,11 @@ class Theta(BaseModel):
     def train(
         self,
         y_context: np.ndarray,
-        y_target: Optional[np.ndarray],
-        timestamps_context: Optional[np.ndarray],
-        timestamps_target: Optional[np.ndarray],
-        **kwargs: dict,
-    ) -> "Theta":
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict
+    ) -> "ThetaModel":
         """
         Train the Multivariate Theta model on given data.
 
@@ -189,9 +171,7 @@ class Theta(BaseModel):
         Returns:
             self: The fitted model instance
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
+
         # Reference params, settings, device, python_version
         sp = self.sp
         theta_method = self.theta_method
@@ -215,7 +195,7 @@ class Theta(BaseModel):
             self.theta_matrix = self._estimate_theta_matrix_correlation_optimal(
                 detrended_data, num_targets
             )
-        else:
+        elif theta_method == 'least_squares':
             self.theta_matrix = self._estimate_theta_matrix_least_squares(
                 detrended_data, num_targets
             )
@@ -236,7 +216,7 @@ class Theta(BaseModel):
             # Also disable deseasonalization if we don't have at least two full cycles
             insufficient_cycles = len(theta_line_series) < 2 * sp
             deseasonalize = (not has_non_positive) and (not insufficient_cycles)
-            
+
             # Create and fit univariate Theta model
             # Disable deseasonalization if data has non-positive values
             theta_model = ThetaForecaster(
@@ -244,7 +224,6 @@ class Theta(BaseModel):
                 deseasonalize=deseasonalize
             )
             theta_model.fit(y=theta_line_series)
-
             self._models[i] = theta_model
 
         self.is_fitted = True
@@ -276,37 +255,14 @@ class Theta(BaseModel):
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, num_targets)
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
-        sp = self.sp
-        
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
-        forecast_horizon = len(timestamps_target)
-        num_targets = self.num_targets
-        # Determine forecast horizon
-        fh = np.arange(1, forecast_horizon + 1)
-
-        forecast_steps = len(fh)
-
-        # Get predictions from each individual Theta model
+        forecast_horizon, num_targets = timestamps_target.shape
         all_predictions = np.zeros((forecast_horizon, num_targets))
-
         for i in range(num_targets):
-            # Get forecast from individual model
-            theta_forecast = self._models[i].predict(fh=fh)
-
-            # Add back the linear trend
+            theta_forecast = self._models[i].predict(fh=np.arange(1, forecast_horizon + 1))
             future_times = np.arange(1, forecast_horizon + 1)
             linear_trend = future_times * self.drift_vector[i]
-
             all_predictions[:, i] = theta_forecast.values + linear_trend
-
-        forecasts = np.asarray(all_predictions)
-        if len(forecasts) == 1:
-            forecasts = np.expand_dims(forecasts, axis=1)
-
-        return forecasts
+        return all_predictions

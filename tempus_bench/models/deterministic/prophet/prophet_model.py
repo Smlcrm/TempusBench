@@ -10,13 +10,13 @@ from ...base_model import BaseModel, validate_inputs
 
 class ProphetHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
-    seasonality_mode: Literal["additive", "multiplicative"] = Field(default="additive", description="Seasonality mode")
-    changepoint_prior_scale: float = Field(default=0.05, ge=0, le=1, description="Changepoint prior scale")
-    seasonality_prior_scale: float = Field(default=10.0, ge=0, description="Seasonality prior scale")
+    seasonality_mode: Literal["additive", "multiplicative"] = Field(..., description="Seasonality mode")
+    changepoint_prior_scale: float = Field(..., ge=0, le=1, description="Changepoint prior scale")
+    seasonality_prior_scale: float = Field(..., ge=0, description="Seasonality prior scale")
     # Fixed Hyperparameters - Optional for User to override
     yearly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable yearly seasonality (bool) or increase the number of Fourier terms (int)")
-    weekly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable weekly seasonality (bool or increase the number of Fourier terms (int)")
-    daily_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)")
+    weekly_seasonality: Optional[Union[int, bool]] = Field(..., description="Enable weekly seasonality (bool or increase the number of Fourier terms (int)")
+    daily_seasonality: Optional[Union[int, bool]] = Field(..., description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)")
     def __init__(self, **data):
         super().__init__(**data)
         # Enforce that only one of the seasonality options can be set (not None)

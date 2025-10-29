@@ -1,2 +1,4 @@
 python_version: "3.12"
 device: "cpu"
+allow_large_cpu_dataset: false
+max_sequence_length: 1000

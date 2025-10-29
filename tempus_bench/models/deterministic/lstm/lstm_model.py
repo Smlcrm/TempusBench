@@ -29,8 +29,8 @@ class LstmHyperparams(PydanticBaseModel):
     dropout: float = Field(..., ge=0, le=1, description="Dropout rate")
     learning_rate: float = Field(..., gt=0, description="Learning rate for optimizer")
     ### Fixed Hyperparameters - Optional for User to override
-    batch_size: Optional[int] = Field(default=32, ge=1, description="Batch size for training")
-    epochs: Optional[int] = Field(default=50, ge=1, description="Number of training epochs")
+    batch_size: int = Field(default=32, ge=1, description="Batch size for training")
+    epochs: int = Field(default=50, ge=1, description="Number of training epochs")
 
 
 class LSTMModel(BaseModel):
