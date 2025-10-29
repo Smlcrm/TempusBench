@@ -59,7 +59,6 @@ class BaseModel(ABC):
 
 
     @abstractmethod
-    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
@@ -82,7 +81,6 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
