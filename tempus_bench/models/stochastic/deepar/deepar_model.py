@@ -21,7 +21,7 @@ from tempus_bench.config.models import JobConfig
 from tempus_bench.models.base_model import BaseModel
 
 
-class DeeparParams(PydanticBaseModel):
+class DeeparHyperparams(PydanticBaseModel):
     hidden_size: Optional[int] = Field(default=32, ge=1, description="Hidden size of RNN")
     rnn_layers: Optional[int] = Field(default=2, ge=1, description="Number of RNN layers")
     dropout: Optional[float] = Field(default=0.1, ge=0, le=1, description="Dropout rate")
@@ -51,7 +51,7 @@ class DeepARModel(BaseModel):
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(params, settings, DeeparParams)
+        super().__init__(params, settings, DeeparHyperparams)
 
         self._model = None
 
@@ -137,14 +137,14 @@ class DeepARModel(BaseModel):
         freq = kwargs["freq"]
 
         # Reference params, settings, device, python_version
-        hidden_size = self.params.hidden_size
-        rnn_layers = self.params.rnn_layers
-        dropout = self.params.dropout
-        learning_rate = self.params.learning_rate
-        batch_size = self.params.batch_size
-        max_encoder_length = self.params.max_encoder_length
-        max_prediction_length = self.params.max_prediction_length
-        num_workers = self.settings.get("num_workers", 0)
+        hidden_size = self.hidden_size
+        rnn_layers = self.rnn_layers
+        dropout = self.dropout
+        learning_rate = self.learning_rate
+        batch_size = self.batch_size
+        max_encoder_length = self.max_encoder_length
+        max_prediction_length = self.max_prediction_length
+        num_workers = self.get("num_workers", 0)
 
         training_dataset = self._series_to_TimeSeriesDataset(y_context)
         validation_dataset = self._series_to_TimeSeriesDataset(y_target)
@@ -197,14 +197,14 @@ class DeepARModel(BaseModel):
         num_samples = kwargs["num_samples"]
 
         # Reference params, settings, device, python_version
-        hidden_size = self.params.hidden_size
-        rnn_layers = self.params.rnn_layers
-        dropout = self.params.dropout
-        learning_rate = self.params.learning_rate
-        batch_size = self.params.batch_size
-        max_encoder_length = self.params.max_encoder_length
-        max_prediction_length = self.params.max_prediction_length
-        num_workers = self.settings.get("num_workers", 0)
+        hidden_size = self.hidden_size
+        rnn_layers = self.rnn_layers
+        dropout = self.dropout
+        learning_rate = self.learning_rate
+        batch_size = self.batch_size
+        max_encoder_length = self.max_encoder_length
+        max_prediction_length = self.max_prediction_length
+        num_workers = self.get("num_workers", 0)
 
         # Use y_target to determine forecast length if provided
         y_target = kwargs.get("y_target", None)

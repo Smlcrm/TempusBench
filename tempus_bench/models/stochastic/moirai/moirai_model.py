@@ -10,7 +10,7 @@ from tempus_bench.models.base_model import BaseModel
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 
-class MoiraiParams(PydanticBaseModel):
+class MoiraiHyperparams(PydanticBaseModel):
     model_name: Optional[str] = Field(default="moirai", description="Model name")
     size: Optional[str] = Field(default=None, description="Model size")
     ctx: Optional[int] = Field(default=None, description="Context length")
@@ -30,7 +30,7 @@ class MoiraiModel(BaseModel):
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(params, settings, MoiraiParams)
+        super().__init__(params, settings, MoiraiHyperparams)
 
         self._model = None
         self.is_fitted = False
@@ -60,13 +60,13 @@ class MoiraiModel(BaseModel):
         freq = kwargs["freq"]
         
         # Reference params, settings, device, python_version
-        model_name = self.params.model_name
-        size = self.params.size
-        ctx = self.params.ctx
-        psz = self.params.psz
-        bsz = self.params.bsz
-        test = self.params.test
-        num_samples = self.params.num_samples
+        model_name = self.model_name
+        size = self.size
+        ctx = self.ctx
+        psz = self.psz
+        bsz = self.bsz
+        test = self.test
+        num_samples = self.num_samples
         
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 

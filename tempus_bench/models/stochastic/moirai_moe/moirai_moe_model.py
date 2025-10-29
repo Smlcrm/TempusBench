@@ -10,7 +10,7 @@ from tempus_bench.models.base_model import BaseModel
 from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 
 
-class MoiraiMoeParams(PydanticBaseModel):
+class MoiraiMoeHyperparams(PydanticBaseModel):
     model_name: Optional[str] = Field(default="moirai-moe", description="Model name")
     size: Optional[str] = Field(default=None, description="Model size")
     ctx: Optional[int] = Field(default=None, description="Context length")
@@ -33,7 +33,7 @@ class MoiraiMoeModel(BaseModel):
         super().__init__(config, logs_path)
         
         # Validate and set model config using Pydantic
-        self._model_config = MoiraiMoeParams(**self._model_config).model_dump()
+        self._model_config = MoiraiMoeHyperparams(**self._model_config).model_dump()
 
         self._model = None
         self.is_fitted = False
