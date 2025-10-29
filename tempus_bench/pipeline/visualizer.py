@@ -1,27 +1,26 @@
 """
 Visualization utilities for the benchmarking pipeline.
 """
+from typing import Any, Dict, Optional, Union
 
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 import numpy as np
+import pandas as pd
+import seaborn as sns
 from scipy import stats
-from typing import Optional, Dict, Any, Union
-from datetime import datetime
+
 from ..utils.logger import get_logger
 
 class Visualizer:
-    def __init__(self, config: Optional[Dict[str, Any]] = None, logs_path: str):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize visualizer with configuration.
 
         Args:
             config (dict, optional): Configuration dictionary with visualization parameters.
-            logs_path (str): Directory for storing log files.
         """
         self.config = config if config is not None else {}
-        self.logger = get_logger(logs_path)
+        self.logger = get_logger()
         # Use a built-in style instead of seaborn
         plt.style.use('fivethirtyeight')
         # Set seaborn style separately

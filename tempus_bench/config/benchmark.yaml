@@ -4,8 +4,7 @@
 task_path: 'multivariate/baggage_100_multivariate'
 
 evaluation:
-  deterministic_tuning_loss: mae
-  stochastic_tuning_loss: crps
+  tuning_loss: mae
   max_windows: 20
   max_num_variates: 10
   num_samples: 100
@@ -13,82 +12,68 @@ evaluation:
   point_forecast_statistic: mean
 
 model:
-  # Traditional models with hyperparameter grids
-  exponential_smoothing:
-    trend: [add]
-    seasonal: [null]
-    seasonal_periods: [null]
-    damped_trend: [false, true]
-
-  seasonal_naive:
-    sp: [24]
-
-  croston_classic:
-    alpha: [0.1, 0.3, 0.5]
-    gamma: [0.1, 0.3, 0.5]
-
-  theta:
-    sp: [12]
-    theta_method: [correlation_optimal]
-
+  # Deterministic Models
   arima:
     p: [1, 2]
     d: [1]
     q: [1, 2]
     s: [2]
 
-  xgboost:
-    lookback_window: [30]
-    n_estimators: [200]
-    max_depth: [4]
-    learning_rate: [0.05]
-    subsample: [0.9]
-    colsample_bytree: [0.9]
-    random_state: [42]
-    n_jobs: [1]
+  croston_classic:
+    alpha: [0.1, 0.3, 0.5]
+    gamma: [0.1, 0.3, 0.5]
 
-  random_forest:
-    lookback_window: [50]
-    n_estimators: [10]
-    max_depth: [2]
-    random_state: [42]
-    n_jobs: [1]
-    forecast_horizon: [50]
-
-  svr:
-    kernel: [rbf]
-    C: [1.0]
-    epsilon: [0.1]
-    gamma: [scale]
-    lookback_window: [30]
-    forecast_horizon: [25]
-
-  prophet:
-    seasonality_mode: [additive]
-    changepoint_prior_scale: [0.05]
-    seasonality_prior_scale: [10.0]
-    # yearly_seasonality: [true]
-    weekly_seasonality: [true]
-    daily_seasonality: [false]
+  exponential_smoothing:
+    trend: [add, mul, null]
+    damped_trend: [false, true]
 
   lstm:
     units: [32]
     layers: [1]
     dropout: [0.1]
     learning_rate: [0.001]
-    batch_size: [16]
-    epochs: [30]
-    sequence_length: [10]
-    forecast_horizon: [25]
 
-  # Foundation models (no hyperparameters)
-  chronos: {}
-  deepar: {}
-  tiny_time_mixer: {}
-  moirai: {}
-  moirai_moe: {}
   moment: {}
-  timesfm: {}
-  lagllama: {}
-  toto: {}
+
+  prophet:
+    seasonality_mode: [additive]
+    changepoint_prior_scale: [0.05]
+    seasonality_prior_scale: [10.0]
+
+  random_forest:
+    n_estimators: [10]
+    max_depth: [2]
+
+  seasonal_naive:
+    sp: [24]
+
+  svr:
+    kernel: [rbf]
+    C: [1.0]
+
   tabpfn: {}
+
+  theta:
+    sp: [12]
+    theta_method: [correlation_optimal]
+
+  timesfm: {}
+
+  tiny_time_mixer: {}
+
+  varmax:
+    p: [1, 2]
+    q: [1, 2]
+
+  xgboost:
+    n_estimators: [200]
+    max_depth: [4]
+    learning_rate: [0.05]
+
+  # Stochastic models
+  # chronos: {}
+  # deepar: {}
+  # moirai: {}
+  # moirai_moe: {}
+  # lagllama: {}
+  # toto: {}

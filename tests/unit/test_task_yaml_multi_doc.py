@@ -8,7 +8,7 @@ task configurations separated by '---' (YAML multi-document format).
 import pytest
 import yaml
 from pathlib import Path
-from tempus_bench.config.manager import ConfigManager, ConfigValidationError
+from tempus_bench.config.config import ConfigManager, ConfigValidationError
 from tempus_bench.config.models import TaskConfig
 
 

@@ -1,6 +1,8 @@
 import os
 import subprocess
+
 from pathlib import Path
+
 from .paths import get_project_root
 
 class CondaEnvManager:
@@ -74,21 +76,39 @@ class CondaEnvManager:
 
         self._installed = True
 
-    def run(self, script: str, args: str = ""):
+    def run(self, script: str = None, args: str = "", command: str = None):
         """
-        Run a Python script inside the conda environment.
+        Run a Python script or command inside the conda environment.
 
         Args:
-            script (str): Path to script to run, or module.
+            script (str): Path to script to run, or module (mutually exclusive with command).
             args (str): Arguments string to pass to `python script`.
+            command (str): Full command string to run (mutually exclusive with script).
         """
-        result = subprocess.run([
-            "conda", "run", "-n", self.env_name, "python", script, args
-        ], capture_output=True, text=True)
+        if script and command:
+            raise ValueError("Cannot specify both 'script' and 'command' parameters")
+        if not script and not command:
+            raise ValueError("Must specify either 'script' or 'command' parameter")
+
+        if command:
+            # Run arbitrary command in conda environment
+            result = subprocess.run(
+                f"conda run -n {self.env_name} {command}",
+                shell=True,
+                executable="/bin/bash",
+                capture_output=True,
+                text=True
+            )
+        else:
+            # Run Python script with args
+            result = subprocess.run([
+                "conda", "run", "-n", self.env_name, "python", script, args
+            ], capture_output=True, text=True)
 
         if result.returncode != 0:
+            target = command if command else f"{script} {args}"
             error_msg = (
-                f"Failed to run script ({script}) in conda env ({self.env_name}).\n"
+                f"Failed to run {target} in conda env ({self.env_name}).\n"
                 f"Exit code: {result.returncode}\n"
                 f"Standard Output:\n{result.stdout}\n"
                 f"Standard Error:\n{result.stderr}"

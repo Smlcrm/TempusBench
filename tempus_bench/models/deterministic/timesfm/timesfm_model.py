@@ -1,47 +1,37 @@
 import os
-import pandas as pd
 import numpy as np
-import torch
+import pandas as pd
 import timesfm
-from typing import Dict, Any, Optional, List, Union
-from tempus_bench.models.base_model import BaseModel
+import torch
 
+from typing import Any, Dict, List, Optional, Union
+from pydantic import BaseModel as PydanticBaseModel, Field
+
+from ...base_model import BaseModel, validate_inputs
+
+
+class TimesfmHyperparams(PydanticBaseModel):
+    pass
 
 class TimesFMModel(BaseModel):
-    def __init__(self, config: UnifiedConfig, logs_path: str):
-        super().__init__(config_path, logs_path, hyperparameters)
-        self.is_fitted = True
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        """
+        Initialize TimesFM model.
 
-        horizon = self.config["task"]["forecast_horizon"]
-        self.model = timesfm.TimesFm(
-            hparams=timesfm.TimesFmHparams(
-                backend="cpu",
-                input_patch_len=32,
-                horizon_len=horizon,
-                num_layers=20,
-                model_dims=1280,
-                # Se this to True for v1.0 checkpoints
-                output_patch_len=128,
-                use_positional_embedding=True,
-                # Note that we could set this to as high as 2048 but keeping it 512 here so that
-                # both v1.0 and 2.0 checkpoints work
-                context_len=128,
-            ),
-            checkpoint=timesfm.TimesFmCheckpoint(
-                path=None,
-                version="jax",
-                huggingface_repo_id="google/timesfm-1.0-200m-pytorch",
-                local_dir=os.path.abspath(os.path.join(os.path.dirname(__file__), "checkpoints")),
-            ),
-        )
+        Args:
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
+        """
+        super().__init__(params, settings, TimesfmHyperparams)
+        self._build_model()
 
+    @validate_inputs
     def train(
         self,
         y_context: np.ndarray,
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ) -> "TimesFMModel":
         """
@@ -50,23 +40,45 @@ class TimesFMModel(BaseModel):
         self.is_fitted = True
         return self
 
+    @validate_inputs
     def predict(
         self,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
         **kwargs,
     ):
+        """
+        Make predictions using the trained TimesFM model.
+        """
+        if not self.is_fitted:
+            raise ValueError("TimesFMModel is not fitted. Call train() first.")
 
         forecast_horizon = timestamps_target.shape[0]
+        predictions = self._model.forecast(y_context)[0]
+        predictions = predictions[:forecast_horizon]
+        return predictions
 
-        # Generate forecasts
-        forecasts = self.model.forecast(y_context)[0]
-        # print(forecasts)
-        if len(forecasts) == 1:
-            forecasts = np.expand_dims(forecasts, axis=0)
-
-        forecasts = forecasts[:forecast_horizon]
-
-        return forecasts
+    def _build_model(self):
+        self._model = timesfm.TimesFm(
+            hparams=timesfm.TimesFmHparams(
+                backend=self.device,
+                input_patch_len=self.input_patch_len,
+                horizon_len=self.horizon_len,
+                num_layers=self.num_layers,
+                model_dims=self.model_dims,
+                # Se this to True for v1.0 checkpoints
+                output_patch_len=self.output_patch_len,
+                use_positional_embedding=self.use_positional_embedding,
+                # Note that we could set this to as high as 2048 but keeping it 512 here so that
+                # both v1.0 and 2.0 checkpoints work
+                context_len=self.context_len,
+            ),
+            checkpoint=timesfm.TimesFmCheckpoint(
+                path=None,
+                version=self.version,
+                huggingface_repo_id=self.huggingface_repo_id,
+                local_dir=os.path.abspath(os.path.join(os.path.dirname(__file__), "checkpoints")),
+            )
+        )
+        self.is_fitted = True

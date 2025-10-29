@@ -1,8 +1,8 @@
 import logging
 import sys
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 class Logger:
@@ -13,7 +13,13 @@ class Logger:
     for the benchmarking pipeline components.
     """
 
-    def __init__(self, logs_path: str, name: str = "TempusBench", console_logging: bool = True, file_logging: bool = True):
+    def __init__(self,
+        logs_path: str,
+        name: str = "TempusBench",
+        console_logging: bool = True,
+        file_logging: bool = True,
+        console_log_level: str = "INFO",
+        file_log_level: str = "DEBUG"):
         """
         Initialize logger with configuration.
 
@@ -22,11 +28,15 @@ class Logger:
             name: Name for the logger instance
             console_logging: Whether to log to console
             file_logging: Whether to log to file
+            console_log_level: Console logging level (DEBUG, INFO, WARNING, ERROR)
+            file_log_level: File logging level (DEBUG, INFO, WARNING, ERROR)
         """
         self.name = name
         self.logs_path = logs_path
         self.console_logging = console_logging
         self.file_logging = file_logging
+        self.console_log_level = console_log_level
+        self.file_log_level = file_log_level
 
         # Create log directory if file logging is enabled
         if file_logging:
@@ -38,19 +48,23 @@ class Logger:
         # Clear any existing handlers to avoid duplicates
         self.logger.handlers.clear()
 
-        # Console handler (shows INFO and above) - only if enabled
+        # Console handler (configurable level) - only if enabled
         if console_logging:
             console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(logging.INFO)
+            # Convert string level to logging constant
+            log_level = getattr(logging, console_log_level.upper(), logging.INFO)
+            console_handler.setLevel(log_level)
             console_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             console_handler.setFormatter(console_format)
             self.logger.addHandler(console_handler)
 
-        # File handler (shows DEBUG and above) - only if enabled
+        # File handler (configurable level) - only if enabled
         if file_logging:
             log_file = Path(logs_path) / f"{name}.log"
             file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(logging.DEBUG)
+            # Convert string level to logging constant
+            log_level = getattr(logging, file_log_level.upper(), logging.DEBUG)
+            file_handler.setLevel(log_level)
             file_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             file_handler.setFormatter(file_format)
             self.logger.addHandler(file_handler)
@@ -95,19 +109,33 @@ class Logger:
 # Global logger instance
 _global_logger = None
 
-def get_logger(logs_path: str, console_logging: Optional[bool] = None, file_logging: Optional[bool] = None) -> Logger:
+def get_logger(logs_path: str = None, console_logging: Optional[bool] = None, file_logging: Optional[bool] = None, console_log_level: str = "INFO", file_log_level: str = "DEBUG") -> Logger:
     """
     Get or create the global logger instance.
 
     Args:
-        logs_path: Directory to write log files
+        logs_path: Directory to write log files (optional - if None, returns existing logger)
         console_logging: Whether to log to console
         file_logging: Whether to log to file
+        console_log_level: Console logging level (DEBUG, INFO, WARNING, ERROR)
+        file_log_level: File logging level (DEBUG, INFO, WARNING, ERROR)
 
     Returns:
         Logger: Global logger instance
     """
     global _global_logger
-    if _global_logger is None or _global_logger.logs_path != logs_path:
-        _global_logger = Logger(logs_path, console_logging=console_logging, file_logging=file_logging)
+    # If no logs_path provided, return existing logger
+    if logs_path is None:
+        if _global_logger is None:
+            raise RuntimeError("Logger not initialized. Call get_logger with logs_path first.")
+        return _global_logger
+
+    if _global_logger is None:
+        _global_logger = Logger(logs_path, console_logging=console_logging, file_logging=file_logging, console_log_level=console_log_level, file_log_level=file_log_level)
+    elif _global_logger.logs_path != logs_path:
+        raise RuntimeError(
+            f"Logger already initialized with different logs_path. Cannot reinitialize with {logs_path}\n"
+            f"Current logs_path: {_global_logger.logs_path}\n"
+            f"New logs_path: {logs_path}\n"
+        )
     return _global_logger

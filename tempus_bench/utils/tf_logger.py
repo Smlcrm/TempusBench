@@ -1,23 +1,20 @@
+"""
+TensorBoard logging utilities for metrics, plots, and hyperparameters.
+This logger only writes to TensorBoard files - no console output.
+"""
 import io
 import os
+
+import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
+from tensorboard.plugins.hparams import api as hp
+from typing import Optional
 
 # Configure TensorFlow threading before import
 os.environ.setdefault('TF_NUM_INTEROP_THREADS', '1')
 os.environ.setdefault('TF_NUM_INTRAOP_THREADS', '1')
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
-
-import tensorflow as tf
-import matplotlib.pyplot as plt
-
-from typing import Optional
-from datetime import datetime
-from tensorboard.plugins.hparams import api as hp
-
-"""
-TensorBoard logging utilities for metrics, plots, and hyperparameters.
-This logger only writes to TensorBoard files - no console output.
-"""
 
 class TFLogger:
     def __init__(self, tf_logs_path: str, name: str = "TFLogger", tensorboard_logging: Optional[bool] = None):
@@ -191,22 +188,29 @@ class TFLogger:
         if self.tf_writer is not None:
             self.tf_writer.close()
 
-
 # Global TFLogger instance
 _global_tf_logger = None
 
-def get_tf_logger(tf_logs_path: str, tensorboard_logging: bool = True) -> TFLogger:
+def get_tf_logger(tf_logs_path: str = None, tensorboard_logging: bool = True) -> TFLogger:
     """
     Get or create the global TFLogger instance.
 
     Args:
-        tf_logs_path: Directory to write TensorBoard log files
+        tf_logs_path: Directory to write TensorBoard log files. If None, return the latest-initialized TFLogger if exists.
         tensorboard_logging: Whether to enable TensorBoard logging
 
     Returns:
         TFLogger: Global TFLogger instance
     """
     global _global_tf_logger
-    if _global_tf_logger is None or _global_tf_logger.tf_logs_path != tf_logs_path:
+    # If no logs_path provided, return existing logger
+    if tf_logs_path is None:
+        if _global_tf_logger is None:
+            raise RuntimeError("Logger not initialized. Call get_logger with tf_logs_path first.")
+        return _global_tf_logger
+
+    if _global_tf_logger is None:
         _global_tf_logger = TFLogger(tf_logs_path, tensorboard_logging=tensorboard_logging)
+    elif _global_tf_logger.tf_logs_path != tf_logs_path:
+        raise RuntimeError(f"Logger already initialized with different tf_logs_path. Cannot reinitialize with {tf_logs_path}")
     return _global_tf_logger
