@@ -110,8 +110,8 @@ print(available)
 # }
 
 # Get model path for specific task type
-folder_path, file_name, class_name = router.get_model_path_by_task_type(
-    'arima', task_type='deterministic'
+folder_path, file_name, class_name = router.get_model_path_by_model_type(
+    'arima', model_type='deterministic'
 )
 ```
 

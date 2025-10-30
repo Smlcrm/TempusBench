@@ -9,18 +9,19 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
-from ..utils.logger import get_logger
+from ..utils.logger import Logger
 
 class Visualizer:
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, logger: Optional[Logger] = None):
         """
         Initialize visualizer with configuration.
 
         Args:
             config (dict, optional): Configuration dictionary with visualization parameters.
+            logger (Logger, optional): Logger instance to use for logging.
         """
         self.config = config if config is not None else {}
-        self.logger = get_logger()
+        self.logger = logger
         # Use a built-in style instead of seaborn
         plt.style.use('fivethirtyeight')
         # Set seaborn style separately

@@ -133,7 +133,7 @@ class TestModelRouter:
     
     @patch('tempus_bench.models.model_router.get_models_dir')
     @patch('tempus_bench.models.model_router.get_logger')
-    def test_get_model_path_by_task_type_deterministic_task_deterministic_model(self, mock_get_logger, mock_get_models_dir):
+    def test_get_model_path_by_model_type_deterministic_model_type_deterministic_model(self, mock_get_logger, mock_get_models_dir):
         """Test routing for deterministic task with deterministic model."""
         mock_get_models_dir.return_value = self.mock_models_dir
         
@@ -148,7 +148,7 @@ class TestModelRouter:
         
         router = ModelRouter("logs_path")
         
-        folder_path, file_name, class_name = router.get_model_path_by_task_type("arima", "deterministic")
+        folder_path, file_name, class_name = router.get_model_path_by_model_type("arima", "deterministic")
         
         assert folder_path == str(self.mock_models_dir / "deterministic" / "arima")
         assert file_name == "arima_model"
@@ -156,7 +156,7 @@ class TestModelRouter:
     
     @patch('tempus_bench.models.model_router.get_models_dir')
     @patch('tempus_bench.models.model_router.get_logger')
-    def test_get_model_path_by_task_type_stochastic_task_stochastic_model(self, mock_get_logger, mock_get_models_dir):
+    def test_get_model_path_by_model_type_stochastic_model_type_stochastic_model(self, mock_get_logger, mock_get_models_dir):
         """Test routing for stochastic task with stochastic model."""
         mock_get_models_dir.return_value = self.mock_models_dir
         
@@ -171,7 +171,7 @@ class TestModelRouter:
         
         router = ModelRouter("logs_path")
         
-        folder_path, file_name, class_name = router.get_model_path_by_task_type("chronos", "stochastic")
+        folder_path, file_name, class_name = router.get_model_path_by_model_type("chronos", "stochastic")
         
         assert folder_path == str(self.mock_models_dir / "stochastic" / "chronos")
         assert file_name == "chronos_model"
@@ -179,7 +179,7 @@ class TestModelRouter:
     
     @patch('tempus_bench.models.model_router.get_models_dir')
     @patch('tempus_bench.models.model_router.get_logger')
-    def test_get_model_path_by_task_type_deterministic_task_stochastic_model(self, mock_get_logger, mock_get_models_dir):
+    def test_get_model_path_by_model_type_deterministic_model_type_stochastic_model(self, mock_get_logger, mock_get_models_dir):
         """Test routing for deterministic task with stochastic model (extract point forecast)."""
         mock_get_models_dir.return_value = self.mock_models_dir
         
@@ -194,7 +194,7 @@ class TestModelRouter:
         
         router = ModelRouter("logs_path")
         
-        folder_path, file_name, class_name = router.get_model_path_by_task_type("chronos", "deterministic")
+        folder_path, file_name, class_name = router.get_model_path_by_model_type("chronos", "deterministic")
         
         assert folder_path == str(self.mock_models_dir / "stochastic" / "chronos")
         assert file_name == "chronos_model"
@@ -202,7 +202,7 @@ class TestModelRouter:
     
     @patch('tempus_bench.models.model_router.get_models_dir')
     @patch('tempus_bench.models.model_router.get_logger')
-    def test_get_model_path_by_task_type_stochastic_task_deterministic_model_raises_error(self, mock_get_logger, mock_get_models_dir):
+    def test_get_model_path_by_model_type_stochastic_model_type_deterministic_model_raises_error(self, mock_get_logger, mock_get_models_dir):
         """Test that stochastic task with deterministic model raises error."""
         mock_get_models_dir.return_value = self.mock_models_dir
         
@@ -218,11 +218,11 @@ class TestModelRouter:
         router = ModelRouter("logs_path")
         
         with pytest.raises(ValueError, match="Model 'arima' is deterministic but task requires stochastic forecasting"):
-            router.get_model_path_by_task_type("arima", "stochastic")
+            router.get_model_path_by_model_type("arima", "stochastic")
     
     @patch('tempus_bench.models.model_router.get_models_dir')
     @patch('tempus_bench.models.model_router.get_logger')
-    def test_get_model_path_by_task_type_invalid_task_type(self, mock_get_logger, mock_get_models_dir):
+    def test_get_model_path_by_model_type_invalid_model_type(self, mock_get_logger, mock_get_models_dir):
         """Test that invalid task type raises error."""
         mock_get_models_dir.return_value = self.mock_models_dir
         
@@ -233,12 +233,12 @@ class TestModelRouter:
         
         router = ModelRouter("logs_path")
         
-        with pytest.raises(ValueError, match="task_type must be 'deterministic' or 'stochastic'"):
-            router.get_model_path_by_task_type("arima", "invalid")
+        with pytest.raises(ValueError, match="Model .* not found"):
+            router.get_model_path_by_model_type("arima", "invalid")
     
     @patch('tempus_bench.models.model_router.get_models_dir')
     @patch('tempus_bench.models.model_router.get_logger')
-    def test_get_model_path_by_task_type_unknown_model(self, mock_get_logger, mock_get_models_dir):
+    def test_get_model_path_by_model_type_unknown_model(self, mock_get_logger, mock_get_models_dir):
         """Test that unknown model raises error."""
         mock_get_models_dir.return_value = self.mock_models_dir
         
@@ -250,7 +250,7 @@ class TestModelRouter:
         router = ModelRouter("logs_path")
         
         with pytest.raises(ValueError, match="Unknown model 'unknown_model'"):
-            router.get_model_path_by_task_type("unknown_model", "deterministic")
+            router.get_model_path_by_model_type("unknown_model", "deterministic")
     
     def test_generate_class_name(self):
         """Test _generate_class_name generates correct class names."""

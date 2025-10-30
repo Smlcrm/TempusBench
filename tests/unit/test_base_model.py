@@ -38,7 +38,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {'param1': 10, 'param2': 'value'}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         
         mock_load_config.return_value = config_dict
@@ -59,7 +59,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {'param1': 5, 'param2': 'test'}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -73,7 +73,7 @@ class TestBaseModel:
         """Test _extract_model_config raises error when model section is missing."""
         config_dict = {
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -93,7 +93,7 @@ class TestBaseModel:
                 'model2': {'param': 2}
             },
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -110,7 +110,7 @@ class TestBaseModel:
                 'dummy': [{'param': 1}, {'param': 2}]
             },
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -127,7 +127,7 @@ class TestBaseModel:
                 'dummy': None
             },
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -142,7 +142,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -173,7 +173,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {'param1': 10, 'param2': 'value'}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -190,7 +190,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {'param1': 10}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -211,7 +211,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -231,7 +231,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {'param1': 10}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -252,7 +252,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -276,7 +276,7 @@ class TestBaseModel:
         config_dict = {
             'model': {'dummy': {}},
             'evaluation': {'tuning_loss': 'mae', 'metrics': ['mae', 'rmse']},
-            'task': {'task_type': 'deterministic'}
+            'task': {'model_type': 'deterministic'}
         }
         mock_load_config.return_value = config_dict
         

@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 import torch
 from unittest.mock import Mock, patch, MagicMock
-from tempus_bench.models.stochastic.chronos.chronos_model import ChronosModel
+from tempus_bench.models.chronos.chronos_model import ChronosModel
 
 
 class TestChronosModel:

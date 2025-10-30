@@ -1,15 +1,15 @@
 """
-Unit tests for multi-document task.yaml file validation in ConfigManager.
+Unit tests for multi-document task.yaml file validation in Manager.
 
-This test ensures that ConfigManager correctly validates task.yaml files with multiple
+This test ensures that Manager correctly validates task.yaml files with multiple
 task configurations separated by '---' (YAML multi-document format).
 """
 
 import pytest
 import yaml
 from pathlib import Path
-from tempus_bench.config.config import ConfigManager, ConfigValidationError
-from tempus_bench.config.models import TaskConfig
+from tempus_bench.config.manager import Manager, ValidationError
+from tempus_bench.config.configs import TaskConfig
 
 
 @pytest.fixture
@@ -72,9 +72,9 @@ class TestTaskYamlMultiDoc:
         task_file = task_dir / "task.yaml"
         task_file.write_text(sample_task_yaml_content)
         
-        # Create a minimal ConfigManager instance for testing
+        # Create a minimal Manager instance for testing
         # We'll use a mock approach since we don't have full benchmark config
-        class TestConfigManager:
+        class TestManager:
             def __init__(self, task_file):
                 self.task_dirs = [task_dir]
             
@@ -85,7 +85,7 @@ class TestTaskYamlMultiDoc:
                 for task_dir in self.task_dirs:
                     task_config_path = task_dir / "task.yaml"
                     if not task_config_path.exists():
-                        raise ConfigValidationError(f"Task config not found: {task_config_path}")
+                        raise ValidationError(f"Task config not found: {task_config_path}")
                     
                     task_name = task_dir.name
                     
@@ -100,7 +100,7 @@ class TestTaskYamlMultiDoc:
                         if isinstance(doc, dict) and 'task' in doc:
                             task_data = doc['task']
                         else:
-                            raise ConfigValidationError(
+                            raise ValidationError(
                                 f"All sections in {task_config_path} must contain a 'task' key."
                             )
                         
@@ -108,13 +108,13 @@ class TestTaskYamlMultiDoc:
                         task_configs.append(task_config)
                     
                     if not task_configs:
-                        raise ConfigValidationError(f"No valid task configurations found in {task_config_path}")
+                        raise ValidationError(f"No valid task configurations found in {task_config_path}")
                     
                     validated_configs[task_name] = task_configs
                 
                 return validated_configs
         
-        manager = TestConfigManager(task_file)
+        manager = TestManager(task_file)
         result = manager.validate_task_configs()
         
         assert 'test_task' in result
@@ -143,7 +143,7 @@ class TestTaskYamlMultiDoc:
         task_file = task_dir / "task.yaml"
         task_file.write_text(single_task_yaml_content)
         
-        class TestConfigManager:
+        class TestManager:
             def __init__(self, task_file):
                 self.task_dirs = [task_dir]
             
@@ -153,7 +153,7 @@ class TestTaskYamlMultiDoc:
                 for task_dir in self.task_dirs:
                     task_config_path = task_dir / "task.yaml"
                     if not task_config_path.exists():
-                        raise ConfigValidationError(f"Task config not found: {task_config_path}")
+                        raise ValidationError(f"Task config not found: {task_config_path}")
                     
                     task_name = task_dir.name
                     
@@ -168,7 +168,7 @@ class TestTaskYamlMultiDoc:
                         if isinstance(doc, dict) and 'task' in doc:
                             task_data = doc['task']
                         else:
-                            raise ConfigValidationError(
+                            raise ValidationError(
                                 f"All sections in {task_config_path} must contain a 'task' key."
                             )
                         
@@ -176,13 +176,13 @@ class TestTaskYamlMultiDoc:
                         task_configs.append(task_config)
                     
                     if not task_configs:
-                        raise ConfigValidationError(f"No valid task configurations found in {task_config_path}")
+                        raise ValidationError(f"No valid task configurations found in {task_config_path}")
                     
                     validated_configs[task_name] = task_configs
                 
                 return validated_configs
         
-        manager = TestConfigManager(task_file)
+        manager = TestManager(task_file)
         result = manager.validate_task_configs()
         
         assert 'test_task' in result
@@ -193,13 +193,13 @@ class TestTaskYamlMultiDoc:
         assert config.context_window == 50
     
     def test_invalid_missing_task_key(self, tmp_path, invalid_task_yaml_content):
-        """Test that missing 'task' key raises ConfigValidationError."""
+        """Test that missing 'task' key raises ValidationError."""
         task_dir = tmp_path / "test_task"
         task_dir.mkdir()
         task_file = task_dir / "task.yaml"
         task_file.write_text(invalid_task_yaml_content)
         
-        class TestConfigManager:
+        class TestManager:
             def __init__(self, task_file):
                 self.task_dirs = [task_dir]
             
@@ -209,7 +209,7 @@ class TestTaskYamlMultiDoc:
                 for task_dir in self.task_dirs:
                     task_config_path = task_dir / "task.yaml"
                     if not task_config_path.exists():
-                        raise ConfigValidationError(f"Task config not found: {task_config_path}")
+                        raise ValidationError(f"Task config not found: {task_config_path}")
                     
                     task_name = task_dir.name
                     
@@ -224,7 +224,7 @@ class TestTaskYamlMultiDoc:
                         if isinstance(doc, dict) and 'task' in doc:
                             task_data = doc['task']
                         else:
-                            raise ConfigValidationError(
+                            raise ValidationError(
                                 f"All sections in {task_config_path} must contain a 'task' key."
                             )
                         
@@ -235,19 +235,19 @@ class TestTaskYamlMultiDoc:
                 
                 return validated_configs
         
-        manager = TestConfigManager(task_file)
+        manager = TestManager(task_file)
         
-        with pytest.raises(ConfigValidationError, match="must contain a 'task' key"):
+        with pytest.raises(ValidationError, match="must contain a 'task' key"):
             manager.validate_task_configs()
     
     def test_empty_file_raises_error(self, tmp_path):
-        """Test that empty task.yaml file raises ConfigValidationError."""
+        """Test that empty task.yaml file raises ValidationError."""
         task_dir = tmp_path / "test_task"
         task_dir.mkdir()
         task_file = task_dir / "task.yaml"
         task_file.write_text("")  # Empty file
         
-        class TestConfigManager:
+        class TestManager:
             def __init__(self, task_file):
                 self.task_dirs = [task_dir]
             
@@ -257,7 +257,7 @@ class TestTaskYamlMultiDoc:
                 for task_dir in self.task_dirs:
                     task_config_path = task_dir / "task.yaml"
                     if not task_config_path.exists():
-                        raise ConfigValidationError(f"Task config not found: {task_config_path}")
+                        raise ValidationError(f"Task config not found: {task_config_path}")
                     
                     task_name = task_dir.name
                     
@@ -272,7 +272,7 @@ class TestTaskYamlMultiDoc:
                         if isinstance(doc, dict) and 'task' in doc:
                             task_data = doc['task']
                         else:
-                            raise ConfigValidationError(
+                            raise ValidationError(
                                 f"All sections in {task_config_path} must contain a 'task' key."
                             )
                         
@@ -280,19 +280,19 @@ class TestTaskYamlMultiDoc:
                         task_configs.append(task_config)
                     
                     if not task_configs:
-                        raise ConfigValidationError(f"No valid task configurations found in {task_config_path}")
+                        raise ValidationError(f"No valid task configurations found in {task_config_path}")
                     
                     validated_configs[task_name] = task_configs
                 
                 return validated_configs
         
-        manager = TestConfigManager(task_file)
+        manager = TestManager(task_file)
         
-        with pytest.raises(ConfigValidationError, match="No valid task configurations found"):
+        with pytest.raises(ValidationError, match="No valid task configurations found"):
             manager.validate_task_configs()
     
     def test_invalid_task_config_schema(self, tmp_path):
-        """Test that invalid task config schema raises ConfigValidationError."""
+        """Test that invalid task config schema raises ValidationError."""
         invalid_yaml = """task:
   forecast_horizon: 24
   # Missing context_window and dataset
@@ -303,7 +303,7 @@ class TestTaskYamlMultiDoc:
         task_file = task_dir / "task.yaml"
         task_file.write_text(invalid_yaml)
         
-        class TestConfigManager:
+        class TestManager:
             def __init__(self, task_file):
                 self.task_dirs = [task_dir]
             
@@ -313,7 +313,7 @@ class TestTaskYamlMultiDoc:
                 for task_dir in self.task_dirs:
                     task_config_path = task_dir / "task.yaml"
                     if not task_config_path.exists():
-                        raise ConfigValidationError(f"Task config not found: {task_config_path}")
+                        raise ValidationError(f"Task config not found: {task_config_path}")
                     
                     task_name = task_dir.name
                     
@@ -328,7 +328,7 @@ class TestTaskYamlMultiDoc:
                         if isinstance(doc, dict) and 'task' in doc:
                             task_data = doc['task']
                         else:
-                            raise ConfigValidationError(
+                            raise ValidationError(
                                 f"All sections in {task_config_path} must contain a 'task' key."
                             )
                         
@@ -340,7 +340,7 @@ class TestTaskYamlMultiDoc:
                 
                 return validated_configs
         
-        manager = TestConfigManager(task_file)
+        manager = TestManager(task_file)
         
         with pytest.raises(Exception):  # Should raise ValidationError from Pydantic
             manager.validate_task_configs()
