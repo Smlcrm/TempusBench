@@ -22,7 +22,7 @@ from .configs import (
     TaskConfig,
     convert_pydantic_errors,
 )
-from ..utils.logger import Logger
+from ..utils.logger import LoggerManager
 from ..utils.paths import (
     get_project_root,
     get_configs_dir,
@@ -54,7 +54,7 @@ class Manager:
         task_path (str): Task path pattern from the benchmark configuration.
         models_evalated (KeysView): Keys of models to be evaluated.
         run_path (str): Path to run directory for outputs.
-        logger (Logger): Logger instance for logging (includes both standard and TensorBoard logging).
+        logger (LoggerManager): Logger instance for logging (includes both standard and TensorBoard logging).
         evaluation_config (EvaluationConfig): Evaluation configuration from the benchmark configuration.
         evaluation_setting (EvaluationSetting): Global logging/runtime options from `tasks/settings.yaml`.
         models_config (Dict[str, ModelConfig]): Model hyperparameters for each model.
@@ -124,7 +124,7 @@ class Manager:
         tensorboard_dir = str(Path(self.run_path) / "tensorboard")
 
         # Initialize unified logger with both standard and TensorBoard logging
-        self.logger = Logger(
+        self.logger = LoggerManager(
             logs_path=str(self.logs_path),
             console_logging=self.evaluation_setting.console_logging,
             file_logging=self.evaluation_setting.file_logging,
@@ -247,7 +247,7 @@ class Manager:
                     model_config=self.model_configs[model_name],
                     model_setting=self.model_settings[model_name],
                     task_config=task_config,
-                    run_path=str(self.run_path)
+                    run_path=str(self.run_path),
                 )
 
     @staticmethod

@@ -21,7 +21,6 @@ from pydantic import BaseModel as PydanticBaseModel
 
 from ..config.configs import JobConfig
 from ..metrics.metric_registry import MetricRegistry
-from ..utils.logger import Logger
 
 
 class BaseModel(ABC):
@@ -43,8 +42,8 @@ class BaseModel(ABC):
     def __init__(
         self,
         params: Dict[str, Any],
-        settings: Dict[str, Any] = None,
-        ParamsClass: PydanticBaseModel = None,
+        settings: Dict[str, Any] | None = None,
+        ParamsClass: PydanticBaseModel | None = None,
     ):
         """
         Initialize the base model with validated hyperparameters and runtime settings.
@@ -56,23 +55,12 @@ class BaseModel(ABC):
         """
         super().__init__()
 
-        # Use existing logger instance if available, otherwise create a minimal one
-        if Logger.logger is not None:
-            self.logger = Logger.logger
-        else:
-            # Create a temporary logger for isolated model execution
-            import tempfile
-            import os
-
-            temp_logs_path = os.path.join(
-                tempfile.gettempdir(), "tempus_bench_model_logs"
-            )
-
         # Setup parameters
         if settings is None:
             settings = {}
+
         self.params_class = ParamsClass
-        self.evaluator = Evaluator(logger=self.logger)
+        self.metric_registry = MetricRegistry()
         self.set_params(**params)
         self.set_attrs(**settings)  # Settings
 
@@ -109,11 +97,11 @@ class BaseModel(ABC):
     ) -> np.ndarray:
         pass
 
-    def compute_loss(
+    def compute_metrics(
         self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs
     ) -> Dict[str, float]:
         """
-        Compute all loss metrics between true and predicted values using the MetricRegistry class.
+        Compute all evaluation metrics between true and predicted values using the MetricRegistry class.
 
         This method computes evaluation metrics as configured in evaluation.metrics
 
@@ -122,14 +110,11 @@ class BaseModel(ABC):
             y_pred: Predicted values (ndarray, shape [num_steps, num_features])
 
         Returns:
-            Dict[str, float]: Dictionary of computed loss metrics (from evaluation.metrics)
+            Dict[str, float]: Dictionary of computed evaluation metrics (from evaluation.metrics)
         """
-        return self.evaluator.evaluate(y_true, y_pred, **kwargs)
+        return self.metric_registry.compute_metrics(y_true, y_pred, **kwargs)
 
-    def evaluate(self, X: np.ndarray, y: np.ndarray) -> Dict[str, float]:
-        pass
-
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self):
         """
         Get the current model parameters.
 
@@ -148,7 +133,10 @@ class BaseModel(ABC):
         Returns:
             self: The model instance with updated parameters
         """
-        self.params = self.params_class(**params)
+        if self.params_class is not None:
+            self.params = self.params_class.model_validate(params)
+        else:
+            self.params = params
         self.set_attrs(**params)
         self.is_fitted = False  # Mark as unfitted if parameters change
         return self

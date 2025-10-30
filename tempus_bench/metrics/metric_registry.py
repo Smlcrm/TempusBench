@@ -13,18 +13,17 @@ from ..metrics.mase import MASE
 from ..metrics.quantile_score import QuantileScore
 from ..metrics.rmse import RMSE
 from ..metrics.weighted_interval_score import WeightedIntervalScore
-from ..utils.logger import Logger
+from ..utils.logger import LoggerManager
 
 
 class MetricRegistry:
-    def __init__(self, logger: Logger = None):
+    def __init__(self):
         """
         Initialize metric registry with configuration.
 
         Args:
             logger: Logger instance to use for logging (optional)
         """
-        self.logger = logger
         self.metric_registry = {
             "rmse": RMSE(),
             "mae": MAE(),
@@ -34,17 +33,22 @@ class MetricRegistry:
             "quantile_score": QuantileScore(),
             "weighted_interval_score": WeightedIntervalScore(),
         }
-        self.stochastic_metrics = ["crps", "quantile_score", "weighted_interval_score"]
-        self.deterministic_metrics = ["rmse", "mae", "mase", "mape"]
+        self.stochastic_metrics = [
+            metric_name
+            for metric_name, metric in self.metric_registry.items()
+            if metric.metric_type == "stochastic"
+        ]
+        self.deterministic_metrics = [
+            metric_name
+            for metric_name, metric in self.metric_registry.items()
+            if metric.metric_type == "deterministic"
+        ]
 
-        if self.logger:
-            self.logger.debug("MetricRegistry", "MetricRegistry initialized")
-
-    def evaluate(
+    def compute_metrics(
         self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs: Dict[str, Any]
     ):
         """
-        Evaluate model performance on given data.
+        Compute evaluation metrics for model performance on given data.
 
         Args:
             y_true (np.ndarray): True target values.
@@ -71,8 +75,8 @@ class MetricRegistry:
             )
 
         results = {}
-        for metric in metrics_to_calculate:
-            results[metric] = self.metric_registry[metric](
+        for metric_name in metrics_to_calculate:
+            results[metric_name] = self.metric_registry[metric_name](
                 y_true=y_true,
                 y_pred=y_pred,
                 model_type=model_type,
