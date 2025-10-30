@@ -20,8 +20,7 @@ from ...base_model import BaseModel, validate_inputs
 
 
 class ChronosHyperparams(PydanticBaseModel):
-    model_size: Optional[Literal["tiny", "mini", "small", "base", "large"]] = Field(default="tiny", description="Size of the Chronos model")
-    context_length: Optional[int] = Field(default=2048, ge=1, description="Number of past time steps for context")
+    pass
 
 class ChronosModel(BaseModel):
     """
@@ -72,17 +71,11 @@ class ChronosModel(BaseModel):
             Chronos is a pre-trained foundation model that doesn't require training.
             This method just marks the model as ready for inference.
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
-        model_size = self.model_size
-        context_length = self.context_length
-        
+        hf_model_name = self.hf_model_name
+
         # For foundation models, we don't need to load the model here
         # It will be loaded fresh for each prediction (like it was in the working version)
         # Load the Chronos model fresh for each prediction (like the working version)
-        hf_model_name = f"amazon/chronos-t5-{model_size}"
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.logger.info("ChronosModel.train", f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
@@ -119,14 +112,7 @@ class ChronosModel(BaseModel):
         Raises:
             ValueError: If model is not fitted or required data is missing
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        num_samples = kwargs["num_samples"]
-        
-        # Reference params, settings, device, python_version
-        model_size = self.model_size
         context_length = self.context_length
-
         forecast_horizon = timestamps_target.shape[0]
 
         padding_length = context_length - y_context.shape[0]

@@ -62,7 +62,6 @@ class HyperparameterTuner:
 
         # Route resolves model location, but we don't need to import the class to build the grid
         router = ModelRouter(logger=self.logger)
-        _ = router.get_model_path_by_model_type(model_name, "deterministic")
         # Build grid from config directly without constructing the model
         params_space = models_hparams[model_name]
         keys = list(params_space.keys())
@@ -103,6 +102,8 @@ class HyperparameterTuner:
         model_executor = ModelExecutor(
             model_settings=self.models_settings,
             logger=self.logger,
+            logs_path=self.logs_path,
+            reinstall_conda=self.benchmark_settings.reinstall_conda,
         )
         # Generate windows for this dataset
         steps = [
@@ -298,6 +299,8 @@ class HyperparameterTuner:
             model_executor = ModelExecutor(
                 model_settings=self.models_settings,
                 logger=self.logger,
+                logs_path=self.logs_path,
+                reinstall_conda=self.benchmark_settings.reinstall_conda,
             )
 
             # Execute model to get predictions
