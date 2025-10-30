@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional
 from ..models.model_router import ModelRouter
 from ..utils.envs import CondaEnvManager
 from ..utils.logger import Logger
-from ..utils.paths import get_models_dir
+from ..utils.paths import get_models_dir, get_tasks_dir
 
 
 class ModelExecutor:
@@ -38,6 +38,7 @@ class ModelExecutor:
         config_path: str,
         logger: Logger,
         logs_path: Optional[str] = None,
+        reinstall_conda: bool = False,
     ):
         """
         Initialize the executor with execution metadata.
@@ -52,6 +53,7 @@ class ModelExecutor:
         self.config_path = config_path
         self.logger = logger
         self.logs_path = logs_path
+        self.reinstall_conda = reinstall_conda
 
     def execute_model(
         self,
@@ -85,11 +87,12 @@ class ModelExecutor:
 
         # Create Conda Environment
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = self.model_settings[model_name]["python_version"]
+        python_version = self.model_settings["python_version"]
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,
             requirements_path=requirements_path,
+            reinstall=self.reinstall_conda,
         )
 
         # Build CLI command
@@ -202,16 +205,15 @@ def main():
 
     manager = Manager(args.config_path, args.logs_path, logger)
 
-    # Find matching job config for the task
-    task_name = Path(args.task_path).parent.name
+    task_path = str(args.task_path)
     matching_jobs = [
         job_config
         for job_config, task_idx in manager.generate_run_configs()
-        if job_config.task_config.name == task_name
+        if job_config.benchmark_config.task_path == task_path
     ]
 
     if not matching_jobs:
-        raise ValueError(f"No job config found for task {task_name}")
+        raise ValueError(f"No job config found for task {task_path}")
 
     job_config = matching_jobs[0]
 
@@ -224,7 +226,7 @@ def main():
         ("train", args.train_steps),
         ("validate", args.validate_steps),
     ]
-    window_iter = data_loader.generate_task_split(args.task_path, steps, stride=1)
+    window_iter = data_loader.generate_dataset_split(args.task_path, steps, stride=1)
 
     # Get the specific window
     window_found = False
@@ -262,7 +264,7 @@ def main():
             vstart, vend = window.validate.start, window.validate.end
 
             # Create and train model
-            model = model_class(params=hyperparameters)
+            model = model_class(params=hyperparameters, settings=job_config.model_settings)
 
             trained_model = model.train(
                 y_context=target[cstart:cend],

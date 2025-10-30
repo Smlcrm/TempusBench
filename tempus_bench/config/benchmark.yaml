@@ -12,63 +12,66 @@ evaluation:
   point_forecast_statistic: mean
 
 model:
+  # Universal Models
+  lafn_hybrid: {}
+
   # Deterministic Models
-  arima:
-    p: [1, 2]
-    d: [1]
-    q: [1, 2]
-    s: [2]
+  # arima:
+  #   p: [1, 2]
+  #   d: [1]
+  #   q: [1, 2]
+  #   s: [2]
 
-  croston_classic:
-    alpha: [0.1, 0.3, 0.5]
-    gamma: [0.1, 0.3, 0.5]
+  # croston_classic:
+  #   alpha: [0.1, 0.3, 0.5]
+  #   gamma: [0.1, 0.3, 0.5]
 
-  exponential_smoothing:
-    trend: [add, mul, null]
-    damped_trend: [false, true]
+  # exponential_smoothing:
+  #   trend: [add, mul, null]
+  #   damped_trend: [false, true]
 
-  lstm:
-    units: [32]
-    layers: [1]
-    dropout: [0.1]
-    learning_rate: [0.001]
+  # lstm:
+  #   units: [32]
+  #   layers: [1]
+  #   dropout: [0.1]
+  #   learning_rate: [0.001]
 
-  moment: {}
+  # moment: {}
 
-  prophet:
-    seasonality_mode: [additive]
-    changepoint_prior_scale: [0.05]
-    seasonality_prior_scale: [10.0]
+  # prophet:
+  #   seasonality_mode: [additive]
+  #   changepoint_prior_scale: [0.05]
+  #   seasonality_prior_scale: [10.0]
 
-  random_forest:
-    n_estimators: [10]
-    max_depth: [2]
+  # random_forest:
+  #   n_estimators: [10]
+  #   max_depth: [2]
 
-  seasonal_naive:
-    sp: [24]
+  # seasonal_naive:
+  #   sp: [24]
 
-  svr:
-    kernel: [rbf]
-    C: [1.0]
+  # svr:
+  #   kernel: [rbf]
+  #   C: [1.0]
 
-  tabpfn: {}
+  # tabpfn: {}
 
-  theta:
-    sp: [12]
-    theta_method: [correlation_optimal]
+  # theta:
+  #   sp: [12]
+  #   theta_method: [correlation_optimal]
 
-  timesfm: {}
+  # timesfm: {}
 
-  tiny_time_mixer: {}
+  # tiny_time_mixer: {}
 
-  varmax:
-    p: [1, 2]
-    q: [1, 2]
+  # varmax:
+  #   p: [1, 2]
+  #   q: [1, 2]
 
-  xgboost:
-    n_estimators: [200]
-    max_depth: [4]
-    learning_rate: [0.05]
+  # xgboost:
+  #   n_estimators: [200]
+  #   max_depth: [4]
+  #   learning_rate: [0.05]
 
   # Stochastic models
   # chronos: {}

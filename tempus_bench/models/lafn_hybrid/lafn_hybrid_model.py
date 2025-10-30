@@ -16,16 +16,12 @@ from typing import (
     Sequence,
 )
 
-from benchmarking_pipeline.models.base_model import BaseModel
-from tempus_bench.config.configs import JobConfig
 from tempus_bench.models.base_model import BaseModel, PydanticBaseModel
 
 from chronarium import Chronarium
 
-
 class LafnHybridHyperparams(PydanticBaseModel):
     pass
-
 
 class LafnHybridModel(BaseModel):
     """Chronarium-backed Large Adaptive Forecasting Network (Hybrid)."""
@@ -52,7 +48,7 @@ class LafnHybridModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
-    ) -> "LAFNModel":
+    ) -> "LafnHybridModel":
         """Pre-trained model – no fine-tuning required."""
 
         return self
