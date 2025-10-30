@@ -22,7 +22,7 @@ os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 
-class Logger:
+class LoggerManager:
     """
     Unified logging utility for orchestration, status messages, and TensorBoard logging.
 
@@ -32,7 +32,7 @@ class Logger:
     - Independent control over each logging type
     """
 
-    logger: Optional["Logger"] = None
+    logger: LoggerManager
 
     def __init__(
         self,
@@ -118,9 +118,6 @@ class Logger:
             self.tf_writer = tf.summary.create_file_writer(self.tf_logs_path)
         else:
             self.tf_writer = None
-
-        # Set the class instance
-        Logger.logger = self
 
     def _should_log(self) -> bool:
         """Check if standard logging should occur."""

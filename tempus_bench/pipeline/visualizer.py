@@ -9,16 +9,16 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
-from ..utils.logger import Logger
+from ..utils.logger import LoggerManager
 
 class Visualizer:
-    def __init__(self, config: Optional[Dict[str, Any]] = None, logger: Optional[Logger] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, logger: Optional[LoggerManager] = None):
         """
         Initialize visualizer with configuration.
 
         Args:
             config (dict, optional): Configuration dictionary with visualization parameters.
-            logger (Logger, optional): Logger instance to use for logging.
+            logger (LoggerManager, optional): Logger instance to use for logging.
         """
         self.config = config if config is not None else {}
         self.logger = logger

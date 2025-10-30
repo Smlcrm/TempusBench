@@ -8,7 +8,7 @@ from typing import List, Tuple
 import numpy as np
 
 from ..config.configs import JobConfig
-from ..utils.logger import Logger
+from ..utils.logger import LoggerManager
 from ..utils.paths import get_task_path
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
@@ -17,7 +17,7 @@ from .model_executor import ModelExecutor
 class HyperparameterTuner:
     """Run rolling-window hyperparameter sweeps for the active task/model pair."""
 
-    def __init__(self, job_config: JobConfig, logger: Logger):
+    def __init__(self, job_config: JobConfig, logger: LoggerManager):
         """
         Build a tuner that is pre-configured for a single job.
 
