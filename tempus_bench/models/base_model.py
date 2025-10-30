@@ -72,7 +72,6 @@ class BaseModel(ABC):
         if settings is None:
             settings = {}
         self.params_class = ParamsClass
-        self.model_name = self.model_class_name.replace("Model", "").lower()
         self.evaluator = Evaluator(logger=self.logger)
         self.set_params(**params)
         self.set_attrs(**settings)  # Settings
