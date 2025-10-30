@@ -20,8 +20,11 @@ Package Structure:
 - utils/: Utility functions and configuration validation
 
 Usage:
-    from tempus_bench import model_router
     from tempus_bench.pipeline import DataLoader, ModelExecutor
+    from tempus_bench.utils import get_available_models
+
+    # Get available models
+    available_models = get_available_models()
 
     # Load data and run benchmarks
     data_loader = DataLoader(job_config)

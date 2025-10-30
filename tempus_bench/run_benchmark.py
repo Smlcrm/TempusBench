@@ -6,9 +6,7 @@ from pathlib import Path
 
 from tempus_bench.config import Manager
 from tempus_bench.pipeline.hyperparameter_tuning import HyperparameterTuner
-from tempus_bench.utils.logger import Logger
 from tempus_bench.utils.paths import get_configs_dir, get_project_root
-from tempus_bench.utils.tf_logger import get_tf_logger
 
 
 class BenchmarkRunner:
@@ -23,44 +21,30 @@ class BenchmarkRunner:
 
     def _initialize_run(self):
         """Initialize and update all path-related attributes."""
-        self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.runs_path = get_project_root() / "runs"
-        self.run_path = self.runs_path / f"run_{self.config_name}_{self.run_timestamp}"
-        self.logs_path = self.run_path / "logs"
-
-        # Create logger first (needed by Manager)
-        self.logger = Logger(
-            logs_path=str(self.logs_path),
-            console_logging=True,  # Default values, will be updated after config is loaded
-            file_logging=True,
-            console_log_level="INFO",
-            file_log_level="DEBUG",
+        
+        # Initialize the Manager (which creates its own Logger and TFLogger)
+        self.manager = Manager(
+            config_path=self.config_path,
         )
+
+        # Get reference to logger from manager
+        self.logger = self.manager.logger
 
         # Emit early log lines so failures during Manager initialization are still captured
-        self.logger.info(
-            "BenchmarkRunner",
-            f"Initializing run at {self.run_timestamp}; logs at: {self.logs_path}",
-        )
+        
         self.logger.debug(
             "BenchmarkRunner",
             f"Config path resolved to: {self.config_path}",
         )
 
-        # Initialize the Manager directly (no longer using singleton pattern)
-        self.manager = Manager(
-            config_path=self.config_path,
-            run_path=str(self.run_path),
-            logger=self.logger,
-        )
-        self.initialize_tf_logger()
+        # Get reference to tf_logger from manager for cleanup
+        self.tf_logger = self.manager.tf_logger
+        self.tensorboard_dir = self.tf_logger.tf_logs_path
 
     def run(self):
         """Execute the end-to-end benchmarking pipeline."""
         self._initialize_run()
-        self.logger.info("BenchmarkRunner", f"Run starts - {self.run_timestamp}")
-        self.logger.info("BenchmarkRunner", f"Results stored at: {self.run_path}")
-
+        
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
         for job_idx, job_config in enumerate(self.manager.generate_run_configs()):
             hyperparameter_tuner = HyperparameterTuner(job_config=job_config)
@@ -89,43 +73,18 @@ class BenchmarkRunner:
                 f"Final Model Evaluation Executed for task: {job_config.task_config.name}",
             )
 
-        self.clean_tf_logger()
-
-    def clean_tf_logger(self):
-        """Cleanup TensorBoard writer and ensure all logs are flushed."""
-        if self.tf_logger:
-            try:
-                self.tf_logger.close()
-                self.logger.info(
-                    "BenchmarkRunner",
-                    f"Benchmark runner TensorBoard writer closed, TF logs saved to: {self.tensorboard_dir}",
-                )
-            except Exception as e:
-                self.logger.warning(
-                    "BenchmarkRunner",
-                    f"Failed to close benchmark TensorBoard writer: {e}",
-                )
-
-    def initialize_tf_logger(self):
-        """Setup logging configuration and TensorBoard."""
-        # Logger already created in _initialize_run with the settings from config
-        tensorboard_logging = self.manager.evaluation_setting.tensorboard_logging
-        self.logger.info("BenchmarkRunner", f"Python logs saved at: {self.logs_path}")
-        self.logger.debug("BenchmarkRunner", "Debug logging is working!")
-
-        # Setup TensorBoard logger - always instantiate
+        # Cleanup TensorBoard writer
         try:
-            self.tensorboard_dir = str(Path(self.run_path) / "tensorboard")
-            self.tf_logger = get_tf_logger(
-                self.tensorboard_dir, tensorboard_logging=tensorboard_logging
+            self.tf_logger.close()
+            self.logger.info(
+                "BenchmarkRunner",
+                f"TensorBoard writer closed, logs saved to: {self.tensorboard_dir}",
             )
-            if tensorboard_logging:
-                self.logger.info(
-                    "BenchmarkRunner",
-                    f"TensorBoard logging enabled at: {self.tensorboard_dir}",
-                )
         except Exception as e:
-            raise RuntimeError(f"Failed to setup benchmark TensorBoard logging: {e}")
+            self.logger.warning(
+                "BenchmarkRunner",
+                f"Failed to close TensorBoard writer: {e}",
+            )
 
 
 if __name__ == "__main__":

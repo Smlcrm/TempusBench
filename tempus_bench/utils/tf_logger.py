@@ -2,6 +2,7 @@
 TensorBoard logging utilities for metrics, plots, and hyperparameters.
 This logger only writes to TensorBoard files - no console output.
 """
+
 import io
 import os
 
@@ -12,12 +13,18 @@ from tensorboard.plugins.hparams import api as hp
 from typing import Optional
 
 # Configure TensorFlow threading before import
-os.environ.setdefault('TF_NUM_INTEROP_THREADS', '1')
-os.environ.setdefault('TF_NUM_INTRAOP_THREADS', '1')
-os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
 
 class TFLogger:
-    def __init__(self, tf_logs_path: str, name: str = "TFLogger", tensorboard_logging: Optional[bool] = None):
+    def __init__(
+        self,
+        tf_logs_path: str,
+        name: str = "TFLogger",
+        tensorboard_logging: Optional[bool] = None,
+    ):
         """
         Initialize TensorBoard logger with configuration.
 
@@ -50,24 +57,33 @@ class TFLogger:
             step (int): The current step (e.g., epoch, batch, or experiment ID).
             model_name (str, optional): A prefix for metric names to group them in TensorBoard.
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         group_prefix = f"{model_name}/" if model_name else ""
         with self.tf_writer.as_default():
             for metric_name, value in metrics.items():
-                if value is None or (isinstance(value, (float, int)) and np.isnan(value)):
+                if value is None or (
+                    isinstance(value, (float, int)) and np.isnan(value)
+                ):
                     continue
 
-                if isinstance(value, dict): # For nested results like quantile losses
+                if isinstance(value, dict):  # For nested results like quantile losses
                     for sub_metric, sub_value in value.items():
                         tag = f"{group_prefix}{metric_name}/{sub_metric}"
                         tf.summary.scalar(tag, sub_value, step=step)
                 elif isinstance(value, (np.ndarray, list)):
                     # For arrays log each element and the mean
                     value_arr = np.asarray(value)
-                    tf.summary.scalar(f"{group_prefix}{metric_name}/mean", np.nanmean(value_arr), step=step)
+                    tf.summary.scalar(
+                        f"{group_prefix}{metric_name}/mean",
+                        np.nanmean(value_arr),
+                        step=step,
+                    )
                     for i, elem in enumerate(value_arr):
-                        tf.summary.scalar(f"{group_prefix}{metric_name}/series_{i}", elem, step=step)
+                        tf.summary.scalar(
+                            f"{group_prefix}{metric_name}/series_{i}", elem, step=step
+                        )
                 elif isinstance(value, (float, np.floating, int)):
                     tf.summary.scalar(f"{group_prefix}{metric_name}", value, step=step)
                 else:
@@ -79,10 +95,11 @@ class TFLogger:
         """
         Log a Matplotlib figure to TensorBoard.
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         buf = io.BytesIO()
-        figure.savefig(buf, format='png')
+        figure.savefig(buf, format="png")
         buf.seek(0)
         image = tf.image.decode_png(buf.getvalue(), channels=4)
         image = tf.expand_dims(image, 0)
@@ -94,10 +111,11 @@ class TFLogger:
         """
         Log an image from disk to TensorBoard.
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         try:
-            with open(image_path, 'rb') as f:
+            with open(image_path, "rb") as f:
                 data = f.read()
             image = tf.image.decode_image(data, channels=4)
             image = tf.expand_dims(image, 0)
@@ -119,7 +137,8 @@ class TFLogger:
             val_loss (float, optional): Validation loss
             step (int, optional): Global step for TensorBoard
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         if step is None:
             step = epoch
@@ -141,11 +160,16 @@ class TFLogger:
                             (e.g., {'learning_rate': 0.1, 'model': 'XGBoost'}).
             metrics (dict): Dictionary of final metrics for this run (e.g., {'mae': 12.3}).
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         with self.tf_writer.as_default():
             # Sanitize hparams for TensorBoard (it has specific type requirements)
-            sanitized_hparams = {k: v for k, v in hparams.items() if isinstance(v, (str, bool, int, float))}
+            sanitized_hparams = {
+                k: v
+                for k, v in hparams.items()
+                if isinstance(v, (str, bool, int, float))
+            }
             hp.hparams(sanitized_hparams)
             for metric_name, value in metrics.items():
                 if isinstance(value, (float, np.floating, int)):
@@ -162,7 +186,8 @@ class TFLogger:
             text (str): Text content to log
             step (int): Step number
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         with self.tf_writer.as_default():
             tf.summary.text(tag, text, step=step)
@@ -177,7 +202,8 @@ class TFLogger:
             value (float): Scalar value to log
             step (int): Step number
         """
-        if not self._should_log(): return
+        if not self._should_log():
+            return
 
         with self.tf_writer.as_default():
             tf.summary.scalar(tag, value, step=step)
@@ -187,30 +213,3 @@ class TFLogger:
         """Closes the TensorBoard writer to ensure all data is written to disk."""
         if self.tf_writer is not None:
             self.tf_writer.close()
-
-# Global TFLogger instance
-_global_tf_logger = None
-
-def get_tf_logger(tf_logs_path: str = None, tensorboard_logging: bool = True) -> TFLogger:
-    """
-    Get or create the global TFLogger instance.
-
-    Args:
-        tf_logs_path: Directory to write TensorBoard log files. If None, return the latest-initialized TFLogger if exists.
-        tensorboard_logging: Whether to enable TensorBoard logging
-
-    Returns:
-        TFLogger: Global TFLogger instance
-    """
-    global _global_tf_logger
-    # If no logs_path provided, return existing logger
-    if tf_logs_path is None:
-        if _global_tf_logger is None:
-            raise RuntimeError("Logger not initialized. Call get_logger with tf_logs_path first.")
-        return _global_tf_logger
-
-    if _global_tf_logger is None:
-        _global_tf_logger = TFLogger(tf_logs_path, tensorboard_logging=tensorboard_logging)
-    elif _global_tf_logger.tf_logs_path != tf_logs_path:
-        raise RuntimeError(f"Logger already initialized with different tf_logs_path. Cannot reinitialize with {tf_logs_path}")
-    return _global_tf_logger
