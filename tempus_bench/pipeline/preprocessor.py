@@ -25,9 +25,9 @@ class Preprocessor:
                 the task metadata and preprocessing directives.
         """
         self.job_config = config
-        self.config = config.benchmark_config
+        self.evaluation_config = config.evaluation_config
         self.logger = config.logger
-        self.max_num_variates = self.config.evaluation.max_num_variates
+        self.max_num_variates = self.evaluation_config.max_num_variates
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """

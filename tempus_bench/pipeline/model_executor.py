@@ -34,22 +34,19 @@ class ModelExecutor:
 
     def __init__(
         self,
-        model_settings: Dict[str, Any],
-        logger: Logger,
+        job_config: JobConfig,
     ):
         """
         Initialize the executor with execution metadata.
 
         Args:
-            model_settings: Mapping of model names to their execution settings (Python version, entrypoint, etc.).
-            logger: Logger instance to use for logging.
+            job_config: Job configuration object.
         """
-        self.model_settings = model_settings
-        self.logger = logger
+        self.job_config = job_config
+
 
     def execute_model(
         self,
-        model_name: str,
         hyperparameters: dict,
         context_steps: int,
         train_steps: int,

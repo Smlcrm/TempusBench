@@ -20,7 +20,7 @@ from tempus_bench.config import (
     EvaluationSettings,
     DatasetConfig,
     EvaluationConfig,
-    ModelHParams,
+    ModelConfig,
 )
 from tempus_bench.utils.paths import get_available_models, find_task_directories
 
@@ -335,7 +335,7 @@ class TestManagerValidateModelSettings:
         """Test that ValidationError is raised when models directory doesn't exist."""
         manager = Mock()
         manager.logger = Mock()
-        manager.model = ModelHParams(arima={"p": [1, 2], "tuning_loss": ["mae"]})
+        manager.model = ModelConfig(arima={"p": [1, 2], "tuning_loss": ["mae"]})
 
         with patch(
             "tempus_bench.config.manager.get_models_dir",
@@ -355,7 +355,7 @@ class TestManagerValidateModelSettings:
 
         manager = Mock()
         manager.logger = Mock()
-        manager.model = ModelHParams(arima={"p": [1, 2], "tuning_loss": ["mae"]})
+        manager.model = ModelConfig(arima={"p": [1, 2], "tuning_loss": ["mae"]})
 
         with patch(
             "tempus_bench.config.manager.get_models_dir",
@@ -375,7 +375,7 @@ class TestManagerValidateModelSettings:
 
         manager = Mock()
         manager.logger = Mock()
-        manager.model = ModelHParams(arima={"p": [1, 2], "tuning_loss": ["mae"]})
+        manager.model = ModelConfig(arima={"p": [1, 2], "tuning_loss": ["mae"]})
 
         with patch(
             "tempus_bench.config.manager.get_models_dir",
@@ -402,7 +402,7 @@ class TestManagerValidateModelSettings:
         manager = Mock()
         manager.logger = Mock()
         # Only arima in main.model
-        manager.model = ModelHParams(arima={"p": [1, 2]})
+        manager.model = ModelConfig(arima={"p": [1, 2]})
 
         with patch(
             "tempus_bench.config.manager.get_models_dir", return_value=models_dir.parent
@@ -595,7 +595,7 @@ class TestManagerFullIntegration:
         # This will call __init__ and cover lines 61-68
         manager = Manager(str(config_file), str(tmp_path))
         assert manager.config_path == str(config_file)
-        assert isinstance(manager.model, ModelHParams)
+        assert isinstance(manager.model, ModelConfig)
         assert isinstance(manager.benchmark_settings, EvaluationSettings)
 
 
@@ -656,7 +656,7 @@ class TestManagerExceptionHandling:
 
         manager = Mock()
         manager.logger = Mock()
-        manager.model = ModelHParams(arima={"p": [1, 2]})
+        manager.model = ModelConfig(arima={"p": [1, 2]})
 
         mock_models_dir.return_value = models_dir.parent.parent
 
