@@ -112,8 +112,8 @@ class MyModel(BaseModel):
         # Prediction implementation
         pass
     
-    def compute_loss(self, y_true, y_pred):
-        # Loss computation
+    def compute_metrics(self, y_true, y_pred):
+        # Metrics computation
         pass
 ```
 
@@ -267,10 +267,10 @@ runner.run()
 ```python
 from tempus_bench.config.manager import Manager
 from tempus_bench.pipeline.model_executor import ModelExecutor
-from tempus_bench.utils.logger import Logger
+from tempus_bench.utils.logger import LoggerManager
 
 # First, create a Manager to load configurations
-logger = Logger(logs_path="./logs", console_logging=True, file_logging=True)
+logger = LoggerManager(logs_path="./logs", console_logging=True, file_logging=True)
 manager = Manager(
     config_path="tempus_bench/config/benchmark.yaml",
     run_path="./runs",
@@ -354,8 +354,8 @@ bash scripts/bash/cleanup_conda_envs.sh
            # Return numpy array of predictions
            return predictions
        
-       def compute_loss(self, y_true, y_pred):
-           # Compute loss metrics
+       def compute_metrics(self, y_true, y_pred):
+           # Compute evaluation metrics
            return {'mae': mae, 'rmse': rmse}
    ```
 

@@ -29,7 +29,7 @@ from pathlib import Path
 import pandas as pd
 
 from ..config.configs import JobConfig
-from ..utils.logger import Logger
+from ..utils.logger import LoggerManager
 from .data_types import Dataset, DatasetSplit
 from .preprocessor import Preprocessor
 
@@ -47,7 +47,7 @@ class DataLoader:
     artificial column naming for maximum flexibility.
     """
 
-    def __init__(self, job_config: JobConfig, logger: Logger):
+    def __init__(self, job_config: JobConfig, logger: LoggerManager):
         """
         Initialize the loader for a specific job configuration.
 

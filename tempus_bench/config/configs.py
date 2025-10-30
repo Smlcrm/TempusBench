@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic import ValidationError as PydanticValidationError
 
 if TYPE_CHECKING:
-    from ..utils.logger import Logger
+    from ..utils.logger import LoggerManager
 
 
 ######################################################## UTILITY FUNCTIONS ########################################################
@@ -205,7 +205,10 @@ class EvaluationSetting(BaseModel):
     )
     tensorboard_logging: bool = Field(..., description="Enable TensorBoard logging")
     conda_env_prefix: str = Field(..., description="Prefix for conda environment names")
-    reinstall_conda: bool = Field(..., description="Whether to reinstall the conda environments for each model")
+    reinstall_conda: bool = Field(
+        ..., description="Whether to reinstall the conda environments for each model"
+    )
+
 
 class JobConfig:
     """Unified configuration model for the benchmarking pipeline (single-model only)."""
@@ -217,7 +220,7 @@ class JobConfig:
         model_config: ModelConfig,
         model_setting: Dict[str, Any],
         task_config: TaskConfig,
-        run_path: str
+        run_path: str,
     ):
 
         self.evaluation_config = evaluation_config

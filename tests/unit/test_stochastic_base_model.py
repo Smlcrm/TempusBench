@@ -135,8 +135,8 @@ class TestBaseModel:
     
     @patch('tempus_bench.models.base_model.load_config')
     @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
-    def test_compute_loss_with_samples(self, mock_evaluator_class, mock_load_config):
-        """Test compute_loss method with samples input."""
+    def test_compute_metrics_with_samples(self, mock_evaluator_class, mock_load_config):
+        """Test compute_metrics method with samples input."""
         config_dict = {
             'model': {'dummy': {}},
             'evaluation': {
@@ -150,7 +150,7 @@ class TestBaseModel:
         mock_load_config.return_value = config_dict
         
         mock_evaluator = Mock()
-        mock_evaluator.evaluate.return_value = {'mae': 0.5, 'rmse': 0.7}
+        mock_evaluator.compute_metrics.return_value = {'mae': 0.5, 'rmse': 0.7}
         mock_evaluator_class.return_value = mock_evaluator
         
         model = DummyStochasticModel("config.yaml", "logs_path", {})
@@ -158,7 +158,7 @@ class TestBaseModel:
         y_true = np.array([[1.0, 2.0], [3.0, 4.0]])  # Shape: (forecast_horizon, num_targets)
         y_pred = np.random.randn(5, 2, 2)  # Shape: (num_samples, forecast_horizon, num_targets)
         
-        result = model.compute_loss(y_true, y_pred)
+        result = model.compute_metrics(y_true, y_pred)
         
         # The result should be computed by the real evaluator
         # We just check that the method runs without error and stores the values
@@ -218,7 +218,7 @@ class TestBaseModel:
         assert hasattr(model, 'get_params')
         assert hasattr(model, 'set_params')
         assert hasattr(model, 'set_scaler')
-        assert hasattr(model, 'compute_loss')
+        assert hasattr(model, 'compute_metrics')
         assert hasattr(model, 'get_model_summary')
         assert hasattr(model, 'get_last_eval_true_pred')
         

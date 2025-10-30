@@ -23,7 +23,7 @@ from typing import Any, Dict, Optional
 
 from tempus_bench.config import JobConfig
 from tempus_bench.utils.envs import CondaEnvManager
-from tempus_bench.utils.logger import Logger
+from tempus_bench.utils.logger import LoggerManager
 
 
 from ..utils.paths import get_models_dir, get_tasks_dir
@@ -40,7 +40,7 @@ class ModelExecutor:
     def __init__(
         self,
         job_config: JobConfig,
-        logger: Logger,
+        logger: LoggerManager,
     ):
         """
         Initialize the executor with execution metadata.
@@ -260,13 +260,13 @@ def main():
         )
 
         # Compute evaluation metrics
-        eval_losses = trained_model.compute_loss(
+        eval_metrics = trained_model.compute_metrics(
             y_true=target[vstart:vend], y_pred=results
         )
 
         # Include predictions in output for plotting
         output = {
-            **eval_losses,
+            **eval_metrics,
             "predictions": results.tolist(),
             "y_true": target[vstart:vend].tolist(),
         }

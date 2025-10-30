@@ -129,7 +129,7 @@ class TestMetricRegistryDeterministic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0, 3.0])
             y_pred = np.array([1.5, 2.5, 2.5])
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "mae" in results
             assert results["mae"] == 0.5
 
@@ -143,7 +143,7 @@ class TestMetricRegistryDeterministic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0, 3.0])
             y_pred = np.array([1.5, 2.5, 2.5])
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "mae" in results
             assert "rmse" in results
 
@@ -157,7 +157,7 @@ class TestMetricRegistryDeterministic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([10.0, 20.0, 30.0])
             y_pred = np.array([11.0, 22.0, 33.0])
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "mape" in results
             assert "mase" in results
 
@@ -171,7 +171,7 @@ class TestMetricRegistryDeterministic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[1.0, 2.0], [3.0, 4.0]])
             y_pred = np.array([[1.5, 2.5], [2.5, 4.5]])
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "mae" in results
             assert "rmse" in results
 
@@ -192,7 +192,7 @@ class TestMetricRegistryStochastic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])  # (T=1, M=1)
             y_pred = np.random.randn(100, 1, 1)  # (S=100, T=1, M=1)
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "crps" in results
             assert results["crps"] >= 0
 
@@ -209,7 +209,7 @@ class TestMetricRegistryStochastic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.random.randn(100, 1, 1)
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "quantile_score" in results
             assert results["quantile_score"] >= 0
 
@@ -226,7 +226,7 @@ class TestMetricRegistryStochastic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.random.randn(100, 1, 1)
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "weighted_interval_score" in results
             assert results["weighted_interval_score"] >= 0
 
@@ -243,7 +243,7 @@ class TestMetricRegistryStochastic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.array([[[2.0]], [[2.0]], [[2.0]]])  # (S=3, T=1, M=1)
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "mae" in results
             assert results["mae"] == 0.0
 
@@ -260,7 +260,7 @@ class TestMetricRegistryStochastic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.random.randn(100, 1, 1)
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "crps" in results
             assert "mae" in results
             assert "rmse" in results
@@ -278,7 +278,7 @@ class TestMetricRegistryStochastic:
             evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0, 3.0], [4.0, 5.0]])  # (T=2, M=2)
             y_pred = np.random.randn(100, 2, 2)
-            results = evaluator.evaluate(y_true, y_pred)
+            results = evaluator.compute_metrics(y_true, y_pred)
             assert "crps" in results
             assert "mae" in results
 
@@ -298,11 +298,11 @@ class TestMetricRegistryErrors:
             y_pred = np.array([1.5, 2.5])
             
             with pytest.raises(ValueError, match="is not a recognized"):
-                evaluator.evaluate(y_true, y_pred)
+                evaluator.compute_metrics(y_true, y_pred)
 
     def test_incorrect_model_type_for_stochastic_metric(self):
         """Test that stochastic metric in deterministic task raises error."""
-        # This would be caught at evaluate() level, not initialization
+        # This would be caught at compute_metrics() level, not initialization
         pass  # Covered by individual metric tests
 
     def test_missing_point_forecast_statistic(self):
