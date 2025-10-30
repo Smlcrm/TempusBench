@@ -97,7 +97,7 @@ class Manager:
 
         config_data = self._load_config(self.config_path)
         evaluation_setting = self._load_config(
-            get_project_root() / "tempus_bench" / "tasks" / "settings.yaml"
+            get_project_root() / "tempus_bench" / "config" / "settings.yaml"
         )
 
         self.models_evaluated = config_data["model"].keys()
