@@ -4,3 +4,4 @@ tensorboard_logging: true
 console_log_level: INFO
 file_log_level: DEBUG
 conda_env_prefix: "benchmark"
+reinstall_conda: false

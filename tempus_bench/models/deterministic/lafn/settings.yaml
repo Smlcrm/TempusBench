@@ -1,8 +1,0 @@
-model_type: "deterministic"
-python_version: "3.10.10"
-device: "cpu"
-bucket_name: "chronarium_artifacts"
-model_name: "tempo_small_2025_10_20_04:39:46_mse_0.873_nll_1.419/"
-model_version: 1
-project: "sim-inference"
-credentials_path: "tempus_bench/models/lafn/gcp_credentials.json"

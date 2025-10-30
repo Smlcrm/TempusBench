@@ -72,8 +72,7 @@ class BaseModel(ABC):
         if settings is None:
             settings = {}
         self.params_class = ParamsClass
-        self.model_name = self.model_class_name.replace("Model", "").lower()
-        self.evaluator = MetricRegistry(logger=self.logger)
+        self.evaluator = Evaluator(logger=self.logger)
         self.set_params(**params)
         self.set_attrs(**settings)  # Settings
 
@@ -161,6 +160,18 @@ class BaseModel(ABC):
         Args:
             **attrs: Arbitrary attributes sourced from the settings dictionary.
         """
+        # Validate that provided setting names do not clash with existing attributes or parameter keys
+        reserved_keys = set(self.__dict__.keys())
+
+        attr_keys = set(attrs.keys())
+        clashing_with_reserved = attr_keys & reserved_keys
+        clashing_keys = sorted(list(clashing_with_reserved))
+        if clashing_keys:
+            raise ValueError(
+                f"Setting names clash with reserved or parameter keys: {clashing_keys}. "
+                f"Please rename these settings."
+            )
+
         self.settings = attrs
         for key, value in attrs.items():
             setattr(self, key, value)
