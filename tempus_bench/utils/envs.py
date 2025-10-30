@@ -6,7 +6,7 @@ from pathlib import Path
 from .paths import get_project_root
 
 class CondaEnvManager:
-    def __init__(self, name: str, python: str = None, requirements_path: str = None):
+    def __init__(self, name: str, python: str = None, requirements_path: str = None, reinstall: bool = False):
         """
         Manage a conda environment: verify or create, install dependencies.
 
@@ -18,6 +18,14 @@ class CondaEnvManager:
         self.env_name = name
         self.python_version = python
         self.requirements_path = requirements_path
+        self._env_created = False
+        self._installed = False
+
+        # If reinstall requested, remove env if it exists
+        if reinstall:
+            subprocess.run([
+                "conda", "env", "remove", "-n", self.env_name, "-y"
+            ], capture_output=True, text=True)
 
         # Check if the conda environment already exists and has tempus_bench installed
         check_result = subprocess.run(
@@ -26,7 +34,7 @@ class CondaEnvManager:
             capture_output=True, text=True
         )
 
-        if check_result.returncode == 0 and "Python" in check_result.stdout:
+        if check_result.returncode == 0 and "Python" in check_result.stdout and not reinstall:
             for line in check_result.stdout.split('\n'):
                 if "Python" in line:
                     self.python_version = line.strip().split("Python")[-1].strip()
@@ -34,9 +42,13 @@ class CondaEnvManager:
             self._env_created = True
             self._installed = True
         else:
-            # Environment doesn't exist or tempus_bench not installed
+            # Environment doesn't exist, not healthy, or reinstall requested
+            if self.python_version is None:
+                # Fallback to 3.11 if not provided
+                self.python_version = self.python_version
             self.create_env()
-            self.install(self.requirements_path)
+            if self.requirements_path:
+                self.install(self.requirements_path)
 
     def __enter__(self):
         return self

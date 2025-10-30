@@ -79,7 +79,9 @@ class Manager:
         self.benchmark_config = self.validate_benchmark_config()
         self.model_settings = self.validate_model_settings()
         self.task_paths = self._find_task_directories()
+        self.logger.info("Manager.init", f"task_paths: {self.task_paths}")
         self.task_configs = self.validate_task_configs()
+        self.logger.info("Manager.init", f"task_configs: {self.task_configs}")
 
     def validate_benchmark_config(self) -> BenchmarkConfig:
         """
@@ -97,8 +99,11 @@ class Manager:
         try:
             # Validate using Pydantic model
             config = self._load_config(self.config_path)
+            self.logger.info("Manager.validate_benchmark_config", f"Config: {config}")
             config = BenchmarkConfig(**config)
+            self.logger.info("Manager.validate_benchmark_config", f"Validated config: {config}")
             self._validate_model_availability(config)
+            self.logger.info("Manager.validate_benchmark_config", f"Validated model availability: {config}")
             return config
 
         except PydanticValidationError as e:
@@ -232,8 +237,10 @@ class Manager:
                 doesn't match folder name, or CSV file doesn't exist
         """
         validated_configs = {}
-
+        self.logger.info("Manager.validate_task_configs", f"task_paths: {self.task_paths}")
         for task_name, task_path in self.task_paths.items():
+            self.logger.info("Manager.validate_task_configs", f"task_name: {task_name}")
+            self.logger.info("Manager.validate_task_configs", f"task_path: {task_path}")
             task_config_path = Path(task_path) / "task.yaml"
             if not task_config_path.exists():
                 raise ValidationError(f"Task config not found: {task_config_path}")
@@ -310,11 +317,15 @@ class Manager:
             JobConfig: Aggregated configuration combining benchmark config, settings,
                 model execution metadata, and a single task configuration.
         """
+        self.logger.info("Manager.generate_run_configs", f"task_configs: {self.task_configs}")
         for task_name, task_configs in self.task_configs.items():
+            self.logger.info("Manager.generate_run_configs", f"task_name: {task_name}")
             for task_idx, task_config in enumerate(task_configs):
+                self.logger.info("Manager.generate_run_configs", f"task_idx: {task_idx}")
                 # Build the updated task_path for this task
                 task_path = get_task_path(task_name)
                 for model_name, model_params in self.model.items():
+                    self.logger.info("Manager.generate_run_configs", f"model_name: {model_name}")
                     # Build a new BenchmarkConfig for this (task, model)
                     benchmark_dict = self.benchmark_config.model_dump()
                     benchmark_dict["task_path"] = str(task_path)
@@ -322,9 +333,13 @@ class Manager:
                     yield JobConfig(
                         benchmark_config=BenchmarkConfig(**benchmark_dict),
                         benchmark_settings=self.benchmark_settings,
-                        model_settings={model_name: self.model_settings[model_name]},
+                        model_settings={
+                            **self.model_settings[model_name],
+                            "model_name": model_name
+                        },
                         task_config=task_config,
                         task_paths=self.task_paths,
+                        config_path=self.config_path,
                         logs_path=self.logs_path,
                         logger=self.logger,
                     ), task_idx
@@ -373,11 +388,28 @@ class Manager:
                 and not model_folder.name.startswith("__")
                 and not model_folder.name.startswith(".")
             ):
-                # Check if it has a model file
-                model_file = model_folder / f"{model_folder.name}_model.py"
-                if model_file.exists():
-                    available_models.add(model_folder.name)
+                # Search for a Python model file inside the folder
+                py_files = list(model_folder.glob("*.py"))
+                expected_model_file = model_folder / f"{model_folder.name}_model.py"
+                found_model_file = None
 
+                for py_file in py_files:
+                    if py_file.name.endswith("_model.py"):
+                        if py_file.name != expected_model_file.name:
+                            raise Exception(
+                                f"Model file convention not followed in folder '{model_folder.name}'. "
+                                f"Expected filename: '{model_folder.name}_model.py', found '{py_file.name}'"
+                            )
+                        found_model_file = py_file
+
+                if found_model_file and found_model_file.exists():
+                    available_models.add(model_folder.name)
+                else:
+                    raise Exception(
+                        f"Model file not found in folder '{model_folder.name}'. "
+                        f"Expected filename: '{model_folder.name}_model.py'"
+                    )
+        self.logger.info("Manager._get_available_models", f"Available models: {available_models}")
         return available_models
 
     def _find_task_directories(self) -> Dict[str, str]:
@@ -416,10 +448,13 @@ class Manager:
                         task_paths[task_path.name] = str(task_path)
         else:
             # Specific task directory
+            self.logger.info("Manager._find_task_directories", f"pattern: {pattern}")
             task_path = tasks_dir / pattern
+            self.logger.info("Manager._find_task_directories", f"task_path: {task_path}")
             if task_path.exists():
+                self.logger.info("Manager._find_task_directories", f"task_path exists: {task_path}")
                 task_paths[task_path.name] = str(task_path)
-
+            self.logger.info("Manager._find_task_directories", f"task_path exists: {task_path.exists()}")
         return task_paths
 
     @staticmethod
