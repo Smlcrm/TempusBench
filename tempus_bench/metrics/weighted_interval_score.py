@@ -27,13 +27,16 @@ class WeightedIntervalScore(BaseMetric):
     def __init__(self):
         super().__init__("stochastic")
 
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
+    def __call__(
+        self, y_true: np.ndarray, y_pred: np.ndarray, num_quantiles: int = 100, **kwargs
+    ) -> float:
         """
         Computes Weighted Interval Score (WIS) for deciles.
 
         Args:
             y_true: True values, shape (n_timesteps, 1) or (n_timesteps, num_targets)
             y_pred: Prediction samples, shape (num_samples, forecast_horizon, num_targets)
+            **kwargs: Optional parameters including 'num_quantiles' for the number of intervals to compute
 
         Returns:
             float: WIS score averaged across all timesteps and targets
@@ -41,29 +44,29 @@ class WeightedIntervalScore(BaseMetric):
         Raises:
             ValueError: If task_type is not 'stochastic'
         """
-        num_intervals = 300
-        alphas = np.linspace(0.0, 1.0, num=num_intervals)  # (num_intervals,)
+        
+        alphas = np.linspace(0.0, 1.0, num=num_quantiles)  # (num_quantiles,)
         # Exclude alpha=0 (interval width 0) for numerical stability (avoid 2/0 in IS_a)
         valid = alphas > 0
         alphas = alphas[
             valid
-        ]  # shape (num_intervals',) where num_intervals' = number of nonzero alpha
+        ]  # shape (num_quantiles',) where num_quantiles' = number of nonzero alpha
 
         l = np.quantile(
             y_pred, alphas[:, None, None] / 2, axis=0
-        )  # shape (num_intervals', H, M)
+        )  # shape (num_quantiles', H, M)
         u = np.quantile(
             y_pred, 1 - alphas[:, None, None] / 2, axis=0
-        )  # shape (num_intervals', H, M)
+        )  # shape (num_quantiles', H, M)
 
         y_true_b = np.broadcast_to(y_true, l.shape)
         dist = np.maximum(
             0, np.maximum(l - y_true_b, y_true_b - u)
-        )  # shape (num_intervals', H, M)
+        )  # shape (num_quantiles', H, M)
 
         interval_scores = (u - l) + (
             2.0 / alphas[:, None, None]
-        ) * dist  # shape (num_intervals', H, M)
+        ) * dist  # shape (num_quantiles', H, M)
         weighted_interval_scores = np.sum(
             alphas[:, None, None] * interval_scores, axis=0
         )

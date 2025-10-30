@@ -38,7 +38,6 @@ class HyperparameterTuner:
         self.tuning_loss = self.eval_config.tuning_loss
         self.dataset_path = job_config.task_paths[self.task_config.name]
         self.dataset_file_path = self.dataset_path + self.task_config.dataset.file_name
-        self.logs_path = job_config.logs_path
         self.logger = job_config.logger
         self.tf_logger = get_tf_logger()
         self.data_loader = DataLoader(job_config)
@@ -100,7 +99,7 @@ class HyperparameterTuner:
         all_evals = {}
         best_hyperparameters = {}
 
-        # Initialize model executor with minimal config
+        # Initialize model executor
         model_executor = ModelExecutor(
             model_settings=self.model_settings,
             config_path=self.job_config.config_path,  # This will be passed to CLI but not used much
@@ -216,7 +215,7 @@ class HyperparameterTuner:
 
         # Write to evaluations CSV in parent directory
         csv_filename = f"evaluations.csv"
-        evals_dir = Path(self.logs_path).parent / "evals"
+        evals_dir = Path(self.job_config.run_path) / "evals"
         evals_dir.mkdir(exist_ok=True)
         csv_outpath = evals_dir / csv_filename
         file_exists = csv_outpath.exists()
@@ -301,7 +300,6 @@ class HyperparameterTuner:
             # Create model executor to get predictions
             model_executor = ModelExecutor(
                 model_settings=self.model_settings,
-                config_path=self.job_config.benchmark_config.task_path,
                 logger=self.logger,
                 logs_path=self.logs_path,
                 reinstall_conda=self.benchmark_settings.reinstall_conda,
@@ -320,7 +318,7 @@ class HyperparameterTuner:
 
             # Create plots directory
             plots_dir = (
-                Path(self.logs_path).parent / "tensorboard" / "plots" / model_name
+                Path(self.job_config.run_path) / "tensorboard" / "plots" / model_name
             )
             plots_dir.mkdir(parents=True, exist_ok=True)
 
