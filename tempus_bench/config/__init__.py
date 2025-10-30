@@ -9,13 +9,10 @@ from .configs import (
     TaskConfig,
     DatasetConfig,
     EvaluationConfig,
-    ModelHParams,
+    ModelConfig,
     EvaluationSettings,
     JobConfig,
     convert_pydantic_errors,
-    load_and_validate_task_configs,
-    validate_model_settings_dict,
-    validate_task_config_with_context,
 )
 from .manager import Manager, ValidationError
 
@@ -25,7 +22,7 @@ __all__ = [
     "TaskConfig",
     "DatasetConfig",
     "EvaluationConfig",
-    "ModelHParams",
+    "ModelConfig",
     "EvaluationSettings",
     "JobConfig",
     # Manager and exceptions
@@ -33,7 +30,4 @@ __all__ = [
     "ValidationError",
     # Validation utility functions
     "convert_pydantic_errors",
-    "load_and_validate_task_configs",
-    "validate_model_settings_dict",
-    "validate_task_config_with_context",
 ]

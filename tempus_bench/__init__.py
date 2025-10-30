@@ -29,7 +29,7 @@ Usage:
 
     # Execute models (runs in isolated conda environment via CLI)
     model_executor = ModelExecutor(
-        model_settings=job_config.model_settings,
+        model_settings=job_config.models_settings,
         logger=job_config.logger
     )
     results = model_executor.execute_model(

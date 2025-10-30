@@ -27,17 +27,16 @@ class HyperparameterTuner:
                 Provides benchmark settings, task metadata, and model hyperparameter grid.
         """
         self.job_config = job_config
-        self.config = job_config.benchmark_config
-        self.benchmark_settings = job_config.benchmark_settings
-        self.model_settings = job_config.model_settings
+        self.evaluation_config = job_config.evaluation_config
+        self.evaluation_settings = job_config.evaluation_settings
+        self.models_settings = job_config.models_settings
         self.task_config = job_config.task_config
-        self.eval_config = self.config.evaluation
-        self.model_name, self.model_config = next(
-            iter(self.config.model.model_dump(exclude_none=True).items())
+        self.model_name, self.model_hparams = next(
+            iter(job_config.models_hparams.items())
         )
-        self.tuning_loss = self.eval_config.tuning_loss
-        self.dataset_path = job_config.task_paths[self.task_config.name]
-        self.dataset_file_path = self.dataset_path + self.task_config.dataset.file_name
+        self.tuning_loss = self.evaluation_config.tuning_loss
+        self.dataset_path = Path(self.task_config.task_path)
+        self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
         self.logger = job_config.logger
         self.tf_logger = get_tf_logger()
         self.data_loader = DataLoader(job_config)
@@ -53,18 +52,18 @@ class HyperparameterTuner:
         Raises:
             ValueError: If more than one model is defined for the job (the tuner only supports a single model).
         """
-        model_map = self.config.model.model_dump(exclude_none=True)
-        if len(model_map) > 1:
+        models_hparams = self.job_config.models_hparams
+        if len(models_hparams) > 1:
             raise ValueError(
                 "Hyperparameter tuning is not supported for multiple models"
             )
 
-        model_name = list(model_map.keys())[0]
+        model_name = list(models_hparams.keys())[0]
 
         # Route resolves model location, but we don't need to import the class to build the grid
         router = ModelRouter(logger=self.logger)
         # Build grid from config directly without constructing the model
-        params_space = model_map[model_name]
+        params_space = models_hparams[model_name]
         keys = list(params_space.keys())
         values_lists = [params_space[k] for k in keys]
         grid: list[dict] = []
@@ -101,8 +100,7 @@ class HyperparameterTuner:
 
         # Initialize model executor
         model_executor = ModelExecutor(
-            model_settings=self.model_settings,
-            config_path=self.job_config.config_path,  # This will be passed to CLI but not used much
+            model_settings=self.models_settings,
             logger=self.logger,
             logs_path=self.logs_path,
             reinstall_conda=self.benchmark_settings.reinstall_conda,
@@ -114,7 +112,7 @@ class HyperparameterTuner:
             ("validate", validate_steps),
         ]
         window_generator = self.data_loader.generate_dataset_split(
-            dataset_path=self.dataset_path, steps=steps, stride=validate_steps
+            dataset_path=str(self.dataset_path), steps=steps, stride=validate_steps
         )
 
         # Store results for each window
@@ -144,7 +142,7 @@ class HyperparameterTuner:
                         context_steps=context_steps,
                         train_steps=train_steps,
                         validate_steps=validate_steps,
-                        task_path=self.dataset_path,
+                        task_path=str(self.dataset_path),
                         window_idx=window_idx,
                     )
 
@@ -163,7 +161,7 @@ class HyperparameterTuner:
                     self.tf_logger.log_hparams(params, eval_losses)
 
                 except Exception as e:
-                    if self.benchmark_settings.console_logging:
+                    if self.evaluation_settings.console_logging:
                         self.logger.error(
                             "HyperparameterTuner",
                             f"Error executing model {self.model_name} with params {params}: {e}",
@@ -189,7 +187,7 @@ class HyperparameterTuner:
                 )
 
         if num_windows == 0:
-            if self.benchmark_settings.console_logging:
+            if self.evaluation_settings.console_logging:
                 self.logger.warning(
                     "HyperparameterTuner",
                     f"No valid windows for dataset {self.dataset_path}",
@@ -245,7 +243,7 @@ class HyperparameterTuner:
         all_evals[self.model_name] = model_evals
         best_hyperparameters[self.model_name] = model_best_params
 
-        if self.benchmark_settings.console_logging:
+        if self.evaluation_settings.console_logging:
             self.logger.success(
                 "HyperparameterTuner", "Hyperparameter optimization completed"
             )
@@ -299,7 +297,7 @@ class HyperparameterTuner:
 
             # Create model executor to get predictions
             model_executor = ModelExecutor(
-                model_settings=self.model_settings,
+                model_settings=self.models_settings,
                 logger=self.logger,
                 logs_path=self.logs_path,
                 reinstall_conda=self.benchmark_settings.reinstall_conda,

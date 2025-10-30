@@ -55,7 +55,7 @@ class DataLoader:
                 dataset metadata, and preprocessing directives for the active task.
         """
         self.job_config = job_config
-        self.config = job_config.benchmark_config
+        self.evaluation_config = job_config.evaluation_config
         self.task_config = job_config.task_config
         self.logger = job_config.logger
         self.preprocessor = Preprocessor(job_config)
@@ -140,7 +140,7 @@ class DataLoader:
         )
         num_steps = target.shape[0]  # (n_steps, n_features): first dim is time-steps
         window_size = sum(seg_len for (_, seg_len) in steps)
-        max_windows = self.config.evaluation.max_windows
+        max_windows = self.evaluation_config.max_windows
 
         win = 0
         while win < max_windows:
