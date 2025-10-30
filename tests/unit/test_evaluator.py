@@ -31,11 +31,11 @@ class TestEvaluatorInitialization:
                     "metrics": ["mae", "rmse"]
                 },
                 "task": {
-                    "task_type": "deterministic"
+                    "model_type": "deterministic"
                 }
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
-            assert evaluator.task_type == "deterministic"
+            assert evaluator.model_type == "deterministic"
             assert "mae" in evaluator.metrics_to_calculate
             assert "rmse" in evaluator.metrics_to_calculate
 
@@ -48,11 +48,11 @@ class TestEvaluatorInitialization:
                     "point_forecast_statistic": "mean"
                 },
                 "task": {
-                    "task_type": "stochastic"
+                    "model_type": "stochastic"
                 }
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
-            assert evaluator.task_type == "stochastic"
+            assert evaluator.model_type == "stochastic"
             assert "crps" in evaluator.metrics_to_calculate
             assert "mae" in evaluator.metrics_to_calculate
 
@@ -66,7 +66,7 @@ class TestEvaluatorInitialization:
         """Test Evaluator raises error when logs_path is None."""
         config = {
             "evaluation": {"metrics": ["mae"]},
-            "task": {"task_type": "deterministic"}
+            "task": {"model_type": "deterministic"}
         }
         with pytest.raises(ValueError, match="logs_path parameter is required"):
             Evaluator(config=config, logs_path=None)
@@ -75,7 +75,7 @@ class TestEvaluatorInitialization:
         """Test Evaluator raises error when logs_path is not provided."""
         config = {
             "evaluation": {"metrics": ["mae"]},
-            "task": {"task_type": "deterministic"}
+            "task": {"model_type": "deterministic"}
         }
         with pytest.raises(ValueError, match="logs_path parameter is required"):
             Evaluator(config=config)
@@ -86,7 +86,7 @@ class TestEvaluatorInitialization:
             config = {
                 "evaluation": {"metrics": ["mae", "rmse", "mase", "mape", "crps", 
                                            "quantile_score", "weighted_interval_score"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             assert "mae" in evaluator.metric_registry
@@ -99,7 +99,7 @@ class TestEvaluatorInitialization:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["crps"]},
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             assert evaluator.stochastic_metrics == {"crps", "quantile_score", 
@@ -110,7 +110,7 @@ class TestEvaluatorInitialization:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["mae"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             assert evaluator.deterministic_metrics == {"rmse", "mae", "mase", "mape"}
@@ -124,7 +124,7 @@ class TestEvaluatorDeterministic:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["mae"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0, 3.0])
@@ -138,7 +138,7 @@ class TestEvaluatorDeterministic:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["mae", "rmse"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0, 3.0])
@@ -152,7 +152,7 @@ class TestEvaluatorDeterministic:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["mape", "mase"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([10.0, 20.0, 30.0])
@@ -166,7 +166,7 @@ class TestEvaluatorDeterministic:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["mae", "rmse"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[1.0, 2.0], [3.0, 4.0]])
@@ -187,7 +187,7 @@ class TestEvaluatorStochastic:
                     "metrics": ["crps"],
                     "point_forecast_statistic": "mean"
                 },
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])  # (T=1, M=1)
@@ -204,7 +204,7 @@ class TestEvaluatorStochastic:
                     "metrics": ["quantile_score"],
                     "point_forecast_statistic": "mean"
                 },
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
@@ -221,7 +221,7 @@ class TestEvaluatorStochastic:
                     "metrics": ["weighted_interval_score"],
                     "point_forecast_statistic": "mean"
                 },
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
@@ -238,7 +238,7 @@ class TestEvaluatorStochastic:
                     "metrics": ["mae"],
                     "point_forecast_statistic": "mean"
                 },
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
@@ -255,7 +255,7 @@ class TestEvaluatorStochastic:
                     "metrics": ["crps", "mae", "rmse"],
                     "point_forecast_statistic": "mean"
                 },
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
@@ -273,7 +273,7 @@ class TestEvaluatorStochastic:
                     "metrics": ["crps", "mae"],
                     "point_forecast_statistic": "mean"
                 },
-                "task": {"task_type": "stochastic"}
+                "task": {"model_type": "stochastic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0, 3.0], [4.0, 5.0]])  # (T=2, M=2)
@@ -291,7 +291,7 @@ class TestEvaluatorErrors:
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {"metrics": ["unknown_metric"]},
-                "task": {"task_type": "deterministic"}
+                "task": {"model_type": "deterministic"}
             }
             evaluator = Evaluator(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0])
@@ -300,7 +300,7 @@ class TestEvaluatorErrors:
             with pytest.raises(ValueError, match="is not a recognized"):
                 evaluator.evaluate(y_true, y_pred)
 
-    def test_incorrect_task_type_for_stochastic_metric(self):
+    def test_incorrect_model_type_for_stochastic_metric(self):
         """Test that stochastic metric in deterministic task raises error."""
         # This would be caught at evaluate() level, not initialization
         pass  # Covered by individual metric tests

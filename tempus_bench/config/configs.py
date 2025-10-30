@@ -1,5 +1,5 @@
 """
-Pydantic models for configuration validation and type safety.
+Pydantic configuration models for validation and type safety.
 
 This module defines all configuration models using Pydantic for comprehensive
 validation, type checking, and documentation of the benchmarking pipeline.
@@ -236,13 +236,15 @@ class BenchmarkSettingsConfig(BaseModel):
 class JobConfig(BaseModel):
     """Unified configuration model for the benchmarking pipeline (single-model only)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     benchmark_config: BenchmarkConfig = Field(..., description="Benchmark configuration (must reference a single model)")
     benchmark_settings: BenchmarkSettingsConfig = Field(..., description="Benchmark settings")
     model_settings: Dict[str, Any] = Field(..., description="Model execution settings")
     task_config: TaskConfig = Field(..., description="Task configuration")
     task_paths: Dict[str, str] = Field(..., description="Task paths")
+    logs_path: str = Field(..., description="Path to logs directory")
+    logger: Any = Field(..., description="Logger instance for logging")
 
     @model_validator(mode="after")
     def validate_single_model_and_existence(cls, values):
@@ -274,3 +276,4 @@ class JobConfig(BaseModel):
             raise ValueError(f"Model file does not exist: {model_file}")
 
         return values
+

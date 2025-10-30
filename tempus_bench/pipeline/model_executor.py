@@ -8,6 +8,7 @@ It handles model execution with specific hyperparameters and returns evaluation 
 Can also be invoked directly from CLI as:
     python -m tempus_bench.pipeline.model_executor --model-name <name> --hyperparameters '{}' ...
 """
+
 import argparse
 import json
 import os
@@ -19,68 +20,76 @@ from typing import Any, Dict, Optional
 
 from ..models.model_router import ModelRouter
 from ..utils.envs import CondaEnvManager
-from ..utils.logger import get_logger
+from ..utils.logger import Logger
 from ..utils.paths import get_models_dir
+
 
 class ModelExecutor:
     """
-    Execute models in isolated conda environments with specific hyperparameters.
+    Execute a single model inside its dedicated Conda environment.
 
-    This class is designed to work without heavy configuration dependencies,
-    taking only the minimal parameters needed for execution.
+    The executor prepares the command-line invocation, ensures the requested environment
+    is available, and parses JSON results emitted by the child process.
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         model_settings: Dict[str, Any],
         config_path: str,
-        task_type: str,
-        enable_logging: bool = True):
+        logger: Logger,
+        logs_path: Optional[str] = None,
+    ):
         """
-        Initialize ModelExecutor with minimal configuration.
+        Initialize the executor with execution metadata.
 
         Args:
-            model_settings: Dictionary containing model execution settings (python_version, etc.)
-            config_path: Path to configuration file (passed to CLI)
-            logs_path: Path to logs directory (passed to CLI)
-            task_type: Type of task (univariate/multivariate)
-            enable_logging: Whether to enable logging output
+            model_settings: Mapping of model names to their execution settings (Python version, entrypoint, etc.).
+            config_path: Absolute path to the benchmark configuration file used for the run.
+            logger: Logger instance to use for logging.
+            logs_path: Optional path to logs directory for passing to subprocess commands.
         """
         self.model_settings = model_settings
         self.config_path = config_path
-        self.logger = get_logger()
+        self.logger = logger
+        self.logs_path = logs_path
 
-    def execute_model(self,
+    def execute_model(
+        self,
         model_name: str,
         hyperparameters: dict,
         context_steps: int,
         train_steps: int,
         validate_steps: int,
-        task_file_path: str) -> dict:
+        task_path: str,
+        window_idx: int,
+    ) -> dict:
         """
         Execute a single model with specific hyperparameters on a specific dataset window.
 
         Args:
-            model_name: Name of the model to execute
-            hyperparameters: Dictionary of hyperparameter values
-            context_steps: Number of context steps
-            train_steps: Number of training steps
-            validate_steps: Number of validation steps
-            task_path: Path to the dataset file
-            window_idx: Index of the window to use
+            model_name: Registered name of the model implementation to execute.
+            hyperparameters: Concrete hyperparameter assignment to forward to the model.
+            context_steps: Number of context steps extracted from each window.
+            train_steps: Number of steps used for fitting inside each window.
+            validate_steps: Number of steps reserved for evaluation.
+            task_path: Absolute path to the dataset folder that holds the CSV payload.
+            window_idx: Index of the window to use for execution.
 
         Returns:
-            dict: Evaluation metrics for the model execution
+            dict: Evaluation metrics and optional artifacts produced by the model command.
         """
-        if self.enable_logging and self.logger:
-            self.logger.info("ModelExecutor", f"Executing model {model_name} with hyperparameters {hyperparameters}")
+        self.logger.info(
+            "ModelExecutor",
+            f"Executing model {model_name} with hyperparameters {hyperparameters}",
+        )
 
         # Create Conda Environment
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = self.model_settings[model_name]['python_version']
+        python_version = self.model_settings[model_name]["python_version"]
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,
-            requirements_path=requirements_path
+            requirements_path=requirements_path,
         )
 
         # Build CLI command
@@ -94,29 +103,34 @@ class ModelExecutor:
             f"--validate-steps {validate_steps} "
             f"--task-path {task_path} "
             f"--window-idx {window_idx} "
-            f"--config-path {self.config_path} "
-            f"--logs-path {self.logs_path}"
+            f"--config-path {self.config_path}"
         )
 
-        if self.enable_logging and self.logger:
-            self.logger.debug("ModelExecutor", f'Running command: {command}')
+        # Add optional logs-path if provided
+        if self.logs_path:
+            command += f" --logs-path {self.logs_path}"
+
+        self.logger.debug("ModelExecutor", f"Running command: {command}")
 
         result = conda_env.run(command=command)
 
-        if self.enable_logging and self.logger:
-            self.logger.success("ModelExecutor", f'Command ran successfully for model {model_name}')
+        self.logger.success(
+            "ModelExecutor", f"Command ran successfully for model {model_name}"
+        )
 
         # Parse the JSON output from the command
         # Find the last line that contains JSON (the script outputs debug info first)
-        lines = result.stdout.strip().split('\n')
+        lines = result.stdout.strip().split("\n")
         json_line = None
         for line in reversed(lines):
-            if line.strip().startswith('{') and line.strip().endswith('}'):
+            if line.strip().startswith("{") and line.strip().endswith("}"):
                 json_line = line.strip()
                 break
 
         if json_line is None:
-            raise ValueError(f"No valid JSON found in command output. Output was: {result.stdout}")
+            raise ValueError(
+                f"No valid JSON found in command output. Output was: {result.stdout}"
+            )
 
         eval_results = json.loads(json_line)
         return eval_results
@@ -124,18 +138,17 @@ class ModelExecutor:
     def _get_model_requirements(self, model_name: str):
         """
         Returns the absolute path to requirements.txt for the requested model.
-        Uses the model router to determine the correct path based on task type.
         """
-        # Use model router to get the correct path
-        router = ModelRouter()
-        folder_path, file_name, class_name = router.get_model_path_by_task_type(
-            model_name, self.task_type
-        )
+        # Models are now directly in the models directory
+        models_dir = get_models_dir()
+        model_dir = models_dir / model_name
 
         # Construct requirements path
-        req_path = Path(folder_path) / "requirements.txt"
+        req_path = model_dir / "requirements.txt"
         if not req_path.exists():
-            raise FileNotFoundError(f"requirements.txt not found at expected path: {req_path}")
+            raise FileNotFoundError(
+                f"requirements.txt not found at expected path: {req_path}"
+            )
         return str(req_path.resolve())
 
 
@@ -145,48 +158,71 @@ def main():
     Uses DataLoader to handle complex data formats.
     """
     parser = argparse.ArgumentParser(
-        description='Execute a forecasting model with specific hyperparameters on a dataset window'
+        description="Execute a forecasting model with specific hyperparameters on a dataset window"
     )
-    parser.add_argument('--model-name', required=True, help='Name of the model to execute')
-    parser.add_argument('--hyperparameters', required=True, help='JSON string of hyperparameter values')
-    parser.add_argument('--context-steps', type=int, required=True, help='Number of context steps')
-    parser.add_argument('--train-steps', type=int, required=True, help='Number of training steps')
-    parser.add_argument('--validate-steps', type=int, required=True, help='Number of validation steps')
-    parser.add_argument('--task-path', required=True, help='Path to the dataset file')
-    parser.add_argument('--window-idx', type=int, required=True, help='Index of the window to use')
-    parser.add_argument('--config-path', required=True, help='Path to configuration file')
-    parser.add_argument('--logs-path', required=True, help='Path to logs directory')
+    parser.add_argument(
+        "--model-name", required=True, help="Name of the model to execute"
+    )
+    parser.add_argument(
+        "--hyperparameters", required=True, help="JSON string of hyperparameter values"
+    )
+    parser.add_argument(
+        "--context-steps", type=int, required=True, help="Number of context steps"
+    )
+    parser.add_argument(
+        "--train-steps", type=int, required=True, help="Number of training steps"
+    )
+    parser.add_argument(
+        "--validate-steps", type=int, required=True, help="Number of validation steps"
+    )
+    parser.add_argument("--task-path", required=True, help="Path to the dataset file")
+    parser.add_argument(
+        "--window-idx", type=int, required=True, help="Index of the window to use"
+    )
+    parser.add_argument(
+        "--config-path", required=True, help="Path to configuration file"
+    )
+    parser.add_argument(
+        "--logs-path", required=False, help="Path to logs directory (optional)"
+    )
 
     args = parser.parse_args()
 
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
 
+    # Create logger for this subprocess
+    from ..utils.logger import Logger
+
+    logger = Logger(logs_path=args.logs_path, enable_logging=False)
+
     # Load configuration to get JobConfig
-    from ..config import load_config_manager
+    from ..config import Manager
     from .data_loader import DataLoader
 
-    config_manager = load_config_manager(args.config_path, args.logs_path)
+    manager = Manager(args.config_path, args.logs_path, logger)
 
     # Find matching job config for the task
     task_name = Path(args.task_path).parent.name
-    matching_jobs = [job for job in config_manager.get_all_job_configs()
-        if job.task_config.name == task_name]
+    matching_jobs = [
+        job_config
+        for job_config, task_idx in manager.generate_run_configs()
+        if job_config.task_config.name == task_name
+    ]
 
     if not matching_jobs:
         raise ValueError(f"No job config found for task {task_name}")
 
     job_config = matching_jobs[0]
-    task_type = "univariate" if task_name.endswith("_univariate") else "multivariate"
 
     # Use DataLoader to handle data loading properly
     data_loader = DataLoader(job_config)
 
     # Generate windows
     steps = [
-        ('context', args.context_steps),
-        ('train', args.train_steps),
-        ('validate', args.validate_steps)
+        ("context", args.context_steps),
+        ("train", args.train_steps),
+        ("validate", args.validate_steps),
     ]
     window_iter = data_loader.generate_task_split(args.task_path, steps, stride=1)
 
@@ -197,15 +233,25 @@ def main():
             window_found = True
             timestamps = window.timestamps
             target = window.target
-            freq = window.metadata['freq']
+            freq = window.metadata["freq"]
 
-            # Import model
-            router = ModelRouter()
-            folder_path, file_name, class_name = router.get_model_path_by_task_type(
-                args.model_name, task_type
+            # Import model - models are now directly in the models directory
+            models_dir = get_models_dir()
+            model_dir = models_dir / args.model_name
+            model_file = f"{args.model_name}_model"
+            module_path = str(model_dir / f"{model_file}.py")
+
+            # Generate class name (PascalCase + Model suffix)
+            class_name = (
+                "".join(word.capitalize() for word in args.model_name.split("_"))
+                + "Model"
             )
-            module_path = str(Path(folder_path) / f"{file_name}.py")
-            spec = importlib.util.spec_from_file_location(file_name, module_path)
+
+            spec = importlib.util.spec_from_file_location(model_file, module_path)
+            if spec is None or spec.loader is None:
+                raise ImportError(
+                    f"Failed to load module spec for {model_file} from {module_path}"
+                )
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             model_class = getattr(module, class_name)
@@ -223,7 +269,7 @@ def main():
                 y_target=target[tstart:tend],
                 timestamps_context=timestamps[cstart:cend],
                 timestamps_target=timestamps[tstart:tend],
-                freq=freq
+                freq=freq,
             )
 
             # Generate predictions
@@ -236,15 +282,14 @@ def main():
 
             # Compute evaluation metrics
             eval_losses = trained_model.compute_loss(
-                y_true=target[vstart:vend],
-                y_pred=results
+                y_true=target[vstart:vend], y_pred=results
             )
 
             # Include predictions in output for plotting
             output = {
                 **eval_losses,
                 "predictions": results.tolist(),
-                "y_true": target[vstart:vend].tolist()
+                "y_true": target[vstart:vend].tolist(),
             }
 
             # Output results as JSON
@@ -252,7 +297,9 @@ def main():
             break
 
     if not window_found:
-        raise Exception(f"Window {args.window_idx} not found for dataset {args.task_path}")
+        raise Exception(
+            f"Window {args.window_idx} not found for dataset {args.task_path}"
+        )
 
 
 if __name__ == "__main__":

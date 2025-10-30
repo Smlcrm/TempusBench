@@ -43,7 +43,7 @@ class TestBaseModel:
                 'num_samples': 5,
                 'point_forecast_statistic': 'mean'
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -69,7 +69,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'median',  # Only 'mean' is supported
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -88,7 +88,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'mean',
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -119,7 +119,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'mean',
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -145,7 +145,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'mean',
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -180,7 +180,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'mean',
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -208,7 +208,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'mean',
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         
@@ -239,7 +239,7 @@ class TestBaseModel:
                 'point_forecast_statistic': 'mean',
                 'metrics': ['mae', 'rmse']
             },
-            'task': {'task_type': 'stochastic'}
+            'task': {'model_type': 'stochastic'}
         }
         mock_load_config.return_value = config_dict
         

@@ -4,7 +4,7 @@ Unit tests for stochastic metrics: CRPS, QuantileScore, WeightedIntervalScore.
 Tests cover:
 - Basic stochastic calculations with sample distributions
 - Shape validation (S, T, M format)
-- Error handling for wrong task_type
+- Error handling for wrong model_type
 - Known mathematical results verification
 - Edge cases (single sample, many samples)
 """
@@ -31,7 +31,7 @@ class TestCRPS:
         y_true = y_true.reshape(1, 1)
         y_pred = y_pred.reshape(3, 1, 1)
         
-        result = crps(y_true, y_pred, task_type='stochastic')
+        result = crps(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_multivariate(self):
@@ -41,7 +41,7 @@ class TestCRPS:
         y_pred = np.random.randn(100, 1, 2)  # (S, T, M)
         y_pred = y_pred + np.array([[[2.0, 3.0]]])
         
-        result = crps(y_true, y_pred, task_type='stochastic')
+        result = crps(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_shape_validation_correct(self):
@@ -50,7 +50,7 @@ class TestCRPS:
         y_true = np.array([[2.0, 3.0], [4.0, 5.0]])  # (2, 2) -> (T, M)
         y_pred = np.random.randn(50, 2, 2)  # (S, T, M)
         
-        result = crps(y_true, y_pred, task_type='stochastic')
+        result = crps(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_shape_validation_incorrect_y_true(self):
@@ -60,7 +60,7 @@ class TestCRPS:
         y_pred = np.random.randn(50, 2, 2)  # (S=50, T=2, M=2)
         
         with pytest.raises(ValueError, match="Shape mismatch"):
-            crps(y_true, y_pred, task_type='stochastic')
+            crps(y_true, y_pred, model_type='stochastic')
 
     def test_shape_validation_incorrect_dimensions(self):
         """Test CRPS with incorrect dimensions."""
@@ -69,19 +69,19 @@ class TestCRPS:
         y_pred = np.random.randn(50, 3, 2)  # (S=50, T=3, M=2) - T mismatch
         
         with pytest.raises(ValueError, match="Shape mismatch"):
-            crps(y_true, y_pred, task_type='stochastic')
+            crps(y_true, y_pred, model_type='stochastic')
 
-    def test_wrong_task_type(self):
-        """Test CRPS raises error with wrong task_type."""
+    def test_wrong_model_type(self):
+        """Test CRPS raises error with wrong model_type."""
         crps = CRPS()
         y_true = np.array([[2.0]])
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(ValueError, match="can only be used with 'stochastic'"):
-            crps(y_true, y_pred, task_type='deterministic')
+            crps(y_true, y_pred, model_type='deterministic')
 
-    def test_wrong_task_type_none(self):
-        """Test CRPS raises error when task_type is None."""
+    def test_wrong_model_type_none(self):
+        """Test CRPS raises error when model_type is None."""
         crps = CRPS()
         y_true = np.array([[2.0]])
         y_pred = np.random.randn(50, 1, 1)
@@ -95,7 +95,7 @@ class TestCRPS:
         y_true = np.array([[2.0]])
         y_pred = np.array([[[2.5]]])  # (1, 1, 1)
         
-        result = crps(y_true, y_pred, task_type='stochastic')
+        result = crps(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_many_samples(self):
@@ -104,7 +104,7 @@ class TestCRPS:
         y_true = np.array([[2.0], [3.0], [4.0]])  # (3, 1)
         y_pred = np.random.randn(1000, 3, 1)  # (1000, 3, 1)
         
-        result = crps(y_true, y_pred, task_type='stochastic')
+        result = crps(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
 
@@ -117,7 +117,7 @@ class TestQuantileScore:
         y_true = np.array([[2.0]])  # (1, 1)
         y_pred = np.random.randn(100, 1, 1)  # (100, 1, 1)
         
-        result = qs(y_true, y_pred, task_type='stochastic')
+        result = qs(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_multivariate(self):
@@ -126,7 +126,7 @@ class TestQuantileScore:
         y_true = np.array([[2.0, 3.0], [4.0, 5.0]])  # (2, 2)
         y_pred = np.random.randn(100, 2, 2)  # (100, 2, 2)
         
-        result = qs(y_true, y_pred, task_type='stochastic')
+        result = qs(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_shape_validation_incorrect(self):
@@ -136,19 +136,19 @@ class TestQuantileScore:
         y_pred = np.random.randn(100, 2, 2)  # (100, 2, 2)
         
         with pytest.raises(ValueError, match="Shape mismatch"):
-            qs(y_true, y_pred, task_type='stochastic')
+            qs(y_true, y_pred, model_type='stochastic')
 
-    def test_wrong_task_type(self):
-        """Test QuantileScore raises error with wrong task_type."""
+    def test_wrong_model_type(self):
+        """Test QuantileScore raises error with wrong model_type."""
         qs = QuantileScore()
         y_true = np.array([[2.0]])
         y_pred = np.random.randn(100, 1, 1)
         
         with pytest.raises(ValueError, match="can only be used with 'stochastic'"):
-            qs(y_true, y_pred, task_type='deterministic')
+            qs(y_true, y_pred, model_type='deterministic')
 
-    def test_wrong_task_type_none(self):
-        """Test QuantileScore raises error when task_type is None."""
+    def test_wrong_model_type_none(self):
+        """Test QuantileScore raises error when model_type is None."""
         qs = QuantileScore()
         y_true = np.array([[2.0]])
         y_pred = np.random.randn(100, 1, 1)
@@ -162,7 +162,7 @@ class TestQuantileScore:
         y_true = np.array([[2.0]])
         y_pred = np.array([[[2.5]]])  # (1, 1, 1)
         
-        result = qs(y_true, y_pred, task_type='stochastic')
+        result = qs(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_known_distribution(self):
@@ -171,7 +171,7 @@ class TestQuantileScore:
         y_true = np.array([[0.0]])  # True value at mean
         y_pred = np.random.randn(10000, 1, 1)  # Standard normal
         
-        result = qs(y_true, y_pred, task_type='stochastic')
+        result = qs(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
 
@@ -184,7 +184,7 @@ class TestWeightedIntervalScore:
         y_true = np.array([[2.0]])  # (1, 1)
         y_pred = np.random.randn(100, 1, 1)  # (100, 1, 1)
         
-        result = wis(y_true, y_pred, task_type='stochastic')
+        result = wis(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_multivariate(self):
@@ -193,7 +193,7 @@ class TestWeightedIntervalScore:
         y_true = np.array([[2.0, 3.0], [4.0, 5.0]])  # (2, 2)
         y_pred = np.random.randn(100, 2, 2)  # (100, 2, 2)
         
-        result = wis(y_true, y_pred, task_type='stochastic')
+        result = wis(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_shape_validation_incorrect(self):
@@ -203,19 +203,19 @@ class TestWeightedIntervalScore:
         y_pred = np.random.randn(100, 2, 2)  # (100, 2, 2)
         
         with pytest.raises(ValueError, match="non-broadcastable output operand"):
-            wis(y_true, y_pred, task_type='stochastic')
+            wis(y_true, y_pred, model_type='stochastic')
 
-    def test_wrong_task_type(self):
-        """Test WeightedIntervalScore raises error with wrong task_type."""
+    def test_wrong_model_type(self):
+        """Test WeightedIntervalScore raises error with wrong model_type."""
         wis = WeightedIntervalScore()
         y_true = np.array([[2.0]])
         y_pred = np.random.randn(100, 1, 1)
         
         with pytest.raises(ValueError, match="can only be used with 'stochastic'"):
-            wis(y_true, y_pred, task_type='deterministic')
+            wis(y_true, y_pred, model_type='deterministic')
 
-    def test_wrong_task_type_none(self):
-        """Test WeightedIntervalScore raises error when task_type is None."""
+    def test_wrong_model_type_none(self):
+        """Test WeightedIntervalScore raises error when model_type is None."""
         wis = WeightedIntervalScore()
         y_true = np.array([[2.0]])
         y_pred = np.random.randn(100, 1, 1)
@@ -229,7 +229,7 @@ class TestWeightedIntervalScore:
         y_true = np.array([[2.0]])
         y_pred = np.array([[[2.5]]])  # (1, 1, 1)
         
-        result = wis(y_true, y_pred, task_type='stochastic')
+        result = wis(y_true, y_pred, model_type='stochastic')
         assert result >= 0
 
     def test_known_distribution(self):
@@ -238,5 +238,5 @@ class TestWeightedIntervalScore:
         y_true = np.array([[0.0]])  # True value at mean
         y_pred = np.random.randn(10000, 1, 1)  # Standard normal
         
-        result = wis(y_true, y_pred, task_type='stochastic')
+        result = wis(y_true, y_pred, model_type='stochastic')
         assert result >= 0

@@ -8,7 +8,7 @@ handles both univariate and multivariate data, and integrates properly with the 
 import pytest
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
-from tempus_bench.models.deterministic.arima.arima_model import ArimaModel
+from tempus_bench.models.arima.arima_model import ArimaModel
 
 
 class TestArimaModel:

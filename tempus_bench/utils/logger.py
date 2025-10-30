@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+
 class Logger:
     """
     Standard Python logging utility for orchestration and status messages.
@@ -13,33 +14,39 @@ class Logger:
     for the benchmarking pipeline components.
     """
 
-    def __init__(self,
+    logger: Optional["Logger"] = None
+
+    def __init__(
+        self,
         logs_path: str,
         name: str = "TempusBench",
+        enable_logging: bool = True,
         console_logging: bool = True,
         file_logging: bool = True,
         console_log_level: str = "INFO",
-        file_log_level: str = "DEBUG"):
+        file_log_level: str = "DEBUG",
+    ):
         """
         Initialize logger with configuration.
 
         Args:
             logs_path: Directory to write log files
             name: Name for the logger instance
+            enable_logging: Master switch for all logging (if False, no logging occurs)
             console_logging: Whether to log to console
             file_logging: Whether to log to file
             console_log_level: Console logging level (DEBUG, INFO, WARNING, ERROR)
             file_log_level: File logging level (DEBUG, INFO, WARNING, ERROR)
         """
         self.name = name
-        self.logs_path = logs_path
+        self.enable_logging = enable_logging
         self.console_logging = console_logging
         self.file_logging = file_logging
         self.console_log_level = console_log_level
         self.file_log_level = file_log_level
 
         # Create log directory if file logging is enabled
-        if file_logging:
+        if enable_logging and file_logging:
             Path(logs_path).mkdir(parents=True, exist_ok=True)
 
         # Setup logger
@@ -49,32 +56,39 @@ class Logger:
         self.logger.handlers.clear()
 
         # Console handler (configurable level) - only if enabled
-        if console_logging:
+        if enable_logging and console_logging:
             console_handler = logging.StreamHandler(sys.stdout)
             # Convert string level to logging constant
             log_level = getattr(logging, console_log_level.upper(), logging.INFO)
             console_handler.setLevel(log_level)
-            console_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_format = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
             console_handler.setFormatter(console_format)
             self.logger.addHandler(console_handler)
 
         # File handler (configurable level) - only if enabled
-        if file_logging:
+        if enable_logging and file_logging:
             log_file = Path(logs_path) / f"{name}.log"
             file_handler = logging.FileHandler(log_file)
             # Convert string level to logging constant
             log_level = getattr(logging, file_log_level.upper(), logging.DEBUG)
             file_handler.setLevel(log_level)
-            file_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_format = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
             file_handler.setFormatter(file_format)
             self.logger.addHandler(file_handler)
 
         # Prevent propagation to root logger
         self.logger.propagate = False
 
+        # Set the class instance
+        Logger.logger = self
+
     def _should_log(self) -> bool:
-        """Check if logging should occur (either console or file)."""
-        return self.console_logging or self.file_logging
+        """Check if logging should occur."""
+        return self.enable_logging
 
     def info(self, module: str, message: str):
         """Log an informational message with module context."""
@@ -105,37 +119,3 @@ class Logger:
         """Log a progress message with module context."""
         if self._should_log():
             self.logger.info(f"[{module}] PROGRESS: {message}")
-
-# Global logger instance
-_global_logger = None
-
-def get_logger(logs_path: str = None, console_logging: Optional[bool] = None, file_logging: Optional[bool] = None, console_log_level: str = "INFO", file_log_level: str = "DEBUG") -> Logger:
-    """
-    Get or create the global logger instance.
-
-    Args:
-        logs_path: Directory to write log files (optional - if None, returns existing logger)
-        console_logging: Whether to log to console
-        file_logging: Whether to log to file
-        console_log_level: Console logging level (DEBUG, INFO, WARNING, ERROR)
-        file_log_level: File logging level (DEBUG, INFO, WARNING, ERROR)
-
-    Returns:
-        Logger: Global logger instance
-    """
-    global _global_logger
-    # If no logs_path provided, return existing logger
-    if logs_path is None:
-        if _global_logger is None:
-            raise RuntimeError("Logger not initialized. Call get_logger with logs_path first.")
-        return _global_logger
-
-    if _global_logger is None:
-        _global_logger = Logger(logs_path, console_logging=console_logging, file_logging=file_logging, console_log_level=console_log_level, file_log_level=file_log_level)
-    elif _global_logger.logs_path != logs_path:
-        raise RuntimeError(
-            f"Logger already initialized with different logs_path. Cannot reinitialize with {logs_path}\n"
-            f"Current logs_path: {_global_logger.logs_path}\n"
-            f"New logs_path: {logs_path}\n"
-        )
-    return _global_logger

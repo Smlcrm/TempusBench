@@ -8,6 +8,7 @@ evaluation, and model persistence.
 All traditional models (ARIMA, LSTM, XGBoost, etc.) should inherit from this class and implement
 the required abstract methods.
 """
+
 import inspect
 
 from abc import ABC, abstractmethod
@@ -18,10 +19,10 @@ import numpy as np
 
 from pydantic import BaseModel as PydanticBaseModel
 
-from ..config.config import ConfigAdapterMixin
-from ..config.models import JobConfig
+from ..config.configs import JobConfig
 from ..metrics.evaluation import Evaluator
-from ..utils.logger import get_logger
+from ..utils.logger import Logger
+
 
 class BaseModel(ABC):
     """
@@ -39,24 +40,42 @@ class BaseModel(ABC):
         evaluator: Evaluator instance for computing metrics
     """
 
-    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any], ParamsClass: PydanticBaseModel):
+    def __init__(
+        self,
+        params: Dict[str, Any],
+        settings: Dict[str, Any] = None,
+        ParamsClass: PydanticBaseModel = None,
+    ):
         """
-        Initialize the base model.
+        Initialize the base model with validated hyperparameters and runtime settings.
 
         Args:
-            config_path: Path to the configuration YAML file
-            logs_path: Directory for storing log files (required)
-            hyperparameters: Model-specific hyperparameters to inject into config
+            params: Raw hyperparameters chosen for the current training run.
+            settings: Model-level execution configuration (device, seed, etc.). Defaults to empty dict.
+            ParamsClass: Pydantic schema used to validate and coerce `params`.
         """
         super().__init__()
-        self.logger = get_logger()
-        # Setup parameters
-        self.params_class = ParamsClass
-        self.model_name = self.model_class_name.replace('Model', '').lower()
-        self.evaluator = Evaluator()
-        self.set_params(**params)
-        self.set_attrs(**settings) # Settings
 
+        # Use existing logger instance if available, otherwise create a minimal one
+        if Logger.logger is not None:
+            self.logger = Logger.logger
+        else:
+            # Create a temporary logger for isolated model execution
+            import tempfile
+            import os
+
+            temp_logs_path = os.path.join(
+                tempfile.gettempdir(), "tempus_bench_model_logs"
+            )
+
+        # Setup parameters
+        if settings is None:
+            settings = {}
+        self.params_class = ParamsClass
+        self.model_name = self.model_class_name.replace("Model", "").lower()
+        self.evaluator = Evaluator(logger=self.logger)
+        self.set_params(**params)
+        self.set_attrs(**settings)  # Settings
 
     @abstractmethod
     def train(
@@ -65,18 +84,19 @@ class BaseModel(ABC):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> "BaseModel":
         """
         Train the model on given data.
 
         Args:
-            y_context: Past target values - training data during tuning time, training + validation data during testing time
-            y_target: Future target values - validation data during tuning time, None during testing time (avoid data leakage)
-            y_start_date: The start date timestamp for y_context and y_target in string form
+            y_context: Context window used to initialise the model before fitting.
+            y_target: Segment used for supervised optimisation during tuning or evaluation.
+            timestamps_context: Timestamp index aligned with `y_context`.
+            timestamps_target: Timestamp index aligned with `y_target`.
 
         Returns:
-            self: The fitted model instance
+            BaseModel: The fitted model instance.
         """
         pass
 
@@ -86,15 +106,12 @@ class BaseModel(ABC):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> np.ndarray:
         pass
 
     def compute_loss(
-        self,
-        y_true: np.ndarray,
-        y_pred: np.ndarray,
-        **kwargs
+        self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs
     ) -> Dict[str, float]:
         """
         Compute all loss metrics between true and predicted values using the Evaluator class.
@@ -110,9 +127,7 @@ class BaseModel(ABC):
         """
         return self.evaluator.evaluate(y_true, y_pred, **kwargs)
 
-    def evaluate(
-        self, X: np.ndarray, y: np.ndarray
-    ) -> Dict[str, float]:
+    def evaluate(self, X: np.ndarray, y: np.ndarray) -> Dict[str, float]:
         pass
 
     def get_params(self) -> Dict[str, Any]:
@@ -141,16 +156,14 @@ class BaseModel(ABC):
 
     def set_attrs(self, **attrs: Dict[str, Any]):
         """
-        Set model parameters.
+        Map validated settings onto the instance for ergonomic access.
 
         Args:
-            **params: Model parameters to set
-
-        Returns:
-            self: The model instance with updated parameters
+            **attrs: Arbitrary attributes sourced from the settings dictionary.
         """
         self.settings = attrs
-        for key, value in attrs.items(): setattr(self, key, value)
+        for key, value in attrs.items():
+            setattr(self, key, value)
 
     def get_model_summary(self) -> Dict[str, Any]:
         """
@@ -175,6 +188,7 @@ def validate_inputs(func):
     - timestamps_context, timestamps_target: 1D arrays (num_steps,)
     - Matching dimensions between related parameters
     """
+
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         # Get function signature to map args to parameter names
@@ -184,10 +198,10 @@ def validate_inputs(func):
         params = bound_args.arguments
 
         # Extract the relevant parameters
-        y_context = params.get('y_context')
-        y_target = params.get('y_target')
-        timestamps_context = params.get('timestamps_context')
-        timestamps_target = params.get('timestamps_target')
+        y_context = params.get("y_context")
+        y_target = params.get("y_target")
+        timestamps_context = params.get("timestamps_context")
+        timestamps_target = params.get("timestamps_target")
 
         # Validate y_context (required parameter)
         if y_context is None:
@@ -197,11 +211,15 @@ def validate_inputs(func):
             raise TypeError(f"y_context must be np.ndarray, got {type(y_context)}")
 
         if y_context.ndim != 2:
-            raise ValueError(f"y_context must be 2D array, got {y_context.ndim}D with shape {y_context.shape}")
+            raise ValueError(
+                f"y_context must be 2D array, got {y_context.ndim}D with shape {y_context.shape}"
+            )
 
         num_steps_context, num_targets_context = y_context.shape
         if num_steps_context == 0 or num_targets_context == 0:
-            raise ValueError(f"y_context cannot have zero dimensions, got shape {y_context.shape}")
+            raise ValueError(
+                f"y_context cannot have zero dimensions, got shape {y_context.shape}"
+            )
 
         # Validate y_target if present
         if y_target is not None:
@@ -209,11 +227,15 @@ def validate_inputs(func):
                 raise TypeError(f"y_target must be np.ndarray, got {type(y_target)}")
 
             if y_target.ndim != 2:
-                raise ValueError(f"y_target must be 2D array, got {y_target.ndim}D with shape {y_target.shape}")
+                raise ValueError(
+                    f"y_target must be 2D array, got {y_target.ndim}D with shape {y_target.shape}"
+                )
 
             num_steps_target, num_targets_target = y_target.shape
             if num_steps_target == 0 or num_targets_target == 0:
-                raise ValueError(f"y_target cannot have zero dimensions, got shape {y_target.shape}")
+                raise ValueError(
+                    f"y_target cannot have zero dimensions, got shape {y_target.shape}"
+                )
 
             # Check that num_targets match
             if num_targets_target != num_targets_context:
@@ -225,7 +247,9 @@ def validate_inputs(func):
         # Validate timestamps_context if present
         if timestamps_context is not None:
             if not isinstance(timestamps_context, np.ndarray):
-                raise TypeError(f"timestamps_context must be np.ndarray, got {type(timestamps_context)}")
+                raise TypeError(
+                    f"timestamps_context must be np.ndarray, got {type(timestamps_context)}"
+                )
 
             if timestamps_context.ndim != 1:
                 raise ValueError(
@@ -243,7 +267,9 @@ def validate_inputs(func):
         # Validate timestamps_target if present
         if timestamps_target is not None:
             if not isinstance(timestamps_target, np.ndarray):
-                raise TypeError(f"timestamps_target must be np.ndarray, got {type(timestamps_target)}")
+                raise TypeError(
+                    f"timestamps_target must be np.ndarray, got {type(timestamps_target)}"
+                )
 
             if timestamps_target.ndim != 1:
                 raise ValueError(
