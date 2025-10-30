@@ -101,7 +101,7 @@ class BenchmarkRunner:
     def initialize_tf_logger(self):
         """Setup logging configuration and TensorBoard."""
         # Logger already created in _initialize_run with the settings from config
-        tensorboard_logging = self.manager.benchmark_settings.tensorboard_logging
+        tensorboard_logging = self.manager.evaluation_settings.tensorboard_logging
         self.logger.info("BenchmarkRunner", f"Python logs saved at: {self.logs_path}")
         self.logger.debug("BenchmarkRunner", "Debug logging is working!")
 
