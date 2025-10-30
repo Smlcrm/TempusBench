@@ -2,7 +2,7 @@ model_type: "hybrid"
 python_version: "3.10.10"
 device: "cpu"
 bucket_name: "chronarium_artifacts"
-model_name: "tempo_small_2025_10_20_04:39:46_mse_0.873_nll_1.419/"
+model_name: "2025_10_29_10:42:03lafn_inferer_mse_5.990_nll_14.189/"
 model_version: 1
 project: "sim-inference"
 credentials_path: "tempus_bench/models/lafn/gcp_credentials.json"
