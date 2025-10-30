@@ -22,7 +22,7 @@ class BenchmarkRunner:
     def _initialize_run(self):
         """Initialize and update all path-related attributes."""
         
-        # Initialize the Manager (which creates its own Logger and TFLogger)
+        # Initialize the Manager (which creates its own unified Logger with TensorBoard support)
         self.manager = Manager(
             config_path=self.config_path,
         )
@@ -47,7 +47,7 @@ class BenchmarkRunner:
         
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
         for job_idx, job_config in enumerate(self.manager.generate_run_configs()):
-            hyperparameter_tuner = HyperparameterTuner(job_config=job_config)
+            hyperparameter_tuner = HyperparameterTuner(job_config=job_config, logger=self.logger)
 
             # Hyper-parameter Tuning
             task_name = job_config.task_config.name

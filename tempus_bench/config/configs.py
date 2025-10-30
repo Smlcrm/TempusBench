@@ -8,13 +8,14 @@ validation, type checking, and documentation of the benchmarking pipeline.
 import yaml
 
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
 
-from ..utils.logger import Logger
-from ..utils.tf_logger import TFLogger
+if TYPE_CHECKING:
+    from ..utils.logger import Logger
+
 
 ######################################################## UTILITY FUNCTIONS ########################################################
 
@@ -102,7 +103,6 @@ class ModelConfig(BaseModel):
     """Model configuration model."""
 
     model_config = ConfigDict(extra="forbid")
-
 
     model_name: str = Field(..., description="Model name")
 
@@ -205,7 +205,7 @@ class EvaluationSetting(BaseModel):
     )
     tensorboard_logging: bool = Field(..., description="Enable TensorBoard logging")
     conda_env_prefix: str = Field(..., description="Prefix for conda environment names")
-
+    reinstall_conda: bool = Field(..., description="Whether to reinstall the conda environments for each model")
 
 class JobConfig:
     """Unified configuration model for the benchmarking pipeline (single-model only)."""
@@ -217,16 +217,12 @@ class JobConfig:
         model_config: ModelConfig,
         model_setting: Dict[str, Any],
         task_config: TaskConfig,
-        run_path: str,
-        logger: Logger,
-        tf_logger: TFLogger,
+        run_path: str
     ):
-        
+
         self.evaluation_config = evaluation_config
         self.evaluation_setting = evaluation_setting
         self.model_config = model_config
         self.model_setting = model_setting
         self.task_config = task_config
         self.run_path = run_path
-        self.logger = logger
-        self.tf_logger = tf_logger

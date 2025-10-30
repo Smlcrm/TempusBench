@@ -17,11 +17,13 @@ import tempfile
 import pickle
 
 from .data_loader import DataLoader
+from .data_types import Dataset
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from tempus_bench.config import JobConfig
 from tempus_bench.utils.envs import CondaEnvManager
+from tempus_bench.utils.logger import Logger
 
 
 from ..utils.paths import get_models_dir, get_tasks_dir
@@ -38,15 +40,17 @@ class ModelExecutor:
     def __init__(
         self,
         job_config: JobConfig,
+        logger: Logger,
     ):
         """
         Initialize the executor with execution metadata.
 
         Args:
             job_config: Job configuration object.
+            logger: Logger instance for logging.
         """
         self.job_config = job_config
-        self.logger = job_config.logger
+        self.logger = logger
 
     def execute_model(
         self,
@@ -127,7 +131,7 @@ class ModelExecutor:
                 )
 
             eval_results = json.loads(json_line)
-            
+
         return eval_results
 
     def _get_model_requirements(self, model_name: str):
@@ -170,14 +174,9 @@ def main():
     parser.add_argument(
         "--validate-steps", type=int, required=True, help="Number of validation steps"
     )
-    parser.add_argument("--task-path", required=True, help="Path to the dataset file")
-    parser.add_argument(
-        "--window-idx", type=int, required=True, help="Index of the window to use"
-    )
     parser.add_argument(
         "--job-config-path", required=True, help="Path to job configuration file"
     )
-    
 
     args = parser.parse_args()
 
@@ -185,39 +184,36 @@ def main():
     hyperparameters = json.loads(args.hyperparameters)
 
     # Load configuration to get JobConfig
-    
 
     with open(args.job_config_path, "rb") as f:
         job_config = pickle.load(f)
-    
 
-
-
-    data_loader = DataLoader(job_config)
+    # Access logger from job_config
+    logger = job_config.logger
+    data_loader = DataLoader(job_config, logger)
     dataset = data_loader.dataset
     context_steps = args.context_steps
     train_steps = args.train_steps
     validate_steps = args.validate_steps
     model_name = args.model_name
-    
+
     steps = [
-            ("context", context_steps),
-            ("train", train_steps),
-            ("validate", validate_steps),
-        ]
-    
+        ("context", context_steps),
+        ("train", train_steps),
+        ("validate", validate_steps),
+    ]
+
     window_generator = data_loader.generate_dataset_split(
         steps=steps, stride=args.validate_steps
     )
-    
-    
+
     outputs = []
-    
+
     for window_idx, dataset_splits in enumerate(window_generator):
 
         timestamps = dataset.timestamps
         target = dataset.target
-        freq = dataset.metadata["time_freq"]
+        freq = dataset.metadata["time_freq"]  # type: ignore
 
         # Import model - models are now directly in the models directory
         models_dir = get_models_dir()
@@ -227,8 +223,7 @@ def main():
 
         # Generate class name (PascalCase + Model suffix)
         class_name = (
-            "".join(word.capitalize() for word in args.model_name.split("_"))
-            + "Model"
+            "".join(word.capitalize() for word in args.model_name.split("_")) + "Model"
         )
 
         spec = importlib.util.spec_from_file_location(model_file, module_path)
@@ -246,9 +241,7 @@ def main():
         vstart, vend = dataset_splits["validate"].start, dataset_splits["validate"].end
 
         # Create and train model
-        model = model_class(
-            params=hyperparameters, settings=job_config.model_setting
-        )
+        model = model_class(params=hyperparameters, settings=job_config.model_setting)
 
         trained_model = model.train(
             y_context=target[cstart:cend],
@@ -282,7 +275,7 @@ def main():
 
     # Output results as JSON
     print(json.dumps(outputs))
-    
+
 
 if __name__ == "__main__":
     main()
