@@ -18,6 +18,8 @@ import yaml
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from tempus_bench.config import JobConfig
+
 from ..models.model_router import ModelRouter
 from ..utils.envs import CondaEnvManager
 from ..utils.logger import Logger
@@ -34,26 +36,19 @@ class ModelExecutor:
 
     def __init__(
         self,
-        model_settings: Dict[str, Any],
-        logger: Logger,
-        logs_path: Optional[str] = None,
-        reinstall_conda: bool = False,
+        job_config: JobConfig,
     ):
         """
         Initialize the executor with execution metadata.
 
         Args:
-            model_settings: Mapping of model names to their execution settings (Python version, entrypoint, etc.).
-            logger: Logger instance to use for logging.
+            job_config: Job configuration object.
         """
-        self.model_settings = model_settings
-        self.logger = logger
-        self.logs_path = logs_path
-        self.reinstall_conda = reinstall_conda
+        self.job_config = job_config
+
 
     def execute_model(
         self,
-        model_name: str,
         hyperparameters: dict,
         context_steps: int,
         train_steps: int,
