@@ -55,6 +55,7 @@ def get_models_dir() -> Path:
     return models_dir
 
 
+# TODO: REMOVE
 def get_configs_dir() -> Path:
     """
     Get the absolute path to the configs directory.
@@ -69,6 +70,33 @@ def get_configs_dir() -> Path:
     if not configs_dir.exists():
         raise FileNotFoundError(f"Configs directory not found: {configs_dir}")
     return configs_dir
+
+
+def get_available_models() -> set:
+    """
+    Get all available model names from the models directory structure.
+
+    This function scans the models directory to find all model folders that contain
+    a corresponding model file. The model file naming convention is {model_name}_model.py.
+
+    Returns:
+        set: Set of available model names found in the models directory
+    """
+    available_models = set()
+    models_dir = get_models_dir()
+    # Look for model folders directly in the models directory
+    for model_folder in models_dir.iterdir():
+        if (
+            model_folder.is_dir()
+            and not model_folder.name.startswith("__")
+            and not model_folder.name.startswith(".")
+        ):
+            # Check if it has a model file
+            model_file = model_folder / f"{model_folder.name}_model.py"
+            if model_file.exists():
+                available_models.add(model_folder.name)
+
+    return available_models
 
 
 def get_absolute_runs_dir(runs_dir_relative: str) -> Path:
@@ -119,7 +147,7 @@ def get_dataset_path(task_name: str) -> Path:
     Raises:
         FileNotFoundError: If the dataset file doesn't exist
     """
-    dataset_path = Path(get_task_path(task_name)) / (task_name + '.csv')
+    dataset_path = Path(get_task_path(task_name)) / (task_name + ".csv")
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
     return dataset_path
@@ -138,7 +166,7 @@ def get_model_path(model_type: str, model_name: str) -> Path:
 
     Raises:
         FileNotFoundError: If the model directory doesn't exist
-        
+
     Note:
         The model_type parameter is deprecated as models are now organized by their
         settings.yaml file rather than folder structure. It's kept for backwards compatibility.
@@ -164,6 +192,56 @@ def get_runs_dir() -> Path:
     if not runs_dir.exists():
         raise FileNotFoundError(f"Runs directory not found: {runs_dir}")
     return runs_dir
+
+
+def find_task_directories(task_path_pattern: str) -> dict[str, str]:
+    """
+    Find task directories based on a task path pattern.
+
+    This function searches for task directories that match the specified pattern.
+    Supported patterns include:
+    - "*": All task directories
+    - "univariate/*": All univariate task directories
+    - "multivariate/*": All multivariate task directories
+    - "specific_task": A specific task directory (e.g., "univariate/specific_task")
+
+    Args:
+        task_path_pattern: Pattern to match task directories against
+
+    Returns:
+        Dict[str, str]: Mapping from task names to absolute directory paths that match the pattern.
+
+    Example:
+        >>> find_task_directories("univariate/*")
+        {'task1': '/path/to/tasks/univariate/task1', 'task2': '/path/to/tasks/univariate/task2'}
+    """
+    tasks_dir = get_tasks_dir()
+    task_paths = {}
+
+    pattern = task_path_pattern
+
+    if pattern == "*":
+        # Find all task directories
+        for subdir in tasks_dir.iterdir():
+            if subdir.is_dir():
+                for task_path in subdir.iterdir():
+                    if task_path.is_dir():
+                        task_paths[task_path.name] = str(task_path)
+    elif pattern.endswith("/*"):
+        # Find directories in specific subdirectory
+        subdir_name = pattern[:-2]
+        subdir_path = tasks_dir / subdir_name
+        if subdir_path.exists():
+            for task_path in subdir_path.iterdir():
+                if task_path.is_dir():
+                    task_paths[task_path.name] = str(task_path)
+    else:
+        # Specific task directory
+        task_path = tasks_dir / pattern
+        if task_path.exists():
+            task_paths[task_path.name] = str(task_path)
+
+    return task_paths
 
 
 def ensure_directory_exists(path: Path) -> None:
