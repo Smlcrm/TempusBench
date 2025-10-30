@@ -31,7 +31,6 @@ from ..utils.paths import (
     get_tasks_dir,
     find_task_directories,
 )
-from ..utils.tf_logger import TFLogger
 
 
 class ValidationError(Exception):
@@ -55,7 +54,7 @@ class Manager:
         task_path (str): Task path pattern from the benchmark configuration.
         models_evalated (KeysView): Keys of models to be evaluated.
         run_path (str): Path to run directory for outputs.
-        logger (Logger): Logger instance for logging.
+        logger (Logger): Logger instance for logging (includes both standard and TensorBoard logging).
         evaluation_config (EvaluationConfig): Evaluation configuration from the benchmark configuration.
         evaluation_setting (EvaluationSetting): Global logging/runtime options from `tasks/settings.yaml`.
         models_config (Dict[str, ModelConfig]): Model hyperparameters for each model.
@@ -73,7 +72,7 @@ class Manager:
         3. Loads evaluation settings from tasks/settings.yaml
         4. Extracts models to be evaluated
         5. Initializes evaluation configuration and settings
-        6. Initializes TFLogger based on evaluation settings
+        6. Initializes Logger with TensorBoard support based on evaluation settings
         7. Initializes model hyperparameters and settings
         8. Initializes task configurations
 
@@ -88,7 +87,7 @@ class Manager:
             - self.models_evaluated: Keys of models to be evaluated.
             - self.run_path: Path to run directory.
             - self.logger: Logger instance.
-            - self.tf_logger: TFLogger instance.
+            - self.tf_logger: Alias to logger instance (for backward compatibility).
             - self.evaluation_config: Evaluation configuration.
             - self.evaluation_setting: System settings (logging format, tensorboard, etc.).
             - self.model_configs: Model hyperparameters for each model.
@@ -122,25 +121,26 @@ class Manager:
         self.run_path = self.runs_path / f"run_{run_timestamp}"
         self.logs_path = self.run_path / "logs"
 
-        self.logger.info(
-            "Manager",
-            f"Initializing run at {run_timestamp}; logs at: {self.logs_path}",
-        )
+        tensorboard_dir = str(Path(self.run_path) / "tensorboard")
 
+        # Initialize unified logger with both standard and TensorBoard logging
         self.logger = Logger(
             logs_path=str(self.logs_path),
             console_logging=self.evaluation_setting.console_logging,
             file_logging=self.evaluation_setting.file_logging,
             console_log_level=self.evaluation_setting.console_log_level,
             file_log_level=self.evaluation_setting.file_log_level,
-        )
-
-        tensorboard_dir = str(Path(self.run_path) / "tensorboard")
-
-        self.tf_logger = TFLogger(
             tf_logs_path=tensorboard_dir,
             tensorboard_logging=self.evaluation_setting.tensorboard_logging,
         )
+
+        self.logger.info(
+            "Manager",
+            f"Initializing run at {run_timestamp}; logs at: {self.logs_path}",
+        )
+
+        # Keep tf_logger as an alias for backward compatibility
+        self.tf_logger = self.logger
 
     def init_tasks(self) -> Dict[str, TaskConfig]:
         """
@@ -247,9 +247,7 @@ class Manager:
                     model_config=self.model_configs[model_name],
                     model_setting=self.model_settings[model_name],
                     task_config=task_config,
-                    run_path=str(self.run_path),
-                    logger=self.logger,
-                    tf_logger=self.tf_logger,
+                    run_path=str(self.run_path)
                 )
 
     @staticmethod

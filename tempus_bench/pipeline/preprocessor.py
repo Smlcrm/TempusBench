@@ -12,21 +12,23 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from ..config.configs import JobConfig
+from ..utils.logger import Logger
 
 class Preprocessor:
     """Clean raw CSV payloads and apply normalization strategies."""
 
-    def __init__(self, config: JobConfig):
+    def __init__(self, config: JobConfig, logger: Logger):
         """
         Initialize the preprocessor for a concrete task configuration.
 
         Args:
             config: `JobConfig` emitted by the configuration manager; supplies
                 the task metadata and preprocessing directives.
+            logger: Logger instance for logging.
         """
         self.job_config = config
         self.evaluation_config = config.evaluation_config
-        self.logger = config.logger
+        self.logger = logger
         self.max_num_variates = self.evaluation_config.max_num_variates
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:

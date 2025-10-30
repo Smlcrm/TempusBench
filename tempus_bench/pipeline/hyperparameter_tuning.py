@@ -8,6 +8,7 @@ from typing import List, Tuple
 import numpy as np
 
 from ..config.configs import JobConfig
+from ..utils.logger import Logger
 from ..utils.paths import get_task_path
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
@@ -16,13 +17,14 @@ from .model_executor import ModelExecutor
 class HyperparameterTuner:
     """Run rolling-window hyperparameter sweeps for the active task/model pair."""
 
-    def __init__(self, job_config: JobConfig):
+    def __init__(self, job_config: JobConfig, logger: Logger):
         """
         Build a tuner that is pre-configured for a single job.
 
         Args:
             job_config: Fully validated `JobConfig` produced by `ConfigManager.generate_run_configs`.
                 Provides benchmark settings, task metadata, and model hyperparameter grid.
+            logger: Logger instance for logging.
         """
         self.job_config = job_config
         self.evaluation_config = job_config.evaluation_config
@@ -35,9 +37,8 @@ class HyperparameterTuner:
         self.tuning_loss = self.evaluation_config.tuning_loss
         self.dataset_path = Path(self.task_config.task_path)
         self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
-        self.logger = self.job_config.logger
-        self.tf_logger = self.job_config.tf_logger
-        self.data_loader = DataLoader(self.job_config)
+        self.logger = logger
+        self.data_loader = DataLoader(self.job_config, self.logger)
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
         """
@@ -94,7 +95,7 @@ class HyperparameterTuner:
         best_hyperparameters = {}
 
         # Initialize model executor
-        model_executor = ModelExecutor(self.job_config)
+        model_executor = ModelExecutor(self.job_config, self.logger)
         # Generate windows for this dataset
 
         # Store results for each window
@@ -105,7 +106,7 @@ class HyperparameterTuner:
 
         tuning_losses = {}
         eval_metrics = {}
-        evaluation_metrics = None 
+        evaluation_metrics = None
 
         # Try each hyperparameter combination
         for params in self._generate_hyperparameter_grid():
@@ -117,21 +118,20 @@ class HyperparameterTuner:
                     train_steps=train_steps,
                     validate_steps=validate_steps,
                 )
-                
+
             except Exception as e:
                 self.logger.error(
                     "HyperparameterTuner",
                     f"Error executing model {self.model_name} with params {params}: {e}",
                 )
                 continue
-            
+
             for window_idx, eval_losses in enumerate(windows_eval_losses):
                 if evaluation_metrics is None:
                     evaluation_metrics = list(eval_losses.keys())
-                    
+
                 immutable_params = tuple(sorted(params.items()))
                 # Set evaluation metrics list on first successful eval
-
 
                 tuning_losses[immutable_params] = eval_losses[self.tuning_loss]
                 eval_metrics[immutable_params] = eval_losses
@@ -141,9 +141,7 @@ class HyperparameterTuner:
                     f"Evaluated model {self.model_name} with params {params}: {eval_losses}",
                 )
                 # Log hyperparameters and metrics to TensorBoard
-                self.tf_logger.log_hparams(params, eval_losses)
-
-
+                self.logger.log_hparams(params, eval_losses)
 
                 # Find the hyperparams with lowest tuning_loss for this window
                 if tuning_losses:
@@ -154,20 +152,18 @@ class HyperparameterTuner:
 
                     # Generate forecast plot for best hyperparameters
                     self._generate_forecast_plot(
-                        model_name=self.model_name,
                         hyperparameters=dict(best_params),
                         context_steps=context_steps,
                         train_steps=train_steps,
                         validate_steps=validate_steps,
-                        dataset_path=self.dataset_path,
                         window_idx=window_idx,
                     )
 
         # Aggregate test loss over all windows, for each metric
-        test_loss = {metric: [] for metric in evaluation_metrics}
+        test_loss = {metric: [] for metric in evaluation_metrics}  # type: ignore
         for window_j in range(num_windows - 1):
             best_params_prev = optimal_hyperparameters[window_j]
-            for metric in evaluation_metrics:
+            for metric in evaluation_metrics:  # type: ignore
                 if best_params_prev in evaluations[window_j + 1]:
                     test_loss[metric].append(
                         evaluations[window_j + 1][best_params_prev][metric]
@@ -177,7 +173,7 @@ class HyperparameterTuner:
             metric: (
                 float(np.mean(test_loss[metric])) if test_loss[metric] else float("nan")
             )
-            for metric in evaluation_metrics
+            for metric in evaluation_metrics  # type: ignore
         }
 
         # Write to evaluations CSV in parent directory
@@ -188,7 +184,7 @@ class HyperparameterTuner:
         file_exists = csv_outpath.exists()
         row = (
             [self.model_name, self.dataset_path]
-            + [avg_test_loss[metric] for metric in evaluation_metrics]
+            + [avg_test_loss[metric] for metric in evaluation_metrics]  # type: ignore
             + [str(optimal_hyperparameters)]
         )
         # Append a new line to evaluations.csv if it already exists
@@ -197,7 +193,7 @@ class HyperparameterTuner:
             if not file_exists:  # write header on the first line
                 writer.writerow(
                     ["model_name", "dataset_path"]
-                    + [f"avg_test_{metric}" for metric in evaluation_metrics]
+                    + [f"avg_test_{metric}" for metric in evaluation_metrics]  # type: ignore
                     + ["best_params"]
                 )
             writer.writerow(row)
@@ -212,21 +208,18 @@ class HyperparameterTuner:
         all_evals[self.model_name] = model_evals
         best_hyperparameters[self.model_name] = model_best_params
 
-        if self.evaluation_settings.console_logging:
-            self.logger.success(
-                "HyperparameterTuner", "Hyperparameter optimization completed"
-            )
+        self.logger.success(
+            "HyperparameterTuner", "Hyperparameter optimization completed"
+        )
 
         return all_evals, best_hyperparameters
 
     def _generate_forecast_plot(
         self,
-        model_name,
         hyperparameters,
         context_steps,
         train_steps,
         validate_steps,
-        dataset_path,
         window_idx,
     ):
         """
@@ -239,7 +232,7 @@ class HyperparameterTuner:
             import matplotlib.pyplot as plt
 
             # Create data loader to get the window data
-            data_loader = DataLoader(self.job_config)
+            data_loader = DataLoader(self.job_config, self.logger)
 
             # Get the specific window data
             steps = [
@@ -247,9 +240,7 @@ class HyperparameterTuner:
                 ("train", train_steps),
                 ("validate", validate_steps),
             ]
-            window_iter = data_loader.generate_dataset_split(
-                dataset_path, steps, stride=1
-            )
+            window_iter = data_loader.generate_dataset_split(steps, stride=1)
 
             # Find the specific window
             window_data = None
@@ -265,27 +256,22 @@ class HyperparameterTuner:
                 return
 
             # Create model executor to get predictions
-            model_executor = ModelExecutor(
-                model_settings=self.models_settings,
-                logger=self.logger,
-                logs_path=self.logs_path,
-                reinstall_conda=self.benchmark_settings.reinstall_conda,
-            )
+            model_executor = ModelExecutor(self.job_config, self.logger)
 
             # Execute model to get predictions
             eval_results = model_executor.execute_model(
-                model_name=model_name,
                 hyperparameters=hyperparameters,
                 context_steps=context_steps,
                 train_steps=train_steps,
                 validate_steps=validate_steps,
-                task_path=dataset_path,
-                window_idx=window_idx,
             )
 
             # Create plots directory
             plots_dir = (
-                Path(self.job_config.run_path) / "tensorboard" / "plots" / model_name
+                Path(self.job_config.run_path)
+                / "tensorboard"
+                / "plots"
+                / self.model_name
             )
             plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -307,6 +293,7 @@ class HyperparameterTuner:
             # Create subplots for each target
             num_targets = context_data.shape[1] if context_data.ndim > 1 else 1
             fig, axes = plt.subplots(num_targets, 1, figsize=(15, 4 * num_targets))
+
             if num_targets == 1:
                 axes = [axes]
 
@@ -331,7 +318,7 @@ class HyperparameterTuner:
 
             # For each target, create a subplot
             for target_idx in range(num_targets):
-                ax = axes[target_idx]
+                ax = axes[target_idx]  # type: ignore
 
                 # Plot context data
                 if context_data.ndim == 1:
@@ -454,7 +441,7 @@ class HyperparameterTuner:
 
                 # Customize subplot
                 ax.set_title(
-                    f"{model_name} - Target {target_idx + 1} (Window {window_idx})"
+                    f"{self.model_name} - Target {target_idx + 1} (Window {window_idx})"
                 )
                 ax.set_xlabel("Time Steps")
                 ax.set_ylabel("Value")
@@ -473,17 +460,14 @@ class HyperparameterTuner:
             plt.close()
 
             # Log to TensorBoard
-            self.tf_logger.log_image_file(
-                image_path=str(plot_path), tag=f"{model_name}/forecast", step=window_idx
-            )
-
-            self.logger.info(
-                "HyperparameterTuner",
-                f"Generated time series plot for {model_name} window {window_idx}",
+            self.logger.log_image_file(
+                image_path=str(plot_path),
+                tag=f"{self.model_name}/forecast",
+                step=window_idx,
             )
 
         except Exception as e:
             self.logger.error(
                 "HyperparameterTuner",
-                f"Error generating time series plot for {model_name}: {e}",
+                f"Error generating time series plot for {self.model_name}: {e}",
             )
