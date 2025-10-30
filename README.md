@@ -70,8 +70,7 @@ tempus_bench/
 └── utils/                     # Utility functions
     ├── __init__.py
     ├── envs.py               # Conda environment management
-    ├── logger.py             # Logging
-    ├── tf_logger.py          # TensorBoard logging
+    ├── logger.py             # Unified logging (standard and TensorBoard)
     ├── model_config.py       # Model configuration handling
     └── paths.py              # Path management
 ```

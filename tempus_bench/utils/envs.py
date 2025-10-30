@@ -5,8 +5,11 @@ from pathlib import Path
 
 from .paths import get_project_root
 
+
 class CondaEnvManager:
-    def __init__(self, name: str, python: str = None, requirements_path: str = None, reinstall: bool = False):
+    def __init__(
+        self, name: str, python: str, requirements_path: str, reinstall: bool = False
+    ):
         """
         Manage a conda environment: verify or create, install dependencies.
 
@@ -23,19 +26,27 @@ class CondaEnvManager:
 
         # If reinstall requested, remove env if it exists
         if reinstall:
-            subprocess.run([
-                "conda", "env", "remove", "-n", self.env_name, "-y"
-            ], capture_output=True, text=True)
+            subprocess.run(
+                ["conda", "env", "remove", "-n", self.env_name, "-y"],
+                capture_output=True,
+                text=True,
+            )
 
         # Check if the conda environment already exists and has tempus_bench installed
         check_result = subprocess.run(
             f"conda run -n {self.env_name} python --version && conda run -n {self.env_name} python -c 'import tempus_bench'",
-            shell=True, executable="/bin/bash",
-            capture_output=True, text=True
+            shell=True,
+            executable="/bin/bash",
+            capture_output=True,
+            text=True,
         )
 
-        if check_result.returncode == 0 and "Python" in check_result.stdout and not reinstall:
-            for line in check_result.stdout.split('\n'):
+        if (
+            check_result.returncode == 0
+            and "Python" in check_result.stdout
+            and not reinstall
+        ):
+            for line in check_result.stdout.split("\n"):
                 if "Python" in line:
                     self.python_version = line.strip().split("Python")[-1].strip()
                     break
@@ -43,12 +54,9 @@ class CondaEnvManager:
             self._installed = True
         else:
             # Environment doesn't exist, not healthy, or reinstall requested
-            if self.python_version is None:
-                # Fallback to 3.11 if not provided
-                self.python_version = self.python_version
+            self.python_version = "3.11"
             self.create_env()
-            if self.requirements_path:
-                self.install(self.requirements_path)
+            self.install(self.requirements_path)
 
     def __enter__(self):
         return self
@@ -58,20 +66,44 @@ class CondaEnvManager:
 
     def create_env(self):
         # Create the conda environment - fail fast, no fallbacks
-        result = subprocess.run([
-            "conda", "create", "-y", "-n", self.env_name, f"python={self.python_version}"
-        ], capture_output=True, text=True)
+        result = subprocess.run(
+            [
+                "conda",
+                "create",
+                "-y",
+                "-n",
+                self.env_name,
+                f"python={self.python_version}",
+            ],
+            capture_output=True,
+            text=True,
+        )
 
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to create conda environment {self.env_name}: {result.stderr}")
+            raise RuntimeError(
+                f"Failed to create conda environment {self.env_name}: {result.stderr}"
+            )
 
         # Install tempus_bench package
-        result = subprocess.run([
-            "conda", "run", "-n", self.env_name, "pip", "install", "-e", str(get_project_root()),
-        ], capture_output=True, text=True)
+        result = subprocess.run(
+            [
+                "conda",
+                "run",
+                "-n",
+                self.env_name,
+                "pip",
+                "install",
+                "-e",
+                str(get_project_root()),
+            ],
+            capture_output=True,
+            text=True,
+        )
 
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to install tempus_bench in conda environment {self.env_name}: {result.stderr}")
+            raise RuntimeError(
+                f"Failed to install tempus_bench in conda environment {self.env_name}: {result.stderr}"
+            )
 
         self._env_created = True
 
@@ -79,16 +111,31 @@ class CondaEnvManager:
         if not requirements_path.endswith(".txt"):
             raise ValueError("Unknown requirements file type. Provide .txt")
 
-        result = subprocess.run([
-            "conda", "run", "-n", self.env_name, "pip", "install", "-r", requirements_path
-        ], capture_output=True, text=True)
+        result = subprocess.run(
+            [
+                "conda",
+                "run",
+                "-n",
+                self.env_name,
+                "pip",
+                "install",
+                "-r",
+                requirements_path,
+            ],
+            capture_output=True,
+            text=True,
+        )
 
         if result.returncode != 0:
-            raise RuntimeError(f"Failed to install requirements {requirements_path} in conda environment {self.env_name}: {result.stderr}")
+            raise RuntimeError(
+                f"Failed to install requirements {requirements_path} in conda environment {self.env_name}: {result.stderr}"
+            )
 
         self._installed = True
 
-    def run(self, script: str = None, args: str = "", command: str = None):
+    def run(
+        self, script: str | None = None, args: str = "", command: str | None = None
+    ):
         """
         Run a Python script or command inside the conda environment.
 
@@ -109,13 +156,26 @@ class CondaEnvManager:
                 shell=True,
                 executable="/bin/bash",
                 capture_output=True,
-                text=True
+                text=True,
             )
         else:
             # Run Python script with args
-            result = subprocess.run([
-                "conda", "run", "-n", self.env_name, "python", script, args
-            ], capture_output=True, text=True)
+            # script is guaranteed to be not None here due to validation above
+            if script is None:
+                raise ValueError("script cannot be None when command is not provided")
+
+            # Build command list: base command + script + split args
+            cmd_list = ["conda", "run", "-n", self.env_name, "python", script]
+            
+            if args:
+                # Split args string into separate list elements
+                cmd_list.extend(args.split())
+
+            result = subprocess.run(
+                cmd_list,
+                capture_output=True,
+                text=True,
+            )
 
         if result.returncode != 0:
             target = command if command else f"{script} {args}"
@@ -131,7 +191,8 @@ class CondaEnvManager:
 
     def delete(self):
         if self._env_created:
-            subprocess.run([
-                "conda", "remove", "-y", "-n", self.env_name, "--all"
-            ], check=True)
-            self._env_created = False; self._installed = False
+            subprocess.run(
+                ["conda", "remove", "-y", "-n", self.env_name, "--all"], check=True
+            )
+            self._env_created = False
+            self._installed = False

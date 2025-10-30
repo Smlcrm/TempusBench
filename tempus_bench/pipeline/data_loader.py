@@ -29,6 +29,7 @@ from pathlib import Path
 import pandas as pd
 
 from ..config.configs import JobConfig
+from ..utils.logger import Logger
 from .data_types import Dataset, DatasetSplit
 from .preprocessor import Preprocessor
 
@@ -46,24 +47,25 @@ class DataLoader:
     artificial column naming for maximum flexibility.
     """
 
-    def __init__(self, job_config: JobConfig):
+    def __init__(self, job_config: JobConfig, logger: Logger):
         """
         Initialize the loader for a specific job configuration.
 
         Args:
             job_config: Aggregated configuration object that includes benchmark settings,
                 dataset metadata, and preprocessing directives for the active task.
+            logger: Logger instance for logging.
         """
         self.job_config = job_config
         self.evaluation_config = job_config.evaluation_config
+        self.task_config = job_config.task_config
         task_path = Path(self.task_config.task_path)
         self.dataset_path = task_path / self.task_config.dataset.file_name
-        self.task_config = job_config.task_config
-        self.logger = job_config.logger
+        self.logger = logger
 
         self._load_dataset()
 
-    def _load_dataset(self) -> tuple:
+    def _load_dataset(self):
         """
         Load a complete dataset file and extract basic metadata.
 
@@ -98,7 +100,7 @@ class DataLoader:
         normalize = self.task_config.dataset.normalize
         handle_missing = self.task_config.dataset.handle_missing
 
-        preprocessor = Preprocessor(self.job_config)
+        preprocessor = Preprocessor(self.job_config, self.logger)
         # All targets are 2D after cleaning: (n_steps, n_variates)
         timestamps, time_start, time_freq, target, scaler = preprocessor.clean(
             time_start, time_freq, target_raw, normalize, handle_missing
@@ -147,7 +149,9 @@ class DataLoader:
 
         # Resolve actual dataset file path and load task-specific options
 
-        num_steps = self.dataset.target.shape[0]  # (n_steps, n_features): first dim is time-steps
+        num_steps = self.dataset.target.shape[
+            0
+        ]  # (n_steps, n_features): first dim is time-steps
         window_size = sum(seg_len for (_, seg_len) in steps)
         max_windows = self.evaluation_config.max_windows
 
