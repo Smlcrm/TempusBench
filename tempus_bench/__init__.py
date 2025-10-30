@@ -22,13 +22,16 @@ Package Structure:
 Usage:
     from tempus_bench import model_router
     from tempus_bench.pipeline import DataLoader, ModelExecutor
-    
+
     # Load data and run benchmarks
-    data_loader = DataLoader(config)
+    data_loader = DataLoader(job_config)
     datasets = data_loader.load_several_chunks(3)
-    
+
     # Execute models (runs in isolated conda environment via CLI)
-    model_executor = ModelExecutor(job_config)
+    model_executor = ModelExecutor(
+        model_settings=job_config.model_settings,
+        logger=job_config.logger
+    )
     results = model_executor.execute_model(
         model_name='arima',
         hyperparameters={'p': 2, 'd': 1, 'q': 2},
@@ -36,7 +39,8 @@ Usage:
         train_steps=100,
         validate_steps=20,
         task_path='path/to/task.csv',
-        window_idx=0
+        window_idx=0,
+        config_path=job_config.config_path
     )
 """
 
