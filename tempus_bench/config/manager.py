@@ -364,8 +364,7 @@ class Manager:
                         model=single_model_config,
                         benchmark_settings=self.benchmark_settings,
                         model_settings={
-                            **self.model_settings[model_name],
-                            "model_name": model_name
+                            **self.model_settings[model_name]
                         },
                         task_config=task_config,
                         task_paths=self.task_paths,
