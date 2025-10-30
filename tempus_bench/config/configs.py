@@ -259,32 +259,29 @@ class ModelHParams(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # Universal models
-    lafn_hybrid: Optional[Dict[str, Any]] = None
-
-    # Stochastic models (with hyperparameters)
-    lstm: Optional[Dict[str, List[Any]]] = None
-    deepar: Optional[Dict[str, Any]] = None
-    xgboost: Optional[Dict[str, List[Any]]] = None
-    random_forest: Optional[Dict[str, List[Any]]] = None
-    svr: Optional[Dict[str, List[Any]]] = None
-    prophet: Optional[Dict[str, List[Any]]] = None
-    varmax: Optional[Dict[str, List[Any]]] = None
-    # Foundation models, stochastic variant (no hyperparameters)
-    chronos: Optional[Dict[str, Any]] = None
-    tiny_time_mixer: Optional[Dict[str, Any]] = None
-    moirai: Optional[Dict[str, Any]] = None
-    moirai_moe: Optional[Dict[str, Any]] = None
-    moment: Optional[Dict[str, Any]] = None
-    timesfm: Optional[Dict[str, Any]] = None
-
-    # Deterministic models (with hyperparameters)
+    # TODO: Remove the necessity of having these models in the config, they should be infered from the model folder
+    # Traditional models with hyperparameters
     exponential_smoothing: Optional[Dict[str, List[Any]]] = None
     seasonal_naive: Optional[Dict[str, List[Any]]] = None
     croston_classic: Optional[Dict[str, List[Any]]] = None
     theta: Optional[Dict[str, List[Any]]] = None
     arima: Optional[Dict[str, List[Any]]] = None
-    # Foundation models, deterministic variant (no hyperparameters)
+    xgboost: Optional[Dict[str, List[Any]]] = None
+    random_forest: Optional[Dict[str, List[Any]]] = None
+    svr: Optional[Dict[str, List[Any]]] = None
+    prophet: Optional[Dict[str, List[Any]]] = None
+    lstm: Optional[Dict[str, List[Any]]] = None
+    varmax: Optional[Dict[str, List[Any]]] = None
+    lafn: Optional[Dict[str, Any]] = None
+
+    # Foundation models (no hyperparameters)
+    chronos: Optional[Dict[str, Any]] = None
+    deepar: Optional[Dict[str, Any]] = None
+    tiny_time_mixer: Optional[Dict[str, Any]] = None
+    moirai: Optional[Dict[str, Any]] = None
+    moirai_moe: Optional[Dict[str, Any]] = None
+    moment: Optional[Dict[str, Any]] = None
+    timesfm: Optional[Dict[str, Any]] = None
     lagllama: Optional[Dict[str, Any]] = None
     toto: Optional[Dict[str, Any]] = None
     tabpfn: Optional[Dict[str, Any]] = None
@@ -388,23 +385,31 @@ class EvaluationSettings(BaseModel):
         default="INFO",
         description="Console logging level (DEBUG, INFO, WARNING, ERROR)",
     )
-    reinstall_conda: bool = Field(
-        default=False,
-        description="If true, force re-create the model's conda environment before execution"
-    )
+    tensorboard_logging: bool = Field(..., description="Enable TensorBoard logging")
+    conda_env_prefix: str = Field(..., description="Prefix for conda environment names")
+
 
 class JobConfig(BaseModel):
     """Unified configuration model for the benchmarking pipeline (single-model only)."""
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    benchmark_config: BenchmarkConfig = Field(..., description="Benchmark configuration (must reference a single model)")
-    benchmark_settings: BenchmarkSettingsConfig = Field(..., description="Benchmark settings")
-    model_settings: Dict[str, Any] = Field(..., description="Model execution settings (flat dict for the single selected model)")
+    # Fields from BenchmarkConfig
+    task_path: str = Field(
+        ...,
+        description="Task path pattern (supports wildcards like '*', 'univariate/*', etc.)",
+    )
+    evaluation: EvaluationConfig = Field(..., description="Evaluation configuration")
+    model: ModelHParams = Field(..., description="Model configuration")
+
+    # Other JobConfig fields
+    benchmark_settings: EvaluationSettings = Field(
+        ..., description="Benchmark settings"
+    )
+    model_settings: Dict[str, Any] = Field(..., description="Model execution settings")
     task_config: TaskConfig = Field(..., description="Task configuration")
     task_paths: Dict[str, str] = Field(..., description="Task paths")
-    config_path: str = Field(..., description="Path to config file")
-    logs_path: str = Field(..., description="Path to logs directory")
+    run_path: str = Field(..., description="Path to run directory for outputs")
     logger: Any = Field(..., description="Logger instance for logging")
 
     @model_validator(mode="after")
@@ -449,24 +454,25 @@ class JobConfig(BaseModel):
     def validate_single_model_and_existence(self):
         model_settings = self.model_settings
 
-        # Extract the single model key from benchmark_config
-        model_config = benchmark_config.model.model_dump(exclude_none=True)
+        # Check that only a single model is referenced in both places
+        # model is an instance of ModelHParams; extract the list of models with non-None config
+        model_config = self.model.model_dump(exclude_none=True)
         if len(model_config) != 1:
             raise ValueError("JobConfig must reference exactly one model")
         model_in_config = list(model_config.keys())[0]
 
-        # Enforce canonical model_name presence and equality in flat model_settings
-        if "model_name" not in model_settings or not model_settings.get("model_name"):
+        if len(model_settings) != 1:
+            raise ValueError("model_settings must contain exactly one model")
+        model_in_settings = list(model_settings.keys())[0]
+
+        if model_in_config != model_in_settings:
             raise ValueError(
-                "model_settings must include a non-empty 'model_name' matching the benchmark key"
-            )
-        if str(model_settings.get("model_name")) != model_in_benchmark:
-            raise ValueError(
-                f"model_settings.model_name ('{model_settings.get('model_name')}') must match '{model_in_benchmark}'"
+                f"Model names do not match in JobConfig: model in config is '{model_in_config}', "
+                f"but in model_settings is '{model_in_settings}'"
             )
 
-        model_path = Path(model_settings["model_path"]) 
-        model_file = model_path / f"{model_in_benchmark}_model.py"
+        model_path = Path(model_settings[model_in_config]["model_path"])
+        model_file = model_path / f"{model_in_config}_model.py"
         if not (model_path.exists() and model_path.is_dir()):
             raise ValueError(f"Model directory does not exist: {model_path}")
         if not model_file.exists():
