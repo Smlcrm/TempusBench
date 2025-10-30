@@ -13,16 +13,17 @@ import argparse
 import json
 import os
 import importlib.util
-import yaml
+import tempfile
+import pickle
 
+from .data_loader import DataLoader
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from tempus_bench.config import JobConfig
+from tempus_bench.utils.envs import CondaEnvManager
 
-from ..models.model_router import ModelRouter
-from ..utils.envs import CondaEnvManager
-from ..utils.logger import Logger
+
 from ..utils.paths import get_models_dir, get_tasks_dir
 
 
@@ -45,7 +46,7 @@ class ModelExecutor:
             job_config: Job configuration object.
         """
         self.job_config = job_config
-
+        self.logger = job_config.logger
 
     def execute_model(
         self,
@@ -53,8 +54,6 @@ class ModelExecutor:
         context_steps: int,
         train_steps: int,
         validate_steps: int,
-        task_path: str,
-        window_idx: int,
     ) -> dict:
         """
         Execute a single model with specific hyperparameters on a specific dataset window.
@@ -71,7 +70,7 @@ class ModelExecutor:
         Returns:
             dict: Evaluation metrics and optional artifacts produced by the model command.
         """
-        model_name = list(self.job_config.model_configs.keys())[0]
+        model_name = self.job_config.model_config.model_name
         self.logger.info(
             "ModelExecutor",
             f"Executing model {model_name} with hyperparameters {hyperparameters}",
@@ -79,50 +78,56 @@ class ModelExecutor:
 
         # Create Conda Environment
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = self.model_settings["python_version"]
+        python_version = self.job_config.model_setting["python_version"]
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,
             requirements_path=requirements_path,
-            reinstall=self.reinstall_conda,
+            reinstall=self.job_config.evaluation_setting.reinstall_conda,
         )
 
-        # Build CLI command
-        hyperparameters_json = json.dumps(hyperparameters)
-        command = (
-            f"python -m tempus_bench.pipeline.model_executor "
-            f"--model-name {model_name} "
-            f"--hyperparameters '{hyperparameters_json}' "
-            f"--context-steps {context_steps} "
-            f"--train-steps {train_steps} "
-            f"--validate-steps {validate_steps} "
-            f"--task-path {task_path} "
-            f"--window-idx {window_idx} "
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            job_config_path = os.path.join(temp_dir, "job_config.pkl")
+            with open(job_config_path, "wb") as f:
+                pickle.dump(self.job_config, f)
 
-        self.logger.debug("ModelExecutor", f"Running command: {command}")
-
-        result = conda_env.run(command=command)
-
-        self.logger.success(
-            "ModelExecutor", f"Command ran successfully for model {model_name}"
-        )
-
-        # Parse the JSON output from the command
-        # Find the last line that contains JSON (the script outputs debug info first)
-        lines = result.stdout.strip().split("\n")
-        json_line = None
-        for line in reversed(lines):
-            if line.strip().startswith("{") and line.strip().endswith("}"):
-                json_line = line.strip()
-                break
-
-        if json_line is None:
-            raise ValueError(
-                f"No valid JSON found in command output. Output was: {result.stdout}"
+            # Create a temporary directory to store the pickled job_config
+            # Build CLI command
+            hyperparameters_json = json.dumps(hyperparameters)
+            command = (
+                f"python -m tempus_bench.pipeline.model_executor "
+                f"--model-name {model_name} "
+                f"--hyperparameters '{hyperparameters_json}' "
+                f"--context-steps {context_steps} "
+                f"--train-steps {train_steps} "
+                f"--validate-steps {validate_steps} "
+                f"--job-config-path {job_config_path} "
             )
 
-        eval_results = json.loads(json_line)
+            self.logger.debug("ModelExecutor", f"Running command: {command}")
+
+            result = conda_env.run(command=command)
+
+            self.logger.success(
+                "ModelExecutor", f"Command ran successfully for model {model_name}"
+            )
+
+            # Parse the JSON output from the command
+            # Find the last line that contains JSON (the script outputs debug info first)
+            lines = result.stdout.strip().split("\n")
+            json_line = None
+            for line in reversed(lines):
+                if line.strip().startswith("{") and line.strip().endswith("}"):
+                    json_line = line.strip()
+                    break
+
+            if json_line is None:
+                raise ValueError(
+                    f"No valid JSON found in command output. Output was: {result.stdout}"
+                )
+
+            eval_results = json.loads(json_line)
+            
         return eval_results
 
     def _get_model_requirements(self, model_name: str):
@@ -170,125 +175,114 @@ def main():
         "--window-idx", type=int, required=True, help="Index of the window to use"
     )
     parser.add_argument(
-        "--config-path", required=True, help="Path to configuration file"
+        "--job-config-path", required=True, help="Path to job configuration file"
     )
+    
 
     args = parser.parse_args()
 
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
 
-    # Create logger for this subprocess
-    from ..utils.logger import Logger
-
-    logger = Logger(logs_path=args.logs_path, enable_logging=False)
-
     # Load configuration to get JobConfig
-    from ..config import Manager
-    from .data_loader import DataLoader
+    
 
-    manager = Manager(args.config_path, args.logs_path, logger)
+    with open(args.job_config_path, "rb") as f:
+        job_config = pickle.load(f)
+    
 
-    task_path = str(args.task_path)
-    matching_jobs = [
-        job_config
-        for job_config, task_idx in manager.generate_run_configs()
-        if job_config.benchmark_config.task_path == task_path
-    ]
 
-    if not matching_jobs:
-        raise ValueError(f"No job config found for task {task_path}")
-
-    job_config = matching_jobs[0]
-
-    # Use DataLoader to handle data loading properly
-    from .data_loader import DataLoader
 
     data_loader = DataLoader(job_config)
-
-    # Generate windows
+    dataset = data_loader.dataset
+    context_steps = args.context_steps
+    train_steps = args.train_steps
+    validate_steps = args.validate_steps
+    model_name = args.model_name
+    
     steps = [
-        ("context", args.context_steps),
-        ("train", args.train_steps),
-        ("validate", args.validate_steps),
-    ]
-    window_iter = data_loader.generate_dataset_split(args.task_path, steps, stride=1)
+            ("context", context_steps),
+            ("train", train_steps),
+            ("validate", validate_steps),
+        ]
+    
+    window_generator = data_loader.generate_dataset_split(
+        steps=steps, stride=args.validate_steps
+    )
+    
+    
+    outputs = []
+    
+    for window_idx, dataset_splits in enumerate(window_generator):
 
-    # Get the specific window
-    window_found = False
-    for idx, (win_idx, window) in enumerate(window_iter):
-        if idx == args.window_idx:
-            window_found = True
-            timestamps = window.timestamps
-            target = window.target
-            freq = window.metadata["freq"]
+        timestamps = dataset.timestamps
+        target = dataset.target
+        freq = dataset.metadata["time_freq"]
 
-            # Import model - models are now directly in the models directory
-            models_dir = get_models_dir()
-            model_dir = models_dir / args.model_name
-            model_file = f"{args.model_name}_model"
-            module_path = str(model_dir / f"{model_file}.py")
+        # Import model - models are now directly in the models directory
+        models_dir = get_models_dir()
+        model_dir = models_dir / args.model_name
+        model_file = f"{model_name}_model"
+        module_path = str(model_dir / f"{model_file}.py")
 
-            # Generate class name (PascalCase + Model suffix)
-            class_name = (
-                "".join(word.capitalize() for word in args.model_name.split("_"))
-                + "Model"
-            )
-
-            spec = importlib.util.spec_from_file_location(model_file, module_path)
-            if spec is None or spec.loader is None:
-                raise ImportError(
-                    f"Failed to load module spec for {model_file} from {module_path}"
-                )
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            model_class = getattr(module, class_name)
-
-            # Extract split indices
-            cstart, cend = window.context.start, window.context.end
-            tstart, tend = window.train.start, window.train.end
-            vstart, vend = window.validate.start, window.validate.end
-
-            # Create and train model
-            model = model_class(params=hyperparameters, settings=job_config.model_settings)
-
-            trained_model = model.train(
-                y_context=target[cstart:cend],
-                y_target=target[tstart:tend],
-                timestamps_context=timestamps[cstart:cend],
-                timestamps_target=timestamps[tstart:tend],
-                freq=freq,
-            )
-
-            # Generate predictions
-            results = trained_model.predict(
-                y_context=target[cstart:tend],
-                timestamps_context=timestamps[cstart:tend],
-                timestamps_target=timestamps[vstart:vend],
-                freq=freq,
-            )
-
-            # Compute evaluation metrics
-            eval_losses = trained_model.compute_loss(
-                y_true=target[vstart:vend], y_pred=results
-            )
-
-            # Include predictions in output for plotting
-            output = {
-                **eval_losses,
-                "predictions": results.tolist(),
-                "y_true": target[vstart:vend].tolist(),
-            }
-
-            # Output results as JSON
-            print(json.dumps(output))
-            break
-
-    if not window_found:
-        raise Exception(
-            f"Window {args.window_idx} not found for dataset {args.task_path}"
+        # Generate class name (PascalCase + Model suffix)
+        class_name = (
+            "".join(word.capitalize() for word in args.model_name.split("_"))
+            + "Model"
         )
 
+        spec = importlib.util.spec_from_file_location(model_file, module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(
+                f"Failed to load module spec for {model_file} from {module_path}"
+            )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        model_class = getattr(module, class_name)
+
+        # Extract split indices
+        cstart, cend = dataset_splits["context"].start, dataset_splits["context"].end
+        tstart, tend = dataset_splits["train"].start, dataset_splits["train"].end
+        vstart, vend = dataset_splits["validate"].start, dataset_splits["validate"].end
+
+        # Create and train model
+        model = model_class(
+            params=hyperparameters, settings=job_config.model_setting
+        )
+
+        trained_model = model.train(
+            y_context=target[cstart:cend],
+            y_target=target[tstart:tend],
+            timestamps_context=timestamps[cstart:cend],
+            timestamps_target=timestamps[tstart:tend],
+            freq=freq,
+        )
+
+        # Generate predictions
+        results = trained_model.predict(
+            y_context=target[cstart:tend],
+            timestamps_context=timestamps[cstart:tend],
+            timestamps_target=timestamps[vstart:vend],
+            freq=freq,
+        )
+
+        # Compute evaluation metrics
+        eval_losses = trained_model.compute_loss(
+            y_true=target[vstart:vend], y_pred=results
+        )
+
+        # Include predictions in output for plotting
+        output = {
+            **eval_losses,
+            "predictions": results.tolist(),
+            "y_true": target[vstart:vend].tolist(),
+        }
+
+        outputs.append(output)
+
+    # Output results as JSON
+    print(json.dumps(outputs))
+    
 
 if __name__ == "__main__":
     main()

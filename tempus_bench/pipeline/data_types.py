@@ -28,9 +28,6 @@ class Dataset:
 
     timestamps: np.ndarray  # Array of timestamps (same length as num_steps) or None
     target: np.ndarray  # 2D np.ndarray of Target values
-    context: DatasetSplit
-    train: DatasetSplit
-    validate: DatasetSplit
     scaler: Optional[StandardScaler] = None  # Scaler used for normalization (if any)
     metadata: Optional[Dict[str, Any]] = None
 

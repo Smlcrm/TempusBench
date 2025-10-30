@@ -10,7 +10,7 @@ import yaml
 
 from pathlib import Path
 from typing import Any, Dict, List
-
+import datetime
 from pydantic import ValidationError as PydanticValidationError
 
 from .configs import (
@@ -31,7 +31,7 @@ from ..utils.paths import (
     get_tasks_dir,
     find_task_directories,
 )
-from ..utils.tf_logger import get_tf_logger
+from ..utils.tf_logger import TFLogger
 
 
 class ValidationError(Exception):
@@ -63,22 +63,24 @@ class Manager:
         task_configs (Dict[str, TaskConfig]): Mapping from task names to validated task configurations.
     """
 
-    def __init__(self, config_path: str, run_path: str, logger: Logger):
+    def __init__(self, config_path: str):
         """
         Initialize the configuration manager.
 
         This method performs initialization in the following order:
-        1. Loads the main benchmark configuration
-        2. Loads evaluation settings from tasks/settings.yaml
-        3. Extracts models to be evaluated
-        4. Initializes evaluation configuration and settings
-        5. Initializes model hyperparameters and settings
-        6. Initializes task configurations
+        1. Initializes the Logger
+        2. Loads the main benchmark configuration
+        3. Loads evaluation settings from tasks/settings.yaml
+        4. Extracts models to be evaluated
+        5. Initializes evaluation configuration and settings
+        6. Initializes TFLogger based on evaluation settings
+        7. Initializes model hyperparameters and settings
+        8. Initializes task configurations
 
         Args:
             config_path: Path to the main benchmark configuration YAML file
             run_path: Directory for run outputs (evaluations, plots, etc.)
-            logger: Logger instance to use for logging
+            logs_path: Path to logs directory
 
         Initializes:
             - self.config_path: Configuration file path.
@@ -86,12 +88,15 @@ class Manager:
             - self.models_evaluated: Keys of models to be evaluated.
             - self.run_path: Path to run directory.
             - self.logger: Logger instance.
+            - self.tf_logger: TFLogger instance.
             - self.evaluation_config: Evaluation configuration.
             - self.evaluation_setting: System settings (logging format, tensorboard, etc.).
             - self.model_configs: Model hyperparameters for each model.
             - self.model_settings: Model execution settings (Python version, device, conda env) for models.
             - self.task_configs: Validated task configurations.
         """
+        # Initialize logger first (needed by Manager)
+
         # Setup paths and settings
         self.config_path = config_path
 
@@ -104,9 +109,6 @@ class Manager:
 
         self.task_path = config_data["task_path"]
 
-        self.run_path = run_path
-        self.logger = logger
-
         self.evaluation_config = EvaluationConfig(**config_data["evaluation"])
         self.evaluation_setting = EvaluationSetting(**evaluation_setting)
 
@@ -114,6 +116,31 @@ class Manager:
         self.model_settings = self.init_model_setting()
 
         self.task_configs = self.init_tasks()
+
+        run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.runs_path = get_project_root() / "runs"
+        self.run_path = self.runs_path / f"run_{run_timestamp}"
+        self.logs_path = self.run_path / "logs"
+
+        self.logger.info(
+            "Manager",
+            f"Initializing run at {run_timestamp}; logs at: {self.logs_path}",
+        )
+
+        self.logger = Logger(
+            logs_path=str(self.logs_path),
+            console_logging=self.evaluation_setting.console_logging,
+            file_logging=self.evaluation_setting.file_logging,
+            console_log_level=self.evaluation_setting.console_log_level,
+            file_log_level=self.evaluation_setting.file_log_level,
+        )
+
+        tensorboard_dir = str(Path(self.run_path) / "tensorboard")
+
+        self.tf_logger = TFLogger(
+            tf_logs_path=tensorboard_dir,
+            tensorboard_logging=self.evaluation_setting.tensorboard_logging,
+        )
 
     def init_tasks(self) -> Dict[str, TaskConfig]:
         """
@@ -161,7 +188,9 @@ class Manager:
         """
         model_hparams = {}
         for model_name in self.models_evaluated:
-            model_hparams[model_name] = ModelConfig(**models_config[model_name])
+            model_hparams[model_name] = ModelConfig(
+                model_name=model_name, **models_config[model_name]
+            )
         return model_hparams
 
     def init_model_setting(self) -> Dict[str, Any]:
@@ -218,8 +247,9 @@ class Manager:
                     model_config=self.model_configs[model_name],
                     model_setting=self.model_settings[model_name],
                     task_config=task_config,
-                    run_path=self.run_path,
+                    run_path=str(self.run_path),
                     logger=self.logger,
+                    tf_logger=self.tf_logger,
                 )
 
     @staticmethod

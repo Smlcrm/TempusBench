@@ -56,11 +56,14 @@ class DataLoader:
         """
         self.job_config = job_config
         self.evaluation_config = job_config.evaluation_config
+        task_path = Path(self.task_config.task_path)
+        self.dataset_path = task_path / self.task_config.dataset.file_name
         self.task_config = job_config.task_config
         self.logger = job_config.logger
-        self.preprocessor = Preprocessor(job_config)
 
-    def _load_dataset(self, dataset_path: str) -> tuple:
+        self._load_dataset()
+
+    def _load_dataset(self) -> tuple:
         """
         Load a complete dataset file and extract basic metadata.
 
@@ -84,23 +87,36 @@ class DataLoader:
             cleaning and preprocessing is handled by the Preprocessor class.
         """
 
-        if not Path(dataset_path).exists():
-            raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
-
         # Load the csv data
-        dataset_file_path = Path(dataset_path) / self.task_config.dataset.file_name
-        file_data = pd.read_csv(dataset_file_path, encoding="utf-8")
+        file_data = pd.read_csv(self.dataset_path, encoding="utf-8")
 
         # Extract basic information
         time_start = file_data["start"].iloc[0]
         time_freq = file_data["freq"].iloc[0]
         target_raw = file_data["target"].iloc[0]
 
-        return time_start, time_freq, target_raw
+        normalize = self.task_config.dataset.normalize
+        handle_missing = self.task_config.dataset.handle_missing
 
-    def generate_dataset_split(
-        self, dataset_path: str, steps: list[tuple[str, int]], stride: int
-    ):
+        preprocessor = Preprocessor(self.job_config)
+        # All targets are 2D after cleaning: (n_steps, n_variates)
+        timestamps, time_start, time_freq, target, scaler = preprocessor.clean(
+            time_start, time_freq, target_raw, normalize, handle_missing
+        )
+
+        # Construct the Dataset with dynamically assigned splits from steps
+        self.dataset = Dataset(
+            timestamps=timestamps,
+            target=target,
+            scaler=scaler,
+            metadata={
+                "dataset_path": str(self.dataset_path),
+                "time_start": time_start,
+                "time_freq": time_freq,
+            },
+        )
+
+    def generate_dataset_split(self, steps: list[tuple[str, int]], stride: int):
         """
         Generate rolling windows over a time series with configurable segments.
 
@@ -127,24 +143,17 @@ class DataLoader:
             - Each yielded `Dataset` includes timestamps, target data, scaler, and metadata.
             - Target data is preprocessed and normalized by the `Preprocessor`.
         """
-        self.logger.debug("DataLoader", f"Extracting data from {dataset_path}")
+        self.logger.debug("DataLoader", f"Extracting data from {self.dataset_path}")
 
         # Resolve actual dataset file path and load task-specific options
-        dataset_file_path = dataset_path
-        normalize = self.task_config.dataset.normalize
-        handle_missing = self.task_config.dataset.handle_missing
 
-        # All targets are 2D after cleaning: (n_steps, n_variates)
-        timestamps, _, time_freq, target, scaler = self.preprocessor.clean(
-            *self._load_dataset(str(dataset_file_path)), normalize, handle_missing
-        )
-        num_steps = target.shape[0]  # (n_steps, n_features): first dim is time-steps
+        num_steps = self.dataset.target.shape[0]  # (n_steps, n_features): first dim is time-steps
         window_size = sum(seg_len for (_, seg_len) in steps)
         max_windows = self.evaluation_config.max_windows
 
-        win = 0
-        while win < max_windows:
-            start = win * stride
+        window_idx = 0
+        while window_idx < max_windows:
+            start = window_idx * stride
             end = start + window_size
             if end > num_steps:
                 break
@@ -156,20 +165,4 @@ class DataLoader:
                 splits[seg_name] = DatasetSplit(start=start, end=end)
                 start = end
 
-            # Construct the Dataset with dynamically assigned splits from steps
-            window_kwargs = dict(
-                timestamps=timestamps,
-                target=target,
-                scaler=scaler,
-                metadata={
-                    "dataset_path": str(dataset_file_path),
-                    "window": win,
-                    "freq": time_freq,
-                },
-            )
-            # Include segment splits (e.g., context=..., train=..., validation=...)
-            window_kwargs.update(splits)
-            window = Dataset(**window_kwargs)
-
-            yield win, window
-            win += 1
+            yield splits
