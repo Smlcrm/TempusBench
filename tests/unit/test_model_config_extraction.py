@@ -23,7 +23,7 @@ class DummyModel(BaseModel):
         return np.array([[1.0]])
 
 
-class TestModelHParamsExtraction:
+class TestModelConfigExtraction:
     """Test suite for model config extraction validation."""
     
     def test_valid_single_model_config(self):

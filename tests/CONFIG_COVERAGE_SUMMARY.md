@@ -46,7 +46,7 @@
 **Recommendation**: Add tests for `max_num_variates < 1` validation
 
 #### Line 93: Model parameters None check
-**Status**: Already covered by ModelHParams default None values
+**Status**: Already covered by ModelConfig default None values
 
 #### Line 96: Model parameters dict validation
 **Status**: Covered by existing tests
@@ -60,7 +60,7 @@
 **Status**: FIXED - Added @staticmethod decorator
 
 ### 2. Fix model availability validation
-**Issue**: Current implementation validates ALL models in ModelHParams, including None values
+**Issue**: Current implementation validates ALL models in ModelConfig, including None values
 **Status**: FIXED - Added check for `model_params is not None` before validating
 
 ### 3. Improve error handling

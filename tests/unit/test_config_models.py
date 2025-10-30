@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 from tempus_bench.config.configs import (
     EvaluationConfig,
-    ModelHParams,
+    ModelConfig,
     DatasetConfig,
     TaskConfig,
     EvaluationSettings
@@ -89,12 +89,12 @@ class TestEvaluationConfig:
         assert config.max_num_variates == 5.5
 
 
-class TestModelHParams:
-    """Test suite for ModelHParams model."""
+class TestModelConfig:
+    """Test suite for ModelConfig model."""
     
     def test_valid_traditional_model_config(self):
         """Test valid traditional model configuration."""
-        config = ModelHParams(
+        config = ModelConfig(
             arima={"p": [1, 2], "d": [1], "tuning_loss": ["mae"]}
         )
         assert config.arima["p"] == [1, 2]
@@ -103,14 +103,14 @@ class TestModelHParams:
     
     def test_valid_traditional_model_without_tuning_loss(self):
         """Test valid traditional model configuration without tuning_loss (for non-trainable models)."""
-        config = ModelHParams(
+        config = ModelConfig(
             prophet={"seasonality_mode": ["additive"]}  # Prophet doesn't require tuning_loss
         )
         assert config.prophet["seasonality_mode"] == ["additive"]
     
     def test_valid_foundation_model_config(self):
         """Test valid foundation model configuration."""
-        config = ModelHParams(
+        config = ModelConfig(
             chronos={}  # Foundation models must have empty config
         )
         assert config.chronos == {}
@@ -118,25 +118,25 @@ class TestModelHParams:
     def test_model_parameters_not_dict(self):
         """Test that non-dict parameters raise ValueError."""
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(arima="invalid")
+            ModelConfig(arima="invalid")
         assert "must be a dict" in str(exc_info.value)
     
     def test_traditional_model_non_list_parameter(self):
         """Test that traditional models must have list parameters."""
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(arima={"p": 1, "tuning_loss": ["mae"]})  # Should be [1]
+            ModelConfig(arima={"p": 1, "tuning_loss": ["mae"]})  # Should be [1]
         assert "must be a list of values" in str(exc_info.value)
     
     def test_traditional_model_empty_list(self):
         """Test that traditional models cannot have empty lists."""
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(arima={"p": [], "tuning_loss": ["mae"]})
+            ModelConfig(arima={"p": [], "tuning_loss": ["mae"]})
         assert "cannot be an empty list" in str(exc_info.value)
     
     def test_foundation_model_simple_values(self):
         """Test that foundation models reject any parameters."""
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(
+            ModelConfig(
                 chronos={"param": "value"}
             )
         assert "Foundation model 'chronos' must not define any parameters" in str(exc_info.value)
@@ -144,7 +144,7 @@ class TestModelHParams:
     def test_foundation_model_list_value(self):
         """Test that foundation models reject list parameters."""
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(
+            ModelConfig(
                 chronos={"params": [1, 2, 3]}
             )
         assert "Foundation model 'chronos' must not define any parameters" in str(exc_info.value)
@@ -152,12 +152,12 @@ class TestModelHParams:
     def test_trainable_model_missing_tuning_loss(self):
         """Test that trainable models fail without tuning_loss."""
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(arima={"p": [1, 2]})  # Missing tuning_loss
+            ModelConfig(arima={"p": [1, 2]})  # Missing tuning_loss
         assert "requires 'tuning_loss' parameter" in str(exc_info.value)
     
     def test_non_trainable_model_without_tuning_loss(self):
         """Test that non-trainable models work without tuning_loss."""
-        config = ModelHParams(
+        config = ModelConfig(
             prophet={"seasonality_mode": ["additive"]},
             xgboost={"n_estimators": [100]}
         )
@@ -166,7 +166,7 @@ class TestModelHParams:
     
     def test_none_values_allowed(self):
         """Test that None values are allowed for optional models."""
-        config = ModelHParams()
+        config = ModelConfig()
         assert config.arima is None
 
 
@@ -296,21 +296,21 @@ class TestEvaluationSettings:
             )
 
 
-class TestModelHParamsTrainingLossValidation:
-    """Test suite for ModelHParams training_loss validation."""
+class TestModelConfigTrainingLossValidation:
+    """Test suite for ModelConfig training_loss validation."""
     
     def test_allowed_models_can_use_training_loss(self):
         """Test that models performing loss-based optimization can use training_loss."""
         # ARIMA - allowed deterministic model
-        config = ModelHParams(arima={"p": [1, 2], "training_loss": ["mae", "rmse"], "tuning_loss": ["mae"]})
+        config = ModelConfig(arima={"p": [1, 2], "training_loss": ["mae", "rmse"], "tuning_loss": ["mae"]})
         assert config.arima["training_loss"] == ["mae", "rmse"]
     
         # LSTM - allowed deterministic model
-        config = ModelHParams(lstm={"units": [50], "training_loss": ["mae"], "tuning_loss": ["mae"]})
+        config = ModelConfig(lstm={"units": [50], "training_loss": ["mae"], "tuning_loss": ["mae"]})
         assert config.lstm["training_loss"] == ["mae"]
     
         # SVR - allowed deterministic model
-        config = ModelHParams(svr={"kernel": ["rbf"], "training_loss": ["mae"], "tuning_loss": ["mae"]})
+        config = ModelConfig(svr={"kernel": ["rbf"], "training_loss": ["mae"], "tuning_loss": ["mae"]})
         assert config.svr["training_loss"] == ["mae"]
     
     def test_non_trainable_deterministic_models_cannot_use_training_loss(self):
@@ -324,10 +324,10 @@ class TestModelHParamsTrainingLossValidation:
             with pytest.raises(ValidationError) as exc_info:
                 if model_name in ['moment', 'timesfm', 'tabpfn']:
                     # Foundation models use simple values
-                    ModelHParams(**{model_name: {"tuning_loss": "mae"}})
+                    ModelConfig(**{model_name: {"tuning_loss": "mae"}})
                 else:
                     # Traditional models use lists
-                    ModelHParams(**{model_name: {"param": [1], "tuning_loss": ["mae"]}})
+                    ModelConfig(**{model_name: {"param": [1], "tuning_loss": ["mae"]}})
             
             assert f"Model '{model_name}' cannot define 'tuning_loss'" in str(exc_info.value)
             assert "Only models performing loss-based optimization (ARIMA, LSTM, DeepAR, SVR)" in str(exc_info.value)
@@ -342,21 +342,21 @@ class TestModelHParamsTrainingLossValidation:
         for model_name in stochastic_models:
             with pytest.raises(ValidationError) as exc_info:
                 # Foundation models use simple values
-                ModelHParams(**{model_name: {"training_loss": "mae"}})
+                ModelConfig(**{model_name: {"training_loss": "mae"}})
             
             assert f"Stochastic model '{model_name}' cannot define 'training_loss' parameter" in str(exc_info.value)
             assert "Only models performing loss-based optimization (ARIMA, LSTM, DeepAR, SVR)" in str(exc_info.value)
     
     def test_deepar_can_use_training_loss(self):
         """Test that DeepAR (stochastic but loss-based) can use training_loss."""
-        config = ModelHParams(deepar={"hidden_size": [32], "training_loss": ["mae"], "tuning_loss": ["mae"]})
+        config = ModelConfig(deepar={"hidden_size": [32], "training_loss": ["mae"], "tuning_loss": ["mae"]})
         assert config.deepar["training_loss"] == ["mae"]
         assert config.deepar["hidden_size"] == [32]
     
     def test_multiple_models_with_training_loss_validation(self):
         """Test validation when multiple models are configured."""
         # Valid configuration with allowed models
-        config = ModelHParams(
+        config = ModelConfig(
             arima={"p": [1], "tuning_loss": ["mae"]},
             lstm={"units": [50], "tuning_loss": ["rmse"]},
             deepar={"hidden_size": [32], "tuning_loss": ["mae"]}
@@ -367,7 +367,7 @@ class TestModelHParamsTrainingLossValidation:
         
         # Invalid configuration with forbidden model
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(
+            ModelConfig(
                 arima={"p": [1], "tuning_loss": ["mae"]},  # Allowed
                 prophet={"tuning_loss": ["mae"]}  # Not allowed
             )
@@ -375,7 +375,7 @@ class TestModelHParamsTrainingLossValidation:
     
     def test_training_loss_validation_with_none_configs(self):
         """Test that None model configs don't trigger training_loss validation."""
-        config = ModelHParams(
+        config = ModelConfig(
             arima={"p": [1], "training_loss": ["mae"]},  # Allowed
             prophet=None,  # None config should not trigger validation
             chronos=None   # None config should not trigger validation
@@ -387,7 +387,7 @@ class TestModelHParamsTrainingLossValidation:
     def test_training_loss_with_other_parameters(self):
         """Test training_loss validation when combined with other parameters."""
         # Valid case - ARIMA with multiple parameters including training_loss
-        config = ModelHParams(arima={
+        config = ModelConfig(arima={
             "p": [1, 2, 3],
             "d": [0, 1],
             "q": [1, 2],
@@ -399,7 +399,7 @@ class TestModelHParamsTrainingLossValidation:
         
         # Invalid case - Prophet with multiple parameters including training_loss
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(prophet={
+            ModelConfig(prophet={
                 "seasonality_mode": ["additive", "multiplicative"],
                 "training_loss": ["mae"],  # This should trigger validation error
                 "holidays": [True, False]
@@ -410,29 +410,29 @@ class TestModelHParamsTrainingLossValidation:
         """Test edge cases for training_loss validation."""
         # Test with empty training_loss list (should be rejected at field validator level)
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(prophet={"training_loss": []})
+            ModelConfig(prophet={"training_loss": []})
         # This fails at field_validator level due to empty list validation
         assert "cannot be an empty list" in str(exc_info.value)
         
         # Test with None training_loss value (should still be rejected for forbidden models)
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(chronos={"training_loss": None})
+            ModelConfig(chronos={"training_loss": None})
         assert "Stochastic model 'chronos' cannot define 'tuning_loss' parameter" in str(exc_info.value)
         
         # Test with string training_loss for traditional models (should be rejected)
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(arima={"training_loss": "mae"})  # Should be ["mae"] for traditional models
+            ModelConfig(arima={"training_loss": "mae"})  # Should be ["mae"] for traditional models
         # This should fail at the field_validator level, not the model_validator level
         assert "must be a list of values" in str(exc_info.value)
         
         # Test with non-empty list for forbidden deterministic model (should reach model validator)
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(prophet={"training_loss": ["mae"]})
+            ModelConfig(prophet={"training_loss": ["mae"]})
         assert "Deterministic model 'prophet' cannot define 'training_loss' parameter" in str(exc_info.value)
         
         # Test with non-empty list for forbidden stochastic model (should reach model validator)
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(chronos={"training_loss": ["mae"]})
+            ModelConfig(chronos={"training_loss": ["mae"]})
         assert "Stochastic model 'chronos' cannot define 'tuning_loss' parameter" in str(exc_info.value)
     
     def test_all_model_types_coverage(self):
@@ -447,10 +447,10 @@ class TestModelHParamsTrainingLossValidation:
             with pytest.raises(ValidationError) as exc_info:
                 if model_name in ['moment', 'timesfm', 'tabpfn']:
                     # Foundation models use simple values
-                    ModelHParams(**{model_name: {"tuning_loss": "mae"}})
+                    ModelConfig(**{model_name: {"tuning_loss": "mae"}})
                 else:
                     # Traditional models use lists
-                    ModelHParams(**{model_name: {"param": [1], "tuning_loss": ["mae"]}})
+                    ModelConfig(**{model_name: {"param": [1], "tuning_loss": ["mae"]}})
             
             assert f"Model '{model_name}' cannot define 'tuning_loss'" in str(exc_info.value)
         
@@ -462,7 +462,7 @@ class TestModelHParamsTrainingLossValidation:
         
         for model_name in forbidden_stochastic:
             with pytest.raises(ValidationError) as exc_info:
-                ModelHParams(**{model_name: {"training_loss": "mae"}})
+                ModelConfig(**{model_name: {"training_loss": "mae"}})
             
             assert f"Stochastic model '{model_name}' cannot define 'training_loss' parameter" in str(exc_info.value)
         
@@ -475,14 +475,14 @@ class TestModelHParamsTrainingLossValidation:
         ]
         
         for model_name, config_dict in allowed_models:
-            config = ModelHParams(**{model_name: config_dict})
+            config = ModelConfig(**{model_name: config_dict})
             assert config.model_dump()[model_name]["training_loss"] is not None
     
     def test_training_loss_validation_error_messages(self):
         """Test that error messages are specific and informative."""
         # Test deterministic model error message
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(prophet={"training_loss": ["mae"]})
+            ModelConfig(prophet={"training_loss": ["mae"]})
         
         error_msg = str(exc_info.value)
         assert "Deterministic model 'prophet'" in error_msg
@@ -491,7 +491,7 @@ class TestModelHParamsTrainingLossValidation:
         
         # Test stochastic model error message
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(chronos={"training_loss": "mae"})
+            ModelConfig(chronos={"training_loss": "mae"})
         
         error_msg = str(exc_info.value)
         assert "Stochastic model 'chronos'" in error_msg
@@ -502,7 +502,7 @@ class TestModelHParamsTrainingLossValidation:
         """Test training_loss validation with complex model configurations."""
         # Test multiple models with mixed valid/invalid training_loss usage
         with pytest.raises(ValidationError) as exc_info:
-            ModelHParams(
+            ModelConfig(
                 arima={"p": [1], "training_loss": ["mae"]},  # Valid
                 lstm={"units": [50], "training_loss": ["rmse"]},  # Valid
                 prophet={"training_loss": ["mae"]},  # Invalid - should trigger error
@@ -513,7 +513,7 @@ class TestModelHParamsTrainingLossValidation:
         assert "Deterministic model 'prophet' cannot define 'training_loss' parameter" in str(exc_info.value)
         
         # Test valid complex configuration
-        config = ModelHParams(
+        config = ModelConfig(
             arima={"p": [1, 2], "d": [0, 1], "training_loss": ["mae", "rmse"]},
             lstm={"units": [50, 100], "dropout": [0.1, 0.2], "training_loss": ["mae"]},
             deepar={"training_loss": "mae", "context_length": 50},
@@ -526,15 +526,15 @@ class TestModelHParamsTrainingLossValidation:
         assert config.svr["training_loss"] == ["mae"]
 
 
-class TestModelHParamsEdgeCases:
-    """Test suite for ModelHParams edge cases."""
+class TestModelConfigEdgeCases:
+    """Test suite for ModelConfig edge cases."""
     
     def test_none_values_return_early(self):
         """Test that None values in validate_model_parameters return early (line 91)."""
         # This test specifically covers line 91 in validate_model_parameters
         # When v is None, the function should return v early
-        # We test this by ensuring ModelHParams with None values works
-        config = ModelHParams(arima=None, prophet=None)
+        # We test this by ensuring ModelConfig with None values works
+        config = ModelConfig(arima=None, prophet=None)
         # The validator at line 91 checks `if v is None: return v`
         # This should pass without raising any errors
         assert config.arima is None
