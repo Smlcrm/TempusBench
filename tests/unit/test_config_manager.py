@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch, mock_open
 from tempus_bench.config.manager import Manager, ValidationError
 from tempus_bench.config import (
     TaskConfig,
-    EvaluationSettings,
+    EvaluationSetting,
     DatasetConfig,
     EvaluationConfig,
     ModelConfig,
@@ -325,7 +325,7 @@ class TestManagerValidateBenchmarkSettings:
         mock_get_configs_dir.return_value = tmp_path
 
         result = Manager.validate_benchmark_settings(manager)
-        assert isinstance(result, EvaluationSettings)
+        assert isinstance(result, EvaluationSetting)
 
 
 class TestManagerValidateModelSettings:
@@ -596,7 +596,7 @@ class TestManagerFullIntegration:
         manager = Manager(str(config_file), str(tmp_path))
         assert manager.config_path == str(config_file)
         assert isinstance(manager.model, ModelConfig)
-        assert isinstance(manager.benchmark_settings, EvaluationSettings)
+        assert isinstance(manager.benchmark_settings, EvaluationSetting)
 
 
 class TestManagerExceptionHandling:

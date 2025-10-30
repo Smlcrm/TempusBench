@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
 
+from ..utils.logger import Logger
+
 ######################################################## UTILITY FUNCTIONS ########################################################
 
 
@@ -183,7 +185,7 @@ class TaskConfig(BaseModel):
 ######################################################## EVALUATION SETTINGS ########################################################
 
 
-class EvaluationSettings(BaseModel):
+class EvaluationSetting(BaseModel):
     """Systems configuration model."""
 
     model_config = ConfigDict(extra="forbid")
@@ -201,85 +203,23 @@ class EvaluationSettings(BaseModel):
     conda_env_prefix: str = Field(..., description="Prefix for conda environment names")
 
 
-class JobConfig(BaseModel):
+class JobConfig:
     """Unified configuration model for the benchmarking pipeline (single-model only)."""
 
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    # Core configuration components (matching Manager initialization)
-    evaluation_config: EvaluationConfig = Field(
-        ..., description="Evaluation configuration"
-    )
-    evaluation_settings: EvaluationSettings = Field(
-        ..., description="Evaluation settings (logging, tensorboard, conda env prefix)"
-    )
-    model_configs: Dict[str, Any] = Field(..., description="Model hyperparameters")
-    models_setting: Dict[str, Any] = Field(..., description="Model execution settings")
-    task_config: TaskConfig = Field(..., description="Task configuration")
-
-    # Additional fields
-    run_path: str = Field(..., description="Path to run directory for outputs")
-    logger: Any = Field(..., description="Logger instance for logging")
-
-    # @model_validator(mode="after")
-    # def validate_tuning_loss_usage(self):
-    #     """
-    #     Ensure that 'tuning_loss' is properly defined for models that require it
-    #     for training/optimization, and not defined for models that don't use it.
-
-    #     Models which have more than 1 possible hyperparameter configuration are
-    #     considered "trainable" and require a tuning_loss.
-    #     """
-    #     # We infer trainable models as those with >1 unique hyperparameter grid combination.
-    #     trainable_models = set()
-    #     for model_name, params in self.model_configs.items():
-    #         if not isinstance(params, dict) or not params:
-    #             continue
-    #         # For each param, get the number of options
-    #         param_lists = [
-    #             v for v in params.values() if isinstance(v, list) and len(v) > 0
-    #         ]
-    #         if not param_lists:
-    #             continue
-    #         # Calculate the total number of possible hyperparam configs
-    #         n_configs = 1
-    #         for l in param_lists:
-    #             n_configs *= len(l)
-    #         if n_configs > 1:
-    #             trainable_models.add(model_name)
-
-    #     for model_name in trainable_models:
-    #         if self.evaluation_config.tuning_loss is None:
-    #             raise ValueError(
-    #                 f"Model '{model_name}' requires 'tuning_loss' parameter for training "
-    #                 f"but it is not defined. Please add 'tuning_loss' to the model configuration."
-    #             )
-    #     return self
-
-    # @model_validator(mode="after")
-    # def validate_single_model_and_existence(self):
-    #     # Check that only a single model is referenced in both model_configs and models_setting
-    #     if len(self.model_configs) != 1:
-    #         raise ValueError(
-    #             "JobConfig must reference exactly one model in model_configs"
-    #         )
-    #     model_in_hparams = list(self.model_configs.keys())[0]
-
-    #     if len(self.models_setting) != 1:
-    #         raise ValueError("models_setting must contain exactly one model")
-    #     model_in_settings = list(self.models_setting.keys())[0]
-
-    #     if model_in_hparams != model_in_settings:
-    #         raise ValueError(
-    #             f"Model names do not match in JobConfig: model in model_configs is '{model_in_hparams}', "
-    #             f"but in models_setting is '{model_in_settings}'"
-    #         )
-
-    #     model_path = Path(self.models_setting[model_in_hparams]["model_path"])
-    #     model_file = model_path / f"{model_in_hparams}_model.py"
-    #     if not (model_path.exists() and model_path.is_dir()):
-    #         raise ValueError(f"Model directory does not exist: {model_path}")
-    #     if not model_file.exists():
-    #         raise ValueError(f"Model file does not exist: {model_file}")
-
-    #     return self
+    def __init__(
+        self,
+        evaluation_config: EvaluationConfig,
+        evaluation_setting: EvaluationSetting,
+        model_config: ModelConfig,
+        model_setting: Dict[str, Any],
+        task_config: TaskConfig,
+        run_path: str,
+        logger: Logger,
+    ):
+        self.evaluation_config = evaluation_config
+        self.evaluation_setting = evaluation_setting
+        self.model_config = model_config
+        self.model_setting = model_setting
+        self.task_config = task_config
+        self.run_path = run_path
+        self.logger = logger
