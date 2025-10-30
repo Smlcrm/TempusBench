@@ -71,6 +71,7 @@ class ModelExecutor:
         Returns:
             dict: Evaluation metrics and optional artifacts produced by the model command.
         """
+        model_name = list(self.job_config.model_configs.keys())[0]
         self.logger.info(
             "ModelExecutor",
             f"Executing model {model_name} with hyperparameters {hyperparameters}",
