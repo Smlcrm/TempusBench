@@ -35,23 +35,17 @@ class ModelExecutor:
     def __init__(
         self,
         model_settings: Dict[str, Any],
-        config_path: str,
         logger: Logger,
-        logs_path: Optional[str] = None,
     ):
         """
         Initialize the executor with execution metadata.
 
         Args:
             model_settings: Mapping of model names to their execution settings (Python version, entrypoint, etc.).
-            config_path: Absolute path to the benchmark configuration file used for the run.
             logger: Logger instance to use for logging.
-            logs_path: Optional path to logs directory for passing to subprocess commands.
         """
         self.model_settings = model_settings
-        self.config_path = config_path
         self.logger = logger
-        self.logs_path = logs_path
 
     def execute_model(
         self,
@@ -103,12 +97,7 @@ class ModelExecutor:
             f"--validate-steps {validate_steps} "
             f"--task-path {task_path} "
             f"--window-idx {window_idx} "
-            f"--config-path {self.config_path}"
         )
-
-        # Add optional logs-path if provided
-        if self.logs_path:
-            command += f" --logs-path {self.logs_path}"
 
         self.logger.debug("ModelExecutor", f"Running command: {command}")
 
@@ -182,25 +171,11 @@ def main():
     parser.add_argument(
         "--config-path", required=True, help="Path to configuration file"
     )
-    parser.add_argument(
-        "--logs-path", required=False, help="Path to logs directory (optional)"
-    )
 
     args = parser.parse_args()
 
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
-
-    # Create logger for this subprocess
-    from ..utils.logger import Logger
-
-    logger = Logger(logs_path=args.logs_path, enable_logging=False)
-
-    # Load configuration to get JobConfig
-    from ..config import Manager
-    from .data_loader import DataLoader
-
-    manager = Manager(args.config_path, args.logs_path, logger)
 
     # Find matching job config for the task
     task_name = Path(args.task_path).parent.name
@@ -216,6 +191,8 @@ def main():
     job_config = matching_jobs[0]
 
     # Use DataLoader to handle data loading properly
+    from .data_loader import DataLoader
+
     data_loader = DataLoader(job_config)
 
     # Generate windows
@@ -224,7 +201,7 @@ def main():
         ("train", args.train_steps),
         ("validate", args.validate_steps),
     ]
-    window_iter = data_loader.generate_task_split(args.task_path, steps, stride=1)
+    window_iter = data_loader.generate_dataset_split(args.task_path, steps, stride=1)
 
     # Get the specific window
     window_found = False

@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
 from tempus_bench.models.base_model import BaseModel
-from tempus_bench.metrics.evaluation import Evaluator
+from tempus_bench.metrics.metric_registry import MetricRegistry
 
 
 class DummyStochasticModel(BaseModel):
@@ -32,7 +32,7 @@ class TestBaseModel:
     """Test suite for BaseModel class."""
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_init_with_valid_config(self, mock_evaluator, mock_load_config):
         """Test initialization with valid configuration."""
         config_dict = {
@@ -58,7 +58,7 @@ class TestBaseModel:
         assert model.scaler is None
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_init_invalid_point_forecast_statistic(self, mock_evaluator, mock_load_config):
         """Test initialization raises error with invalid point forecast statistic."""
         config_dict = {
@@ -77,7 +77,7 @@ class TestBaseModel:
             DummyStochasticModel("config.yaml", "logs_path", {})
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_compute_point_forecast_mean(self, mock_evaluator, mock_load_config):
         """Test compute_point_forecast with mean statistic."""
         config_dict = {
@@ -108,7 +108,7 @@ class TestBaseModel:
         assert point_forecast.shape == (2, 2)  # (forecast_horizon, num_targets)
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_compute_point_forecast_invalid_statistic(self, mock_evaluator, mock_load_config):
         """Test compute_point_forecast raises error with invalid statistic."""
         config_dict = {
@@ -134,7 +134,7 @@ class TestBaseModel:
             model.compute_point_forecast(samples)
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_compute_loss_with_samples(self, mock_evaluator_class, mock_load_config):
         """Test compute_loss method with samples input."""
         config_dict = {
@@ -169,7 +169,7 @@ class TestBaseModel:
         assert model._last_y_pred is y_pred
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_get_model_summary_includes_stochastic_fields(self, mock_evaluator, mock_load_config):
         """Test get_model_summary includes stochastic-specific fields."""
         config_dict = {
@@ -197,7 +197,7 @@ class TestBaseModel:
         assert summary['point_forecast_statistic'] == 'mean'
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_inheritance_from_base_model(self, mock_evaluator, mock_load_config):
         """Test that BaseModel properly inherits from BaseModel."""
         config_dict = {
@@ -228,7 +228,7 @@ class TestBaseModel:
         assert hasattr(model, 'point_forecast_statistic')
     
     @patch('tempus_bench.models.base_model.load_config')
-    @patch('tempus_bench.metrics.evaluation.Evaluator')
+    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
     def test_predict_freq_validation_inherited(self, mock_evaluator, mock_load_config):
         """Test that freq validation is inherited from BaseModel."""
         config_dict = {

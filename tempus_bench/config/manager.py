@@ -13,9 +13,25 @@ from typing import Any, Dict, List
 
 from pydantic import ValidationError as PydanticValidationError
 
-from .configs import BenchmarkConfig, BenchmarkSettingsConfig, JobConfig, TaskConfig
+from .configs import (
+    EvaluationConfig,
+    EvaluationSettings,
+    DatasetConfig,
+    JobConfig,
+    ModelHParams,
+    TaskConfig,
+    convert_pydantic_errors,
+    load_and_validate_task_configs,
+)
 from ..utils.logger import Logger
-from ..utils.paths import get_configs_dir, get_models_dir, get_task_path, get_tasks_dir
+from ..utils.paths import (
+    get_project_root,
+    get_configs_dir,
+    get_models_dir,
+    get_task_path,
+    get_tasks_dir,
+    find_task_directories,
+)
 from ..utils.tf_logger import get_tf_logger
 
 
@@ -37,121 +53,132 @@ class Manager:
 
     Attributes:
         config_path (str): Path to the main benchmark configuration YAML file.
-        benchmark_config (BenchmarkConfig): Validated benchmark definition loaded from `benchmark.yaml`.
-        benchmark_settings (BenchmarkSettingsConfig): Global logging/runtime options from `config/settings.yaml`.
+        task_path (str): Task path pattern from the benchmark configuration.
+        evaluation (EvaluationConfig): Evaluation configuration from the benchmark configuration.
+        model (ModelHParams): Model configuration with hyperparameters from the benchmark configuration.
+        benchmark_settings (EvaluationSettings): Global logging/runtime options from `config/settings.yaml`.
         model_settings (Dict[str, Any]): Model execution settings derived from each model's `settings.yaml`.
         task_paths (Dict[str, str]): Mapping from task names to absolute directory paths.
         task_configs (Dict[str, List[TaskConfig]]): Per-task lists of validated task configurations.
-        model (Dict[str, Any]): Hyperparameter definitions extracted from the benchmark configuration.
     """
 
-    def __init__(self, config_path: str, logs_path: str, logger: Logger):
+    def __init__(self, config_path: str, run_path: str, logger: Logger):
         """
         Initialize the configuration manager.
 
         This method performs initialization in the following order:
-        1. Validates the main benchmark configuration (benchmark_config)
+        1. Validates the main benchmark configuration
         2. Validates system settings (benchmark_settings)
-        3. Validates model settings (only for models defined in benchmark_config)
+        3. Validates model settings (only for models defined in config)
         4. Finds task directories based on task_path pattern
         5. Validates task configurations for found task directories
 
         Args:
             config_path: Path to the main benchmark configuration YAML file
-            logs_path: Directory for log files
+            run_path: Directory for run outputs (evaluations, plots, etc.)
             logger: Logger instance to use for logging
 
         Initializes:
             - self.config_path: Configuration file path.
-            - self.benchmark_config: Main benchmark configuration with model hyperparameters.
+            - self.task_path: Task path pattern from the benchmark configuration.
+            - self.evaluation: Evaluation configuration.
+            - self.model: Model configuration with hyperparameters.
             - self.benchmark_settings: System settings (logging format, tensorboard, etc.).
-            - self.task_paths: Task directories matching the task_path pattern from benchmark_config.
-            - self.model_settings: Model execution settings (Python version, device, conda env) for models in benchmark_config.
+            - self.task_paths: Task directories matching the task_path pattern.
+            - self.model_settings: Model execution settings (Python version, device, conda env) for models.
             - self.task_configs: Validated task configurations (each task can have multiple configs).
-            - self.model: Model hyperparameters extracted from benchmark_config.
         """
         # Setup paths and settings
         self.config_path = config_path
-        self.logs_path = logs_path
+
+        config_data = self._load_config(self.config_path)
+        evaluation_settings = self._load_config(get_project_root() / "tempus_bench" / "tasks" / "settings.yaml")
+        
+        self.models_evalated = config_data["model"].keys()
+        
+        self.task_path = config_data["task_path"]
+
+        self.run_path = run_path
         self.logger = logger
-        self.benchmark_settings = self.validate_benchmark_settings()
 
-        self.benchmark_config = self.validate_benchmark_config()
-        self.model_settings = self.validate_model_settings()
-        self.task_paths = self._find_task_directories()
-        self.task_configs = self.validate_task_configs()
+        self.evaluation_config = EvaluationConfig(**config_data["evaluation"])
+        self.evaluation_settings = EvaluationSettings(**evaluation_settings)
+        
+        self.models_hparams = self.init_models_hparams(config_data["model"])
+        self.models_settings = self.init_models_settings()
+        
+        self.task_configs = self.init_tasks()
 
-    def validate_benchmark_config(self) -> BenchmarkConfig:
+    # Evaluation config
+    # Evaluation settings
+    # Model params
+    # Model settings
+    # Dataset Config
+    # Task Config
+    # Logger
+
+    # Job config (for each task-model combination, fixing model settings and benchmark settings):
+    # Evaluation config
+    # Evaluation settings
+    # Model hparams
+    # Model settings
+    # Task config
+    # Logger
+
+    def init_tasks(self) -> Dict[str, TaskConfig]:
         """
-        Validate the main benchmark configuration file.
+        Initialize the tasks.
 
-        This method loads the configuration file specified in self.config_path, validates it
-        against the BenchmarkConfig schema, and checks that all specified models are available.
+        Discovers and loads all TaskConfig objects from task.yaml files in directories
+        found via find_task_directories using self.task_path.
 
         Returns:
-            BenchmarkConfig: Validated benchmark configuration instance
+            Dict[str, TaskConfig]: Mapping of task directory names to their validated TaskConfig objects.
 
         Raises:
-            ValidationError: If validation fails or models are not available
+            FileNotFoundError or ValidationError if a task.yaml file is missing or invalid.
         """
-        try:
-            # Validate using Pydantic model
-            config = self._load_config(self.config_path)
-            config = BenchmarkConfig(**config)
-            self._validate_model_availability(config)
-            return config
+        
+        task_configs = {}
+        tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
 
-        except PydanticValidationError as e:
-            error_msg = self._convert_pydantic_errors(e)
-            raise ValidationError(error_msg)
+        for task_name, task_path in tasks.items():
+            from pathlib import Path
 
-    def validate_benchmark_settings(self) -> BenchmarkSettingsConfig:
+            task_config_path = Path(task_path) / "task.yaml"
+            
+            task_data = self._load_config(task_config_path)
+            dataset_config = DatasetConfig(**task_data["task"].pop("dataset"))
+            task_configs[task_name] = TaskConfig(
+                name=task_name,
+                **task_data["task"],
+                task_path=task_path,
+                dataset=dataset_config,
+            )
+
+        return task_configs
+
+    def init_models_hparams(self, models_hparams: Dict[str, Any]) -> Dict[str, ModelHParams]:
         """
-        Validate the benchmark settings.yaml file.
+        Initialize the model hyperparameters.
 
-        This method loads and validates the system settings configuration file located at
-        config/settings.yaml against the BenchmarkSettingsConfig schema.
+        This method initializes the model hyperparameters.
 
         Returns:
-            BenchmarkSettingsConfig: Validated system settings instance
-
-        Raises:
-            FileNotFoundError: If settings.yaml doesn't exist
-            ValidationError: If validation fails
+            Dict[str, ModelHParams]: Dictionary mapping model names to their validated ModelHParams objects.
         """
-        config_dir = get_configs_dir()
-        benchmark_settings_dir = config_dir / "settings.yaml"
+        model_hparams = {}
+        for model_name in self.models_evalated:
+            model_hparams[model_name] = ModelHParams(**models_hparams[model_name])
+        return model_hparams
 
-        if not benchmark_settings_dir.exists():
-            raise FileNotFoundError(
-                f"Settings config not found: {benchmark_settings_dir}"
-            )
-
-        try:
-            with open(benchmark_settings_dir, "r") as f:
-                benchmark_settings_data = yaml.safe_load(f)
-
-            # Validate using BenchmarkSettingsConfig
-            benchmark_settings = BenchmarkSettingsConfig(**benchmark_settings_data)
-            return benchmark_settings
-
-        except PydanticValidationError as e:
-            error_msg = self._convert_pydantic_errors(e)
-            raise ValidationError(
-                f"Invalid systems config at {benchmark_settings_dir}: {error_msg}"
-            )
-        except Exception as e:
-            raise ValidationError(
-                f"Invalid systems config at {benchmark_settings_dir}: {e}"
-            )
-
-    def validate_model_settings(self) -> Dict[str, Any]:
+    def init_models_settings(self) -> Dict[str, Any]:
         """
-        Validate model execution settings for models specified in benchmark_config.
+        Validate model execution settings for models specified in the configuration.
 
         This method finds and validates model-specific settings.yaml files recursively
         in the models directory. Only processes models that are defined in
-        self.benchmark_config.model.
+        self.model.
 
         Returns:
             Dict[str, Any]: Dictionary mapping model names to their validated
@@ -161,136 +188,23 @@ class Manager:
             ValidationError: If validation fails, models directory doesn't exist,
                 or a model settings file is invalid
         """
+        model_setting = {}
         models_dir = get_models_dir()
-        model_config = self.benchmark_config.model.model_dump(exclude_none=True)
-        validated_settings = {}
-        # Find all model settings.yaml files recursively in models_dir and use their parent folders as model names
+
+        # Find all model settings.yaml files recursively in models_dir
         settings_files = list(models_dir.glob("**/settings.yaml"))
         for model_settings_path in settings_files:
-            model_path = model_settings_path.parent
-            model_name = model_path.name
-            if model_name not in model_config:
+            model_name = model_settings_path.parent.name
+            if (
+                model_name
+                not in self.models_evalated
+            ):
                 continue
 
-            try:
-                with open(model_settings_path, "r") as f:
-                    model_settings_data = yaml.safe_load(f)
+            else:
+                model_settings[model_name] = self._load_config(model_settings_path)
 
-                model_settings_data.update(model_path=str(model_path))
-                model_settings = dict[str, Any](**model_settings_data)
-                validated_settings[model_name] = model_settings
-                validated_settings[model_name].update(model_path=str(model_path))
-
-            except Exception as e:
-                error_msg = (
-                    self._convert_pydantic_errors(e)
-                    if isinstance(e, PydanticValidationError)
-                    else str(e)
-                )
-                raise ValidationError(
-                    f"Invalid model settings for '{model_name}' at {model_settings_path}: {error_msg}"
-                )
-
-        return validated_settings
-
-    def validate_task_configs(self) -> Dict[str, List[TaskConfig]]:
-        """
-        Validate task.yaml files for task directories found via task_path pattern.
-
-        This method validates task configurations for all task directories in self.task_paths
-        (which were determined by the task_path pattern in benchmark_config). Each task's
-        configuration is validated against the TaskConfig schema. Supports multiple TaskConfigs
-        per task using YAML multi-document format (separated by '---').
-
-        Example task.yaml format:
-        ```yaml
-        task:
-            name: soil_nature_univariate
-            context_window: 256
-            forecast_horizon: 16
-            dataset:
-                handle_missing: interpolate
-                normalize: true
-                file_name: soil_nature_univariate.csv
-        ---
-        task:
-            name: soil_nature_univariate
-            context_window: 512
-            forecast_horizon: 16
-            dataset:
-                handle_missing: drop
-                normalize: false
-                file_name: soil_nature_univariate.csv
-        ```
-
-        Returns:
-            Dict[str, List[TaskConfig]]: Dictionary mapping task directory paths (as strings)
-                to lists of validated TaskConfig instances (supports multiple configs per task).
-
-        Raises:
-            ValidationError: If validation fails, task.yaml not found, task name
-                doesn't match folder name, or CSV file doesn't exist
-        """
-        validated_configs = {}
-
-        for task_name, task_path in self.task_paths.items():
-            task_config_path = Path(task_path) / "task.yaml"
-            if not task_config_path.exists():
-                raise ValidationError(f"Task config not found: {task_config_path}")
-
-            try:
-                with open(task_config_path, "r") as f:
-                    task_config_documents = list(yaml.safe_load_all(f))
-
-                # Handle multiple task configs defined with '---' separator
-                task_configs = []
-                for doc in task_config_documents:
-                    if not doc:
-                        continue  # Skip empty documents
-                    # Extract the 'task' key if present
-                    if isinstance(doc, dict) and "task" in doc:
-                        task_data = doc["task"]
-                    else:
-                        raise ValidationError(
-                            f"All sections in {task_config_path} must contain a 'task' key."
-                        )
-
-                    # Validate and create TaskConfig
-                    task_config = TaskConfig(**task_data)
-
-                    # Validate that task name matches folder name
-                    if task_config.name != task_name:
-                        raise ValidationError(
-                            f"Task name '{task_config.name}' in {task_config_path} does not match folder name '{task_name}'"
-                        )
-
-                    # Validate that CSV file exists and matches task name
-                    csv_file = Path(task_path) / task_config.dataset.file_name
-                    if not csv_file.exists():
-                        raise ValidationError(
-                            f"CSV file not found in {task_path}. Expected: {csv_file.name}"
-                        )
-
-                    task_configs.append(task_config)
-
-                if not task_configs:
-                    raise ValidationError(
-                        f"No valid task configurations found in {task_config_path}"
-                    )
-
-                validated_configs[str(task_path)] = task_configs
-
-            except Exception as e:
-                error_msg = (
-                    self._convert_pydantic_errors(e)
-                    if isinstance(e, PydanticValidationError)
-                    else str(e)
-                )
-                raise ValidationError(
-                    f"Invalid task config at {task_config_path}: {error_msg}"
-                )
-
-        return validated_configs
+        return model_setting
 
     def generate_run_configs(self):
         """
@@ -314,116 +228,26 @@ class Manager:
             for task_idx, task_config in enumerate(task_configs):
                 # Build the updated task_path for this task
                 task_path = get_task_path(task_name)
-                for model_name, model_params in self.model.items():
-                    # Build a new BenchmarkConfig for this (task, model)
-                    benchmark_dict = self.benchmark_config.model_dump()
-                    benchmark_dict["task_path"] = str(task_path)
-                    benchmark_dict["model"] = {model_name: model_params}
+                model_dict = self.model.model_dump(exclude_none=True)
+                for model_name, model_params in model_dict.items():
+                    # Create a ModelHParams with only this single model
+                    single_model_config = ModelHParams(**{model_name: model_params})
+
                     yield JobConfig(
-                        benchmark_config=BenchmarkConfig(**benchmark_dict),
+                        task_path=str(task_path),
+                        evaluation=self.evaluation,
+                        model=single_model_config,
                         benchmark_settings=self.benchmark_settings,
                         model_settings={model_name: self.model_settings[model_name]},
                         task_config=task_config,
                         task_paths=self.task_paths,
-                        logs_path=self.logs_path,
+                        run_path=self.run_path,
                         logger=self.logger,
                     ), task_idx
 
-    def _validate_model_availability(self, config: BenchmarkConfig) -> None:
-        """
-        Validate that all models specified in config are available.
-
-        This method checks that each model specified in the benchmark configuration
-        has a corresponding model file in the models directory structure. The models
-        are validated against available models found in self._get_available_models().
-
-        Args:
-            config: The validated BenchmarkConfig instance
-
-        Raises:
-            ValidationError: If any specified model is not available in the models directory
-        """
-        # Check each model in the configuration
-        available_models = self._get_available_models()
-        self.model = config.model.model_dump(exclude_none=True)
-        # Only validate models that are actually specified (not None)
-        for model_name, model_params in self.model.items():
-            if model_name not in available_models:
-                raise ValidationError(
-                    f"Model '{model_name}' is not available. "
-                    f"Available models: {sorted(available_models)}"
-                )
-
-    def _get_available_models(self) -> set:
-        """
-        Get all available model names from the models directory structure.
-
-        This method scans the models directory to find all model folders that contain
-        a corresponding model file. The model file naming convention is {model_name}_model.py.
-
-        Returns:
-            set: Set of available model names found in the models directory
-        """
-        available_models = set()
-        models_dir = get_models_dir()
-        # Look for model folders directly in the models directory
-        for model_folder in models_dir.iterdir():
-            if (
-                model_folder.is_dir()
-                and not model_folder.name.startswith("__")
-                and not model_folder.name.startswith(".")
-            ):
-                # Check if it has a model file
-                model_file = model_folder / f"{model_folder.name}_model.py"
-                if model_file.exists():
-                    available_models.add(model_folder.name)
-
-        return available_models
-
-    def _find_task_directories(self) -> Dict[str, str]:
-        """
-        Find task directories based on the task_path pattern from benchmark_config.
-
-        This method searches for task directories that match the pattern specified in
-        self.benchmark_config.task_path. Supported patterns include:
-        - "*": All task directories
-        - "univariate/*": All univariate task directories
-        - "multivariate/*": All multivariate task directories
-        - "specific_task": A specific task directory
-
-        Returns:
-            Dict[str, str]: Mapping from task names to absolute directory paths that match the pattern.
-        """
-        tasks_dir = get_tasks_dir()
-        task_paths = {}
-
-        pattern = self.benchmark_config.task_path
-
-        if pattern == "*":
-            # Find all task directories
-            for subdir in tasks_dir.iterdir():
-                if subdir.is_dir():
-                    for task_path in subdir.iterdir():
-                        if task_path.is_dir():
-                            task_paths[task_path.name] = str(task_path)
-        elif pattern.endswith("/*"):
-            # Find directories in specific subdirectory
-            subdir_name = pattern[:-2]
-            subdir_path = tasks_dir / subdir_name
-            if subdir_path.exists():
-                for task_path in subdir_path.iterdir():
-                    if task_path.is_dir():
-                        task_paths[task_path.name] = str(task_path)
-        else:
-            # Specific task directory
-            task_path = tasks_dir / pattern
-            if task_path.exists():
-                task_paths[task_path.name] = str(task_path)
-
-        return task_paths
 
     @staticmethod
-    def _load_config(config_path: str) -> Dict[str, Any]:
+    def _load_config(path: str | Path) -> Dict[str, Any]:
         """
         Load configuration from YAML file and return as dictionary.
 
@@ -437,13 +261,13 @@ class Manager:
             FileNotFoundError: If the configuration file doesn't exist
             ValueError: If the file is empty or contains invalid YAML
         """
-        config_file = Path(config_path)
+        path = Path(path)
 
-        if not config_file.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        if not path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {path}")
 
         try:
-            with open(config_file, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             if config_data is None:
@@ -452,24 +276,4 @@ class Manager:
             return config_data
 
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML format in {config_path}: {e}")
-
-    @staticmethod
-    def _convert_pydantic_errors(validation_error: PydanticValidationError) -> str:
-        """
-        Convert Pydantic validation errors to a readable string format.
-
-        This method takes a Pydantic ValidationError and formats it into a human-readable
-        string that shows the field path and error message for each validation failure.
-
-        Args:
-            validation_error: The Pydantic ValidationError to convert
-
-        Returns:
-            str: Formatted error string with field paths and error messages
-        """
-        error_messages = []
-        for error in validation_error.errors():
-            field_path = " -> ".join(str(loc) for loc in error["loc"])
-            error_messages.append(f"{field_path}: {error['msg']}")
-        return "; ".join(error_messages)
+            raise ValueError(f"Invalid YAML format in {path}: {e}")

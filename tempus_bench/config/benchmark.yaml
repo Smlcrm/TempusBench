@@ -1,9 +1,10 @@
 # Main configuration for the benchmarking pipeline
 # This file provides sensible defaults for all configuration options
 
-task_path: 'multivariate/baggage_100_multivariate'
+
 
 evaluation:
+  task_path: 'multivariate/baggage_100_multivariate'
   tuning_loss: mae
   max_windows: 20
   max_num_variates: 10

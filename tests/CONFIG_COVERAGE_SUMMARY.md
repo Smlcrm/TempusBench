@@ -46,7 +46,7 @@
 **Recommendation**: Add tests for `max_num_variates < 1` validation
 
 #### Line 93: Model parameters None check
-**Status**: Already covered by ModelConfig default None values
+**Status**: Already covered by ModelHParams default None values
 
 #### Line 96: Model parameters dict validation
 **Status**: Covered by existing tests
@@ -60,7 +60,7 @@
 **Status**: FIXED - Added @staticmethod decorator
 
 ### 2. Fix model availability validation
-**Issue**: Current implementation validates ALL models in ModelConfig, including None values
+**Issue**: Current implementation validates ALL models in ModelHParams, including None values
 **Status**: FIXED - Added check for `model_params is not None` before validating
 
 ### 3. Improve error handling
@@ -78,7 +78,7 @@
    - Tests for _get_available_models method
    - Tests for _validate_model_availability method
    - Tests for _convert_pydantic_errors method
-   - Tests for _find_task_directories method
+   - Tests for find_task_directories function (moved to tempus_bench.utils.paths)
    - Tests for validate_benchmark_settings method
    - Tests for validate_model_settings method
    - Tests for validate_task_configs method
@@ -151,10 +151,10 @@ We've achieved **100% coverage** with **68 passing tests**.
 ### Test Categories
 - ✅ ConfigValidationError exception
 - ✅ ConfigManager._load_config (all edge cases)
-- ✅ ConfigManager._get_available_models
+- ✅ utils.paths.get_available_models (utility function)
 - ✅ ConfigManager._validate_model_availability
 - ✅ ConfigManager._convert_pydantic_errors
-- ✅ ConfigManager._find_task_directories (all patterns)
+- ✅ utils.paths.find_task_directories (all patterns, moved from ConfigManager)
 - ✅ ConfigManager.validate_benchmark_config
 - ✅ ConfigManager.validate_benchmark_settings
 - ✅ ConfigManager.validate_model_settings
