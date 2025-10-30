@@ -12,7 +12,7 @@ from tempus_bench.config.configs import (
     ModelConfig,
     DatasetConfig,
     TaskConfig,
-    EvaluationSettings
+    EvaluationSetting
 )
 
 
@@ -244,33 +244,33 @@ class TestTaskConfig:
 
 # BenchmarkConfig tests removed - validation logic now tested through JobConfig
 
-class TestEvaluationSettings:
-    """Test suite for EvaluationSettings model."""
+class TestEvaluationSetting:
+    """Test suite for EvaluationSetting model."""
     
     def test_valid_config_with_defaults(self):
         """Test valid model settings configuration with defaults."""
-        config = EvaluationSettings()
+        config = EvaluationSetting()
         assert config.python_version == "3.11"
         assert config.device == "cpu"
     
     def test_valid_config_custom_values(self):
         """Test valid model settings configuration with custom values."""
-        config = EvaluationSettings(python_version="3.12", device="gpu")
+        config = EvaluationSetting(python_version="3.12", device="gpu")
         assert config.python_version == "3.12"
         assert config.device == "gpu"
     
     def test_invalid_device(self):
         """Test that invalid device raises ValidationError."""
         with pytest.raises(ValidationError):
-            EvaluationSettings(device="invalid")
+            EvaluationSetting(device="invalid")
 
 
-class TestEvaluationSettings:
-    """Test suite for EvaluationSettings model."""
+class TestEvaluationSetting:
+    """Test suite for EvaluationSetting model."""
     
     def test_valid_config(self):
         """Test valid systems configuration."""
-        config = EvaluationSettings(
+        config = EvaluationSetting(
             logging_format="%(message)s",
             file_logging=True,
             console_logging=True,
@@ -285,7 +285,7 @@ class TestEvaluationSettings:
     def test_forbid_extra_fields(self):
         """Test that extra fields are forbidden."""
         with pytest.raises(ValidationError):
-            EvaluationSettings(
+            EvaluationSetting(
                 logging_format="%(message)s",
                 file_logging=True,
                 console_logging=True,

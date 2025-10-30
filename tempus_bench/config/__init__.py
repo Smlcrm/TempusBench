@@ -10,7 +10,7 @@ from .configs import (
     DatasetConfig,
     EvaluationConfig,
     ModelConfig,
-    EvaluationSettings,
+    EvaluationSetting,
     JobConfig,
     convert_pydantic_errors,
 )
@@ -23,7 +23,7 @@ __all__ = [
     "DatasetConfig",
     "EvaluationConfig",
     "ModelConfig",
-    "EvaluationSettings",
+    "EvaluationSetting",
     "JobConfig",
     # Manager and exceptions
     "Manager",

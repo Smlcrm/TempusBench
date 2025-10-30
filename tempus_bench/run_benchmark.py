@@ -52,16 +52,14 @@ class BenchmarkRunner:
         self.logger.info("BenchmarkRunner", f"Results stored at: {self.run_path}")
 
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
-        for job_idx, (job_config, task_idx) in enumerate(
-            self.manager.generate_run_configs()
-        ):
+        for job_idx, job_config in enumerate(self.manager.generate_run_configs()):
             hyperparameter_tuner = HyperparameterTuner(job_config=job_config)
 
             # Hyper-parameter Tuning
             task_name = job_config.task_config.name
             self.logger.info(
                 "BenchmarkRunner",
-                f"Hyperparameter Tuning Starts for job: {job_idx}, task: {task_name}, task config idx: {task_idx}",
+                f"Hyperparameter Tuning Starts for job: {job_idx}, task: {task_name}",
             )
 
             # Hyperparameter Tuning - Context + Train + Validate Losses (Rolling Window with strides of validate_steps)
@@ -101,7 +99,7 @@ class BenchmarkRunner:
     def initialize_tf_logger(self):
         """Setup logging configuration and TensorBoard."""
         # Logger already created in _initialize_run with the settings from config
-        tensorboard_logging = self.manager.evaluation_settings.tensorboard_logging
+        tensorboard_logging = self.manager.evaluation_setting.tensorboard_logging
         self.logger.info("BenchmarkRunner", f"Python logs saved at: {self.logs_path}")
         self.logger.debug("BenchmarkRunner", "Debug logging is working!")
 

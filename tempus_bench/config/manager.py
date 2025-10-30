@@ -15,7 +15,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from .configs import (
     EvaluationConfig,
-    EvaluationSettings,
+    EvaluationSetting,
     DatasetConfig,
     JobConfig,
     ModelConfig,
@@ -57,9 +57,9 @@ class Manager:
         run_path (str): Path to run directory for outputs.
         logger (Logger): Logger instance for logging.
         evaluation_config (EvaluationConfig): Evaluation configuration from the benchmark configuration.
-        evaluation_settings (EvaluationSettings): Global logging/runtime options from `tasks/settings.yaml`.
+        evaluation_setting (EvaluationSetting): Global logging/runtime options from `tasks/settings.yaml`.
         models_config (Dict[str, ModelConfig]): Model hyperparameters for each model.
-        model_settings (Dict[str, Any]): Model execution settings derived from each model's `settings.yaml`.
+        model_setting (Dict[str, Any]): Model execution settings derived from each model's `settings.yaml`.
         task_configs (Dict[str, TaskConfig]): Mapping from task names to validated task configurations.
     """
 
@@ -87,7 +87,7 @@ class Manager:
             - self.run_path: Path to run directory.
             - self.logger: Logger instance.
             - self.evaluation_config: Evaluation configuration.
-            - self.evaluation_settings: System settings (logging format, tensorboard, etc.).
+            - self.evaluation_setting: System settings (logging format, tensorboard, etc.).
             - self.model_configs: Model hyperparameters for each model.
             - self.model_settings: Model execution settings (Python version, device, conda env) for models.
             - self.task_configs: Validated task configurations.
@@ -96,7 +96,7 @@ class Manager:
         self.config_path = config_path
 
         config_data = self._load_config(self.config_path)
-        evaluation_settings = self._load_config(
+        evaluation_setting = self._load_config(
             get_project_root() / "tempus_bench" / "tasks" / "settings.yaml"
         )
 
@@ -108,10 +108,10 @@ class Manager:
         self.logger = logger
 
         self.evaluation_config = EvaluationConfig(**config_data["evaluation"])
-        self.evaluation_settings = EvaluationSettings(**evaluation_settings)
+        self.evaluation_setting = EvaluationSetting(**evaluation_setting)
 
         self.model_configs = self.init_models_config(config_data["model"])
-        self.model_settings = self.init_model_settings()
+        self.model_settings = self.init_model_setting()
 
         self.task_configs = self.init_tasks()
 
@@ -164,7 +164,7 @@ class Manager:
             model_hparams[model_name] = ModelConfig(**models_config[model_name])
         return model_hparams
 
-    def init_model_settings(self) -> Dict[str, Any]:
+    def init_model_setting(self) -> Dict[str, Any]:
         """
         Validate model execution settings for models specified in the configuration.
 
@@ -180,19 +180,19 @@ class Manager:
             ValidationError: If validation fails, models directory doesn't exist,
                 or a model settings file is invalid
         """
-        model_settings = {}
+        model_setting = {}
         models_dir = get_models_dir()
 
         # Find all model settings.yaml files recursively in models_dir
         settings_files = list(models_dir.glob("**/settings.yaml"))
-        for model_settings_path in settings_files:
-            model_name = model_settings_path.parent.name
+        for model_setting_path in settings_files:
+            model_name = model_setting_path.parent.name
             if model_name not in self.models_evaluated:
                 continue
             else:
-                model_settings[model_name] = self._load_config(model_settings_path)
+                model_setting[model_name] = self._load_config(model_setting_path)
 
-        return model_settings
+        return model_setting
 
     def generate_run_configs(self):
         """
@@ -210,19 +210,16 @@ class Manager:
             Tuple[JobConfig, int]: A tuple of (JobConfig, task_idx) where JobConfig is the
                 aggregated configuration and task_idx is always 0 (for backward compatibility).
         """
-        for task_name, task_config in self.task_configs.items():
+        for task_config in self.task_configs.values():
             for model_name in self.models_evaluated:
-                yield (
-                    JobConfig(
-                        evaluation_config=self.evaluation_config,
-                        evaluation_settings=self.evaluation_settings,
-                        models_config=self.model_configs[model_name],
-                        models_setting=self.model_settings[model_name]},
-                        task_config=task_config,
-                        run_path=self.run_path,
-                        logger=self.logger,
-                    ),
-                    0,  # task_idx, always 0 since each task has a single configuration
+                yield JobConfig(
+                    evaluation_config=self.evaluation_config,
+                    evaluation_setting=self.evaluation_setting,
+                    model_config=self.model_configs[model_name],
+                    model_setting=self.model_settings[model_name],
+                    task_config=task_config,
+                    run_path=self.run_path,
+                    logger=self.logger,
                 )
 
     @staticmethod
