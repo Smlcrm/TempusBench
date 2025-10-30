@@ -40,10 +40,10 @@ class BenchmarkRunner:
         # Initialize the Manager directly (no longer using singleton pattern)
         self.manager = Manager(
             config_path=self.config_path,
-            logs_path=str(self.logs_path),
+            run_path=str(self.run_path),
             logger=self.logger,
         )
-        self._setup_logging()
+        self.initialize_tf_logger()
 
     def run(self):
         """Execute the end-to-end benchmarking pipeline."""
@@ -81,9 +81,9 @@ class BenchmarkRunner:
                 f"Final Model Evaluation Executed for task: {job_config.task_config.name}",
             )
 
-        self.cleanup()
+        self.clean_tf_logger()
 
-    def cleanup(self):
+    def clean_tf_logger(self):
         """Cleanup TensorBoard writer and ensure all logs are flushed."""
         if self.tf_logger:
             try:
@@ -98,7 +98,7 @@ class BenchmarkRunner:
                     f"Failed to close benchmark TensorBoard writer: {e}",
                 )
 
-    def _setup_logging(self):
+    def initialize_tf_logger(self):
         """Setup logging configuration and TensorBoard."""
         # Logger already created in _initialize_run with the settings from config
         tensorboard_logging = self.manager.benchmark_settings.tensorboard_logging
