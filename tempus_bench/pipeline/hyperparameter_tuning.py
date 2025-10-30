@@ -8,9 +8,7 @@ from typing import List, Tuple
 import numpy as np
 
 from ..config.configs import JobConfig
-from ..models.model_router import ModelRouter
 from ..utils.paths import get_task_path
-from ..utils.tf_logger import get_tf_logger
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
 
@@ -28,18 +26,18 @@ class HyperparameterTuner:
         """
         self.job_config = job_config
         self.evaluation_config = job_config.evaluation_config
-        self.evaluation_settings = job_config.evaluation_settings
-        self.models_settings = job_config.models_settings
+        self.evaluation_setting = job_config.evaluation_setting
+        self.model_config = job_config.model_config
+        self.model_setting = job_config.model_setting
         self.task_config = job_config.task_config
-        self.model_name, self.model_hparams = next(
-            iter(job_config.models_hparams.items())
-        )
+
+        self.model_name = job_config.model_config.model_name
         self.tuning_loss = self.evaluation_config.tuning_loss
         self.dataset_path = Path(self.task_config.task_path)
         self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
-        self.logger = job_config.logger
-        self.tf_logger = get_tf_logger()
-        self.data_loader = DataLoader(job_config)
+        self.logger = self.job_config.logger
+        self.tf_logger = self.job_config.tf_logger
+        self.data_loader = DataLoader(self.job_config)
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
         """
@@ -52,27 +50,24 @@ class HyperparameterTuner:
         Raises:
             ValueError: If more than one model is defined for the job (the tuner only supports a single model).
         """
-        models_hparams = self.job_config.models_hparams
-        if len(models_hparams) > 1:
-            raise ValueError(
-                "Hyperparameter tuning is not supported for multiple models"
-            )
+        model_config = self.job_config.model_config
 
-        model_name = list(models_hparams.keys())[0]
+        model_name = self.model_name
 
-        # Route resolves model location, but we don't need to import the class to build the grid
-        router = ModelRouter(logger=self.logger)
         # Build grid from config directly without constructing the model
-        params_space = models_hparams[model_name]
+        params_space = self.model_config.model_config
         keys = list(params_space.keys())
         values_lists = [params_space[k] for k in keys]
         grid: list[dict] = []
+
         for combo in product(*values_lists):
             grid.append(dict(zip(keys, combo)))
+
         self.logger.info(
             "HyperparameterTuner",
             f"Generated hyperparameter grid for {model_name}: number of combinations = {len(grid)}",
         )
+
         return grid
 
     def optimize_hyperparameters(
@@ -99,21 +94,8 @@ class HyperparameterTuner:
         best_hyperparameters = {}
 
         # Initialize model executor
-        model_executor = ModelExecutor(
-            model_settings=self.models_settings,
-            logger=self.logger,
-            logs_path=self.logs_path,
-            reinstall_conda=self.benchmark_settings.reinstall_conda,
-        )
+        model_executor = ModelExecutor(self.job_config)
         # Generate windows for this dataset
-        steps = [
-            ("context", context_steps),
-            ("train", train_steps),
-            ("validate", validate_steps),
-        ]
-        window_generator = self.data_loader.generate_dataset_split(
-            dataset_path=str(self.dataset_path), steps=steps, stride=validate_steps
-        )
 
         # Store results for each window
         window_results = []
@@ -121,78 +103,65 @@ class HyperparameterTuner:
         evaluations = []
         num_windows = 0
 
-        # For each rolling window
-        for window_idx, dataset in window_generator:
-            self.logger.debug(
-                "HyperparameterTuner",
-                f"Processing window {window_idx} for dataset {self.task_config.dataset.file_name}",
-            )
+        tuning_losses = {}
+        eval_metrics = {}
+        evaluation_metrics = None 
 
-            tuning_losses = {}
-            eval_metrics = {}
-            evaluation_metrics = None
-
-            # Try each hyperparameter combination
-            for params in self._generate_hyperparameter_grid():
-                try:
-                    # Execute model with these hyperparameters
-                    eval_losses = model_executor.execute_model(
-                        model_name=self.model_name,
-                        hyperparameters=params,
-                        context_steps=context_steps,
-                        train_steps=train_steps,
-                        validate_steps=validate_steps,
-                        task_path=str(self.dataset_path),
-                        window_idx=window_idx,
-                    )
-
-                    immutable_params = tuple(sorted(params.items()))
-                    # Set evaluation metrics list on first successful eval
-                    if evaluation_metrics is None:
-                        evaluation_metrics = list(eval_losses.keys())
-                    tuning_losses[immutable_params] = eval_losses[self.tuning_loss]
-                    eval_metrics[immutable_params] = eval_losses
-
-                    self.logger.debug(
-                        "HyperparameterTuner",
-                        f"Evaluated model {self.model_name} with params {params}: {eval_losses}",
-                    )
-                    # Log hyperparameters and metrics to TensorBoard
-                    self.tf_logger.log_hparams(params, eval_losses)
-
-                except Exception as e:
-                    if self.evaluation_settings.console_logging:
-                        self.logger.error(
-                            "HyperparameterTuner",
-                            f"Error executing model {self.model_name} with params {params}: {e}",
-                        )
-                    continue
-
-            # Find the hyperparams with lowest tuning_loss for this window
-            if tuning_losses:
-                best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
-                optimal_hyperparameters.append(best_params)
-                evaluations.append(eval_metrics)
-                num_windows += 1
-
-                # Generate forecast plot for best hyperparameters
-                self._generate_forecast_plot(
-                    model_name=self.model_name,
-                    hyperparameters=dict(best_params),
+        # Try each hyperparameter combination
+        for params in self._generate_hyperparameter_grid():
+            try:
+                # Execute model with these hyperparameters
+                windows_eval_losses = model_executor.execute_model(
+                    hyperparameters=params,
                     context_steps=context_steps,
                     train_steps=train_steps,
                     validate_steps=validate_steps,
-                    dataset_path=self.dataset_path,
-                    window_idx=window_idx,
                 )
-
-        if num_windows == 0:
-            if self.evaluation_settings.console_logging:
-                self.logger.warning(
+                
+            except Exception as e:
+                self.logger.error(
                     "HyperparameterTuner",
-                    f"No valid windows for dataset {self.dataset_path}",
+                    f"Error executing model {self.model_name} with params {params}: {e}",
                 )
-            return {}, {}
+                continue
+            
+            for window_idx, eval_losses in enumerate(windows_eval_losses):
+                if evaluation_metrics is None:
+                    evaluation_metrics = list(eval_losses.keys())
+                    
+                immutable_params = tuple(sorted(params.items()))
+                # Set evaluation metrics list on first successful eval
+
+
+                tuning_losses[immutable_params] = eval_losses[self.tuning_loss]
+                eval_metrics[immutable_params] = eval_losses
+
+                self.logger.debug(
+                    "HyperparameterTuner",
+                    f"Evaluated model {self.model_name} with params {params}: {eval_losses}",
+                )
+                # Log hyperparameters and metrics to TensorBoard
+                self.tf_logger.log_hparams(params, eval_losses)
+
+
+
+                # Find the hyperparams with lowest tuning_loss for this window
+                if tuning_losses:
+                    best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
+                    optimal_hyperparameters.append(best_params)
+                    evaluations.append(eval_metrics)
+                    num_windows += 1
+
+                    # Generate forecast plot for best hyperparameters
+                    self._generate_forecast_plot(
+                        model_name=self.model_name,
+                        hyperparameters=dict(best_params),
+                        context_steps=context_steps,
+                        train_steps=train_steps,
+                        validate_steps=validate_steps,
+                        dataset_path=self.dataset_path,
+                        window_idx=window_idx,
+                    )
 
         # Aggregate test loss over all windows, for each metric
         test_loss = {metric: [] for metric in evaluation_metrics}

@@ -20,15 +20,15 @@ from tempus_bench.models.base_model import BaseModel, PydanticBaseModel
 
 from chronarium import Chronarium
 
-class LafnHybridHyperparams(PydanticBaseModel):
+class LafnHyperparams(PydanticBaseModel):
     pass
 
-class LafnHybridModel(BaseModel):
+class LafnModel(BaseModel):
     """Chronarium-backed Large Adaptive Forecasting Network (Hybrid)."""
 
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
 
-        super().__init__(params, settings, LafnHybridHyperparams)
+        super().__init__(params, settings, LafnHyperparams)
 
         manager = Chronarium(
             bucket_name=self.bucket_name,
@@ -48,7 +48,7 @@ class LafnHybridModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
-    ) -> "LafnHybridModel":
+    ) -> "LafnModel":
         """Pre-trained model – no fine-tuning required."""
 
         return self

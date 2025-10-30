@@ -47,26 +47,18 @@ tempus_bench/
 ├── models/                    # Model implementations
 │   ├── __init__.py
 │   ├── base_model.py          # Base class for all models
-│   ├── stochastic_base_model.py  # Base class for stochastic models
-│   ├── model_router.py        # Model routing system
-│   ├── deterministic/         # Point forecast models
-│   │   ├── arima/
-│   │   ├── lstm/
-│   │   ├── xgboost/
-│   │   ├── prophet/
-│   │   ├── timesfm/
-│   │   ├── tiny_time_mixer/
-│   │   ├── tabpfn/
-│   │   └── ... (other models)
-│   └── stochastic/           # Probabilistic forecast models
-│       ├── chronos/
-│       ├── lagllama/
-│       ├── moirai/
-│       ├── moirai_moe/
-│       ├── toto/
-│       ├── moment/
-│       ├── deepar/
-│       └── ... (other models)
+│   ├── arima/                 # ARIMA model
+│   ├── lstm/                  # LSTM model
+│   ├── xgboost/               # XGBoost model
+│   ├── prophet/               # Prophet model
+│   ├── chronos/               # Chronos foundation model
+│   ├── lagllama/              # LagLlama foundation model
+│   ├── moirai/                # Moirai foundation model
+│   ├── moirai_moe/            # Moirai MoE foundation model
+│   ├── toto/                  # Toto foundation model
+│   ├── moment/                # Moment foundation model
+│   ├── deepar/                # DeepAR model
+│   └── ... (other models)
 ├── pipeline/                  # Core pipeline components
 │   ├── __init__.py
 │   ├── data_loader.py        # Data loading and preprocessing
@@ -86,33 +78,19 @@ tempus_bench/
 
 ## Key Features
 
-### 1. Intelligent Model Routing
+### 1. Automatic Model Discovery
 
-The `ModelRouter` automatically discovers available models and routes requests based on:
-- **Task type** (deterministic vs stochastic)
-- **Model categorization** (deterministic vs stochastic folders)
-- **Folder structure** (automatic discovery)
+The framework automatically discovers available models from the models directory. Each model has a `settings.yaml` file that specifies its type (deterministic, stochastic, or hybrid).
 
 All models handle both univariate and multivariate datasets internally.
 
 ```python
-from tempus_bench.models.model_router import ModelRouter
+from tempus_bench.utils import get_available_models
 
-# Initialize router
-router = ModelRouter(logs_path="./logs")
-
-# Get available models
-available = router.get_available_models()
-print(available)
-# Output: {
-#   'deterministic': ['arima', 'lstm', 'xgboost', 'prophet', ...],
-#   'stochastic': ['chronos', 'lagllama', 'moirai', 'deepar', ...]
-# }
-
-# Get model path for specific task type
-folder_path, file_name, class_name = router.get_model_path_by_model_type(
-    'arima', model_type='deterministic'
-)
+# Get all available models
+available_models = get_available_models()
+print(available_models)
+# Output: {'arima', 'lstm', 'xgboost', 'prophet', 'chronos', 'lagllama', 'moirai', ...}
 ```
 
 ### 2. Unified Model Interface
@@ -243,7 +221,7 @@ model:
 
 3. **Verify installation**:
    ```bash
-   python -c "from tempus_bench.models.model_router import ModelRouter; print('Installation successful!')"
+   python -c "from tempus_bench.utils import get_available_models; print('Installation successful!')"
    ```
 
 ## Usage
@@ -337,27 +315,35 @@ bash scripts/bash/cleanup_conda_envs.sh
 
 ### Adding New Models
 
-1. **Choose model category** (deterministic or stochastic):
+1. **Choose model type** (deterministic, stochastic, or hybrid):
    - **Deterministic**: Point forecasts (mean/median predictions)
    - **Stochastic**: Probabilistic forecasts (samples/quantiles)
+   - **Hybrid**: Both point forecasts and samples
 
 2. **Create model directory**:
    ```
-   tempus_bench/models/deterministic/my_model/  # or stochastic/
+   tempus_bench/models/my_model/
    ├── my_model_model.py
    ├── requirements.txt
    └── settings.yaml
    ```
 
-3. **Implement model class**:
+3. **Create settings.yaml**:
+   ```yaml
+   # settings.yaml
+   model_type: deterministic  # or 'stochastic' or 'hybrid'
+   python_version: "3.11.13"
+   ```
+
+4. **Implement model class**:
    ```python
    from tempus_bench.models.base_model import BaseModel
    
    class MyModelModel(BaseModel):
-       def __init__(self, config, logs_path=None):
-           super().__init__(config, logs_path=logs_path)
-           # Store model-specific config
-           self.model_config = config['model']['my_model']
+       def __init__(self, params, settings):
+           super().__init__(params, settings)
+           # Store model-specific params
+           self.params = params
        
        def train(self, y_context, y_target, timestamps_context, timestamps_target, freq, **kwargs):
            # Training implementation
@@ -374,7 +360,7 @@ bash scripts/bash/cleanup_conda_envs.sh
            return {'mae': mae, 'rmse': rmse}
    ```
 
-4. **Add to configuration**:
+5. **Add to configuration**:
    ```yaml
    # In tempus_bench/config/benchmark.yaml
    model:
@@ -383,14 +369,7 @@ bash scripts/bash/cleanup_conda_envs.sh
        param2: [value3, value4]
    ```
 
-5. **Specify Python version** (if needed):
-   ```python
-   # In tempus_bench/utils/model_config.py
-   MODEL_PYTHON_VERSIONS = {
-       'my_model': '3.11.13',
-       # ... other models
-   }
-   ```
+The model will be automatically discovered and available for benchmarking!
 
 ## Model Categories
 

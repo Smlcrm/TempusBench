@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic import ValidationError as PydanticValidationError
 
 from ..utils.logger import Logger
+from ..utils.tf_logger import TFLogger
 
 ######################################################## UTILITY FUNCTIONS ########################################################
 
@@ -101,6 +102,9 @@ class ModelConfig(BaseModel):
     """Model configuration model."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+    model_name: str = Field(..., description="Model name")
 
     # @model_validator(mode="after")
     # def validate_model_availability(self):
@@ -215,7 +219,9 @@ class JobConfig:
         task_config: TaskConfig,
         run_path: str,
         logger: Logger,
+        tf_logger: TFLogger,
     ):
+        
         self.evaluation_config = evaluation_config
         self.evaluation_setting = evaluation_setting
         self.model_config = model_config
@@ -223,3 +229,4 @@ class JobConfig:
         self.task_config = task_config
         self.run_path = run_path
         self.logger = logger
+        self.tf_logger = tf_logger
