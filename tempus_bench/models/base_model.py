@@ -20,7 +20,7 @@ import numpy as np
 from pydantic import BaseModel as PydanticBaseModel
 
 from ..config.configs import JobConfig
-from ..metrics.evaluation import Evaluator
+from ..metrics.metric_registry import MetricRegistry
 from ..utils.logger import Logger
 
 
@@ -37,7 +37,7 @@ class BaseModel(ABC):
         training_loss: Primary loss function for training
         forecast_horizon: Number of steps to forecast ahead
         is_fitted: Whether the model has been trained
-        evaluator: Evaluator instance for computing metrics
+        evaluator: MetricRegistry instance for computing metrics
     """
 
     def __init__(
@@ -73,7 +73,7 @@ class BaseModel(ABC):
             settings = {}
         self.params_class = ParamsClass
         self.model_name = self.model_class_name.replace("Model", "").lower()
-        self.evaluator = Evaluator(logger=self.logger)
+        self.evaluator = MetricRegistry(logger=self.logger)
         self.set_params(**params)
         self.set_attrs(**settings)  # Settings
 
@@ -114,7 +114,7 @@ class BaseModel(ABC):
         self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs
     ) -> Dict[str, float]:
         """
-        Compute all loss metrics between true and predicted values using the Evaluator class.
+        Compute all loss metrics between true and predicted values using the MetricRegistry class.
 
         This method computes evaluation metrics as configured in evaluation.metrics
 

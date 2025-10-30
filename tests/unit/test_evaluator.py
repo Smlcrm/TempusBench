@@ -1,5 +1,5 @@
 """
-Unit tests for the Evaluator class in evaluation.py.
+Unit tests for the MetricRegistry class in metric_registry.py.
 
 Tests cover:
 - Initialization with valid/invalid configs
@@ -17,14 +17,14 @@ import tempfile
 import os
 from pathlib import Path
 
-from tempus_bench.metrics.evaluation import Evaluator
+from tempus_bench.metrics.metric_registry import MetricRegistry
 
 
-class TestEvaluatorInitialization:
-    """Test Evaluator initialization and configuration."""
+class TestMetricRegistryInitialization:
+    """Test MetricRegistry initialization and configuration."""
 
     def test_initialization_with_valid_config_deterministic(self):
-        """Test Evaluator initialization with valid deterministic config."""
+        """Test MetricRegistry initialization with valid deterministic config."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {
@@ -34,13 +34,13 @@ class TestEvaluatorInitialization:
                     "model_type": "deterministic"
                 }
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             assert evaluator.model_type == "deterministic"
             assert "mae" in evaluator.metrics_to_calculate
             assert "rmse" in evaluator.metrics_to_calculate
 
     def test_initialization_with_valid_config_stochastic(self):
-        """Test Evaluator initialization with valid stochastic config."""
+        """Test MetricRegistry initialization with valid stochastic config."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = {
                 "evaluation": {
@@ -51,34 +51,34 @@ class TestEvaluatorInitialization:
                     "model_type": "stochastic"
                 }
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             assert evaluator.model_type == "stochastic"
             assert "crps" in evaluator.metrics_to_calculate
             assert "mae" in evaluator.metrics_to_calculate
 
     def test_initialization_with_none_config(self):
-        """Test Evaluator initialization with None config (defaults to {})."""
+        """Test MetricRegistry initialization with None config (defaults to {})."""
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(KeyError, match="evaluation"):
-                Evaluator(config=None, logs_path=tmpdir)
+                MetricRegistry(config=None, logs_path=tmpdir)
 
     def test_missing_logs_path(self):
-        """Test Evaluator raises error when logs_path is None."""
+        """Test MetricRegistry raises error when logs_path is None."""
         config = {
             "evaluation": {"metrics": ["mae"]},
             "task": {"model_type": "deterministic"}
         }
         with pytest.raises(ValueError, match="logs_path parameter is required"):
-            Evaluator(config=config, logs_path=None)
+            MetricRegistry(config=config, logs_path=None)
 
     def test_missing_logs_path_default(self):
-        """Test Evaluator raises error when logs_path is not provided."""
+        """Test MetricRegistry raises error when logs_path is not provided."""
         config = {
             "evaluation": {"metrics": ["mae"]},
             "task": {"model_type": "deterministic"}
         }
         with pytest.raises(ValueError, match="logs_path parameter is required"):
-            Evaluator(config=config)
+            MetricRegistry(config=config)
 
     def test_metric_registry_setup(self):
         """Test that metric registry is properly set up."""
@@ -88,7 +88,7 @@ class TestEvaluatorInitialization:
                                            "quantile_score", "weighted_interval_score"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             assert "mae" in evaluator.metric_registry
             assert "rmse" in evaluator.metric_registry
             assert "crps" in evaluator.metric_registry
@@ -101,7 +101,7 @@ class TestEvaluatorInitialization:
                 "evaluation": {"metrics": ["crps"]},
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             assert evaluator.stochastic_metrics == {"crps", "quantile_score", 
                                                      "weighted_interval_score"}
 
@@ -112,12 +112,12 @@ class TestEvaluatorInitialization:
                 "evaluation": {"metrics": ["mae"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             assert evaluator.deterministic_metrics == {"rmse", "mae", "mase", "mape"}
 
 
-class TestEvaluatorDeterministic:
-    """Test Evaluator with deterministic task type."""
+class TestMetricRegistryDeterministic:
+    """Test MetricRegistry with deterministic task type."""
 
     def test_evaluate_mae_deterministic(self):
         """Test evaluation with MAE metric in deterministic mode."""
@@ -126,7 +126,7 @@ class TestEvaluatorDeterministic:
                 "evaluation": {"metrics": ["mae"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0, 3.0])
             y_pred = np.array([1.5, 2.5, 2.5])
             results = evaluator.evaluate(y_true, y_pred)
@@ -140,7 +140,7 @@ class TestEvaluatorDeterministic:
                 "evaluation": {"metrics": ["mae", "rmse"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0, 3.0])
             y_pred = np.array([1.5, 2.5, 2.5])
             results = evaluator.evaluate(y_true, y_pred)
@@ -154,7 +154,7 @@ class TestEvaluatorDeterministic:
                 "evaluation": {"metrics": ["mape", "mase"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([10.0, 20.0, 30.0])
             y_pred = np.array([11.0, 22.0, 33.0])
             results = evaluator.evaluate(y_true, y_pred)
@@ -168,7 +168,7 @@ class TestEvaluatorDeterministic:
                 "evaluation": {"metrics": ["mae", "rmse"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[1.0, 2.0], [3.0, 4.0]])
             y_pred = np.array([[1.5, 2.5], [2.5, 4.5]])
             results = evaluator.evaluate(y_true, y_pred)
@@ -176,8 +176,8 @@ class TestEvaluatorDeterministic:
             assert "rmse" in results
 
 
-class TestEvaluatorStochastic:
-    """Test Evaluator with stochastic task type."""
+class TestMetricRegistryStochastic:
+    """Test MetricRegistry with stochastic task type."""
 
     def test_evaluate_crps_stochastic(self):
         """Test evaluation with CRPS metric in stochastic mode."""
@@ -189,7 +189,7 @@ class TestEvaluatorStochastic:
                 },
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])  # (T=1, M=1)
             y_pred = np.random.randn(100, 1, 1)  # (S=100, T=1, M=1)
             results = evaluator.evaluate(y_true, y_pred)
@@ -206,7 +206,7 @@ class TestEvaluatorStochastic:
                 },
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.random.randn(100, 1, 1)
             results = evaluator.evaluate(y_true, y_pred)
@@ -223,7 +223,7 @@ class TestEvaluatorStochastic:
                 },
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.random.randn(100, 1, 1)
             results = evaluator.evaluate(y_true, y_pred)
@@ -240,7 +240,7 @@ class TestEvaluatorStochastic:
                 },
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.array([[[2.0]], [[2.0]], [[2.0]]])  # (S=3, T=1, M=1)
             results = evaluator.evaluate(y_true, y_pred)
@@ -257,7 +257,7 @@ class TestEvaluatorStochastic:
                 },
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0]])
             y_pred = np.random.randn(100, 1, 1)
             results = evaluator.evaluate(y_true, y_pred)
@@ -275,7 +275,7 @@ class TestEvaluatorStochastic:
                 },
                 "task": {"model_type": "stochastic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([[2.0, 3.0], [4.0, 5.0]])  # (T=2, M=2)
             y_pred = np.random.randn(100, 2, 2)
             results = evaluator.evaluate(y_true, y_pred)
@@ -283,8 +283,8 @@ class TestEvaluatorStochastic:
             assert "mae" in results
 
 
-class TestEvaluatorErrors:
-    """Test error handling in Evaluator."""
+class TestMetricRegistryErrors:
+    """Test error handling in MetricRegistry."""
 
     def test_unknown_metric_error(self):
         """Test that unknown metric raises ValueError."""
@@ -293,7 +293,7 @@ class TestEvaluatorErrors:
                 "evaluation": {"metrics": ["unknown_metric"]},
                 "task": {"model_type": "deterministic"}
             }
-            evaluator = Evaluator(config=config, logs_path=tmpdir)
+            evaluator = MetricRegistry(config=config, logs_path=tmpdir)
             y_true = np.array([1.0, 2.0])
             y_pred = np.array([1.5, 2.5])
             
@@ -314,4 +314,4 @@ class TestEvaluatorErrors:
         """Test that accessing None config raises KeyError."""
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(KeyError, match="evaluation"):
-                Evaluator(config={}, logs_path=tmpdir)
+                MetricRegistry(config={}, logs_path=tmpdir)

@@ -288,13 +288,25 @@ runner.run()
 ### Running Individual Models
 
 ```python
+from tempus_bench.config.manager import Manager
 from tempus_bench.pipeline.model_executor import ModelExecutor
-from tempus_bench.models.model_router import ModelRouter
+from tempus_bench.utils.logger import Logger
 
-# Initialize executor
-executor = ModelExecutor(
+# First, create a Manager to load configurations
+logger = Logger(logs_path="./logs", console_logging=True, file_logging=True)
+manager = Manager(
     config_path="tempus_bench/config/benchmark.yaml",
-    run_dir="./runs"
+    run_path="./runs",
+    logger=logger
+)
+
+# Get a job config
+job_config, _ = next(manager.generate_run_configs())
+
+# Initialize executor with model settings and logger
+executor = ModelExecutor(
+    model_settings=job_config.model_settings,
+    logger=logger
 )
 
 # Execute a single model with specific hyperparameters
@@ -304,8 +316,9 @@ results = executor.execute_model(
     context_steps=50,
     train_steps=25,
     validate_steps=25,
-    dataset_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate/chickenpox_dense_univariate.csv",
-    window_idx=0
+    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    window_idx=0,
+    config_path=job_config.config_path
 )
 ```
 

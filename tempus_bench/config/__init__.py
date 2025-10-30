@@ -6,25 +6,34 @@ benchmarking pipeline. All configuration-related functionality is centralized he
 """
 
 from .configs import (
-    BenchmarkConfig,
     TaskConfig,
     DatasetConfig,
     EvaluationConfig,
-    ModelConfig,
-    BenchmarkSettingsConfig,
+    ModelHParams,
+    EvaluationSettings,
     JobConfig,
+    convert_pydantic_errors,
+    load_and_validate_task_configs,
+    validate_model_settings_dict,
+    validate_task_config_with_context,
 )
 from .manager import Manager, ValidationError
 
 
 __all__ = [
-    "BenchmarkConfig",
+    # Configuration models
     "TaskConfig",
     "DatasetConfig",
     "EvaluationConfig",
-    "ModelConfig",
-    "BenchmarkSettingsConfig",
+    "ModelHParams",
+    "EvaluationSettings",
     "JobConfig",
+    # Manager and exceptions
     "Manager",
     "ValidationError",
+    # Validation utility functions
+    "convert_pydantic_errors",
+    "load_and_validate_task_configs",
+    "validate_model_settings_dict",
+    "validate_task_config_with_context",
 ]

@@ -16,10 +16,10 @@ from ..metrics.weighted_interval_score import WeightedIntervalScore
 from ..utils.logger import Logger
 
 
-class Evaluator:
+class MetricRegistry:
     def __init__(self, logger: Logger = None):
         """
-        Initialize evaluator with configuration.
+        Initialize metric registry with configuration.
 
         Args:
             logger: Logger instance to use for logging (optional)
@@ -38,7 +38,7 @@ class Evaluator:
         self.deterministic_metrics = ["rmse", "mae", "mase", "mape"]
 
         if self.logger:
-            self.logger.debug("Evaluator", "Evaluator initialized")
+            self.logger.debug("MetricRegistry", "MetricRegistry initialized")
 
     def evaluate(
         self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs: Dict[str, Any]
