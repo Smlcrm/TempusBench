@@ -11,18 +11,22 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from ..config.config import ConfigAdapterMixin
-from ..config.models import JobConfig
+from ..config.configs import JobConfig
 
-class Preprocessor(ConfigAdapterMixin):
+class Preprocessor:
+    """Clean raw CSV payloads and apply normalization strategies."""
+
     def __init__(self, config: JobConfig):
         """
-        Initialize preprocessor with configuration.
+        Initialize the preprocessor for a concrete task configuration.
 
         Args:
-            config_path: Path to the configuration YAML file
+            config: `JobConfig` emitted by the configuration manager; supplies
+                the task metadata and preprocessing directives.
         """
-        super().__init__(config)
+        self.job_config = config
+        self.config = config.benchmark_config
+        self.logger = config.logger
         self.max_num_variates = self.config.evaluation.max_num_variates
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
@@ -268,8 +272,9 @@ class Preprocessor(ConfigAdapterMixin):
             handle_missing: Strategy for handling missing values ('drop', 'mean', 'median', 'interpolate', 'forward_fill', 'backward_fill')
 
         Returns:
-            Tuple of (timestamps, time_start, freq, target) - cleaned timestamps, time_start, freq, and target
-            Where target is a 2D ndarray of shape (num_steps, num_targets)
+            Tuple[np.ndarray, str, str, np.ndarray, Optional[StandardScaler]]:
+                Cleaned timestamps, sanitized start timestamp, validated frequency string,
+                processed target array (shape `(num_steps, num_targets)`), and an optional scaler.
         """
         self.logger.debug("Preprocessor.clean", f"[DEBUG] Starting preprocessor.clean() with time_start={time_start}, freq={freq}")
 

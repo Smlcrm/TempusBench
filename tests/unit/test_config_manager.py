@@ -1,7 +1,7 @@
 """
-Unit tests for ConfigManager class.
+Unit tests for Manager class.
 
-This test suite provides 100% coverage of the ConfigManager functionality including:
+This test suite provides 100% coverage of the Manager functionality including:
 - Initialization and validation
 - Benchmark config validation
 - Settings validation
@@ -14,9 +14,9 @@ import pytest
 import yaml
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
-from tempus_bench.config.config import ConfigManager, ConfigValidationError
-from tempus_bench.config.models import (
-    BenchmarkConfig, TaskConfig, ModelSettingsConfig, BenchmarkSettingsConfig,
+from tempus_bench.config.manager import Manager, ValidationError
+from tempus_bench.config.managers import (
+    BenchmarkConfig, TaskConfig, BenchmarkSettingsConfig,
     DatasetConfig, EvaluationConfig, ModelConfig
 )
 
@@ -61,17 +61,17 @@ def sample_settings_config():
     }
 
 
-class TestConfigValidationError:
-    """Test suite for ConfigValidationError exception."""
+class TestValidationError:
+    """Test suite for ValidationError exception."""
     
     def test_exception_initialization(self):
-        """Test that ConfigValidationError can be initialized."""
-        error = ConfigValidationError("Test error message")
+        """Test that ValidationError can be initialized."""
+        error = ValidationError("Test error message")
         assert str(error) == "Test error message"
         assert error.message == "Test error message"
 
 
-class TestConfigManagerLoadConfig:
+class TestManagerLoadConfig:
     """Test suite for _load_config method."""
     
     def test_load_valid_config(self, tmp_path):
@@ -80,13 +80,13 @@ class TestConfigManagerLoadConfig:
         config_data = {"key": "value"}
         config_file.write_text(yaml.dump(config_data))
         
-        result = ConfigManager._load_config(str(config_file))
+        result = Manager._load_config(str(config_file))
         assert result == config_data
     
     def test_load_config_file_not_found(self):
         """Test that FileNotFoundError is raised for non-existent file."""
         with pytest.raises(FileNotFoundError, match="Configuration file not found"):
-            ConfigManager._load_config("nonexistent.yaml")
+            Manager._load_config("nonexistent.yaml")
     
     def test_load_config_empty_file(self, tmp_path):
         """Test that ValueError is raised for empty file."""
@@ -94,7 +94,7 @@ class TestConfigManagerLoadConfig:
         config_file.write_text("")
         
         with pytest.raises(ValueError, match="Configuration file is empty or invalid YAML"):
-            ConfigManager._load_config(str(config_file))
+            Manager._load_config(str(config_file))
     
     def test_load_config_invalid_yaml(self, tmp_path):
         """Test that ValueError is raised for invalid YAML."""
@@ -102,10 +102,10 @@ class TestConfigManagerLoadConfig:
         config_file.write_text("invalid: [yaml: content")
         
         with pytest.raises(ValueError, match="Invalid YAML format"):
-            ConfigManager._load_config(str(config_file))
+            Manager._load_config(str(config_file))
 
 
-class TestConfigManagerGetAvailableModels:
+class TestManagerGetAvailableModels:
     """Test suite for _get_available_models method."""
     
     def test_get_available_models(self, tmp_path):
@@ -129,9 +129,9 @@ class TestConfigManagerGetAvailableModels:
         deepar_dir.mkdir()
         (deepar_dir / "deepar_model.py").write_text("# model file")
         
-        with patch('tempus_bench.config.config.get_models_dir', return_value=models_dir):
+        with patch('tempus_bench.config.manager.get_models_dir', return_value=models_dir):
             manager = Mock()
-            available_models = ConfigManager._get_available_models(manager)
+            available_models = Manager._get_available_models(manager)
             assert "arima" in available_models
             assert "deepar" in available_models
             assert len(available_models) == 2
@@ -141,13 +141,13 @@ class TestConfigManagerGetAvailableModels:
         models_dir = tmp_path / "models"
         models_dir.mkdir()
         
-        with patch('tempus_bench.config.config.get_models_dir', return_value=models_dir):
+        with patch('tempus_bench.config.manager.get_models_dir', return_value=models_dir):
             manager = Mock()
-            available_models = ConfigManager._get_available_models(manager)
+            available_models = Manager._get_available_models(manager)
             assert available_models == set()
 
 
-class TestConfigManagerValidateModelAvailability:
+class TestManagerValidateModelAvailability:
     """Test suite for _validate_model_availability method."""
     
     def test_validate_all_models_available(self):
@@ -163,7 +163,7 @@ class TestConfigManagerValidateModelAvailability:
         manager.model = {"arima": {"p": [1, 2]}}
         
         # Should not raise exception
-        ConfigManager._validate_model_availability(manager, config)
+        Manager._validate_model_availability(manager, config)
     
     def test_validate_model_not_available(self):
         """Test validation when a specified model is not available."""
@@ -177,11 +177,11 @@ class TestConfigManagerValidateModelAvailability:
         manager._get_available_models = Mock(return_value={"arima"})
         manager.model = {"arima": {"p": [1, 2]}, "xgboost": {"n_estimators": [100]}}
         
-        with pytest.raises(ConfigValidationError, match="Model 'xgboost' is not available"):
-            ConfigManager._validate_model_availability(manager, config)
+        with pytest.raises(ValidationError, match="Model 'xgboost' is not available"):
+            Manager._validate_model_availability(manager, config)
 
 
-class TestConfigManagerConvertPydanticErrors:
+class TestManagerConvertPydanticErrors:
     """Test suite for _convert_pydantic_errors method."""
     
     def test_convert_single_error(self):
@@ -194,7 +194,7 @@ class TestConfigManagerConvertPydanticErrors:
             {"loc": ("field",), "msg": "error message"}
         ])
         
-        result = ConfigManager._convert_pydantic_errors(error)
+        result = Manager._convert_pydantic_errors(error)
         assert "field" in result
         assert "error message" in result
     
@@ -208,14 +208,14 @@ class TestConfigManagerConvertPydanticErrors:
             {"loc": ("field2",), "msg": "error 2"}
         ])
         
-        result = ConfigManager._convert_pydantic_errors(error)
+        result = Manager._convert_pydantic_errors(error)
         assert "field1" in result
         assert "field2" in result
         assert "error 1" in result
         assert "error 2" in result
 
 
-class TestConfigManagerFindTaskDirectories:
+class TestManagerFindTaskDirectories:
     """Test suite for _find_task_directories method."""
     
     def test_find_all_task_directories(self, tmp_path):
@@ -235,8 +235,8 @@ class TestConfigManagerFindTaskDirectories:
         manager = Mock()
         manager.benchmark_config = Mock(task_path="*")
         
-        with patch('tempus_bench.config.config.get_tasks_dir', return_value=tasks_dir):
-            result = ConfigManager._find_task_directories(manager)
+        with patch('tempus_bench.config.manager.get_tasks_dir', return_value=tasks_dir):
+            result = Manager._find_task_directories(manager)
             assert len(result) == 2
     
     def test_find_specific_subdirectory(self, tmp_path):
@@ -259,8 +259,8 @@ class TestConfigManagerFindTaskDirectories:
         manager = Mock()
         manager.benchmark_config = Mock(task_path="univariate/*")
         
-        with patch('tempus_bench.config.config.get_tasks_dir', return_value=tasks_dir):
-            result = ConfigManager._find_task_directories(manager)
+        with patch('tempus_bench.config.manager.get_tasks_dir', return_value=tasks_dir):
+            result = Manager._find_task_directories(manager)
             assert len(result) == 1
             assert result[0].name == "task1"
     
@@ -278,8 +278,8 @@ class TestConfigManagerFindTaskDirectories:
         manager = Mock()
         manager.benchmark_config = Mock(task_path="univariate/specific_task")
         
-        with patch('tempus_bench.config.config.get_tasks_dir', return_value=tasks_dir):
-            result = ConfigManager._find_task_directories(manager)
+        with patch('tempus_bench.config.manager.get_tasks_dir', return_value=tasks_dir):
+            result = Manager._find_task_directories(manager)
             assert len(result) == 1
             assert result[0].name == "specific_task"
     
@@ -291,8 +291,8 @@ class TestConfigManagerFindTaskDirectories:
         manager = Mock()
         manager.benchmark_config = Mock(task_path="nonexistent/*")
         
-        with patch('tempus_bench.config.config.get_tasks_dir', return_value=tasks_dir):
-            result = ConfigManager._find_task_directories(manager)
+        with patch('tempus_bench.config.manager.get_tasks_dir', return_value=tasks_dir):
+            result = Manager._find_task_directories(manager)
             assert len(result) == 0
     
     def test_find_nonexistent_specific_task(self, tmp_path):
@@ -303,15 +303,15 @@ class TestConfigManagerFindTaskDirectories:
         manager = Mock()
         manager.benchmark_config = Mock(task_path="univariate/nonexistent_task")
         
-        with patch('tempus_bench.config.config.get_tasks_dir', return_value=tasks_dir):
-            result = ConfigManager._find_task_directories(manager)
+        with patch('tempus_bench.config.manager.get_tasks_dir', return_value=tasks_dir):
+            result = Manager._find_task_directories(manager)
             assert len(result) == 0
 
 
-class TestConfigManagerValidateBenchmarkConfig:
+class TestManagerValidateBenchmarkConfig:
     """Test suite for validate_benchmark_config method."""
     
-    @patch('tempus_bench.config.config.get_logger')
+    @patch('tempus_bench.config.manager.get_logger')
     def test_validate_valid_benchmark_config(self, mock_logger, tmp_path):
         """Test validating a valid benchmark configuration."""
         config_file = tmp_path / "benchmark.yaml"
@@ -334,7 +334,7 @@ class TestConfigManagerValidateBenchmarkConfig:
                 self.logger = Mock()
             
             def _load_config(self, config_path):
-                return ConfigManager._load_config(config_path)
+                return Manager._load_config(config_path)
             
             def _get_available_models(self):
                 return {"arima"}
@@ -344,10 +344,10 @@ class TestConfigManagerValidateBenchmarkConfig:
                 pass
         
         manager = MockManager(str(config_file))
-        result = ConfigManager.validate_benchmark_config(manager)
+        result = Manager.validate_benchmark_config(manager)
         assert isinstance(result, BenchmarkConfig)
     
-    @patch('tempus_bench.config.config.get_logger')
+    @patch('tempus_bench.config.manager.get_logger')
     def test_validate_invalid_benchmark_config(self, mock_logger, tmp_path):
         """Test validating an invalid benchmark configuration."""
         config_file = tmp_path / "benchmark.yaml"
@@ -360,18 +360,18 @@ class TestConfigManagerValidateBenchmarkConfig:
             
             def _load_config(self, config_path):
                 try:
-                    return ConfigManager._load_config(config_path)
+                    return Manager._load_config(config_path)
                 except ValueError:
-                    # Wrap ValueError in ConfigValidationError as the code does
-                    raise ConfigValidationError("Invalid YAML")
+                    # Wrap ValueError in ValidationError as the code does
+                    raise ValidationError("Invalid YAML")
         
         manager = MockManager(str(config_file))
         
-        with pytest.raises((ConfigValidationError, ValueError)):
-            ConfigManager.validate_benchmark_config(manager)
+        with pytest.raises((ValidationError, ValueError)):
+            Manager.validate_benchmark_config(manager)
 
 
-class TestConfigManagerValidateBenchmarkSettings:
+class TestManagerValidateBenchmarkSettings:
     """Test suite for validate_benchmark_settings method."""
     
     def test_validate_settings_file_not_found(self, tmp_path):
@@ -379,9 +379,9 @@ class TestConfigManagerValidateBenchmarkSettings:
         manager = Mock()
         manager.logger = Mock()
         
-        with patch('tempus_bench.config.config.get_configs_dir', return_value=tmp_path):
+        with patch('tempus_bench.config.manager.get_configs_dir', return_value=tmp_path):
             with pytest.raises(FileNotFoundError, match="Settings config not found"):
-                ConfigManager.validate_benchmark_settings(manager)
+                Manager.validate_benchmark_settings(manager)
     
     def test_validate_settings_validation_error(self, tmp_path):
         """Test that ValidationError in settings is caught and wrapped."""
@@ -391,23 +391,23 @@ class TestConfigManagerValidateBenchmarkSettings:
         manager = Mock()
         manager.logger = Mock()
         
-        with patch('tempus_bench.config.config.get_configs_dir', return_value=tmp_path):
-            with pytest.raises(ConfigValidationError, match="Invalid systems config"):
-                ConfigManager.validate_benchmark_settings(manager)
+        with patch('tempus_bench.config.manager.get_configs_dir', return_value=tmp_path):
+            with pytest.raises(ValidationError, match="Invalid systems config"):
+                Manager.validate_benchmark_settings(manager)
     
     def test_validate_invalid_settings(self, tmp_path):
-        """Test that ConfigValidationError is raised for invalid settings."""
+        """Test that ValidationError is raised for invalid settings."""
         settings_file = tmp_path / "settings.yaml"
         settings_file.write_text("invalid: [yaml")
         
         manager = Mock()
         manager.logger = Mock()
         
-        with patch('tempus_bench.config.config.get_configs_dir', return_value=tmp_path):
-            with pytest.raises(ConfigValidationError):
-                ConfigManager.validate_benchmark_settings(manager)
+        with patch('tempus_bench.config.manager.get_configs_dir', return_value=tmp_path):
+            with pytest.raises(ValidationError):
+                Manager.validate_benchmark_settings(manager)
     
-    @patch('tempus_bench.config.config.get_configs_dir')
+    @patch('tempus_bench.config.manager.get_configs_dir')
     def test_validate_valid_settings(self, mock_get_configs_dir, tmp_path):
         """Test validating valid settings."""
         settings_file = tmp_path / "settings.yaml"
@@ -425,22 +425,22 @@ class TestConfigManagerValidateBenchmarkSettings:
         manager.logger = Mock()
         mock_get_configs_dir.return_value = tmp_path
         
-        result = ConfigManager.validate_benchmark_settings(manager)
+        result = Manager.validate_benchmark_settings(manager)
         assert isinstance(result, BenchmarkSettingsConfig)
 
 
-class TestConfigManagerValidateModelSettings:
+class TestManagerValidateModelSettings:
     """Test suite for validate_model_settings method."""
     
     def test_validate_models_directory_not_found(self):
-        """Test that ConfigValidationError is raised when models directory doesn't exist."""
+        """Test that ValidationError is raised when models directory doesn't exist."""
         manager = Mock()
         manager.logger = Mock()
         manager.benchmark_config = Mock(model=ModelConfig(arima={"p": [1, 2], "tuning_loss": ["mae"]}).model_dump())
         
-        with patch('tempus_bench.config.config.get_models_dir', return_value=Path("nonexistent")):
-            with pytest.raises(ConfigValidationError, match="Models directory not found"):
-                ConfigManager.validate_model_settings(manager)
+        with patch('tempus_bench.config.manager.get_models_dir', return_value=Path("nonexistent")):
+            with pytest.raises(ValidationError, match="Models directory not found"):
+                Manager.validate_model_settings(manager)
     
     def test_validate_model_settings_success(self, tmp_path):
         """Test successful validation of model settings."""
@@ -455,13 +455,13 @@ class TestConfigManagerValidateModelSettings:
         manager.logger = Mock()
         manager.benchmark_config = Mock(model=ModelConfig(arima={"p": [1, 2], "tuning_loss": ["mae"]}).model_dump())
         
-        with patch('tempus_bench.config.config.get_models_dir', return_value=models_dir.parent.parent):
-            result = ConfigManager.validate_model_settings(manager)
+        with patch('tempus_bench.config.manager.get_models_dir', return_value=models_dir.parent.parent):
+            result = Manager.validate_model_settings(manager)
             assert "arima" in result
             assert isinstance(result["arima"], ModelSettingsConfig)
     
     def test_validate_model_settings_invalid_yaml(self, tmp_path):
-        """Test that invalid YAML raises ConfigValidationError."""
+        """Test that invalid YAML raises ValidationError."""
         models_dir = tmp_path / "models" / "deterministic" / "arima"
         models_dir.mkdir(parents=True, exist_ok=True)
         
@@ -472,9 +472,9 @@ class TestConfigManagerValidateModelSettings:
         manager.logger = Mock()
         manager.benchmark_config = Mock(model=ModelConfig(arima={"p": [1, 2], "tuning_loss": ["mae"]}).model_dump())
         
-        with patch('tempus_bench.config.config.get_models_dir', return_value=models_dir.parent.parent):
-            with pytest.raises(ConfigValidationError):
-                ConfigManager.validate_model_settings(manager)
+        with patch('tempus_bench.config.manager.get_models_dir', return_value=models_dir.parent.parent):
+            with pytest.raises(ValidationError):
+                Manager.validate_model_settings(manager)
     
     def test_validate_model_settings_filters_by_main_model(self, tmp_path):
         """Test that only models in main.model are validated."""
@@ -492,17 +492,17 @@ class TestConfigManagerValidateModelSettings:
         # Only arima in main.model
         manager.main = Mock(model={"arima": {"p": [1, 2]}})
         
-        with patch('tempus_bench.config.config.get_models_dir', return_value=models_dir.parent):
-            result = ConfigManager.validate_model_settings(manager)
+        with patch('tempus_bench.config.manager.get_models_dir', return_value=models_dir.parent):
+            result = Manager.validate_model_settings(manager)
             assert "arima" in result
             assert "prophet" not in result  # Should be filtered out
 
 
-class TestConfigManagerValidateTaskConfigs:
+class TestManagerValidateTaskConfigs:
     """Test suite for validate_task_configs method."""
     
     def test_validate_task_config_not_found(self, tmp_path):
-        """Test that ConfigValidationError is raised when task config doesn't exist."""
+        """Test that ValidationError is raised when task config doesn't exist."""
         task_dir = tmp_path / "task1"
         task_dir.mkdir()
         
@@ -510,8 +510,8 @@ class TestConfigManagerValidateTaskConfigs:
         manager.task_paths = [task_dir]
         manager.logger = Mock()
         
-        with pytest.raises(ConfigValidationError, match="Task config not found"):
-            ConfigManager.validate_task_configs(manager)
+        with pytest.raises(ValidationError, match="Task config not found"):
+            Manager.validate_task_configs(manager)
     
     def test_validate_task_configs_success(self, tmp_path):
         """Test successful validation of task configs."""
@@ -541,7 +541,7 @@ class TestConfigManagerValidateTaskConfigs:
         manager.task_paths = [task_dir]
         manager.logger = Mock()
         
-        result = ConfigManager.validate_task_configs(manager)
+        result = Manager.validate_task_configs(manager)
         assert "test_task" in result
         assert len(result["test_task"]) == 1
     
@@ -570,7 +570,7 @@ task:
         manager.task_paths = [task_dir]
         manager.logger = Mock()
         
-        result = ConfigManager.validate_task_configs(manager)
+        result = Manager.validate_task_configs(manager)
         assert "test_task" in result
         assert len(result["test_task"]) == 2
     
@@ -589,8 +589,8 @@ task:
         manager.task_paths = [task_dir]
         manager.logger = Mock()
         
-        with pytest.raises(ConfigValidationError):
-            ConfigManager.validate_task_configs(manager)
+        with pytest.raises(ValidationError):
+            Manager.validate_task_configs(manager)
     
     def test_validate_task_configs_empty_documents(self, tmp_path):
         """Test that empty task config raises error."""
@@ -604,19 +604,19 @@ task:
         manager.task_paths = [task_dir]
         manager.logger = Mock()
         
-        with pytest.raises(ConfigValidationError, match="No valid task configurations found"):
-            ConfigManager.validate_task_configs(manager)
+        with pytest.raises(ValidationError, match="No valid task configurations found"):
+            Manager.validate_task_configs(manager)
 
 
-class TestConfigManagerFullIntegration:
-    """Test suite for full ConfigManager initialization."""
+class TestManagerFullIntegration:
+    """Test suite for full Manager initialization."""
     
-    @patch('tempus_bench.config.config.get_logger')
-    @patch('tempus_bench.config.config.get_configs_dir')
+    @patch('tempus_bench.config.manager.get_logger')
+    @patch('tempus_bench.config.manager.get_configs_dir')
     @patch('tempus_bench.config.manager.get_models_dir')
-    @patch('tempus_bench.config.config.get_tasks_dir')
+    @patch('tempus_bench.config.manager.get_tasks_dir')
     def test_config_manager_full_initialization(self, mock_tasks_dir, mock_models_dir, mock_configs_dir, mock_logger, tmp_path):
-        """Test full ConfigManager initialization to cover __init__ lines 61-68."""
+        """Test full Manager initialization to cover __init__ lines 61-68."""
         # Setup benchmark config
         config_file = tmp_path / "benchmark.yaml"
         config_data = {
@@ -669,16 +669,16 @@ class TestConfigManagerFullIntegration:
         mock_logger.return_value = Mock()
         
         # This will call __init__ and cover lines 61-68
-        manager = ConfigManager(str(config_file), str(tmp_path))
+        manager = Manager(str(config_file), str(tmp_path))
         assert manager.config_path == str(config_file)
         assert isinstance(manager.main, BenchmarkConfig)
         assert isinstance(manager.benchmark_settings, BenchmarkSettingsConfig)
 
 
-class TestConfigManagerExceptionHandling:
+class TestManagerExceptionHandling:
     """Test suite for exception handling paths."""
     
-    @patch('tempus_bench.config.config.get_logger')
+    @patch('tempus_bench.config.manager.get_logger')
     def test_validate_benchmark_config_validation_error_handling(self, mock_logger, tmp_path):
         """Test ValidationError handling in validate_benchmark_config (lines 92-94)."""
         config_file = tmp_path / "benchmark.yaml"
@@ -696,7 +696,7 @@ class TestConfigManagerExceptionHandling:
                 self.logger = Mock()
             
             def _load_config(self, config_path):
-                return ConfigManager._load_config(config_path)
+                return Manager._load_config(config_path)
             
             def _validate_model_availability(self, config):
                 # Mock implementation
@@ -709,13 +709,13 @@ class TestConfigManagerExceptionHandling:
         manager = MockManager(str(config_file))
         
         # This should trigger ValidationError which gets caught and wrapped
-        with pytest.raises(ConfigValidationError):
-            ConfigManager.validate_benchmark_config(manager)
+        with pytest.raises(ValidationError):
+            Manager.validate_benchmark_config(manager)
         
         # Verify logger.error was called (line 93)
         manager.logger.error.assert_called()
     
-    @patch('tempus_bench.config.config.get_logger')
+    @patch('tempus_bench.config.manager.get_logger')
     @patch('tempus_bench.config.manager.get_models_dir')
     def test_validate_model_settings_validation_error_handling(self, mock_models_dir, mock_logger, tmp_path):
         """Test ValidationError handling in validate_model_settings (lines 165-166)."""
@@ -733,14 +733,14 @@ class TestConfigManagerExceptionHandling:
         mock_models_dir.return_value = models_dir.parent.parent
         
         # This should trigger ValidationError which gets caught
-        with pytest.raises(ConfigValidationError):
-            ConfigManager.validate_model_settings(manager)
+        with pytest.raises(ValidationError):
+            Manager.validate_model_settings(manager)
         
         # Verify exception was handled (lines 165-166)
         assert manager.logger.debug.call_count >= 0  # May be called before error
 
 
-class TestConfigManagerTaskConfigBranch:
+class TestManagerTaskConfigBranch:
     """Test suite for task config validation branch."""
     
     def test_task_config_without_task_key_raises_error(self, tmp_path):
@@ -755,8 +755,8 @@ class TestConfigManagerTaskConfigBranch:
         manager.task_paths = [task_dir]
         manager.logger = Mock()
         
-        with pytest.raises(ConfigValidationError, match="must contain a 'task' key"):
-            ConfigManager.validate_task_configs(manager)
+        with pytest.raises(ValidationError, match="must contain a 'task' key"):
+            Manager.validate_task_configs(manager)
 
 
 if __name__ == "__main__":

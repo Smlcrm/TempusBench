@@ -23,16 +23,17 @@ Example:
     ... ):
     ...     # Process dataset...
 """
+
 from pathlib import Path
 
 import pandas as pd
 
-from ..config.config import ConfigAdapterMixin
-from ..config.models import JobConfig
+from ..config.configs import JobConfig
 from .data_types import Dataset, DatasetSplit
 from .preprocessor import Preprocessor
 
-class DataLoader(ConfigAdapterMixin):
+
+class DataLoader:
     """
     Loads and processes complete time series datasets into Dataset objects.
 
@@ -40,35 +41,23 @@ class DataLoader(ConfigAdapterMixin):
     and creating rolling windows for training. It works with a single dataset at a time,
     suitable for the task-based execution model.
 
-    Attributes:
-        config (dict): Configuration dictionary loaded from config_path
-        logger (Logger): Logger instance for debugging and monitoring
-        tasks_dir (Path): Base directory containing task files
-        run_path (str): Directory for storing run outputs
-
-    Note:
-        All data is treated as multivariate where univariate is simply num_targets == 1.
-        Targets are inferred from data structure and kept as raw arrays without
-        artificial column naming for maximum flexibility.
+    All data is treated as multivariate where univariate is simply num_targets == 1.
+    Targets are inferred from data structure and kept as raw arrays without
+    artificial column naming for maximum flexibility.
     """
+
     def __init__(self, job_config: JobConfig):
         """
-        Initialize DataLoader with configuration and directory paths.
+        Initialize the loader for a specific job configuration.
 
         Args:
-            config_path (str): Path to the configuration YAML file containing
-                dataset parameters and task specifications.
-            logs_path (str): Directory for storing log files.
-
-        Raises:
-            FileNotFoundError: If config_path does not exist.
-
-        Note:
-            The configuration should contain:
-            - evaluation.max_windows: Maximum number of windows to generate
-            - Other preprocessing and model parameters
+            job_config: Aggregated configuration object that includes benchmark settings,
+                dataset metadata, and preprocessing directives for the active task.
         """
-        super().__init__(job_config)
+        self.job_config = job_config
+        self.config = job_config.benchmark_config
+        self.task_config = job_config.task_config
+        self.logger = job_config.logger
         self.preprocessor = Preprocessor(job_config)
 
     def _load_dataset(self, dataset_path: str) -> tuple:
@@ -99,7 +88,7 @@ class DataLoader(ConfigAdapterMixin):
             raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
 
         # Load the csv data
-        file_data = pd.read_csv(dataset_path, encoding='utf-8')
+        file_data = pd.read_csv(dataset_path, encoding="utf-8")
 
         # Extract basic information
         time_start = file_data["start"].iloc[0]
@@ -108,7 +97,9 @@ class DataLoader(ConfigAdapterMixin):
 
         return time_start, time_freq, target_raw
 
-    def generate_dataset_split(self, dataset_path: str, steps: list[tuple[str, int]], stride: int):
+    def generate_dataset_split(
+        self, dataset_path: str, steps: list[tuple[str, int]], stride: int
+    ):
         """
         Generate rolling windows over a time series with configurable segments.
 
@@ -128,36 +119,24 @@ class DataLoader(ConfigAdapterMixin):
                 - window_index (int): Zero-based index of the current window
                 - dataset (Dataset): Dataset object containing the window data with
                     segment splits (context, train, validation, etc.) and metadata
+                stride=1 creates overlapping windows, stride=window_size creates non-overlapping.
 
-        Note:
-            - Windows are limited by max_windows configuration parameter
-            - Each Dataset includes timestamps, target data, scaler, and metadata
-            - Target data is preprocessed and normalized by the Preprocessor
-            - Metadata includes dataset_path, window index, and frequency
-
-        Example:
-            >>> for win_idx, dataset in loader.generate_dataset_split(
-            ...     "data.csv",
-            ...     [('context', 24), ('train', 12), ('validate', 6)],
-            ...     stride=1
-            ... ):
-            ...     context_data = dataset.context.target  # Context segment
-            ...     train_data = dataset.train.target     # Training segment
-            ...     val_data = dataset.validate.target    # Validation segment
+        Notes:
+            - Windows are limited by the `evaluation.max_windows` configuration parameter.
+            - Each yielded `Dataset` includes timestamps, target data, scaler, and metadata.
+            - Target data is preprocessed and normalized by the `Preprocessor`.
         """
         self.logger.debug("DataLoader", f"Extracting data from {dataset_path}")
 
-        dataset_file_path = self.dataset_file_path
-
-        # Load task-specific configuration from task.yaml in the task directory
+        # Resolve actual dataset file path and load task-specific options
+        dataset_file_path = dataset_path
         normalize = self.task_config.dataset.normalize
         handle_missing = self.task_config.dataset.handle_missing
 
         # All targets are 2D after cleaning: (n_steps, n_variates)
         timestamps, _, time_freq, target, scaler = self.preprocessor.clean(
-            *self._load_dataset(str(dataset_file_path)),
-            normalize,
-            handle_missing)
+            *self._load_dataset(str(dataset_file_path)), normalize, handle_missing
+        )
         num_steps = target.shape[0]  # (n_steps, n_features): first dim is time-steps
         window_size = sum(seg_len for (_, seg_len) in steps)
         max_windows = self.config.evaluation.max_windows
@@ -166,7 +145,8 @@ class DataLoader(ConfigAdapterMixin):
         while win < max_windows:
             start = win * stride
             end = start + window_size
-            if end > num_steps: break
+            if end > num_steps:
+                break
 
             # Compute segment ranges for each step
             splits = {}
@@ -183,8 +163,8 @@ class DataLoader(ConfigAdapterMixin):
                 metadata={
                     "dataset_path": str(dataset_file_path),
                     "window": win,
-                    "freq": time_freq
-                }
+                    "freq": time_freq,
+                },
             )
             # Include segment splits (e.g., context=..., train=..., validation=...)
             window_kwargs.update(splits)

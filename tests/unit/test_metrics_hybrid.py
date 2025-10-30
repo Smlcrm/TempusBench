@@ -32,7 +32,7 @@ class TestMAEStochastic:
             [[3.0], [4.0]]   # Sample 3
         ])
         # Mean: [[2.0], [3.0]] - same as y_true
-        result = mae(y_true, y_pred, task_type='stochastic', 
+        result = mae(y_true, y_pred, model_type='stochastic', 
                      point_forecast_statistic='mean')
         assert result == 0.0
 
@@ -42,7 +42,7 @@ class TestMAEStochastic:
         y_true = np.array([[2.0]])  # (T=1, M=1)
         # y_pred shape: (S=3, T=1, M=1)
         y_pred = np.array([[[1.0]], [[3.0]], [[5.0]]])  # Mean = 3.0
-        result = mae(y_true, y_pred, task_type='stochastic',
+        result = mae(y_true, y_pred, model_type='stochastic',
                      point_forecast_statistic='mean')
         assert result == 1.0  # |2.0 - 3.0| = 1.0
 
@@ -54,7 +54,7 @@ class TestMAEStochastic:
         y_pred = np.random.randn(100, 2, 2)
         y_pred = y_pred + np.array([[[2.0, 3.0], [4.0, 5.0]]])
         
-        result = mae(y_true, y_pred, task_type='stochastic',
+        result = mae(y_true, y_pred, model_type='stochastic',
                      point_forecast_statistic='mean')
         assert result < 1.0  # Should be small for large sample
 
@@ -65,7 +65,7 @@ class TestMAEStochastic:
         y_pred = np.random.randn(50, 2, 2)  # (S=50, T=2, M=2)
         
         with pytest.raises(ValueError, match="Shape mismatch"):
-            mae(y_true, y_pred, task_type='stochastic',
+            mae(y_true, y_pred, model_type='stochastic',
                 point_forecast_statistic='mean')
 
     def test_invalid_point_forecast_statistic(self):
@@ -75,7 +75,7 @@ class TestMAEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(ValueError, match="can only handle point_forecast_statistic == 'mean'"):
-            mae(y_true, y_pred, task_type='stochastic',
+            mae(y_true, y_pred, model_type='stochastic',
                 point_forecast_statistic='median')
 
     def test_missing_point_forecast_statistic(self):
@@ -85,7 +85,7 @@ class TestMAEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(KeyError):
-            mae(y_true, y_pred, task_type='stochastic')
+            mae(y_true, y_pred, model_type='stochastic')
 
 
 class TestMAPEStochastic:
@@ -97,7 +97,7 @@ class TestMAPEStochastic:
         y_true = np.array([[100.0]])  # (T=1, M=1)
         # y_pred shape: (S=3, T=1, M=1)
         y_pred = np.array([[[110.0]], [[100.0]], [[90.0]]])  # Mean = 100.0
-        result = mape(y_true, y_pred, task_type='stochastic',
+        result = mape(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result == 0.0
 
@@ -106,7 +106,7 @@ class TestMAPEStochastic:
         mape = MAPE()
         y_true = np.array([[100.0]])
         y_pred = np.array([[[100.0]], [[110.0]], [[110.0]]])  # Mean = 106.67
-        result = mape(y_true, y_pred, task_type='stochastic',
+        result = mape(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result > 0
 
@@ -117,7 +117,7 @@ class TestMAPEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(ValueError, match="Shape mismatch"):
-            mape(y_true, y_pred, task_type='stochastic',
+            mape(y_true, y_pred, model_type='stochastic',
                  point_forecast_statistic='mean')
 
     def test_invalid_point_forecast_statistic(self):
@@ -127,7 +127,7 @@ class TestMAPEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(ValueError, match="can only handle point_forecast_statistic == 'mean'"):
-            mape(y_true, y_pred, task_type='stochastic',
+            mape(y_true, y_pred, model_type='stochastic',
                  point_forecast_statistic='median')
 
     def test_epsilon_protection(self):
@@ -135,7 +135,7 @@ class TestMAPEStochastic:
         mape = MAPE()
         y_true = np.array([[0.0]])
         y_pred = np.array([[[1.0]], [[2.0]], [[3.0]]])  # Mean = 2.0
-        result = mape(y_true, y_pred, task_type='stochastic',
+        result = mape(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result >= 0
 
@@ -154,7 +154,7 @@ class TestMASEStochastic:
             [[1.0], [2.0], [3.0], [4.0]]   # Sample 3
         ])
         # Mean: same as y_true -> MAE = 0
-        result = mase(y_true, y_pred, task_type='stochastic',
+        result = mase(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result == 0.0
 
@@ -172,7 +172,7 @@ class TestMASEStochastic:
         # MAE = mean(|[1-2, 2-3, 3-4]|) = 1.0
         # Denominator = mean(|[2-1, 3-2]|) = 1.0
         # MASE = 1.0
-        result = mase(y_true, y_pred, task_type='stochastic',
+        result = mase(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert_allclose(result, 1.0, atol=1e-5)
 
@@ -183,7 +183,7 @@ class TestMASEStochastic:
         y_pred = np.random.randn(50, 3, 1)
         
         with pytest.raises(ValueError, match="Shape mismatch"):
-            mase(y_true, y_pred, task_type='stochastic',
+            mase(y_true, y_pred, model_type='stochastic',
                  point_forecast_statistic='mean')
 
     def test_invalid_point_forecast_statistic(self):
@@ -193,7 +193,7 @@ class TestMASEStochastic:
         y_pred = np.random.randn(50, 3, 1)
         
         with pytest.raises(ValueError, match="can only handle point_forecast_statistic == 'mean'"):
-            mase(y_true, y_pred, task_type='stochastic',
+            mase(y_true, y_pred, model_type='stochastic',
                  point_forecast_statistic='median')
 
 
@@ -206,7 +206,7 @@ class TestRMSEStochastic:
         y_true = np.array([[2.0]])  # (T=1, M=1)
         # y_pred shape: (S=3, T=1, M=1)
         y_pred = np.array([[[2.0]], [[2.0]], [[2.0]]])  # Mean = 2.0
-        result = rmse(y_true, y_pred, task_type='stochastic',
+        result = rmse(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result == 0.0
 
@@ -216,7 +216,7 @@ class TestRMSEStochastic:
         y_true = np.array([[2.0]])
         # y_pred shape: (S=4, T=1, M=1)
         y_pred = np.array([[[1.0]], [[3.0]], [[5.0]], [[7.0]]])  # Mean = 4.0
-        result = rmse(y_true, y_pred, task_type='stochastic',
+        result = rmse(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result == 2.0  # sqrt((2-4)^2) = 2.0
 
@@ -227,7 +227,7 @@ class TestRMSEStochastic:
         y_pred = np.random.randn(100, 2, 2)
         y_pred = y_pred + np.array([[[2.0, 3.0], [4.0, 5.0]]])
         
-        result = rmse(y_true, y_pred, task_type='stochastic',
+        result = rmse(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result < 1.0  # Should be small for large sample
 
@@ -238,7 +238,7 @@ class TestRMSEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         # RMSE doesn't validate shapes, it just computes
-        result = rmse(y_true, y_pred, task_type='stochastic',
+        result = rmse(y_true, y_pred, model_type='stochastic',
                       point_forecast_statistic='mean')
         assert result >= 0
 
@@ -249,7 +249,7 @@ class TestRMSEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(ValueError, match="can only handle point_forecast_statistic == 'mean'"):
-            rmse(y_true, y_pred, task_type='stochastic',
+            rmse(y_true, y_pred, model_type='stochastic',
                  point_forecast_statistic='median')
 
     def test_error_message_verification(self):
@@ -259,5 +259,5 @@ class TestRMSEStochastic:
         y_pred = np.random.randn(50, 1, 1)
         
         with pytest.raises(ValueError, match="RMSE can only handle"):
-            rmse(y_true, y_pred, task_type='stochastic',
+            rmse(y_true, y_pred, model_type='stochastic',
                  point_forecast_statistic='median')

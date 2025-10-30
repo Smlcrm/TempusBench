@@ -17,20 +17,20 @@ from typing import (
 )
 
 from benchmarking_pipeline.models.base_model import BaseModel
-from tempus_bench.config.models import UnifiedConfig
+from tempus_bench.config.configs import JobConfig
 from tempus_bench.models.base_model import BaseModel, PydanticBaseModel
 
 from chronarium import Chronarium
 
-class LAFNHyperparams(PydanticBaseModel):
+class LafnHybridHyperparams(PydanticBaseModel):
     pass
 
-class LAFNModel(BaseModel):
-    """Chronarium-backed Large Adaptive Forecasting Network."""
+class LafnHybridModel(BaseModel):
+    """Chronarium-backed Large Adaptive Forecasting Network (Hybrid)."""
 
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
 
-        super().__init__(params, settings, LAFNHyperparams)
+        super().__init__(params, settings, LafnHybridHyperparams)
 
         manager = Chronarium(
             bucket_name=self.bucket_name,

@@ -130,7 +130,7 @@ def get_model_path(model_type: str, model_name: str) -> Path:
     Get the absolute path to a specific model directory.
 
     Args:
-        model_type: Type of model ('deterministic' or 'stochastic')
+        model_type: Type of model ('deterministic', 'stochastic', or 'hybrid') - deprecated, kept for backwards compatibility
         model_name: Name of the model
 
     Returns:
@@ -138,8 +138,13 @@ def get_model_path(model_type: str, model_name: str) -> Path:
 
     Raises:
         FileNotFoundError: If the model directory doesn't exist
+        
+    Note:
+        The model_type parameter is deprecated as models are now organized by their
+        settings.yaml file rather than folder structure. It's kept for backwards compatibility.
     """
-    model_path = get_models_dir() / model_type / model_name
+    # Models are now directly in the models directory, not in subdirectories
+    model_path = get_models_dir() / model_name
     if not model_path.exists():
         raise FileNotFoundError(f"Model directory not found: {model_path}")
     return model_path

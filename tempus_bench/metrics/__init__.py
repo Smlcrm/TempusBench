@@ -17,7 +17,7 @@ Task Type Requirements:
 - deterministic: mae, rmse, mape, mase
 - stochastic: crps, quantile_score, weighted_interval_score, mae, rmse
 
-All metrics accept an optional 'task_type' parameter in kwargs to validate compatibility.
+All metrics accept an optional 'model_type' parameter in kwargs to validate compatibility.
 If not provided, metrics default to their compatible task type.
 
 Usage:
@@ -28,7 +28,7 @@ Usage:
     mae_score = mae(y_true, y_pred)
 
     # Compute MAE for stochastic forecasts (explicit)
-    mae_score = mae(y_true, y_pred, task_type='stochastic')
+    mae_score = mae(y_true, y_pred, model_type='stochastic')
 
     # Compute CRPS (defaults to stochastic)
     crps = CRPS()

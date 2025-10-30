@@ -7,13 +7,12 @@ edge cases for max_num_variates, model parameter validation, and foundation mode
 
 import pytest
 from pydantic import ValidationError
-from tempus_bench.config.models import (
+from tempus_bench.config.configs import (
     EvaluationConfig,
     ModelConfig,
     DatasetConfig,
     TaskConfig,
     BenchmarkConfig,
-    ModelSettingsConfig,
     BenchmarkSettingsConfig
 )
 
@@ -391,25 +390,25 @@ class TestBenchmarkConfigTuningLossCompatibility:
         assert config.evaluation.tuning_loss == "mae"
 
 
-class TestModelSettingsConfig:
-    """Test suite for ModelSettingsConfig model."""
+class TestBenchmarkSettingsConfig:
+    """Test suite for BenchmarkSettingsConfig model."""
     
     def test_valid_config_with_defaults(self):
         """Test valid model settings configuration with defaults."""
-        config = ModelSettingsConfig()
+        config = BenchmarkSettingsConfig()
         assert config.python_version == "3.11"
         assert config.device == "cpu"
     
     def test_valid_config_custom_values(self):
         """Test valid model settings configuration with custom values."""
-        config = ModelSettingsConfig(python_version="3.12", device="gpu")
+        config = BenchmarkSettingsConfig(python_version="3.12", device="gpu")
         assert config.python_version == "3.12"
         assert config.device == "gpu"
     
     def test_invalid_device(self):
         """Test that invalid device raises ValidationError."""
         with pytest.raises(ValidationError):
-            ModelSettingsConfig(device="invalid")
+            BenchmarkSettingsConfig(device="invalid")
 
 
 class TestBenchmarkSettingsConfig:
