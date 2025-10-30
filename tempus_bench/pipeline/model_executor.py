@@ -18,10 +18,12 @@ import yaml
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from tempus_bench.config import JobConfig
+
 from ..models.model_router import ModelRouter
 from ..utils.envs import CondaEnvManager
 from ..utils.logger import Logger
-from ..utils.paths import get_models_dir
+from ..utils.paths import get_models_dir, get_tasks_dir
 
 
 class ModelExecutor:
@@ -69,6 +71,7 @@ class ModelExecutor:
         Returns:
             dict: Evaluation metrics and optional artifacts produced by the model command.
         """
+        model_name = list(self.job_config.model_configs.keys())[0]
         self.logger.info(
             "ModelExecutor",
             f"Executing model {model_name} with hyperparameters {hyperparameters}",
@@ -76,11 +79,12 @@ class ModelExecutor:
 
         # Create Conda Environment
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = self.model_settings[model_name]["python_version"]
+        python_version = self.model_settings["python_version"]
         conda_env = CondaEnvManager(
             name=f"benchmark.{model_name}",
             python=python_version,
             requirements_path=requirements_path,
+            reinstall=self.reinstall_conda,
         )
 
         # Build CLI command
@@ -174,16 +178,26 @@ def main():
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
 
-    # Find matching job config for the task
-    task_name = Path(args.task_path).parent.name
+    # Create logger for this subprocess
+    from ..utils.logger import Logger
+
+    logger = Logger(logs_path=args.logs_path, enable_logging=False)
+
+    # Load configuration to get JobConfig
+    from ..config import Manager
+    from .data_loader import DataLoader
+
+    manager = Manager(args.config_path, args.logs_path, logger)
+
+    task_path = str(args.task_path)
     matching_jobs = [
         job_config
         for job_config, task_idx in manager.generate_run_configs()
-        if job_config.task_config.name == task_name
+        if job_config.benchmark_config.task_path == task_path
     ]
 
     if not matching_jobs:
-        raise ValueError(f"No job config found for task {task_name}")
+        raise ValueError(f"No job config found for task {task_path}")
 
     job_config = matching_jobs[0]
 
@@ -236,7 +250,7 @@ def main():
             vstart, vend = window.validate.start, window.validate.end
 
             # Create and train model
-            model = model_class(params=hyperparameters)
+            model = model_class(params=hyperparameters, settings=job_config.model_settings)
 
             trained_model = model.train(
                 y_context=target[cstart:cend],

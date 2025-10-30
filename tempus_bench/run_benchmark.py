@@ -37,6 +37,16 @@ class BenchmarkRunner:
             file_log_level="DEBUG",
         )
 
+        # Emit early log lines so failures during Manager initialization are still captured
+        self.logger.info(
+            "BenchmarkRunner",
+            f"Initializing run at {self.run_timestamp}; logs at: {self.logs_path}",
+        )
+        self.logger.debug(
+            "BenchmarkRunner",
+            f"Config path resolved to: {self.config_path}",
+        )
+
         # Initialize the Manager directly (no longer using singleton pattern)
         self.manager = Manager(
             config_path=self.config_path,

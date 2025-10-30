@@ -1,6 +1,0 @@
-flax==0.10.7
-jax==0.6.2
-jaxlib==0.6.2
-matplotlib>=3.8.0
-numpy>=1.24.0
-git+ssh://git@github.com:Smlcrm/chronarium.git@BRANCH#egg=chronarium

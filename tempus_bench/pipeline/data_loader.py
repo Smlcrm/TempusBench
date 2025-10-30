@@ -88,7 +88,8 @@ class DataLoader:
             raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
 
         # Load the csv data
-        file_data = pd.read_csv(dataset_path, encoding="utf-8")
+        dataset_file_path = Path(dataset_path) / self.task_config.dataset.file_name
+        file_data = pd.read_csv(dataset_file_path, encoding="utf-8")
 
         # Extract basic information
         time_start = file_data["start"].iloc[0]
