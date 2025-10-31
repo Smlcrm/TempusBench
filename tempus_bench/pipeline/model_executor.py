@@ -352,6 +352,7 @@ def main():
             timestamps_context=timestamps[cstart:tend],
             timestamps_target=timestamps[vstart:vend],
             freq=freq,
+            num_samples=job_config.evaluation_config.num_samples,
         )
 
         logger.info(

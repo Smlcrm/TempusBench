@@ -60,6 +60,7 @@ class BaseModel(ABC):
             settings = {}
 
         self.params_class = ParamsClass
+
         self.metric_registry = MetricRegistry()
         self.set_params(**params)
         self.set_attrs(**settings)  # Settings
@@ -154,11 +155,9 @@ class BaseModel(ABC):
         Returns:
             self: The model instance with updated parameters
         """
-        if self.params_class is not None:
-            self.params = self.params_class.model_validate(params)
-        else:
-            self.params = params
-        self.set_attrs(**params)
+        validated_params = self.params_class.model_validate(params)
+
+        self.set_attrs(**validated_params.model_dump())
         self.is_fitted = False  # Mark as unfitted if parameters change
         return self
 
