@@ -18,6 +18,7 @@ import numpy as np
 
 from ..utils.configs import JobConfig
 from ..utils.log_manager import LogManager
+from ..utils.visualizer import Visualizer
 from ..utils.paths import get_task_path
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
@@ -66,6 +67,7 @@ class HyperparameterTuner:
         self.dataset_path = Path(self.task_config.task_path)
         self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
         self.data_loader = DataLoader(self.task_config, self.evaluation_config)
+        self.visualizer = Visualizer()
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
         """
@@ -139,7 +141,6 @@ class HyperparameterTuner:
         window_results = []
         optimal_hyperparameters = []
         evaluations = []
-        num_windows = 0
 
         tuning_losses = {}
         eval_metrics = {}
@@ -181,21 +182,21 @@ class HyperparameterTuner:
                 LogManager.get_logger().log_hparams(params, eval_losses)
 
                 # Find the hyperparams with lowest tuning_loss for this window
-                if tuning_losses:
-                    best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
-                    optimal_hyperparameters.append(best_params)
-                    evaluations.append(eval_metrics)
-                    num_windows += 1
+                best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
+                optimal_hyperparameters.append(best_params)
+                evaluations.append(eval_metrics)
 
-                    # Generate forecast plot for best hyperparameters
-                    self._generate_forecast_plot(
-                        hyperparameters=dict(best_params),
-                        context_steps=context_steps,
-                        train_steps=train_steps,
-                        validate_steps=validate_steps,
-                        window_idx=window_idx,
-                    )
+                # Generate forecast plot for best hyperparameters
+                self.visualizer.plot_forecast_window(
+                    y_pred=eval_losses["y_pred"],
+                    y_true=eval_losses["y_true"],
+                    timestamps_pred=eval_losses["timestamps_pred"],
+                    model_name=self.model_name,
+                    hyperparameters=dict(best_params),
+                    window_idx=window_idx
+                )
 
+        num_windows = len(optimal_hyperparameters)
         # Aggregate test loss over all windows, for each metric
         test_loss = {metric: [] for metric in evaluation_metrics}  # type: ignore
         for window_j in range(num_windows - 1):
@@ -251,274 +252,3 @@ class HyperparameterTuner:
 
         return all_evals, best_hyperparameters
 
-    def _generate_forecast_plot(
-        self,
-        hyperparameters: dict,
-        context_steps: int,
-        train_steps: int,
-        validate_steps: int,
-        window_idx: int,
-    ):
-        """
-        Generate and log a time-series plot comparing predictions with actual data.
-
-        This method creates visualization plots showing the context, training, validation,
-        and predicted segments for the specified window. The plot is saved to disk and
-        logged to TensorBoard for later inspection.
-
-        Args:
-            hyperparameters (dict): Dictionary of hyperparameter values used for this forecast.
-            context_steps (int): Number of context steps used in the window.
-            train_steps (int): Number of training steps used in the window.
-            validate_steps (int): Number of validation steps used in the window.
-            window_idx (int): Index of the window to visualize.
-
-        Note:
-            This method logs errors but does not raise exceptions, allowing the tuning
-            process to continue even if visualization fails.
-        """
-        try:
-            import matplotlib.pyplot as plt
-
-            # Create data loader to get the window data
-            data_loader = DataLoader(self.task_config, self.evaluation_config)
-
-            # Get the specific window data
-            steps = [
-                ("context", context_steps),
-                ("train", train_steps),
-                ("validate", validate_steps),
-            ]
-            window_iter = data_loader.dataset.generate_dataset_split(
-                steps, stride=1, max_windows=self.evaluation_config.max_windows
-            )
-
-            # Find the specific window
-            window_data = None
-            for idx, window in window_iter:
-                if idx == window_idx:
-                    window_data = window
-                    break
-
-            if window_data is None:
-                LogManager.get_logger().warning(
-                    "HyperparameterTuner", f"Window {window_idx} not found for plotting"
-                )
-                return
-
-            # Create model executor to get predictions
-            model_executor = ModelExecutor(self.job_config)
-
-            # Execute model to get predictions
-            eval_results = model_executor.execute_model(
-                hyperparameters=hyperparameters,
-                context_steps=context_steps,
-                train_steps=train_steps,
-                validate_steps=validate_steps,
-            )
-
-            # Create plots directory
-            plots_dir = (
-                Path(self.job_config.run_path)
-                / "tensorboard"
-                / "plots"
-                / self.model_name
-            )
-            plots_dir.mkdir(parents=True, exist_ok=True)
-
-            # Get data from window using indices
-            context_data = window_data.target[
-                window_data.context.start : window_data.context.end
-            ]
-            train_data = window_data.target[
-                window_data.train.start : window_data.train.end
-            ]
-            validate_data = window_data.target[
-                window_data.validate.start : window_data.validate.end
-            ]
-
-            # Extract actual predictions from results
-            predictions = np.array(eval_results.get("predictions"))
-            y_true_validate = np.array(eval_results.get("y_true"))
-
-            # Create subplots for each target
-            num_targets = context_data.shape[1] if context_data.ndim > 1 else 1
-            fig, axes = plt.subplots(num_targets, 1, figsize=(15, 4 * num_targets))
-
-            if num_targets == 1:
-                axes = [axes]
-
-            # Create continuous time indices for smooth plotting
-            context_len = len(context_data)
-            train_len = len(train_data)
-            validate_len = len(validate_data)
-
-            # Create continuous time series by concatenating all segments
-            if context_data.ndim == 1:
-                full_data = np.concatenate([context_data, train_data, validate_data])
-            else:
-                full_data = np.concatenate(
-                    [context_data, train_data, validate_data], axis=0
-                )
-
-            # Create continuous time indices
-            full_time = np.arange(len(full_data))
-            context_time = full_time[:context_len]
-            train_time = full_time[context_len : context_len + train_len]
-            validate_time = full_time[context_len + train_len :]
-
-            # For each target, create a subplot
-            for target_idx in range(num_targets):
-                ax = axes[target_idx]  # type: ignore
-
-                # Plot context data
-                if context_data.ndim == 1:
-                    ax.plot(
-                        context_time,
-                        context_data,
-                        "b-",
-                        label="Context",
-                        linewidth=2,
-                        alpha=0.8,
-                    )
-                else:
-                    ax.plot(
-                        context_time,
-                        context_data[:, target_idx],
-                        "b-",
-                        label="Context",
-                        linewidth=2,
-                        alpha=0.8,
-                    )
-
-                # Plot training data
-                if train_data.ndim == 1:
-                    ax.plot(
-                        train_time,
-                        train_data,
-                        "g-",
-                        label="Train",
-                        linewidth=2,
-                        alpha=0.8,
-                    )
-                else:
-                    ax.plot(
-                        train_time,
-                        train_data[:, target_idx],
-                        "g-",
-                        label="Train",
-                        linewidth=2,
-                        alpha=0.8,
-                    )
-
-                # Plot validation data (true values)
-                if validate_data.ndim == 1:
-                    ax.plot(
-                        validate_time,
-                        validate_data,
-                        "r-",
-                        label="True Values",
-                        linewidth=2,
-                        alpha=0.8,
-                    )
-                else:
-                    ax.plot(
-                        validate_time,
-                        validate_data[:, target_idx],
-                        "r-",
-                        label="True Values",
-                        linewidth=2,
-                        alpha=0.8,
-                    )
-
-                # Plot actual model predictions
-                if len(predictions) > 0:
-                    if predictions.ndim == 1:
-                        ax.plot(
-                            validate_time,
-                            predictions,
-                            "orange",
-                            linestyle="--",
-                            label="Model Predictions",
-                            linewidth=2,
-                            alpha=0.8,
-                        )
-                    else:
-                        ax.plot(
-                            validate_time,
-                            predictions[:, target_idx],
-                            "orange",
-                            linestyle="--",
-                            label="Model Predictions",
-                            linewidth=2,
-                            alpha=0.8,
-                        )
-                else:
-                    # Fallback to simple prediction if no actual predictions available
-                    if validate_data.ndim == 1:
-                        last_train_val = (
-                            train_data[-1] if len(train_data) > 0 else context_data[-1]
-                        )
-                        fallback_predictions = np.full_like(
-                            validate_data, last_train_val
-                        )
-                        ax.plot(
-                            validate_time,
-                            fallback_predictions,
-                            "orange",
-                            linestyle="--",
-                            label="Predictions (Fallback)",
-                            linewidth=2,
-                            alpha=0.8,
-                        )
-                    else:
-                        last_train_vals = (
-                            train_data[-1, :]
-                            if len(train_data) > 0
-                            else context_data[-1, :]
-                        )
-                        fallback_predictions = np.full_like(
-                            validate_data, last_train_vals
-                        )
-                        ax.plot(
-                            validate_time,
-                            fallback_predictions[:, target_idx],
-                            "orange",
-                            linestyle="--",
-                            label="Predictions (Fallback)",
-                            linewidth=2,
-                            alpha=0.8,
-                        )
-
-                # Customize subplot
-                ax.set_title(
-                    f"{self.model_name} - Target {target_idx + 1} (Window {window_idx})"
-                )
-                ax.set_xlabel("Time Steps")
-                ax.set_ylabel("Value")
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-
-            # Add hyperparameters info to the figure
-            fig.suptitle(
-                f"Best Hyperparameters: {hyperparameters}", fontsize=12, y=0.98
-            )
-
-            # Save plot
-            plot_path = plots_dir / f"window_{window_idx}.png"
-            plt.tight_layout()
-            plt.savefig(plot_path, dpi=150, bbox_inches="tight")
-            plt.close()
-
-            # Log to TensorBoard
-            LogManager.get_logger().log_image_file(
-                image_path=str(plot_path),
-                tag=f"{self.model_name}/forecast",
-                step=window_idx,
-            )
-
-        except Exception as e:
-            LogManager.get_logger().error(
-                "HyperparameterTuner",
-                f"Error generating time series plot for {self.model_name}: {e}",
-            )
