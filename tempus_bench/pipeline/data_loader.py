@@ -67,23 +67,17 @@ class DataLoader:
         Load a complete dataset file and extract basic metadata.
 
         Loads the entire CSV file into memory and extracts metadata from the first row.
-        The CSV is expected to have columns: item_id, start, freq, and target.
+        The CSV is expected to have columns: item_id, start, freq, and target. The
+        data is then preprocessed using the Preprocessor class and stored as a Dataset
+        instance.
 
-        Args:
-            dataset_path (str): Path to the CSV dataset file to load.
-
-        Returns:
-            tuple: A tuple containing (time_start, time_freq, target_raw) where:
-                - time_start: Starting timestamp of the time series
-                - time_freq: Frequency of the time series data
-                - target_raw: Raw target data (will be processed by preprocessor)
+        Note:
+            This method only extracts metadata and raw data. The actual data cleaning
+            and preprocessing is handled by the Preprocessor class.
 
         Raises:
             FileNotFoundError: If the dataset file doesn't exist.
-
-        Note:
-            This method only extracts metadata and raw data. The actual data
-            cleaning and preprocessing is handled by the Preprocessor class.
+            ValueError: If the dataset cannot be processed or has invalid format.
         """
 
         # Load the csv data

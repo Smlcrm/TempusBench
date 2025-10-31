@@ -1,3 +1,11 @@
+"""
+Entry point for running the benchmarking pipeline.
+
+This module provides the BenchmarkRunner class which orchestrates the end-to-end
+benchmarking process including configuration loading, hyperparameter tuning, and
+model evaluation across multiple task-model combinations.
+"""
+
 import argparse
 import datetime
 import os
@@ -13,11 +21,27 @@ from tempus_bench.pipeline.data_loader import DataLoader
 
 
 class BenchmarkRunner:
+    """
+    Orchestrates the end-to-end benchmarking pipeline execution.
+
+    The BenchmarkRunner coordinates the execution of multiple benchmarking jobs,
+    where each job represents a combination of a task (dataset) and model. It
+    handles configuration loading, hyperparameter tuning, and result aggregation.
+
+    Attributes:
+        config_path (str): Path to the configuration YAML file.
+        config_name (str): Name of the configuration file (without extension).
+        manager (Manager): Configuration manager instance.
+        logger (LoggerManager): Logger instance for logging operations.
+    """
+
     def __init__(self, config_path: str):
         """
         Initialize benchmark runner with configuration.
+
         Args:
-            config_path: Path to the config file used
+            config_path (str): Path to the configuration YAML file used for
+                this benchmark run.
         """
         self.config_path = config_path
         # Initialize the Manager (which creates its own unified Logger with TensorBoard support)
@@ -100,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="tempus_bench/config/benchmark.yaml",
+        default=os.path.join(os.path.dirname(__file__), "config", "benchmark.yaml"),
         help="Path to the config YAML file. If not specified, uses the default config in tempus_bench/configs/all_models.yaml",
     )
     args = parser.parse_args()
