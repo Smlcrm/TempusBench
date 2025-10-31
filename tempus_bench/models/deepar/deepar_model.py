@@ -53,7 +53,6 @@ class DeeparHyperparams(PydanticBaseModel):
     )
 
 
-
 class DeeparModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
@@ -67,6 +66,35 @@ class DeeparModel(BaseModel):
 
         self._model = None
 
+    def _evenly_split_array(self, arr, chunk_size):
+        """
+        Split an array into chunks of approximately equal size.
+
+        Args:
+            arr: Array-like object to split
+            chunk_size: Target size for each chunk
+
+        Returns:
+            List of arrays, each of size approximately chunk_size
+        """
+        arr_len = len(arr)
+        if arr_len == 0:
+            return []
+
+        # Calculate number of chunks
+        num_chunks = max(1, math.ceil(arr_len / chunk_size))
+
+        # Calculate actual chunk size (might be slightly smaller for the last chunk)
+        actual_chunk_size = math.ceil(arr_len / num_chunks)
+
+        chunks = []
+        for i in range(0, arr_len, actual_chunk_size):
+            chunk = arr[i : i + actual_chunk_size]
+            if len(chunk) > 0:
+                chunks.append(chunk)
+
+        return chunks
+
     def _series_to_TimeSeriesDataset(self, series, train=True):
 
         values = None
@@ -74,6 +102,21 @@ class DeeparModel(BaseModel):
             values = series.values
         else:
             values = series
+
+        # Handle 2D arrays (multivariate) by taking mean across targets
+        # Convert to numpy array if needed
+        if not isinstance(values, np.ndarray):
+            values = np.array(values)
+
+        # If 2D array (num_steps, num_targets), flatten to 1D
+        if values.ndim == 2:
+            # For multivariate, take mean across targets to get 1D series
+            values = np.mean(values, axis=1)
+        elif values.ndim > 2:
+            raise ValueError(f"Series must be 1D or 2D, got {values.ndim}D")
+
+        # Ensure it's 1D
+        values = values.flatten()
 
         if train:
             # Increase speed of training
@@ -102,8 +145,8 @@ class DeeparModel(BaseModel):
             dataset_altered_form = pd.DataFrame(
                 {
                     "value": values,
-                    "time_idx": list(range(len(series))),
-                    "group_id": ["0"] * len(series),
+                    "time_idx": list(range(len(values))),
+                    "group_id": ["0"] * len(values),
                 }
             )
 
@@ -162,10 +205,11 @@ class DeeparModel(BaseModel):
         batch_size = self.batch_size
         max_encoder_length = self.max_encoder_length
         max_prediction_length = self.max_prediction_length
-        num_workers = self.get("num_workers", 0)
+        num_workers = self.num_workers
 
         training_dataset = self._series_to_TimeSeriesDataset(y_context)
-        validation_dataset = self._series_to_TimeSeriesDataset(y_target)
+        # Skip validation_dataset creation as it's not used and y_target might be too short
+        # validation_dataset = self._series_to_TimeSeriesDataset(y_target)
 
         if self._model is None:
             self._build_model(training_dataset)
@@ -175,7 +219,7 @@ class DeeparModel(BaseModel):
             batch_size=self.batch_size,
             batch_sampler="synchronized",
             num_workers=self.num_workers,
-            persistent_workers=True,
+            persistent_workers=True if self.num_workers > 0 else False,
         )
 
         # validation_dataloader = validation_dataset.to_dataloader(
@@ -281,7 +325,7 @@ class DeeparModel(BaseModel):
                     batch_size=1,
                     batch_sampler="synchronized",
                     num_workers=self.num_workers,
-                    persistent_workers=True,
+                    persistent_workers=True if self.num_workers > 0 else False,
                 )
             )
 
@@ -322,7 +366,16 @@ class DeeparModel(BaseModel):
         if self._model is None:
             raise ValueError("Model not initialized. Call train first.")
 
+        # Extract kwargs (NO defaults, use kwargs["var_name"])
+        num_samples = kwargs["num_samples"]
+
         forecast_horizon = timestamps_target.shape[0]
+
+        # Get original number of targets from y_context BEFORE flattening
+        if y_context.ndim == 2:
+            num_targets = y_context.shape[1]
+        else:
+            num_targets = 1
 
         # For DeepAR, we need to generate samples through multiple forward passes
         # This is a simplified implementation - in practice, you'd want to use the model's
@@ -330,30 +383,22 @@ class DeeparModel(BaseModel):
 
         # Get deterministic predictions first
         all_predictions = []
+        # Store original shape info before flattening
+        original_shape = y_context.shape
         values = y_context.flatten() if y_context.ndim > 1 else y_context
 
         # We need at least max_encoder_length+max_prediction_length values
         all_predictions.extend(
-            values[
-                -(
-                    self._model_config["max_encoder_length"]
-                    + self._model_config["max_prediction_length"]
-                ) :
-            ]
+            values[-(self.max_encoder_length + self.max_prediction_length) :]
         )
 
         val_length = forecast_horizon
-        num_windows = math.ceil(
-            val_length / self._model_config["max_prediction_length"]
-        )
+        num_windows = math.ceil(val_length / self.max_prediction_length)
 
         deterministic_preds = []
         for window in range(num_windows):
             current_encoder_sequence = all_predictions[
-                -(
-                    self._model_config["max_encoder_length"]
-                    + self._model_config["max_prediction_length"]
-                ) :
+                -(self.max_encoder_length + self.max_prediction_length) :
             ]
 
             # Convert to form compatible with data loader
@@ -369,8 +414,8 @@ class DeeparModel(BaseModel):
                     train=False,
                     batch_size=1,
                     batch_sampler="synchronized",
-                    num_workers=self._model_config["num_workers"],
-                    persistent_workers=True,
+                    num_workers=self.num_workers,
+                    persistent_workers=True if self.num_workers > 0 else False,
                 )
             )
 
@@ -383,16 +428,29 @@ class DeeparModel(BaseModel):
 
         deterministic_preds = np.array(
             deterministic_preds[
-                self._model_config["max_prediction_length"] : self._model_config[
-                    "max_prediction_length"
-                ]
-                + val_length
+                self.max_prediction_length : self.max_prediction_length + val_length
             ]
         )
 
+        # Ensure deterministic_preds is 1D (we converted multivariate to univariate by taking mean)
+        deterministic_preds = np.array(deterministic_preds)
+        if deterministic_preds.ndim > 1:
+            deterministic_preds = deterministic_preds.flatten()
+
+        # Ensure we have the right length
+        if len(deterministic_preds) != forecast_horizon:
+            # Trim or pad if needed
+            if len(deterministic_preds) > forecast_horizon:
+                deterministic_preds = deterministic_preds[:forecast_horizon]
+            else:
+                # Pad with last value if needed
+                padding = np.full(
+                    forecast_horizon - len(deterministic_preds), deterministic_preds[-1]
+                )
+                deterministic_preds = np.concatenate([deterministic_preds, padding])
+
         # Generate samples by adding noise to deterministic predictions
         # This is a simplified approach - real DeepAR would use the model's probabilistic output
-        num_samples = self.num_samples
         samples = []
 
         for _ in range(num_samples):
@@ -406,7 +464,12 @@ class DeeparModel(BaseModel):
         samples = np.array(samples)  # Shape: (num_samples, forecast_horizon)
 
         # Ensure correct shape: (num_samples, forecast_horizon, num_targets)
+        # Broadcast univariate predictions to match original multivariate structure
         if samples.ndim == 2:
+            # Expand to (num_samples, forecast_horizon, num_targets)
             samples = samples[:, :, np.newaxis]
+            # Broadcast to match original number of targets by repeating
+            if num_targets > 1:
+                samples = np.repeat(samples, num_targets, axis=2)
 
         return samples
