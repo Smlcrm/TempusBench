@@ -8,7 +8,7 @@ import pandas as pd
 import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from ...base_model import BaseModel
+from tempus_bench.models.base_model import BaseModel
 from .toto.data.util.dataset import MaskedTimeseries
 from .toto.inference.forecaster import TotoForecaster
 from .toto.model.toto import Toto

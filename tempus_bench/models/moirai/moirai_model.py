@@ -7,7 +7,7 @@ from einops import rearrange
 from pydantic import BaseModel as PydanticBaseModel, Field
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class MoiraiHyperparams(PydanticBaseModel):

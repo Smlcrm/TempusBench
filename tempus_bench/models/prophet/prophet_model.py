@@ -4,40 +4,56 @@ import numpy as np
 import pandas as pd
 from prophet import Prophet
 from pydantic import BaseModel as PydanticBaseModel, Field
-from sklearn.preprocessing import StandardScaler
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
+
 
 class ProphetHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
-    seasonality_mode: Literal["additive", "multiplicative"] = Field(..., description="Seasonality mode")
-    changepoint_prior_scale: float = Field(..., ge=0, le=1, description="Changepoint prior scale")
-    seasonality_prior_scale: float = Field(..., ge=0, description="Seasonality prior scale")
+    seasonality_mode: Literal["additive", "multiplicative"] = Field(
+        ..., description="Seasonality mode"
+    )
+    changepoint_prior_scale: float = Field(
+        ..., ge=0, le=1, description="Changepoint prior scale"
+    )
+    seasonality_prior_scale: float = Field(
+        ..., ge=0, description="Seasonality prior scale"
+    )
     # Fixed Hyperparameters - Optional for User to override
-    yearly_seasonality: Optional[Union[int, bool]] = Field(default=None, description="Enable yearly seasonality (bool) or increase the number of Fourier terms (int)")
-    weekly_seasonality: Optional[Union[int, bool]] = Field(..., description="Enable weekly seasonality (bool or increase the number of Fourier terms (int)")
-    daily_seasonality: Optional[Union[int, bool]] = Field(..., description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)")
+    yearly_seasonality: Optional[Union[int, bool]] = Field(
+        default=False,
+        description="Enable yearly seasonality (bool) or increase the number of Fourier terms (int)",
+    )
+    weekly_seasonality: Optional[Union[int, bool]] = Field(
+        default=False,
+        description="Enable weekly seasonality (bool) or increase the number of Fourier terms (int)",
+    )
+    daily_seasonality: Optional[Union[int, bool]] = Field(
+        default=False,
+        description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)",
+    )
+
     def __init__(self, **data):
         super().__init__(**data)
-        # Enforce that only one of the seasonality options can be set (not None)
+        # Enforce that only one of the seasonality options can be enabled (truthy)
         seasonality_options = [
             self.yearly_seasonality,
             self.weekly_seasonality,
             self.daily_seasonality,
         ]
-        set_options = [opt for opt in seasonality_options if opt is not None]
-        if len(set_options) > 1:
-            raise ValueError("Only one of yearly_seasonality, weekly_seasonality, or daily_seasonality can be set at the same time.")
+        # Check for truthy values (True or positive integers), not just "not None"
+        # Default values are False, which is fine - only count truthy values
+        enabled_options = [opt for opt in seasonality_options if opt]
+        if len(enabled_options) > 1:
+            raise ValueError(
+                "Only one of yearly_seasonality, weekly_seasonality, or daily_seasonality can be enabled at the same time."
+            )
+
 
 class ProphetModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         super().__init__(params, settings, ProphetHyperparams)
-        self._build_model()
-        self._scaler = StandardScaler()
-
-    def _build_model(self):
-        self._model = Prophet(**self.params.model_dump(exclude_none=True))
-        self.is_fitted = False
+        self._models = []
 
     @validate_inputs
     def _train(
@@ -46,45 +62,73 @@ class ProphetModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ):
+        """
+        Fit the Prophet model on the provided context data.
+
+        Args:
+            y_context (np.ndarray): Historical target values for model fitting.
+            y_target (np.ndarray): Future target values (unused; included for compatibility).
+            timestamps_context (np.ndarray): Timestamps corresponding to y_context.
+            timestamps_target (np.ndarray): Timestamps corresponding to y_target (unused).
+
+        Returns:
+            The fitted Prophet model instance.
+
+        Notes:
+            Only y_context is used for fitting the Prophet model. All other arguments are ignored to avoid data leakage.
+        """
         y_context = y_context.squeeze()
-        y_target = y_target.squeeze()
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
-        timestamps_target = self._convert_to_datetimeindex(timestamps_target)
 
         train_df = pd.DataFrame({"ds": timestamps_context, "y": y_context})
 
-        self._model.fit(train_df)
-        self.is_fitted = True
-        return self
+        model = Prophet(**self.params.model_dump(exclude_none=True))
+        fitted_model = model.fit(train_df)
+
+        return fitted_model
 
     @validate_inputs
     def _predict(
         self,
+        prophet_model,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> np.ndarray:
         """
-        Generate predictions using the trained Prophet model.
+        Predicts future values using the trained Prophet model.
 
         Args:
-            y_context: Recent/past target values.
-            timestamps_context: Timestamps for context data.
-            timestamps_target: Timestamps for target/forecast steps.
+            prophet_model: The fitted Prophet model instance.
+            y_context: Past target values (unused, present for interface consistency)
+            timestamps_context: Context timestamps (unused)
+            timestamps_target: Timestamps for the forecast horizon
 
         Returns:
-            np.ndarray: Model predictions (num_steps, 1).
+            np.ndarray: Predictions with shape (forecast_horizon, 1)
+
+        Raises:
+            ValueError: If the model is not fitted or forecast horizon is invalid.
         """
+        if not self.is_fitted:
+            raise ValueError("ProphetModel not fitted. Call train() first.")
+
+        if timestamps_target is None or len(timestamps_target) == 0:
+            raise ValueError(
+                "timestamps_target must be provided and non-empty for Prophet prediction."
+            )
+
         future_df = pd.DataFrame(
             {"ds": self._convert_to_datetimeindex(timestamps_target)}
         )
 
-        forecast_df = self._model.predict(future_df)
+        forecast_df = prophet_model.predict(future_df)
         predictions = np.asarray(forecast_df["yhat"])
-        if predictions.ndim == 1: predictions = np.expand_dims(predictions, axis=1)
+        if predictions.ndim == 1:
+            predictions = np.expand_dims(predictions, axis=1)
 
         return predictions
 
@@ -95,33 +139,27 @@ class ProphetModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
-    ):
+        **kwargs: dict,
+    ) -> "ProphetModel":
         """
-        Train the Prophet model. For multivariate data, fits one model per variate.
+        Trains a separate Prophet model for each variate in a (potentially multivariate) time series.
 
-        Args:
-            y_context: Training target values (shape: [n_samples] or [n_samples, n_variates])
-            y_target: Optional target values (same shape as y_context)
-            timestamps_context: Timestamps for training data
-            timestamps_target: Timestamps for target data
-            **kwargs: Additional arguments
-
-        Returns:
-            self
+        Expects y_context and y_target as 2D arrays: (num_steps, num_targets).
         """
-        self._models = []
-        for i in range(y_context.shape[1]):
-            model = ProphetModel(params=self.dict())
-            model._train(
-                y_context=y_context[:, i],
-                y_target=y_target[:, i] if y_target is not None else None,
+        num_targets = y_context.shape[1]
+
+        for k in range(num_targets):
+            fitted_model = self._train(
+                y_context=y_context[:, k : k + 1],
+                y_target=y_target[:, k : k + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
-                **kwargs
+                **kwargs,
             )
-            self._models.append(model)
+            self._models.append(fitted_model)
+
         self.is_fitted = True
+
         return self
 
     @validate_inputs
@@ -130,37 +168,39 @@ class ProphetModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> np.ndarray:
         """
-        Make predictions using the trained Prophet model(s).
-        Handles both univariate and multivariate time series.
+        Predicts future values for each variate and concatenates the results.
 
         Args:
-            y_context: Recent/past target values.
-            timestamps_context: Timestamps for context data.
-            timestamps_target: Timestamps for target (forecast) data.
+            y_context (np.ndarray): Context values, shape (num_steps, num_variates).
+            timestamps_context (np.ndarray): Timestamps for context data.
+            timestamps_target (np.ndarray): Timestamps for target/future data.
+            **kwargs: Additional keyword arguments.
 
         Returns:
-            np.ndarray: Model predictions (shape: [n_forecast_steps, n_variates])
+            np.ndarray: Predictions with shape (forecast_horizon, num_variates).
+
+        Raises:
+            ValueError: If the model has not been fitted.
         """
         if not self.is_fitted:
             raise ValueError("ProphetModel not fitted. Call train() first.")
 
-        self._scaler.fit(y_context)
-        y_scaled = self._scaler.transform(y_context)
-        predictions = [
-            model._predict(
-                y_context=y_scaled[:, idx],
+        preds = []
+        for idx, prophet_model in enumerate(self._models):
+            prediction = self._predict(
+                prophet_model=prophet_model,
+                y_context=y_context[:, idx : idx + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
-                **kwargs
+                **kwargs,
             )
-            for idx, model in enumerate(self._models)
-        ]
-        combined = np.column_stack(predictions)
-        combined = self._scaler.inverse_transform(combined)
-        return combined
+            preds.append(prediction)
+
+        result = np.concatenate(preds, axis=-1)
+        return result
 
     def _convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
