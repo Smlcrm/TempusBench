@@ -213,8 +213,8 @@ model:
    ./install.sh
    
    # Or manually create conda environment
-   conda create -n sim.benchmarks python=3.11.13
-   conda activate sim.benchmarks
+   conda create -n tempus_bench python=3.11.13
+   conda activate tempus_bench
    pip install -e .
    ```
 
