@@ -22,6 +22,7 @@ from ..utils.visualizer import Visualizer
 from ..utils.paths import get_task_path
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
+from .metric_registry import MetricRegistry
 
 
 class HyperparameterTuner:
@@ -149,12 +150,15 @@ class HyperparameterTuner:
         eval_metrics = {}
         evaluation_metrics = None
 
+        y_true = []
+        y_pred = []
+        timestamps_pred = []
         # Try each hyperparameter combination
         for params in self._generate_hyperparameter_grid():
 
             try:
                 # Execute model with these hyperparameters
-                windows_eval_losses = model_executor.execute_model(
+                windows_eval_outputs = model_executor.execute_model(
                     hyperparameters=params,
                     context_steps=context_steps,
                     train_steps=train_steps,
@@ -168,22 +172,27 @@ class HyperparameterTuner:
                 )
                 continue
 
-            for window_idx, eval_losses in enumerate(windows_eval_losses):
-                if evaluation_metrics is None:
-                    evaluation_metrics = list(eval_losses.keys())
+            for window_idx, eval_outputs in enumerate(windows_eval_outputs):
 
                 immutable_params = tuple(sorted(params.items()))
                 # Set evaluation metrics list on first successful eval
 
-                tuning_losses[immutable_params] = eval_losses[self.tuning_loss]
-                eval_metrics[immutable_params] = eval_losses
+                tuning_losses[immutable_params] = eval_outputs[self.tuning_loss]
+                y_true.append(eval_outputs.pop("y_true"))
+                y_pred.append(eval_outputs.pop("y_pred"))
+                timestamps_pred.append(eval_outputs.pop("timestamps_pred"))
+
+                if evaluation_metrics is None:
+                    evaluation_metrics = list(eval_outputs.keys())
+
+                eval_metrics[immutable_params] = eval_outputs
 
                 LogManager.get_logger().debug(
                     "HyperparameterTuner",
-                    f"Evaluated model {self.model_name} with params {params}: {eval_losses}",
+                    f"Evaluated model {self.model_name} with params {params}: {eval_outputs}",
                 )
                 # Log hyperparameters and metrics to TensorBoard
-                LogManager.get_logger().log_hparams(params, eval_losses)
+                LogManager.get_logger().log_hparams(params, eval_outputs)
 
                 # Find the hyperparams with lowest tuning_loss for this window
                 best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
@@ -192,12 +201,12 @@ class HyperparameterTuner:
 
                 # Generate forecast plot for best hyperparameters
                 self.visualizer.plot_forecast_window(
-                    y_pred=eval_losses["y_pred"],
-                    y_true=eval_losses["y_true"],
-                    timestamps_pred=eval_losses["timestamps_pred"],
+                    y_pred=np.array(y_pred[window_idx]),
+                    y_true=np.array(y_true[window_idx]),
+                    timestamps_pred=np.array(timestamps_pred[window_idx]),
                     model_name=self.model_name,
                     hyperparameters=dict(best_params),
-                    window_idx=window_idx
+                    window_idx=window_idx,
                 )
 
         num_windows = len(optimal_hyperparameters)
@@ -224,21 +233,58 @@ class HyperparameterTuner:
         evals_dir.mkdir(exist_ok=True)
         csv_outpath = evals_dir / csv_filename
         file_exists = csv_outpath.exists()
-        row = (
-            [self.model_name, self.dataset_path]
-            + [avg_test_loss[metric] for metric in evaluation_metrics]  # type: ignore
-            + [str(optimal_hyperparameters)]
+
+        # Obtain all possible metrics from MetricRegistry, if possible
+        metrics_registry = MetricRegistry()
+        all_metric_names = sorted(list(metrics_registry.metric_registry.keys()))
+        deterministic_metric_names = sorted(
+            list(metrics_registry.deterministic_metrics)
         )
+        stochastic_metric_names = sorted(list(metrics_registry.stochastic_metrics))
+
+        # Determine model type (fallback to 'deterministic' if not present)
+        model_type = self.model_setting["model_type"]
+
+        # Prepare the row to write: 'NA' for metrics not available for this model type
+        formatted_row = [self.model_name, self.task_config.task_name]
+
+        for metric in all_metric_names:
+            # Determine if this metric applies to this model type
+            metric_applies = False
+            if model_type == "deterministic":
+                # For deterministic models, only include deterministic metrics
+                metric_applies = metric in deterministic_metric_names
+            else:
+                # For non-deterministic models, include both stochastic and deterministic metrics
+                metric_applies = metric in (
+                    stochastic_metric_names + deterministic_metric_names
+                )
+
+            if metric_applies:
+                # Get metric value if available, otherwise use 'NA'
+                value = avg_test_loss.get(metric, "NA")
+                # Convert nan/inf to "NA" for consistent CSV formatting
+                # Handle both Python float and numpy float types
+                if isinstance(value, (float, np.floating)):
+                    if np.isnan(value) or np.isinf(value):
+                        value = "NA"
+                formatted_row.append(str(value))
+            else:
+                # Metric doesn't apply to this model type
+                formatted_row.append("NA")
+
+        formatted_row.append(str(optimal_hyperparameters))
+
         # Append a new line to evaluations.csv if it already exists
         with open(csv_outpath, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
             if not file_exists:  # write header on the first line
                 writer.writerow(
-                    ["model_name", "dataset_path"]
-                    + [f"avg_test_{metric}" for metric in evaluation_metrics]  # type: ignore
+                    ["model_name", "task_name"]
+                    + [f"avg_test_{metric}" for metric in all_metric_names]
                     + ["best_params"]
                 )
-            writer.writerow(row)
+            writer.writerow(formatted_row)
 
         # Store results for this dataset
         model_evals = {}
@@ -255,4 +301,3 @@ class HyperparameterTuner:
         )
 
         return all_evals, best_hyperparameters
-

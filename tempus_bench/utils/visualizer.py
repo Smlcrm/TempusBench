@@ -35,7 +35,7 @@ class Visualizer:
         Initialize visualizer with configuration.
 
         """
-        plt.style.use('fivethirtyeight')
+        plt.style.use("fivethirtyeight")
         sns.set_theme(style="whitegrid")
 
     def plot_predictions(
@@ -200,14 +200,17 @@ class Visualizer:
         try:
             # Enforce 2D arrays with identical shapes
             if y_true.ndim != 2 or y_pred.ndim != 2:
-                raise ValueError("y_true and y_pred must be 2D arrays")
+                raise ValueError(
+                    f"y_true and y_pred must be 2D arrays, got {y_true.shape} and {y_pred.shape}"
+                )
             if y_true.shape != y_pred.shape:
                 raise ValueError(
                     f"y_true and y_pred must have the same shape, got {y_true.shape} vs {y_pred.shape}"
                 )
             if timestamps_pred.ndim != 1 or timestamps_pred.shape[0] != y_pred.shape[0]:
                 raise ValueError(
-                    "timestamps_pred must be 1D and match the number of rows in y_pred"
+                    f"Invalid shape for timestamps_pred: expected 1D array with length {y_pred.shape[0]}, "
+                    f"but got shape {timestamps_pred.shape}. Ensure timestamps_pred is 1D and matches the number of rows in y_pred."
                 )
 
             num_targets = y_true.shape[1]
