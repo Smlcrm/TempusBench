@@ -114,66 +114,135 @@ class LoggerManager:
         self.tf_writer = tf.summary.create_file_writer(self.tf_logs_path)
 
     def _should_log(self) -> bool:
-        """Check if standard logging should occur."""
+        """
+        Check if standard logging should occur.
+
+        Returns:
+            bool: True if standard logging is enabled, False otherwise.
+        """
         return self.enable_logging
 
     def _should_log_tensorboard(self) -> bool:
-        """Check if TensorBoard logging should occur."""
+        """
+        Check if TensorBoard logging should occur.
+
+        Returns:
+            bool: True if TensorBoard logging is enabled, False otherwise.
+        """
         return self.tensorboard_logging
 
     # ==================== Context Manager Methods ====================
 
     def __enter__(self):
-        """Enter the context manager."""
+        """
+        Enter the context manager.
+
+        Returns:
+            LoggerManager: Returns self for use in with statements.
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit the context manager, ensuring all logs are flushed and resources closed."""
+        """
+        Exit the context manager, ensuring all logs are flushed and resources closed.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Exception traceback if an exception occurred.
+
+        Returns:
+            bool: False, indicating that exceptions should not be suppressed.
+        """
         self.close()
         return False  # Don't suppress exceptions
 
     # ==================== Standard Logging Methods ====================
 
     def info(self, module: str, message: str):
-        """Log an informational message with module context."""
+        """
+        Log an informational message with module context.
+
+        Args:
+            module (str): Module name for context.
+            message (str): Message to log.
+        """
         if self._should_log():
             self.logger.info(f"[{module}] {message}")
 
     def warning(self, module: str, message: str):
-        """Log a warning message with module context."""
+        """
+        Log a warning message with module context.
+
+        Args:
+            module (str): Module name for context.
+            message (str): Message to log.
+        """
         if self._should_log():
             self.logger.warning(f"[{module}] {message}")
 
     def error(self, module: str, message: str):
-        """Log an error message with module context."""
+        """
+        Log an error message with module context.
+
+        Args:
+            module (str): Module name for context.
+            message (str): Message to log.
+        """
         if self._should_log():
             self.logger.error(f"[{module}] {message}")
 
     def success(self, module: str, message: str):
-        """Log a success message with module context."""
+        """
+        Log a success message with module context.
+
+        Args:
+            module (str): Module name for context.
+            message (str): Message to log.
+        """
         if self._should_log():
             self.logger.info(f"[{module}] SUCCESS: {message}")
 
     def debug(self, module: str, message: str):
-        """Log a debug message with module context."""
+        """
+        Log a debug message with module context.
+
+        Args:
+            module (str): Module name for context.
+            message (str): Message to log.
+        """
         if self._should_log():
             self.logger.debug(f"[{module}] {message}")
 
     def progress(self, module: str, message: str):
-        """Log a progress message with module context."""
+        """
+        Log a progress message with module context.
+
+        Args:
+            module (str): Module name for context.
+            message (str): Message to log.
+        """
         if self._should_log():
             self.logger.info(f"[{module}] PROGRESS: {message}")
 
     # ==================== TensorBoard Logging Methods ====================
 
-    def log_metrics(self, metrics, step, model_name=""):
+    def log_metrics(self, metrics: dict, step: int, model_name: str = ""):
         """
         Log evaluation metrics to TensorBoard.
 
+        This method logs metrics to TensorBoard, handling various metric value types
+        including scalars, arrays, and nested dictionaries. NaN values are skipped.
+
         Args:
-            metrics (dict): Dictionary of metrics to log.
+            metrics (dict): Dictionary of metrics to log. Values may be scalars,
+                arrays, or nested dictionaries.
             step (int): The current step (e.g., epoch, batch, or experiment ID).
-            model_name (str, optional): A prefix for metric names to group them in TensorBoard.
+            model_name (str): Optional prefix for metric names to group them in
+                TensorBoard. Defaults to empty string.
+
+        Returns:
+            None: Logs metrics to TensorBoard if TensorBoard logging is enabled.
         """
         if not self._should_log_tensorboard():
             return
@@ -214,9 +283,12 @@ class LoggerManager:
         Log a Matplotlib figure to TensorBoard.
 
         Args:
-            figure: Matplotlib figure object
-            tag (str): Tag for the figure
-            step (int): Step number
+            figure: Matplotlib figure object to log.
+            tag (str): Tag for the figure in TensorBoard.
+            step (int): Step number for this figure.
+
+        Returns:
+            None: Logs figure to TensorBoard if TensorBoard logging is enabled.
         """
         if not self._should_log_tensorboard():
             return
@@ -235,9 +307,13 @@ class LoggerManager:
         Log an image from disk to TensorBoard.
 
         Args:
-            image_path (str): Path to the image file
-            tag (str): Tag for the image
-            step (int): Step number
+            image_path (str): Path to the image file to log.
+            tag (str): Tag for the image in TensorBoard.
+            step (int): Step number for this image.
+
+        Returns:
+            None: Logs image to TensorBoard if TensorBoard logging is enabled.
+                Silently skips logging if file cannot be read.
         """
         if not self._should_log_tensorboard():
             return
@@ -254,16 +330,32 @@ class LoggerManager:
             # Silently skip failed image logging (TensorBoard-only logging)
             pass
 
-    def log_training_progress(self, model_name, epoch, loss, val_loss=None, step=None):
+    def log_training_progress(
+        self,
+        model_name: str,
+        epoch: int,
+        loss: float,
+        val_loss: Optional[float] = None,
+        step: Optional[int] = None,
+    ):
         """
         Log training progress for real-time monitoring.
 
+        This method logs training and validation losses to TensorBoard for
+        real-time monitoring of model training progress.
+
         Args:
-            model_name (str): Name of the model being trained
-            epoch (int): Current epoch number
-            loss (float): Training loss
-            val_loss (float, optional): Validation loss
-            step (int, optional): Global step for TensorBoard
+            model_name (str): Name of the model being trained.
+            epoch (int): Current epoch number.
+            loss (float): Training loss value.
+            val_loss (Optional[float]): Validation loss value. If None, only
+                training loss is logged.
+            step (Optional[int]): Global step for TensorBoard. If None, uses
+                epoch as the step.
+
+        Returns:
+            None: Logs training progress to TensorBoard if TensorBoard logging
+                is enabled.
         """
         if not self._should_log_tensorboard():
             return
@@ -278,15 +370,23 @@ class LoggerManager:
                 tf.summary.scalar(f"{model_name}/val_loss", val_loss, step=step)
         self.tf_writer.flush()
 
-    def log_hparams(self, hparams, metrics):
+    def log_hparams(self, hparams: dict, metrics: dict):
         """
-        Log a set of hyperparameters and the resulting metrics for comparison
-        in TensorBoard's HParams dashboard.
+        Log hyperparameters and metrics for TensorBoard's HParams dashboard.
+
+        This method logs hyperparameters and their resulting metrics to TensorBoard's
+        HParams dashboard for hyperparameter comparison and analysis.
 
         Args:
-            hparams (dict): Dictionary of hyperparameters used for the run
-                            (e.g., {'learning_rate': 0.1, 'model': 'XGBoost'}).
-            metrics (dict): Dictionary of final metrics for this run (e.g., {'mae': 12.3}).
+            hparams (dict): Dictionary of hyperparameters used for the run.
+                Example: {'learning_rate': 0.1, 'model': 'XGBoost'}.
+                Only scalar values (str, bool, int, float) are logged.
+            metrics (dict): Dictionary of final metrics for this run.
+                Example: {'mae': 12.3}. Only scalar values are logged.
+
+        Returns:
+            None: Logs hyperparameters and metrics to TensorBoard if TensorBoard
+                logging is enabled.
         """
         if not self._should_log_tensorboard():
             return
@@ -310,9 +410,12 @@ class LoggerManager:
         Log text to TensorBoard.
 
         Args:
-            tag (str): Tag for the text
-            text (str): Text content to log
-            step (int): Step number
+            tag (str): Tag for the text in TensorBoard.
+            text (str): Text content to log.
+            step (int): Step number for this text.
+
+        Returns:
+            None: Logs text to TensorBoard if TensorBoard logging is enabled.
         """
         if not self._should_log_tensorboard():
             return
@@ -326,9 +429,12 @@ class LoggerManager:
         Log a scalar value to TensorBoard.
 
         Args:
-            tag (str): Tag for the scalar
-            value (float): Scalar value to log
-            step (int): Step number
+            tag (str): Tag for the scalar in TensorBoard.
+            value (float): Scalar value to log.
+            step (int): Step number for this scalar.
+
+        Returns:
+            None: Logs scalar to TensorBoard if TensorBoard logging is enabled.
         """
         if not self._should_log_tensorboard():
             return
@@ -338,7 +444,15 @@ class LoggerManager:
         self.tf_writer.flush()
 
     def close(self):
-        """Flush and close all logger resources (can be called independently without using context manager)."""
+        """
+        Flush and close all logger resources.
+
+        This method flushes all log handlers and closes the TensorBoard writer.
+        It can be called independently without using the context manager.
+
+        Returns:
+            None: Flushes and closes all logging resources.
+        """
         # Flush all handlers in the standard logger
         for handler in self.logger.handlers:
             handler.flush()

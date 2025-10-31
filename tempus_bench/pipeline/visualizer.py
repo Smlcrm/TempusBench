@@ -1,6 +1,11 @@
 """
 Visualization utilities for the benchmarking pipeline.
+
+This module provides the Visualizer class for creating plots and visualizations
+of time series forecasts, including prediction plots with confidence intervals
+and residual analysis plots.
 """
+
 from typing import Any, Dict, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -11,14 +16,33 @@ from scipy import stats
 
 from ..utils.logger import LoggerManager
 
+
 class Visualizer:
-    def __init__(self, config: Optional[Dict[str, Any]] = None, logger: Optional[LoggerManager] = None):
+    """
+    Creates visualizations for time series forecasting results.
+
+    The Visualizer provides methods to create various plots including prediction
+    vs actual values, confidence intervals, and residual analysis. It supports
+    both deterministic and probabilistic forecasts.
+
+    Attributes:
+        config (Dict[str, Any]): Configuration dictionary with visualization parameters.
+        logger (Optional[LoggerManager]): Logger instance for logging operations.
+    """
+
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        logger: Optional[LoggerManager] = None,
+    ):
         """
         Initialize visualizer with configuration.
 
         Args:
-            config (dict, optional): Configuration dictionary with visualization parameters.
-            logger (LoggerManager, optional): Logger instance to use for logging.
+            config (Optional[Dict[str, Any]]): Configuration dictionary with
+                visualization parameters. If None, uses empty dict.
+            logger (Optional[LoggerManager]): Logger instance to use for logging.
+                If None, logging operations will be skipped.
         """
         self.config = config if config is not None else {}
         self.logger = logger
@@ -27,25 +51,37 @@ class Visualizer:
         # Set seaborn style separately
         sns.set_theme(style="whitegrid")
 
-    def plot_predictions(self,
-                        y_true: Union[pd.Series, np.ndarray],
-                        y_pred: Union[pd.Series, np.ndarray],
-                        time_index: Optional[Union[pd.DatetimeIndex, list]] = None,
-                        y_pred_lower: Optional[Union[pd.Series, np.ndarray]] = None,
-                        y_pred_upper: Optional[Union[pd.Series, np.ndarray]] = None,
-                        title: str = "Predictions vs Actual Values",
-                        save_path: Optional[str] = None):
+    def plot_predictions(
+        self,
+        y_true: Union[pd.Series, np.ndarray],
+        y_pred: Union[pd.Series, np.ndarray],
+        time_index: Optional[Union[pd.DatetimeIndex, list]] = None,
+        y_pred_lower: Optional[Union[pd.Series, np.ndarray]] = None,
+        y_pred_upper: Optional[Union[pd.Series, np.ndarray]] = None,
+        title: str = "Predictions vs Actual Values",
+        save_path: Optional[str] = None,
+    ):
         """
         Plot predictions against actual values with optional confidence intervals.
 
+        This method creates a line plot showing actual values, predicted values,
+        and optionally prediction intervals. The plot supports both pandas and
+        numpy array inputs.
+
         Args:
-            y_true: Actual values
-            y_pred: Predicted values
-            time_index: Optional time index for x-axis
-            y_pred_lower: Lower bound of prediction interval (optional)
-            y_pred_upper: Upper bound of prediction interval (optional)
-            title: Plot title
-            save_path: If provided, save the plot to this path
+            y_true (Union[pd.Series, np.ndarray]): Actual target values.
+            y_pred (Union[pd.Series, np.ndarray]): Predicted values.
+            time_index (Optional[Union[pd.DatetimeIndex, list]]): Optional time index
+                for x-axis. If None and y_true is a pd.Series, uses its index.
+            y_pred_lower (Optional[Union[pd.Series, np.ndarray]]): Lower bound of
+                prediction interval for probabilistic forecasts.
+            y_pred_upper (Optional[Union[pd.Series, np.ndarray]]): Upper bound of
+                prediction interval for probabilistic forecasts.
+            title (str): Plot title. Defaults to "Predictions vs Actual Values".
+            save_path (Optional[str]): If provided, saves the plot to this path.
+
+        Returns:
+            None: Displays the plot using matplotlib.pyplot.show().
         """
         plt.figure(figsize=(12, 6))
 
@@ -97,19 +133,27 @@ class Visualizer:
 
         plt.show()
 
-    def plot_residuals(self,
-                      y_true: Union[pd.Series, np.ndarray],
-                      y_pred: Union[pd.Series, np.ndarray],
-                      title: str = "Residual Analysis",
-                      save_path: Optional[str] = None):
+    def plot_residuals(
+        self,
+        y_true: Union[pd.Series, np.ndarray],
+        y_pred: Union[pd.Series, np.ndarray],
+        title: str = "Residual Analysis",
+        save_path: Optional[str] = None,
+    ):
         """
         Plot residual analysis including residual distribution and Q-Q plot.
 
+        This method creates a two-panel plot showing the distribution of residuals
+        and a Q-Q plot to assess normality of residuals.
+
         Args:
-            y_true: Actual values
-            y_pred: Predicted values
-            title: Plot title
-            save_path: If provided, save the plot to this path
+            y_true (Union[pd.Series, np.ndarray]): Actual target values.
+            y_pred (Union[pd.Series, np.ndarray]): Predicted values.
+            title (str): Plot title. Defaults to "Residual Analysis".
+            save_path (Optional[str]): If provided, saves the plot to this path.
+
+        Returns:
+            None: Displays the plot using matplotlib.pyplot.show().
         """
         # Convert inputs to numpy arrays if they're pandas objects
         if isinstance(y_true, pd.Series):
