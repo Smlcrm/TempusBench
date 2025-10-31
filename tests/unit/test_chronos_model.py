@@ -33,7 +33,7 @@ class TestChronosModel:
         }
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_init_with_valid_config(self, mock_evaluator, mock_load_config):
         """Test initialization with valid configuration."""
         mock_load_config.return_value = self.config
@@ -47,7 +47,7 @@ class TestChronosModel:
         assert model.point_forecast_statistic == 'mean'
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('chronos.ChronosPipeline.from_pretrained')
     def test_train_loads_model(self, mock_from_pretrained, mock_evaluator, mock_load_config):
         """Test that train method loads the Chronos model."""
@@ -79,7 +79,7 @@ class TestChronosModel:
         )
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('chronos.ChronosPipeline.from_pretrained')
     def test_predict_returns_samples(self, mock_from_pretrained, mock_evaluator, mock_load_config):
         """Test that predict returns samples with correct shape."""
@@ -113,7 +113,7 @@ class TestChronosModel:
         np.testing.assert_array_equal(predictions, expected)
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('chronos.ChronosPipeline.from_pretrained')
     def test_predict_univariate(self, mock_from_pretrained, mock_evaluator, mock_load_config):
         """Test prediction with univariate data."""
@@ -143,7 +143,7 @@ class TestChronosModel:
         assert predictions.shape == (5, 3, 1)
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('chronos.ChronosPipeline.from_pretrained')
     def test_predict_context_padding(self, mock_from_pretrained, mock_evaluator, mock_load_config):
         """Test that context is padded when shorter than context_length."""
@@ -181,7 +181,7 @@ class TestChronosModel:
         assert context_arg.shape[1] == 512  # context_length
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_predict_not_fitted_raises_error(self, mock_evaluator, mock_load_config):
         """Test that prediction without training raises error."""
         mock_load_config.return_value = self.config
@@ -196,7 +196,7 @@ class TestChronosModel:
             model.predict(y_context, timestamps_context, timestamps_target, "D")
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_predict_freq_none_raises_error(self, mock_evaluator, mock_load_config):
         """Test that prediction with None freq raises error."""
         mock_load_config.return_value = self.config
@@ -212,7 +212,7 @@ class TestChronosModel:
             model.predict(y_context, timestamps_context, timestamps_target, None)
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_get_model_summary(self, mock_evaluator, mock_load_config):
         """Test get_model_summary returns correct information."""
         mock_load_config.return_value = self.config
@@ -230,7 +230,7 @@ class TestChronosModel:
         assert 'device' in summary
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_compute_point_forecast_integration(self, mock_evaluator, mock_load_config):
         """Test integration with BaseModel's compute_point_forecast."""
         mock_load_config.return_value = self.config

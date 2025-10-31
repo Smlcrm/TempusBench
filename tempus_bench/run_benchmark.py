@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tempus_bench.config import Manager
 from tempus_bench.pipeline.hyperparameter_tuning import HyperparameterTuner
-from tempus_bench.utils.paths import get_configs_dir, get_project_root
+from tempus_bench.utils.paths import get_project_root
 
 
 class BenchmarkRunner:
@@ -21,7 +21,7 @@ class BenchmarkRunner:
 
     def _initialize_run(self):
         """Initialize and update all path-related attributes."""
-        
+
         # Initialize the Manager (which creates its own unified Logger with TensorBoard support)
         self.manager = Manager(
             config_path=self.config_path,
@@ -31,7 +31,7 @@ class BenchmarkRunner:
         self.logger = self.manager.logger
 
         # Emit early log lines so failures during Manager initialization are still captured
-        
+
         self.logger.debug(
             "BenchmarkRunner",
             f"Config path resolved to: {self.config_path}",
@@ -44,10 +44,12 @@ class BenchmarkRunner:
     def run(self):
         """Execute the end-to-end benchmarking pipeline."""
         self._initialize_run()
-        
+
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
         for job_idx, job_config in enumerate(self.manager.generate_run_configs()):
-            hyperparameter_tuner = HyperparameterTuner(job_config=job_config, logger=self.logger)
+            hyperparameter_tuner = HyperparameterTuner(
+                job_config=job_config, logger=self.logger
+            )
 
             # Hyper-parameter Tuning
             task_name = job_config.task_config.name
@@ -99,12 +101,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.config is not None:
-        config_path = args.config
-    else:
-        # Use absolute path for the default config
-        default_config_path = get_configs_dir() / "benchmark.yaml"
-        config_path = str(default_config_path)
+    config_path = args.config
 
     # Run the Benchmarks
     runner = BenchmarkRunner(config_path=config_path)

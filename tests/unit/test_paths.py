@@ -12,7 +12,6 @@ from tempus_bench.utils.paths import (
     get_project_root,
     get_tasks_dir,
     get_models_dir,
-    get_configs_dir,
     get_runs_dir,
     get_logs_path,
     get_task_path,
@@ -63,17 +62,6 @@ class TestPathFunctions:
         print(f"  Actual:   {actual}")
         
         assert actual == expected, "Models directory path mismatch"
-    
-    def test_get_configs_dir(self):
-        """Test that get_configs_dir returns the correct configs directory path."""
-        expected = get_project_root() / "tempus_bench" / "config"
-        actual = get_configs_dir()
-        
-        print(f"\nConfigs Directory:")
-        print(f"  Expected: {expected}")
-        print(f"  Actual:   {actual}")
-        
-        assert actual == expected, "Configs directory path mismatch"
     
     def test_get_runs_dir(self):
         """Test that get_runs_dir returns the correct runs directory path."""
@@ -159,13 +147,11 @@ class TestPathFunctions:
         # All should be under project_root
         tasks = get_tasks_dir()
         models = get_models_dir()
-        configs = get_configs_dir()
         runs = get_runs_dir()
         logs = get_logs_path()
         
         assert tasks.is_relative_to(project_root) or tasks == project_root
         assert models.is_relative_to(project_root) or models == project_root
-        assert configs.is_relative_to(project_root) or configs == project_root
         assert runs.is_relative_to(project_root) or runs == project_root
         assert logs.is_relative_to(project_root) or logs == project_root
         
@@ -179,7 +165,6 @@ class TestPathFunctions:
             ("project_root", get_project_root()),
             ("tasks_dir", get_tasks_dir()),
             ("models_dir", get_models_dir()),
-            ("configs_dir", get_configs_dir()),
             ("runs_dir", get_runs_dir()),
             ("logs_path", get_logs_path()),
             ("task_path", get_task_path("univariate/test_univariate")),
@@ -231,16 +216,13 @@ class TestPathFunctions:
         print(f"\n3. Models Directory:")
         print(f"   {get_models_dir()}")
         
-        print(f"\n4. Configs Directory:")
-        print(f"   {get_configs_dir()}")
-        
-        print(f"\n5. Runs Directory:")
+        print(f"\n4. Runs Directory:")
         print(f"   {get_runs_dir()}")
         
-        print(f"\n6. Logs Directory:")
+        print(f"\n5. Logs Directory:")
         print(f"   {get_logs_path()}")
         
-        print(f"\n7. Example Task Paths:")
+        print(f"\n6. Example Task Paths:")
         examples = [
             "multivariate/baggage_100_multivariate",
             "univariate/daily_gpu_price_univariate",
@@ -249,7 +231,7 @@ class TestPathFunctions:
         for example in examples:
             print(f"   Task '{example}': {get_task_path(example)}")
         
-        print(f"\n8. Example Model Paths:")
+        print(f"\n7. Example Model Paths:")
         model_examples = [
             ("deterministic", "arima"),
             ("deterministic", "prophet"),

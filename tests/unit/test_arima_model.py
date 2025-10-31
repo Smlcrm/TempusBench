@@ -32,7 +32,7 @@ class TestArimaModel:
         }
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_init_with_valid_config(self, mock_evaluator, mock_load_config):
         """Test initialization with valid configuration."""
         mock_load_config.return_value = self.config
@@ -47,7 +47,7 @@ class TestArimaModel:
         assert model.model_ is None
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_init_missing_parameters_raises_error(self, mock_evaluator, mock_load_config):
         """Test that missing required parameters raise errors."""
         # Test missing 'p'
@@ -67,7 +67,7 @@ class TestArimaModel:
             ArimaModel("config.yaml", "logs_path", {})
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('statsmodels.tsa.arima.model.ARIMA')
     def test_train_univariate(self, mock_arima, mock_evaluator, mock_load_config):
         """Test training with univariate data."""
@@ -100,7 +100,7 @@ class TestArimaModel:
         mock_arima.assert_called_once()
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('statsmodels.tsa.arima.model.ARIMA')
     def test_train_multivariate(self, mock_arima, mock_evaluator, mock_load_config):
         """Test training with multivariate data."""
@@ -134,7 +134,7 @@ class TestArimaModel:
         assert model.model_ is mock_fitted_model  # First model for compatibility
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('statsmodels.tsa.arima.model.ARIMA')
     def test_predict_univariate(self, mock_arima, mock_evaluator, mock_load_config):
         """Test prediction with univariate data."""
@@ -166,7 +166,7 @@ class TestArimaModel:
         mock_fitted_model.forecast.assert_called_once_with(steps=2, exog=None)
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     @patch('statsmodels.tsa.arima.model.ARIMA')
     def test_predict_multivariate(self, mock_arima, mock_evaluator, mock_load_config):
         """Test prediction with multivariate data."""
@@ -206,7 +206,7 @@ class TestArimaModel:
         np.testing.assert_array_equal(predictions, expected)
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_predict_not_fitted_raises_error(self, mock_evaluator, mock_load_config):
         """Test that prediction without training raises error."""
         mock_load_config.return_value = self.config
@@ -221,7 +221,7 @@ class TestArimaModel:
             model.predict(y_context, timestamps_context, timestamps_target, "D")
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_predict_freq_none_raises_error(self, mock_evaluator, mock_load_config):
         """Test that prediction with None freq raises error."""
         mock_load_config.return_value = self.config
@@ -237,7 +237,7 @@ class TestArimaModel:
             model.predict(y_context, timestamps_context, timestamps_target, None)
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_get_params(self, mock_evaluator, mock_load_config):
         """Test get_params returns model configuration."""
         mock_load_config.return_value = self.config
@@ -248,7 +248,7 @@ class TestArimaModel:
         assert params == {'p': 1, 'd': 1, 'q': 1, 's': 1}
     
     @patch('tempus_bench.config.load_config')
-    @patch('tempus_bench.metrics.metric_registry.MetricRegistry')
+    @patch('tempus_bench.pipeline.metric_registry.MetricRegistry')
     def test_set_params(self, mock_evaluator, mock_load_config):
         """Test set_params updates model configuration."""
         mock_load_config.return_value = self.config
