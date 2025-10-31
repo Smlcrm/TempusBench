@@ -361,8 +361,9 @@ def main():
         # Include predictions in output for plotting
         output = {
             **eval_metrics,
-            "predictions": results.tolist(),
+            "y_pred": results.tolist(),
             "y_true": target[vstart:vend].tolist(),
+            "timestamps_pred": timestamps[vstart:vend].tolist(),
         }
 
         outputs.append(output)

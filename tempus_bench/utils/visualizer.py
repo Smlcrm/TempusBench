@@ -7,15 +7,14 @@ and residual analysis plots.
 """
 
 from typing import Any, Dict, Optional, Union
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
-
 from ..utils.log_manager import LogManager
-
 
 
 class Visualizer:
@@ -31,24 +30,12 @@ class Visualizer:
         logger (Optional[LoggerManager]): Logger instance for logging operations.
     """
 
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        logger: Optional[LoggerManager] = None,
-    ):
+    def __init__(self):
         """
         Initialize visualizer with configuration.
 
-        Args:
-            config (Optional[Dict[str, Any]]): Configuration dictionary with
-                visualization parameters. If None, uses empty dict.
-            logger (Optional[LoggerManager]): Logger instance to use for logging.
-                If None, logging operations will be skipped.
         """
-        self.config = config if config is not None else {}
-        # Use a built-in style instead of seaborn
-        plt.style.use("fivethirtyeight")
-        # Set seaborn style separately
+        plt.style.use('fivethirtyeight')
         sns.set_theme(style="whitegrid")
 
     def plot_predictions(
@@ -193,3 +180,105 @@ class Visualizer:
             LogManager.get_logger().info("Visualizer", f"Plot saved to {save_path}")
 
         plt.show()
+
+    def plot_forecast_window(
+        self,
+        *,
+        y_pred: np.ndarray,
+        y_true: np.ndarray,
+        timestamps_pred: np.ndarray,
+        model_name: str,
+        hyperparameters: dict,
+        window_idx: int,
+    ) -> None:
+        """
+        Generate and log a time-series plot comparing predictions with actual data for a window.
+
+        All required data (context/train/validate segments and predictions) must be provided
+        by the caller. This function does not execute any models or perform data loading.
+        """
+        try:
+            # Enforce 2D arrays with identical shapes
+            if y_true.ndim != 2 or y_pred.ndim != 2:
+                raise ValueError("y_true and y_pred must be 2D arrays")
+            if y_true.shape != y_pred.shape:
+                raise ValueError(
+                    f"y_true and y_pred must have the same shape, got {y_true.shape} vs {y_pred.shape}"
+                )
+            if timestamps_pred.ndim != 1 or timestamps_pred.shape[0] != y_pred.shape[0]:
+                raise ValueError(
+                    "timestamps_pred must be 1D and match the number of rows in y_pred"
+                )
+
+            num_targets = y_true.shape[1]
+
+            # Create plots directory in current working directory
+            plots_dir = Path.cwd() / "tensorboard" / "plots" / model_name
+            plots_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create subplots for each target
+            fig, axes = plt.subplots(num_targets, 1, figsize=(15, 4 * num_targets))
+            if num_targets == 1:
+                axes = [axes]
+
+            # Use prediction timestamps for both series; assume alignment
+            time_axis = timestamps_pred
+
+            for target_idx in range(num_targets):
+                ax = axes[target_idx]  # type: ignore
+
+                true_series = y_true[:, target_idx]
+                pred_series = y_pred[:, target_idx]
+
+                # Plot true values
+                ax.plot(
+                    time_axis,
+                    true_series,
+                    "b-",
+                    label="True Values",
+                    linewidth=2,
+                    alpha=0.8,
+                )
+
+                # Plot predictions
+                ax.plot(
+                    time_axis,
+                    pred_series,
+                    "orange",
+                    label="Predicted",
+                    linewidth=2,
+                    alpha=0.8,
+                )
+
+                # Customize subplot
+                ax.set_title(
+                    f"{model_name} - Target {target_idx + 1} (Window {window_idx})"
+                )
+                ax.set_xlabel("Time")
+                ax.set_ylabel("Value")
+                ax.legend()
+                ax.grid(True, alpha=0.3)
+
+            # Add hyperparameters info to the figure
+            fig.suptitle(
+                f"Best Hyperparameters: {hyperparameters}", fontsize=12, y=0.98
+            )
+
+            # Save plot
+            plot_path = plots_dir / f"window_{window_idx}.png"
+            plt.tight_layout()
+            plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+            plt.close()
+
+            # Log to TensorBoard via LogManager
+            LogManager.get_logger().log_image_file(
+                image_path=str(plot_path),
+                tag=f"{model_name}/forecast",
+                step=window_idx,
+            )
+
+        except Exception as e:
+            LogManager.get_logger().error(
+                "Visualizer",
+                f"Error generating forecast plot for {model_name}: {e}",
+            )
