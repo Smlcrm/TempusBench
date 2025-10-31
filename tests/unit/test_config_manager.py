@@ -264,68 +264,7 @@ class TestFindTaskDirectories:
 # TestManagerValidateBenchmarkConfig removed - validate_benchmark_config method no longer exists
 
 
-class TestManagerValidateBenchmarkSettings:
-    """Test suite for validate_benchmark_settings method."""
-
-    def test_validate_settings_file_not_found(self, tmp_path):
-        """Test that FileNotFoundError is raised when settings file doesn't exist."""
-        manager = Mock()
-        manager.logger = Mock()
-
-        with patch(
-            "tempus_bench.config.manager.get_configs_dir", return_value=tmp_path
-        ):
-            with pytest.raises(FileNotFoundError, match="Settings config not found"):
-                Manager.validate_benchmark_settings(manager)
-
-    def test_validate_settings_validation_error(self, tmp_path):
-        """Test that ValidationError in settings is caught and wrapped."""
-        settings_file = tmp_path / "settings.yaml"
-        settings_file.write_text("invalid_field: not_in_schema")
-
-        manager = Mock()
-        manager.logger = Mock()
-
-        with patch(
-            "tempus_bench.config.manager.get_configs_dir", return_value=tmp_path
-        ):
-            with pytest.raises(ValidationError, match="Invalid systems config"):
-                Manager.validate_benchmark_settings(manager)
-
-    def test_validate_invalid_settings(self, tmp_path):
-        """Test that ValidationError is raised for invalid settings."""
-        settings_file = tmp_path / "settings.yaml"
-        settings_file.write_text("invalid: [yaml")
-
-        manager = Mock()
-        manager.logger = Mock()
-
-        with patch(
-            "tempus_bench.config.manager.get_configs_dir", return_value=tmp_path
-        ):
-            with pytest.raises(ValidationError):
-                Manager.validate_benchmark_settings(manager)
-
-    @patch("tempus_bench.config.manager.get_configs_dir")
-    def test_validate_valid_settings(self, mock_get_configs_dir, tmp_path):
-        """Test validating valid settings."""
-        settings_file = tmp_path / "settings.yaml"
-        settings_data = {
-            "logging_format": "%(message)s",
-            "file_logging": True,
-            "console_logging": True,
-            "tensorboard_logging": True,
-            "runs_dir": "runs",
-            "conda_env_prefix": "benchmark",
-        }
-        settings_file.write_text(yaml.dump(settings_data))
-
-        manager = Mock()
-        manager.logger = Mock()
-        mock_get_configs_dir.return_value = tmp_path
-
-        result = Manager.validate_benchmark_settings(manager)
-        assert isinstance(result, EvaluationSetting)
+# TestManagerValidateBenchmarkSettings removed - validate_benchmark_settings method no longer exists
 
 
 class TestManagerValidateModelSettings:
@@ -529,16 +468,23 @@ task:
 class TestManagerFullIntegration:
     """Test suite for full Manager initialization."""
 
-    @patch("tempus_bench.config.manager.get_logger")
-    @patch("tempus_bench.config.manager.get_configs_dir")
+    @patch("tempus_bench.config.manager.LoggerManager")
+    @patch("tempus_bench.config.manager.get_project_root")
     @patch("tempus_bench.config.manager.get_models_dir")
     @patch("tempus_bench.config.manager.get_tasks_dir")
     def test_config_manager_full_initialization(
-        self, mock_tasks_dir, mock_models_dir, mock_configs_dir, mock_logger, tmp_path
+        self, mock_tasks_dir, mock_models_dir, mock_get_project_root, mock_logger, tmp_path
     ):
         """Test full Manager initialization to cover __init__ lines 61-68."""
+        # Setup project root structure
+        project_root = tmp_path
+        tempus_bench_dir = project_root / "tempus_bench"
+        tempus_bench_dir.mkdir()
+        config_dir = tempus_bench_dir / "config"
+        config_dir.mkdir()
+        
         # Setup benchmark config
-        config_file = tmp_path / "benchmark.yaml"
+        config_file = project_root / "benchmark.yaml"
         config_data = {
             "task_path": "univariate/*",
             "evaluation": {
@@ -550,8 +496,8 @@ class TestManagerFullIntegration:
         }
         config_file.write_text(yaml.dump(config_data))
 
-        # Setup settings
-        settings_file = tmp_path / "settings.yaml"
+        # Setup settings in config directory
+        settings_file = config_dir / "settings.yaml"
         settings_data = {
             "logging_format": "%(message)s",
             "file_logging": True,
@@ -572,7 +518,7 @@ class TestManagerFullIntegration:
         (arima_dir / "arima_model.py").write_text("# model file")
 
         # Setup task
-        tasks_dir = tmp_path / "tasks" / "univariate"
+        tasks_dir = tempus_bench_dir / "tasks" / "univariate"
         task_dir = tasks_dir / "test_task"
         task_dir.mkdir(parents=True)
         (task_dir / "task.yaml").write_text(
@@ -587,16 +533,16 @@ class TestManagerFullIntegration:
             )
         )
 
-        mock_configs_dir.return_value = tmp_path
+        mock_get_project_root.return_value = project_root
         mock_models_dir.return_value = models_dir.parent
         mock_tasks_dir.return_value = tasks_dir.parent
         mock_logger.return_value = Mock()
 
         # This will call __init__ and cover lines 61-68
-        manager = Manager(str(config_file), str(tmp_path))
+        manager = Manager(str(config_file))
         assert manager.config_path == str(config_file)
-        assert isinstance(manager.model, ModelConfig)
-        assert isinstance(manager.benchmark_settings, EvaluationSetting)
+        assert isinstance(manager.model_configs, dict)
+        assert isinstance(manager.evaluation_setting, EvaluationSetting)
 
 
 class TestManagerExceptionHandling:

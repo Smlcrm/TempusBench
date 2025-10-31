@@ -17,7 +17,7 @@ import tempfile
 import os
 from pathlib import Path
 
-from tempus_bench.metrics.metric_registry import MetricRegistry
+from tempus_bench.pipeline.metric_registry import MetricRegistry
 
 
 class TestMetricRegistryInitialization:

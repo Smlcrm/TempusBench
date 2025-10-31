@@ -7,13 +7,11 @@ in the time series forecasting benchmarking pipeline.
 Components:
 - data_loader: Loads and processes time series data chunks
 - data_types: Defines data structures for datasets and splits
-- evaluator: Computes evaluation metrics
-- logger: Handles logging and metrics storage
+- metric_registry: Computes evaluation metrics
 - preprocessor: Applies data preprocessing steps
 - model_executor: Executes model training and evaluation in isolated environments
 - visualizer: Creates plots and visualizations
-- batch_utils: Utilities for batch processing
-- forecast_horizon: Handles forecast horizon calculations
+- hyperparameter_tuning: Handles hyperparameter optimization
 
 Usage:
     from tempus_bench.pipeline import DataLoader, ModelExecutor

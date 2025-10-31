@@ -9,7 +9,7 @@ import pytest
 import numpy as np
 from unittest.mock import Mock, patch, MagicMock
 from tempus_bench.models.base_model import BaseModel
-from tempus_bench.metrics.metric_registry import MetricRegistry
+from tempus_bench.pipeline.metric_registry import MetricRegistry
 
 
 class DummyModel(BaseModel):
@@ -38,7 +38,7 @@ class TestBaseModel:
     """Test suite for BaseModel class."""
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_init_with_valid_config(self, mock_evaluator, mock_load_config):
         """Test initialization with valid configuration."""
         # Create a simple dict-like mock
@@ -60,7 +60,7 @@ class TestBaseModel:
         assert model.scaler is None
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_extract_model_config_valid(self, mock_evaluator, mock_load_config):
         """Test _extract_model_config with valid config."""
         config_dict = {
@@ -75,7 +75,7 @@ class TestBaseModel:
         assert model.model_config == {"param1": 5, "param2": "test"}
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_extract_model_config_missing_model_section(
         self, mock_evaluator, mock_load_config
     ):
@@ -93,7 +93,7 @@ class TestBaseModel:
             model._extract_model_config(config_dict)
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_extract_model_config_multiple_models(
         self, mock_evaluator, mock_load_config
     ):
@@ -110,7 +110,7 @@ class TestBaseModel:
             model._extract_model_config(config_dict)
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_extract_model_config_model_params_as_list(
         self, mock_evaluator, mock_load_config
     ):
@@ -127,7 +127,7 @@ class TestBaseModel:
             model._extract_model_config(config_dict)
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_extract_model_config_model_params_as_none(
         self, mock_evaluator, mock_load_config
     ):
@@ -144,7 +144,7 @@ class TestBaseModel:
             model._extract_model_config(config_dict)
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_compute_metrics(self, mock_evaluator_class, mock_load_config):
         """Test compute_metrics method integration with evaluator."""
         config_dict = {
@@ -175,7 +175,7 @@ class TestBaseModel:
         assert model._last_y_pred is y_pred
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_get_params(self, mock_evaluator, mock_load_config):
         """Test get_params returns model configuration."""
         config_dict = {
@@ -192,7 +192,7 @@ class TestBaseModel:
         assert params == {"param1": 10, "param2": "value"}
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_set_params(self, mock_evaluator, mock_load_config):
         """Test set_params updates model configuration."""
         config_dict = {
@@ -213,7 +213,7 @@ class TestBaseModel:
         assert model.is_fitted == False  # Should be reset when params change
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_set_scaler(self, mock_evaluator, mock_load_config):
         """Test set_scaler method."""
         config_dict = {
@@ -233,7 +233,7 @@ class TestBaseModel:
         assert model.scaler is mock_scaler
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_get_model_summary(self, mock_evaluator, mock_load_config):
         """Test get_model_summary returns correct information."""
         config_dict = {
@@ -254,7 +254,7 @@ class TestBaseModel:
         assert summary["parameters"] == {"param1": 10}
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_get_last_eval_true_pred(self, mock_evaluator, mock_load_config):
         """Test get_last_eval_true_pred returns stored values."""
         config_dict = {
@@ -278,7 +278,7 @@ class TestBaseModel:
         assert result == (y_true, y_pred)
 
     @patch("tempus_bench.models.base_model.load_config")
-    @patch("tempus_bench.metrics.metric_registry.MetricRegistry")
+    @patch("tempus_bench.pipeline.metric_registry.MetricRegistry")
     def test_predict_freq_validation(self, mock_evaluator, mock_load_config):
         """Test predict method validates freq parameter."""
         config_dict = {
