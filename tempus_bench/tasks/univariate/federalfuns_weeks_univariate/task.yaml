@@ -1,5 +1,5 @@
 task:
-  name: federalfuns_weeks_univariate
+  task_name: weeks
   context_window: 2048
   forecast_horizon: 64
   dataset:

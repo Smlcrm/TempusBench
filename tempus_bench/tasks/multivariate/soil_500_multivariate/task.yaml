@@ -1,5 +1,5 @@
 task:
-  name: soil_500_multivariate
+  task_name: 500
   context_window: 2048
   forecast_horizon: 64
   dataset:

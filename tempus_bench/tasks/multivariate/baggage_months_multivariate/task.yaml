@@ -1,5 +1,5 @@
 task:
-  name: baggage_months_multivariate
+  task_name: months
   context_window: 32
   forecast_horizon: 16
   dataset:

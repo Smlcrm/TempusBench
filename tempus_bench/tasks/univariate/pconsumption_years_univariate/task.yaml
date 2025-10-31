@@ -1,5 +1,5 @@
 task:
-  name: pconsumption_years_univariate
+  task_name: years
   context_window: 64
   forecast_horizon: 8
   dataset:

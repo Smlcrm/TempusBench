@@ -1,5 +1,5 @@
 task:
-  name: wtraffic_web_univariate
+  task_name: web
   context_window: 2048
   forecast_horizon: 32
   dataset:

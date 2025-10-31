@@ -1,6 +1,7 @@
 """
 Visualization utilities for the benchmarking pipeline.
 """
+
 from typing import Any, Dict, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -9,32 +10,33 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
-from ..utils.logger import LoggerManager
+from ..utils.log_manager import LogManager
+
 
 class Visualizer:
-    def __init__(self, config: Optional[Dict[str, Any]] = None, logger: Optional[LoggerManager] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize visualizer with configuration.
 
         Args:
             config (dict, optional): Configuration dictionary with visualization parameters.
-            logger (LoggerManager, optional): Logger instance to use for logging.
         """
         self.config = config if config is not None else {}
-        self.logger = logger
         # Use a built-in style instead of seaborn
-        plt.style.use('fivethirtyeight')
+        plt.style.use("fivethirtyeight")
         # Set seaborn style separately
         sns.set_theme(style="whitegrid")
 
-    def plot_predictions(self,
-                        y_true: Union[pd.Series, np.ndarray],
-                        y_pred: Union[pd.Series, np.ndarray],
-                        time_index: Optional[Union[pd.DatetimeIndex, list]] = None,
-                        y_pred_lower: Optional[Union[pd.Series, np.ndarray]] = None,
-                        y_pred_upper: Optional[Union[pd.Series, np.ndarray]] = None,
-                        title: str = "Predictions vs Actual Values",
-                        save_path: Optional[str] = None):
+    def plot_predictions(
+        self,
+        y_true: Union[pd.Series, np.ndarray],
+        y_pred: Union[pd.Series, np.ndarray],
+        time_index: Optional[Union[pd.DatetimeIndex, list]] = None,
+        y_pred_lower: Optional[Union[pd.Series, np.ndarray]] = None,
+        y_pred_upper: Optional[Union[pd.Series, np.ndarray]] = None,
+        title: str = "Predictions vs Actual Values",
+        save_path: Optional[str] = None,
+    ):
         """
         Plot predictions against actual values with optional confidence intervals.
 
@@ -60,10 +62,10 @@ class Visualizer:
         x = time_index if time_index is not None else np.arange(len(y_true))
 
         # Plot actual values
-        plt.plot(x, y_true, label='Actual', color='blue', alpha=0.7)
+        plt.plot(x, y_true, label="Actual", color="blue", alpha=0.7)
 
         # Plot predictions
-        plt.plot(x, y_pred, label='Predicted', color='red', alpha=0.7)
+        plt.plot(x, y_pred, label="Predicted", color="red", alpha=0.7)
 
         # Plot confidence intervals if available
         if y_pred_lower is not None and y_pred_upper is not None:
@@ -72,14 +74,19 @@ class Visualizer:
             if isinstance(y_pred_upper, pd.Series):
                 y_pred_upper = y_pred_upper.values
 
-            plt.fill_between(x, y_pred_lower, y_pred_upper,
-                           color='red', alpha=0.2,
-                           label='Prediction Interval')
+            plt.fill_between(
+                x,
+                y_pred_lower,
+                y_pred_upper,
+                color="red",
+                alpha=0.2,
+                label="Prediction Interval",
+            )
 
         # Customize plot
         plt.title(title)
-        plt.xlabel('Time' if isinstance(x, pd.DatetimeIndex) else 'Time Steps')
-        plt.ylabel('Value')
+        plt.xlabel("Time" if isinstance(x, pd.DatetimeIndex) else "Time Steps")
+        plt.ylabel("Value")
         plt.legend()
         plt.grid(True, alpha=0.3)
 
@@ -93,15 +100,17 @@ class Visualizer:
         # Save plot if path provided
         if save_path:
             plt.savefig(save_path)
-            self.logger.info("Visualizer", f"Plot saved to {save_path}")
+            LogManager.get_logger().info("Visualizer", f"Plot saved to {save_path}")
 
         plt.show()
 
-    def plot_residuals(self,
-                      y_true: Union[pd.Series, np.ndarray],
-                      y_pred: Union[pd.Series, np.ndarray],
-                      title: str = "Residual Analysis",
-                      save_path: Optional[str] = None):
+    def plot_residuals(
+        self,
+        y_true: Union[pd.Series, np.ndarray],
+        y_pred: Union[pd.Series, np.ndarray],
+        title: str = "Residual Analysis",
+        save_path: Optional[str] = None,
+    ):
         """
         Plot residual analysis including residual distribution and Q-Q plot.
 
@@ -141,6 +150,6 @@ class Visualizer:
         # Save plot if path provided
         if save_path:
             plt.savefig(save_path)
-            self.logger.info("Visualizer", f"Plot saved to {save_path}")
+            LogManager.get_logger().info("Visualizer", f"Plot saved to {save_path}")
 
         plt.show()
