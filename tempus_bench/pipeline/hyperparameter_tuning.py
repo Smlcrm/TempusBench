@@ -84,14 +84,17 @@ class HyperparameterTuner:
             ValueError: If more than one model is defined for the job (the tuner only
                 supports a single model).
         """
-        model_config = self.job_config.model_config
 
         model_name = self.model_name
 
         # Build grid from config directly without constructing the model
-        params_space = self.model_config.model_config
+        params_space = {
+            k: v for k, v in self.model_config.__dict__.items() if k != "model_name"
+        }
+
         keys = list(params_space.keys())
         values_lists = [params_space[k] for k in keys]
+
         grid: list[dict] = []
 
         for combo in product(*values_lists):
@@ -147,6 +150,7 @@ class HyperparameterTuner:
 
         # Try each hyperparameter combination
         for params in self._generate_hyperparameter_grid():
+
             try:
                 # Execute model with these hyperparameters
                 windows_eval_losses = model_executor.execute_model(

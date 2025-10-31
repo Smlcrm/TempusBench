@@ -15,7 +15,7 @@ import os
 import importlib.util
 import tempfile
 import pickle
-
+import datetime
 
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -24,7 +24,6 @@ from tempus_bench.utils.configs import JobConfig
 from tempus_bench.utils.envs import CondaEnvManager
 from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.paths import get_project_root, get_models_dir
-
 
 
 class ModelExecutor:
@@ -98,16 +97,16 @@ class ModelExecutor:
             reinstall=self.job_config.evaluation_setting.reinstall_conda,
         )
 
-
         with tempfile.TemporaryDirectory() as temp_dir:
             job_config_path = os.path.join(temp_dir, "job_config.pkl")
-            
+
             with open(job_config_path, "wb") as f:
                 pickle.dump(self.job_config, f)
 
             # Create a temporary directory to store the pickled job_config
             # Build CLI command
             hyperparameters_json = json.dumps(hyperparameters)
+
             command = (
                 f"python -m tempus_bench.pipeline.model_executor "
                 f"--task-name {self.job_config.task_config.task_name} "
@@ -132,6 +131,8 @@ class ModelExecutor:
             # Parse the JSON output from the command
             # Find the last line that contains JSON (the script outputs debug info first)
             lines = result.stdout.strip().split("\n")
+            if "\n" in result.stdout:
+                print("RESULT.STDOUT CONTAINS NEWLINES")
             json_line = None
             for line in reversed(lines):
                 if line.strip().startswith("{") and line.strip().endswith("}"):
@@ -221,23 +222,22 @@ def main():
     parser.add_argument(
         "--job-config-path", required=True, help="Path to job configuration file"
     )
-    
 
     args = parser.parse_args()
 
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
 
-
     # Load configuration to get JobConfig
 
     with open(args.job_config_path, "rb") as f:
         job_config = pickle.load(f)
 
-
     task_name = args.task_name
-    temp_task_dataset_path = Path(get_project_root()) / "temp_task_datasets" / task_name
-    
+    temp_task_dataset_path = (
+        Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
+    )
+
     with open(temp_task_dataset_path, "rb") as f:
         dataset = pickle.load(f)
 
@@ -247,20 +247,51 @@ def main():
     validate_steps = args.validate_steps
     model_name = args.model_name
 
+    run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    logs_path = (
+        Path(get_project_root())
+        / "model_logs"
+        / run_timestamp
+        / f"{model_name}_{task_name}"
+    )
+
+    tensorboard_dir = (
+        Path(get_project_root())
+        / "model_logs"
+        / run_timestamp
+        / "tensorboard"
+        / f"{model_name}_{task_name}"
+    )
+
+    logger = LogManager(
+        logs_path=str(logs_path),
+        console_logging=False,
+        file_logging=True,
+        console_log_level="INFO",
+        file_log_level="INFO",
+        tf_logs_path=str(tensorboard_dir),
+        tensorboard_logging=True,
+    )
+
     steps = [
         ("context", context_steps),
         ("train", train_steps),
         ("validate", validate_steps),
     ]
 
-
     window_generator = dataset.generate_dataset_split(
-        steps=steps, stride=args.validate_steps, max_windows=job_config.evaluation_config.max_windows
+        steps=steps,
+        stride=args.validate_steps,
+        max_windows=job_config.evaluation_config.max_windows,
     )
 
     outputs = []
 
     for window_idx, dataset_splits in enumerate(window_generator):
+
+        logger.info(
+            "Model Executor", f"========= Window index: {window_idx} =========="
+        )
 
         timestamps = dataset.timestamps
         target = dataset.target
@@ -292,6 +323,10 @@ def main():
         vstart, vend = dataset_splits["validate"].start, dataset_splits["validate"].end
 
         # Create and train model
+        logger.info(
+            "Model Executor",
+            f"========= Training model {model_name} with hyperparameters {hyperparameters} on window {window_idx} ==========",
+        )
         model = model_class(params=hyperparameters, settings=job_config.model_setting)
 
         trained_model = model.train(
@@ -302,6 +337,10 @@ def main():
             freq=freq,
         )
 
+        logger.info(
+            "Model Executor",
+            f"========= Predicting model {model_name} on window {window_idx} ==========",
+        )
         # Generate predictions
         results = trained_model.predict(
             y_context=target[cstart:tend],
@@ -310,6 +349,10 @@ def main():
             freq=freq,
         )
 
+        logger.info(
+            "Model Executor",
+            f"========= Computing evaluation metrics for model {model_name} on window {window_idx} ==========",
+        )
         # Compute evaluation metrics
         eval_metrics = trained_model.compute_metrics(
             y_true=target[vstart:vend], y_pred=results

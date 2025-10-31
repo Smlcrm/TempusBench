@@ -54,7 +54,9 @@ class Dataset:
     scaler: Optional[StandardScaler] = None  # Scaler used for normalization (if any)
     metadata: Optional[Dict[str, Any]] = None
 
-    def generate_dataset_split(self, steps: list[tuple[str, int]], stride: int, max_windows: int):
+    def generate_dataset_split(
+        self, steps: list[tuple[str, int]], stride: int, max_windows: int
+    ):
         """
         Generate rolling windows over a time series with configurable segments.
 
@@ -84,8 +86,10 @@ class Dataset:
 
         # Resolve actual dataset file path and load task-specific options
 
-        num_steps = self.target.shape[0]  # (n_steps, n_features): first dim is time-steps
-        
+        num_steps = self.target.shape[
+            0
+        ]  # (n_steps, n_features): first dim is time-steps
+
         window_size = sum(seg_len for (_, seg_len) in steps)
 
         window_idx = 0
@@ -102,7 +106,9 @@ class Dataset:
                 splits[seg_name] = DatasetSplit(start=start, end=end)
                 start = end
 
+            window_idx += 1
             yield splits
+
 
 @dataclass
 class TaskResult:
