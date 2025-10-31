@@ -3,7 +3,6 @@ Model evaluation.
 """
 
 import importlib
-import inspect
 from typing import Any, Dict
 
 import numpy as np
@@ -104,16 +103,23 @@ class MetricRegistry:
                 # Import the module
                 module = importlib.import_module(module_name)
 
-                # Find the class that inherits from BaseMetric
-                for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if (
-                        issubclass(obj, BaseMetric)
-                        and obj is not BaseMetric
-                        and obj.__module__ == module_name
-                    ):
-                        # Use file stem as the registry key (e.g., "mae", "quantile_score")
-                        metric_registry[file_stem] = obj()
-                        break
+                # Convert file stem to CamelCase class name
+                # e.g., "mae" -> "Mae", "quantile_score" -> "QuantileScore"
+                class_name = "".join(word.capitalize() for word in file_stem.split("_"))
+
+                # Get the class from the module
+                metric_class = getattr(module, class_name)
+
+                # Verify it's a subclass of BaseMetric
+                if (
+                    not issubclass(metric_class, BaseMetric)
+                    or metric_class is BaseMetric
+                ):
+                    continue
+
+                # Use file stem as the registry key (e.g., "mae", "quantile_score")
+                # Each concrete metric class implements __init__ that handles initialization
+                metric_registry[file_stem] = metric_class()  # type: ignore
 
             except (ImportError, AttributeError) as e:
                 # Skip files that can't be imported or don't have valid metric classes
