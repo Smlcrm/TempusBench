@@ -13,9 +13,7 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
 
-
-from .log_manager import LogManager
-
+from tempus_bench.utils.paths import get_available_models
 
 ######################################################## UTILITY FUNCTIONS ########################################################
 
@@ -81,6 +79,7 @@ class EvaluationConfig(BaseModel):
     )
     max_num_variates: Optional[int] = Field(
         default=None,
+        ge=1,
         description="Maximum number of variates to extract from dataset for evaluation (use None for all variates)",
     )
     num_samples: int = Field(
@@ -97,27 +96,6 @@ class EvaluationConfig(BaseModel):
         default="mean",
         description="Statistic to use for converting stochastic predictions to point forecasts",
     )
-
-    # @field_validator("max_num_variates")
-    # @classmethod
-    # def validate_max_num_variates(cls, v):
-    #     """Validate max_num_variates is either inf or a positive number."""
-    #     if v == None:
-    #         return v
-    #     if isinstance(v, (int, float)) and v < 1:
-    #         raise ValueError("max_num_variates must be at least 1 or inf")
-    #     return v
-
-    # @field_validator("tuning_loss")
-    # @classmethod
-    # def validate_tuning_loss(cls, v):
-    #     """Validate that tuning_loss is a deterministic metric."""
-    #     allowed_metrics = {"mae", "mase", "mape", "rmse"}
-    #     if v is not None and v not in allowed_metrics:
-    #         raise ValueError(
-    #             f"tuning_loss must be one of: {', '.join(sorted(allowed_metrics))}"
-    #         )
-    #     return v
 
 
 class ModelConfig:
