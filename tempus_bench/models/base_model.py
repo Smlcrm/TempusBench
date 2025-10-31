@@ -132,7 +132,7 @@ class BaseModel(ABC):
             Dict[str, float]: Dictionary of computed evaluation metrics (from evaluation.metrics)
         """
         return self.metric_registry.compute_metrics(
-            y_true, y_pred, model_type=self.model_type, **kwargs # type: ignore
+            y_true, y_pred, model_type=self.model_type, **kwargs  # type: ignore
         )
 
     def get_params(self):
