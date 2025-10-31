@@ -12,6 +12,7 @@ Since Theta is mainly a univariate model, the structure had to be changed for mu
 Source of the method:
 https://onlinelibrary.wiley.com/doi/full/10.1002/for.2334 ( Forecasting Multivariate Time Series with the Theta Method )
 """
+
 import os
 import pickle
 import numpy as np
@@ -23,15 +24,19 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sktime.forecasting.theta import ThetaForecaster
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class ThetaHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
     sp: int = Field(..., ge=1, description="Seasonal period")
-    theta_method: Literal["least_squares", "correlation_optimal"] = Field(..., description="Method for theta estimation")
+    theta_method: Literal["least_squares", "correlation_optimal"] = Field(
+        ..., description="Method for theta estimation"
+    )
     # Fixed Hyperparameters - Optional for User to override
-    use_reduced_rank: bool = Field(default=False, description="Whether to use cointegration/reduced rank")
+    use_reduced_rank: bool = Field(
+        default=False, description="Whether to use cointegration/reduced rank"
+    )
 
 
 class ThetaModel(BaseModel):
@@ -40,6 +45,8 @@ class ThetaModel(BaseModel):
         Initialize the Multivariate Theta model with model-specific parameters.
         """
         super().__init__(params, settings, ThetaHyperparams)
+
+        self._models = []
 
     def _estimate_drift(self, y_context: np.ndarray) -> np.ndarray:
         """
@@ -149,7 +156,7 @@ class ThetaModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> "ThetaModel":
         """
         Train the Multivariate Theta model on given data.
@@ -180,12 +187,9 @@ class ThetaModel(BaseModel):
         # Calculate num_targets from data
         num_targets = y_context.shape[1]
         self.num_targets = num_targets  # Store for use in predict
-        self.logger.debug("ThetaModel.train", f"y_context shape: {y_context.shape}")
-        self.logger.info("ThetaModel.train", f"Training Multivariate Theta with {num_targets} targets...")
 
         # Step 1: Estimate drift vector μ
         self.drift_vector = self._estimate_drift(y_context)
-        self.logger.debug("ThetaModel.train", f"Estimated drift vector: {self.drift_vector}")
 
         # Step 2: Detrend the data
         detrended_data = self._detrend_data(y_context, self.drift_vector)
@@ -195,12 +199,10 @@ class ThetaModel(BaseModel):
             self.theta_matrix = self._estimate_theta_matrix_correlation_optimal(
                 detrended_data, num_targets
             )
-        elif theta_method == 'least_squares':
+        elif theta_method == "least_squares":
             self.theta_matrix = self._estimate_theta_matrix_least_squares(
                 detrended_data, num_targets
             )
-
-        self.logger.debug("ThetaModel.train", f"Estimated Θ matrix:\n{self.theta_matrix}")
 
         # Step 4: Create θ-lines
         theta_lines = self._create_theta_lines(detrended_data, self.theta_matrix)
@@ -219,15 +221,11 @@ class ThetaModel(BaseModel):
 
             # Create and fit univariate Theta model
             # Disable deseasonalization if data has non-positive values
-            theta_model = ThetaForecaster(
-                sp=sp,
-                deseasonalize=deseasonalize
-            )
+            theta_model = ThetaForecaster(sp=sp, deseasonalize=deseasonalize)
             theta_model.fit(y=theta_line_series)
-            self._models[i] = theta_model
+            self._models.append(theta_model)
 
         self.is_fitted = True
-        self.logger.info("ThetaModel.train", "Multivariate Theta training complete.")
         return self
 
     @validate_inputs
@@ -258,10 +256,13 @@ class ThetaModel(BaseModel):
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
-        forecast_horizon, num_targets = timestamps_target.shape
+        forecast_horizon = timestamps_target.shape[0]
+        num_targets = y_context.shape[1]
         all_predictions = np.zeros((forecast_horizon, num_targets))
         for i in range(num_targets):
-            theta_forecast = self._models[i].predict(fh=np.arange(1, forecast_horizon + 1))
+            theta_forecast = self._models[i].predict(
+                fh=np.arange(1, forecast_horizon + 1)
+            )
             future_times = np.arange(1, forecast_horizon + 1)
             linear_trend = future_times * self.drift_vector[i]
             all_predictions[:, i] = theta_forecast.values + linear_trend

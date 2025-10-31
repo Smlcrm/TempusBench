@@ -6,7 +6,7 @@ from typing import Any, Dict
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class TinyTimeMixerHyperparams(PydanticBaseModel):

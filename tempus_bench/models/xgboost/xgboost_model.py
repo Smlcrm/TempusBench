@@ -4,6 +4,7 @@ Multivariate XGBoost model implementation for time series forecasting.
 This model extends the univariate XGBoost to handle multiple target variables simultaneously.
 Uses sklearn's MultiOutputRegressor to handle multiple targets with advanced feature engineering.
 """
+
 import os
 import pickle
 
@@ -15,7 +16,7 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 from sklearn.multioutput import MultiOutputRegressor
 from xgboost import XGBRegressor
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class XgboostHyperparams(PydanticBaseModel):
@@ -24,15 +25,37 @@ class XgboostHyperparams(PydanticBaseModel):
     max_depth: int = Field(..., ge=1, description="Maximum tree depth")
     learning_rate: float = Field(..., gt=0, description="Learning rate")
     # Fixed Hyperparameters - Optional for User to override
-    reg_alpha: float = Field(default=0.0, ge=0, description="L1 regularization strength (optional)")
-    reg_lambda: float = Field(default=1.0, ge=0, description="L2 regularization strength (optional)")
-    subsample: float = Field(default=0.8, gt=0, le=1, description="Subsample ratio of the training instances (optional)")
-    colsample_bytree: float = Field(default=0.8, gt=0, le=1, description="Subsample ratio of columns for each tree (optional)")
-    min_child_weight: int = Field(default=1, ge=1, description="Minimum sum of instance weight needed in a child (optional)")
-    gamma: float = Field(default=0.0, ge=0, description="Minimum loss reduction required to make a further partition (optional)")
+    reg_alpha: float = Field(
+        default=0.0, ge=0, description="L1 regularization strength (optional)"
+    )
+    reg_lambda: float = Field(
+        default=1.0, ge=0, description="L2 regularization strength (optional)"
+    )
+    subsample: float = Field(
+        default=0.8,
+        gt=0,
+        le=1,
+        description="Subsample ratio of the training instances (optional)",
+    )
+    colsample_bytree: float = Field(
+        default=0.8,
+        gt=0,
+        le=1,
+        description="Subsample ratio of columns for each tree (optional)",
+    )
+    min_child_weight: int = Field(
+        default=1,
+        ge=1,
+        description="Minimum sum of instance weight needed in a child (optional)",
+    )
+    gamma: float = Field(
+        default=0.0,
+        ge=0,
+        description="Minimum loss reduction required to make a further partition (optional)",
+    )
 
 
-class XGBoostModel(BaseModel):
+class XgboostModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize XGBoost model with a given configuration.
@@ -60,18 +83,27 @@ class XGBoostModel(BaseModel):
 
         num_steps, num_targets = y_series.shape
         forecast_horizon = kwargs["forecast_horizon"]
-        lookback_window = self.lookback_window
 
-        n_samples = (
-            num_steps
-            - lookback_window
-            - forecast_horizon
-            + 1
-        )
+        # Use stored lookback_window from training if available (for prediction consistency)
+        # Otherwise, adapt lookback_window to available data if needed
+        if hasattr(self, "_trained_lookback_window"):
+            lookback_window = self._trained_lookback_window
+        else:
+            # Adapt lookback_window to available data if needed
+            max_lookback = num_steps - forecast_horizon
+            effective_lookback = (
+                min(self.lookback_window, max_lookback) if max_lookback > 0 else 1
+            )
+            lookback_window = effective_lookback
+            # Store effective_lookback used during training for consistency in prediction
+            self._trained_lookback_window = lookback_window
+
+        n_samples = num_steps - lookback_window - forecast_horizon + 1
 
         if n_samples <= 0:
             raise ValueError(
-                f"Not enough data. Need at least {lookback_window + forecast_horizon} samples."
+                f"Not enough data. Need at least {lookback_window + forecast_horizon} samples, "
+                f"but only have {num_steps} steps (lookback_window={self.lookback_window})."
             )
 
         features = []
@@ -80,16 +112,14 @@ class XGBoostModel(BaseModel):
         # Calculate expected feature dimension for consistency
         lag_features = lookback_window * num_targets
         rolling_stats = num_targets * 8  # 8 stats per target
-        cross_corr = (num_targets * (num_targets - 1) // 2) * 2 if num_targets > 1 else 0
+        cross_corr = (
+            (num_targets * (num_targets - 1) // 2) * 2 if num_targets > 1 else 0
+        )
         temporal = num_targets if lookback_window >= 7 else 0
         expected_feature_dim = lag_features + rolling_stats + cross_corr + temporal
 
-        # Debug: let's use the actual counts we're getting
-        actual_feature_dim = lag_features + rolling_stats + cross_corr + temporal
-        self.logger.debug("XGBoostModel._create_features", f"Expected feature dim: {expected_feature_dim} (lag:{lag_features}, stats:{rolling_stats}, cross:{cross_corr}, temp:{temporal})")
-        self.logger.debug("XGBoostModel._create_features", f"Actual feature dim: {actual_feature_dim}")
-
         # Use the actual dimension for consistency
+        actual_feature_dim = lag_features + rolling_stats + cross_corr + temporal
         expected_feature_dim = actual_feature_dim
 
         for i in range(n_samples):
@@ -118,9 +148,7 @@ class XGBoostModel(BaseModel):
                 rolling_median = np.median(target_data)
 
                 # Trend features
-                trend = np.polyfit(
-                    range(len(target_data)), target_data, 1
-                )[0]
+                trend = np.polyfit(range(len(target_data)), target_data, 1)[0]
 
                 # Volatility features
                 rolling_range = rolling_max - rolling_min
@@ -178,12 +206,6 @@ class XGBoostModel(BaseModel):
             #     current_x = x_series[i + self._model_config['lookback_window']]
             #     sample_features.extend(current_x.flatten())
 
-            # Debug feature counts
-            lag_count = lookback_window * num_targets
-            stats_count = num_targets * 8
-            temp_count = num_targets if lookback_window >= 7 else 0
-            self.logger.debug("XGBoostModel._create_features", f"Sample {i}: lag={lag_count}, stats={stats_count}, cross={cross_corr_count}, temp={temp_count}, total={len(sample_features)}")
-
             features.append(sample_features)
 
             # Create target: next forecast_horizon steps for all targets, flattened
@@ -192,16 +214,14 @@ class XGBoostModel(BaseModel):
             future_values = y_series[
                 start_idx:end_idx, :
             ]  # Shape: (forecast_horizon, num_targets)
-            target_flat = future_values.flatten()  # Shape: (forecast_horizon * num_targets,)
-            self.logger.debug("XGBoostModel._create_features", f"Sample {i} target shape: {future_values.shape}, flattened: {target_flat.shape}")
+            target_flat = (
+                future_values.flatten()
+            )  # Shape: (forecast_horizon * num_targets,)
             targets.append(target_flat)
 
         # Ensure all arrays have consistent shapes
         features_array = np.array(features)
         targets_array = np.array(targets)
-
-        self.logger.debug("XGBoostModel._create_features", f"Features shape: {features_array.shape}")
-        self.logger.debug("XGBoostModel._create_features", f"Targets shape: {targets_array.shape}")
 
         return features_array, targets_array
 
@@ -213,7 +233,7 @@ class XGBoostModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         **kwargs,
-    ) -> "XGBoostModel":
+    ) -> "XgboostModel":
         """
         Train the Multivariate XGBoost model for direct multi-output forecasting.
 
@@ -236,10 +256,11 @@ class XGBoostModel(BaseModel):
         """
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
-        forecast_horizon = kwargs["forecast_horizon"]
+        # Calculate forecast_horizon from y_target if not provided in kwargs
+        forecast_horizon = kwargs.get("forecast_horizon", y_target.shape[0])
 
         # Reference params, settings, device, python_version
-        lookback_window = self._model_config["lookback_window"]
+        lookback_window = self.lookback_window
 
         if self._model is None:
             self._build_model()
@@ -250,12 +271,9 @@ class XGBoostModel(BaseModel):
         else:
             training_data = y_context
 
-        self.logger.debug("XGBoostModel.train", f"XGBoost training data shape: {training_data.shape}")
-        self.logger.debug("XGBoostModel.train", f"Lookback window: {lookback_window}")
-        self.logger.debug("XGBoostModel.train", f"Forecast horizon: {forecast_horizon}")
-
-        # Prepare features for training
-        X, y = self._create_multivariate_features(training_data, **kwargs)
+        # Prepare features for training - add forecast_horizon to kwargs if not present
+        kwargs_with_horizon = {**kwargs, "forecast_horizon": forecast_horizon}
+        X, y = self._create_multivariate_features(training_data, **kwargs_with_horizon)
 
         # Train the model
         self._model.fit(X, y)
@@ -285,10 +303,11 @@ class XGBoostModel(BaseModel):
         """
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
-        forecast_horizon = kwargs["forecast_horizon"]
+        # Calculate forecast_horizon from timestamps_target if not provided in kwargs
+        forecast_horizon = kwargs.get("forecast_horizon", len(timestamps_target))
 
         # Reference params, settings, device, python_version
-        lookback_window = self._model_config["lookback_window"]
+        lookback_window = self.lookback_window
 
         preds = []
         # Use the entire context, maintaining the multivariate structure
@@ -301,7 +320,9 @@ class XGBoostModel(BaseModel):
             steps = min(forecast_horizon, total_steps - steps_done)
 
             # Take the last lookback_window timesteps for feature creation
-            current_window = context[-lookback_window:, :]  # Shape: (lookback_window, num_targets)
+            current_window = context[
+                -lookback_window:, :
+            ]  # Shape: (lookback_window, num_targets)
 
             try:
                 # Create features using the same method as training
@@ -326,14 +347,7 @@ class XGBoostModel(BaseModel):
                     )
 
                 # Reshape predictions back to (num_targets, forecast_horizon)
-                pred_reshaped = pred_flat.reshape(
-                    num_targets, forecast_horizon
-                )
-
-                self.logger.debug(
-                    "XGBoostModel.rolling_predict",
-                    f"Rolling predict X_pred shape: {X_pred.shape}, pred_reshaped shape: {pred_reshaped.shape}"
-                )
+                pred_reshaped = pred_flat.reshape(num_targets, forecast_horizon)
 
                 # Only take as many steps as needed
                 pred_steps = pred_reshaped[:, :steps]  # Shape: (num_targets, steps)
@@ -342,7 +356,9 @@ class XGBoostModel(BaseModel):
                 # Update context with new predictions
                 # pred_steps needs to be transposed to (steps, num_targets) to match context format
                 pred_steps_transposed = pred_steps.T  # Shape: (steps, num_targets)
-                context = np.concatenate([context, pred_steps_transposed], axis=0)  # Concatenate along time axis
+                context = np.concatenate(
+                    [context, pred_steps_transposed], axis=0
+                )  # Concatenate along time axis
                 steps_done += steps
 
             except Exception as e:
@@ -350,7 +366,8 @@ class XGBoostModel(BaseModel):
 
         # Concatenate all predictions along time axis
         result = np.concatenate(preds, axis=1)  # Shape: (num_targets, total_steps)
-        return result
+        # Transpose to (total_steps, num_targets) to match expected format
+        return result.T  # Shape: (total_steps, num_targets)
 
     @validate_inputs
     def predict(
@@ -380,31 +397,41 @@ class XGBoostModel(BaseModel):
         """
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
-        forecast_horizon = kwargs["forecast_horizon"]
+        # Calculate forecast_horizon from timestamps_target if not provided in kwargs
+        forecast_horizon = kwargs.get("forecast_horizon", len(timestamps_target))
 
         # Reference params, settings, device, python_version
-        lookback_window = self._model_config["lookback_window"]
+        lookback_window = self.lookback_window
 
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
         # Use rolling prediction to cover the full test set (no exogenous variables)
+        # Add forecast_horizon to kwargs if not present
+        kwargs_with_horizon = {**kwargs, "forecast_horizon": forecast_horizon}
         preds = self.rolling_predict(
-            y_context, timestamps_context, timestamps_target, **kwargs
+            y_context, timestamps_context, timestamps_target, **kwargs_with_horizon
         )
-        self.logger.debug("XGBoostModel.predict", f"Final rolling preds shape: {preds.shape}")
         return preds
 
     def _build_model(self):
         """
         Build the XGBRegressor model instance from the configuration.
         """
-        all_params = {
-            **self.params,
-            **self.settings
-        }
+        # Get hyperparameters from params, excluding non-estimator parameters
+        # Convert Pydantic model to dict if needed
+        params_dict = (
+            self.params.model_dump()
+            if hasattr(self.params, "model_dump")
+            else self.params
+        )
+        all_params = {**params_dict, **self.settings}
 
-        self._model = XGBRegressor(**all_params)
+        # Filter out keys that are not valid for XGBRegressor
+        valid_keys = set(XGBRegressor().get_params().keys())
+        filtered_params = {k: v for k, v in all_params.items() if k in valid_keys}
+
+        self._model = XGBRegressor(**filtered_params)
         self.is_fitted = False
 
     def _create_single_sample_features(self, y_series: np.ndarray) -> np.ndarray:
@@ -418,10 +445,16 @@ class XGBoostModel(BaseModel):
             np.ndarray: Feature vector for the single sample
         """
         num_targets = y_series.shape[1]
-        lookback_window = self.lookback_window
+        # Use stored lookback_window from training if available (for prediction consistency)
+        # Otherwise, use the default lookback_window
+        lookback_window = getattr(
+            self, "_trained_lookback_window", self.lookback_window
+        )
 
         # Take the last lookback_window timesteps
-        current_window = y_series[-lookback_window:, :]  # Shape: (lookback_window, num_targets)
+        current_window = y_series[
+            -lookback_window:, :
+        ]  # Shape: (lookback_window, num_targets)
 
         sample_features = []
 
@@ -440,12 +473,22 @@ class XGBoostModel(BaseModel):
             rolling_median = np.median(target_data)
             trend = np.polyfit(range(len(target_data)), target_data, 1)[0]
             rolling_range = rolling_max - rolling_min
-            rolling_iqr = np.percentile(target_data, 75) - np.percentile(target_data, 25)
+            rolling_iqr = np.percentile(target_data, 75) - np.percentile(
+                target_data, 25
+            )
 
-            sample_features.extend([
-                rolling_mean, rolling_std, rolling_min, rolling_max,
-                rolling_median, trend, rolling_range, rolling_iqr
-            ])
+            sample_features.extend(
+                [
+                    rolling_mean,
+                    rolling_std,
+                    rolling_min,
+                    rolling_max,
+                    rolling_median,
+                    trend,
+                    rolling_range,
+                    rolling_iqr,
+                ]
+            )
             stats_count += 8
 
         # 3. Cross-correlation features (if multivariate)
@@ -453,7 +496,9 @@ class XGBoostModel(BaseModel):
         if num_targets > 1:
             for i_target in range(num_targets):
                 for j_target in range(i_target + 1, num_targets):
-                    corr = np.corrcoef(current_window[:, i_target], current_window[:, j_target])[0, 1]
+                    corr = np.corrcoef(
+                        current_window[:, i_target], current_window[:, j_target]
+                    )[0, 1]
                     if np.isnan(corr):
                         corr = 0.0
                     sample_features.append(corr)

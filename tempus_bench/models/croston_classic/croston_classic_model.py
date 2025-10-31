@@ -1,23 +1,28 @@
 """
 Croston's Classic Model implementation for intermittent demand forecasting.
 """
+
 from typing import Any, Dict
 
 import numpy as np
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class CrostonClassicHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
-    alpha: float = Field(..., gt=0, lt=1, description="Smoothing parameter for demand level")
-    gamma: float = Field(..., gt=0, lt=1, description="Smoothing parameter for interval level")
+    alpha: float = Field(
+        ..., gt=0, lt=1, description="Smoothing parameter for demand level"
+    )
+    gamma: float = Field(
+        ..., gt=0, lt=1, description="Smoothing parameter for interval level"
+    )
 
 
 class CrostonClassicModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, CrostonClassicHyperparams)
+        super().__init__(params, settings, CrostonClassicHyperparams)  # type: ignore
 
     @validate_inputs
     def train(
@@ -44,8 +49,8 @@ class CrostonClassicModel(BaseModel):
         Returns:
             CrostonClassicModel: Trained model.
         """
-        alpha = self.alpha
-        gamma = self.gamma
+        alpha = self.alpha  # type: ignore
+        gamma = self.gamma  # type: ignore
         num_targets = y_context.shape[1]
 
         demand_levels = np.zeros(num_targets)
@@ -73,7 +78,9 @@ class CrostonClassicModel(BaseModel):
 
             # Simple Exponential Smoothing for intervals
             for v in intervals[1:]:
-                current_interval_level = gamma * v + (1 - gamma) * current_interval_level
+                current_interval_level = (
+                    gamma * v + (1 - gamma) * current_interval_level
+                )
 
             demand_levels[target] = current_demand_level
             interval_levels[target] = current_interval_level
@@ -122,8 +129,8 @@ class CrostonClassicModel(BaseModel):
         """
         summary = {
             "model_type": "CrostonClassic",
-            "alpha": self.alpha,
-            "gamma": self.gamma,
+            "alpha": self.alpha,  # type: ignore
+            "gamma": self.gamma,  # type: ignore
             "is_fitted": self.is_fitted,
         }
 
