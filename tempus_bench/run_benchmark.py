@@ -1,3 +1,11 @@
+"""
+Entry point for running the benchmarking pipeline.
+
+This module provides the BenchmarkRunner class which orchestrates the end-to-end
+benchmarking process including configuration loading, hyperparameter tuning, and
+model evaluation across multiple task-model combinations.
+"""
+
 import argparse
 import datetime
 import os
@@ -10,18 +18,39 @@ from tempus_bench.utils.paths import get_project_root
 
 
 class BenchmarkRunner:
+    """
+    Orchestrates the end-to-end benchmarking pipeline execution.
+
+    The BenchmarkRunner coordinates the execution of multiple benchmarking jobs,
+    where each job represents a combination of a task (dataset) and model. It
+    handles configuration loading, hyperparameter tuning, and result aggregation.
+
+    Attributes:
+        config_path (str): Path to the configuration YAML file.
+        config_name (str): Name of the configuration file (without extension).
+        manager (Manager): Configuration manager instance.
+        logger (LoggerManager): Logger instance for logging operations.
+    """
+
     def __init__(self, config_path: str):
         """
         Initialize benchmark runner with configuration.
+
         Args:
-            config_path: Path to the config file used
+            config_path (str): Path to the configuration YAML file used for
+                this benchmark run.
         """
         self.config_path = config_path
         self.config_name = os.path.splitext(os.path.basename(self.config_path))[0]
 
     def _initialize_run(self):
-        """Initialize and update all path-related attributes."""
+        """
+        Initialize the run by creating the manager and logger.
 
+        This method initializes the Manager which handles configuration loading
+        and creates a unified logger with TensorBoard support. The logger is then
+        stored as an instance attribute for use throughout the benchmark execution.
+        """
         # Initialize the Manager (which creates its own unified Logger with TensorBoard support)
         self.manager = Manager(
             config_path=self.config_path,
@@ -38,7 +67,14 @@ class BenchmarkRunner:
         )
 
     def run(self):
-        """Execute the end-to-end benchmarking pipeline."""
+        """
+        Execute the end-to-end benchmarking pipeline.
+
+        This method iterates through all job configurations (task-model combinations),
+        performs hyperparameter tuning for each combination, and aggregates results.
+        Each job configuration is processed sequentially, with hyperparameter optimization
+        using rolling window validation.
+        """
         self._initialize_run()
 
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
@@ -82,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default=None,
+        default=os.path.join(os.path.dirname(__file__), "config", "benchmark.yaml"),
         help="Path to the config YAML file. If not specified, uses the default config in tempus_bench/configs/all_models.yaml",
     )
     args = parser.parse_args()

@@ -1,4 +1,4 @@
-rel"""
+"""
 ARIMA (AutoRegressive Integrated Moving Average) model implementation.
 
 This module provides an ARIMA model implementation for univariate time series forecasting.

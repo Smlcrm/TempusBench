@@ -1,5 +1,9 @@
 """
-Data preprocessing utilities.
+Data preprocessing utilities for time series data.
+
+This module provides the Preprocessor class for cleaning raw CSV payloads,
+handling missing values, normalizing data, and preparing time series data
+for model training and evaluation.
 """
 
 import ast
@@ -17,16 +21,29 @@ from ..utils.logger import LoggerManager
 
 
 class Preprocessor:
-    """Clean raw CSV payloads and apply normalization strategies."""
+    """
+    Cleans raw CSV payloads and applies normalization strategies.
+
+    The Preprocessor handles parsing raw target data from CSV files, handling
+    missing values using various strategies, normalizing data if configured, and
+    ensuring data is in the correct format for model consumption.
+
+    Attributes:
+        job_config (JobConfig): Job configuration containing task and evaluation settings.
+        evaluation_config (EvaluationConfig): Evaluation-specific configuration.
+        logger (LoggerManager): Logger instance for logging operations.
+        max_num_variates (Optional[int]): Maximum number of variates to extract from
+            dataset. None means all variates.
+    """
 
     def __init__(self, config: JobConfig, logger: LoggerManager):
         """
         Initialize the preprocessor for a concrete task configuration.
 
         Args:
-            config: `JobConfig` emitted by the configuration manager; supplies
-                the task metadata and preprocessing directives.
-            logger: Logger instance for logging.
+            config (JobConfig): JobConfig emitted by the configuration manager,
+                supplies the task metadata and preprocessing directives.
+            logger (LoggerManager): Logger instance for logging operations.
         """
         self.job_config = config
         self.evaluation_config = config.evaluation_config
@@ -35,13 +52,18 @@ class Preprocessor:
 
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """
-        Parse and clean raw target string data, handling empty values and converting to numpy array.
+        Parse and clean raw target string data, handling empty values.
+
+        This method parses a JSON-like array string from CSV data, handles empty
+        values by converting them to NaN, and converts the result to a numpy array
+        in the format (num_steps, num_targets).
 
         Args:
-            target_raw: Raw target data as string (JSON-like array format)
+            target_raw (str): Raw target data as string (JSON-like array format).
 
         Returns:
-            Cleaned numpy array in (num_steps, num_targets) format
+            np.ndarray: Cleaned numpy array with shape (num_steps, num_targets).
+                Empty values are converted to NaN.
         """
         # Clean the target string to handle empty values before parsing
         self.logger.debug(
@@ -174,18 +196,23 @@ class Preprocessor:
         self, arr: np.ndarray, start: str, freq: str, handle_missing: str
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Handle missing values in the ndarray and return cleaned data with corresponding timestamps.
+        Handle missing values in the ndarray and return cleaned data with timestamps.
+
+        This method applies the specified missing value handling strategy to the input
+        array and generates corresponding timestamps based on the start time and frequency.
 
         Args:
-            arr: Input array to clean, shape (num_steps, num_targets)
-            start: Start time as string
-            freq: Frequency as string
-            handle_missing: Strategy for handling missing values
+            arr (np.ndarray): Input array to clean with shape (num_steps, num_targets).
+            start (str): Start time as string (pandas-compatible).
+            freq (str): Frequency as string (pandas-compatible frequency).
+            handle_missing (str): Strategy for handling missing values. Options:
+                'drop', 'mean', 'median', 'interpolate', 'forward_fill', 'backward_fill'.
 
         Returns:
-            Tuple of (timestamps, cleaned_array)
-                - timestamps: shape (num_steps,)
-                - cleaned_array: shape (num_steps, num_targets)
+            Tuple[np.ndarray, np.ndarray]: A tuple containing:
+                - timestamps: Array of shape (num_steps,) with generated timestamps.
+                - cleaned_array: Array of shape (num_steps, num_targets) with missing
+                  values handled according to the strategy.
         """
         # Input requirement: arr shape (num_steps, num_targets)
         num_steps = arr.shape[0]
@@ -250,7 +277,16 @@ class Preprocessor:
         return timestamps, result
 
     def _interpolate_column(self, col_data: np.ndarray) -> np.ndarray:
-        """Interpolate missing values in a single column."""
+        """
+        Interpolate missing values in a single column.
+
+        Args:
+            col_data (np.ndarray): Column data with possible NaN values.
+
+        Returns:
+            np.ndarray: Column data with interpolated missing values. If all values
+                are NaN, returns zeros.
+        """
         if not np.isnan(col_data).any():
             return col_data
 
@@ -276,7 +312,16 @@ class Preprocessor:
         return interpolated
 
     def _forward_fill_column(self, col_data: np.ndarray) -> np.ndarray:
-        """Forward fill missing values in a single column."""
+        """
+        Forward fill missing values in a single column.
+
+        Args:
+            col_data (np.ndarray): Column data with possible NaN values.
+
+        Returns:
+            np.ndarray: Column data with forward-filled missing values (carries
+                last valid value forward).
+        """
         result = col_data.copy()
         last_valid = None
 
@@ -288,7 +333,16 @@ class Preprocessor:
         return result
 
     def _backward_fill_column(self, col_data: np.ndarray) -> np.ndarray:
-        """Backward fill missing values in a single column."""
+        """
+        Backward fill missing values in a single column.
+
+        Args:
+            col_data (np.ndarray): Column data with possible NaN values.
+
+        Returns:
+            np.ndarray: Column data with backward-filled missing values (carries
+                next valid value backward).
+        """
         result = col_data.copy()
         next_valid = None
 
@@ -304,10 +358,11 @@ class Preprocessor:
         Cap the number of features (variates/columns) to max_num_variates if specified.
 
         Args:
-            target: Target array in (num_steps, num_targets) format
+            target (np.ndarray): Target array in (num_steps, num_targets) format.
 
         Returns:
-            Target array with capped number of features
+            np.ndarray: Target array with capped number of features (columns),
+                keeping only the first max_num_variates columns if capping is applied.
         """
         if self.max_num_variates is None or self.max_num_variates == float("inf"):
             return target
@@ -336,17 +391,30 @@ class Preprocessor:
         """
         Clean raw target data by parsing, handling missing values, and normalizing.
 
+        This method performs the complete preprocessing pipeline: parsing raw target
+        data, capping variates if configured, validating timestamps and frequency,
+        handling missing values, and optionally normalizing the data.
+
         Args:
-            time_start: Start time as string (will be converted to pandas Timestamp)
-            freq: Frequency as string (pandas-compatible frequency)
-            target_raw: Raw target data as string (JSON-like array format)
-            normalize: Whether to normalize the data using StandardScaler
-            handle_missing: Strategy for handling missing values ('drop', 'mean', 'median', 'interpolate', 'forward_fill', 'backward_fill')
+            time_start (str): Start time as string (will be converted to pandas Timestamp).
+            freq (str): Frequency as string (pandas-compatible frequency).
+            target_raw (str): Raw target data as string (JSON-like array format).
+            normalize (bool): Whether to normalize the data using StandardScaler.
+            handle_missing (str): Strategy for handling missing values. Options:
+                'drop', 'mean', 'median', 'interpolate', 'forward_fill', 'backward_fill'.
 
         Returns:
-            Tuple[np.ndarray, str, str, np.ndarray, Optional[StandardScaler]]:
-                Cleaned timestamps, sanitized start timestamp, validated frequency string,
-                processed target array (shape `(num_steps, num_targets)`), and an optional scaler.
+            Tuple[np.ndarray, str, str, np.ndarray, Optional[StandardScaler]]: A tuple containing:
+                - timestamps (np.ndarray): Cleaned timestamps array of shape (num_steps,).
+                - time_start (str): Sanitized start timestamp string.
+                - freq (str): Validated frequency string.
+                - target (np.ndarray): Processed target array of shape (num_steps, num_targets).
+                - scaler (Optional[StandardScaler]): Scaler instance if normalization was applied,
+                  None otherwise.
+
+        Raises:
+            ValueError: If target array is empty, has incorrect dimensions, or frequency
+                is invalid or missing.
         """
         self.logger.debug(
             "Preprocessor.clean",

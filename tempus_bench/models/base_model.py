@@ -95,6 +95,25 @@ class BaseModel(ABC):
         timestamps_target: np.ndarray,
         **kwargs: dict,
     ) -> np.ndarray:
+        """
+        Generate predictions for the target time steps.
+
+        Args:
+            y_context (np.ndarray): Context window used for prediction initialization,
+                shape (num_steps_context, num_targets).
+            timestamps_context (np.ndarray): Timestamp index aligned with y_context,
+                shape (num_steps_context,).
+            timestamps_target (np.ndarray): Timestamp index for prediction targets,
+                shape (num_steps_target,).
+            **kwargs (dict): Additional keyword arguments for model-specific prediction
+                parameters (e.g., freq, num_samples for stochastic models).
+
+        Returns:
+            np.ndarray: Predicted values. Shape depends on model type:
+                - Deterministic: (num_steps_target, num_targets)
+                - Stochastic: (num_samples, num_steps_target, num_targets)
+                - Hybrid: Tuple of (point_forecasts, samples)
+        """
         pass
 
     def compute_metrics(
