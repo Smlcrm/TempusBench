@@ -37,10 +37,6 @@ class BenchmarkRunner:
             f"Config path resolved to: {self.config_path}",
         )
 
-        # Get reference to tf_logger from manager for cleanup
-        self.tf_logger = self.manager.tf_logger
-        self.tensorboard_dir = self.tf_logger.tf_logs_path
-
     def run(self):
         """Execute the end-to-end benchmarking pipeline."""
         self._initialize_run()
@@ -76,17 +72,7 @@ class BenchmarkRunner:
             )
 
         # Cleanup TensorBoard writer
-        try:
-            self.tf_logger.close()
-            self.logger.info(
-                "BenchmarkRunner",
-                f"TensorBoard writer closed, logs saved to: {self.tensorboard_dir}",
-            )
-        except Exception as e:
-            self.logger.warning(
-                "BenchmarkRunner",
-                f"Failed to close TensorBoard writer: {e}",
-            )
+        self.logger.close()
 
 
 if __name__ == "__main__":

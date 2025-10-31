@@ -42,7 +42,7 @@ class LoggerManager:
         console_log_level: str = "INFO",
         file_log_level: str = "DEBUG",
         tf_logs_path: Optional[str] = None,
-        tensorboard_logging: Optional[bool] = None,
+        tensorboard_logging: bool = False,
     ):
         """
         Initialize logger with configuration for both standard and TensorBoard logging.
@@ -63,9 +63,7 @@ class LoggerManager:
         """
         self.name = name
         self.enable_logging = enable_logging
-        self.tensorboard_logging = (
-            tensorboard_logging if tensorboard_logging is not None else False
-        )
+        self.tensorboard_logging = tensorboard_logging
 
         # Always create log directory
         Path(logs_path).mkdir(parents=True, exist_ok=True)
@@ -122,6 +120,17 @@ class LoggerManager:
     def _should_log_tensorboard(self) -> bool:
         """Check if TensorBoard logging should occur."""
         return self.tensorboard_logging
+
+    # ==================== Context Manager Methods ====================
+
+    def __enter__(self):
+        """Enter the context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the context manager, ensuring all logs are flushed and resources closed."""
+        self.close()
+        return False  # Don't suppress exceptions
 
     # ==================== Standard Logging Methods ====================
 
@@ -329,5 +338,18 @@ class LoggerManager:
         self.tf_writer.flush()
 
     def close(self):
-        """Closes the TensorBoard writer to ensure all data is written to disk."""
-        self.tf_writer.close()
+        """Flush and close all logger resources (can be called independently without using context manager)."""
+        # Flush all handlers in the standard logger
+        for handler in self.logger.handlers:
+            handler.flush()
+
+        # Flush and close TensorBoard writer
+        if self.tf_writer is not None:
+            try:
+                self.tf_writer.flush()
+            except Exception:
+                pass
+            try:
+                self.tf_writer.close()
+            except Exception:
+                pass
