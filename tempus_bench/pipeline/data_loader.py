@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..config.configs import JobConfig
+from ..utils.configs import JobConfig
 from ..utils.logger import LoggerManager
 from .data_types import Dataset, DatasetSplit
 from .preprocessor import Preprocessor

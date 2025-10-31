@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from ..config.configs import JobConfig
+from ..utils.configs import JobConfig
 from ..utils.logger import LoggerManager
 
 

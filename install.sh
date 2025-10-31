@@ -3,14 +3,16 @@
 
 echo "🚀 Installing SMLCRM Benchmark Pipeline..."
 
-# Set PYTHONPATH to include current directory
-echo "🔧 Setting PYTHONPATH..."
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+echo "🔧 Creating conda environment tempus_bench..."
+conda create -n tempus_bench python=3.11.13
 
-# Install the package in development mode (includes requirements.txt)
+echo "🔧 Activating conda environment tempus_bench..."
+conda activate tempus_bench
+
+
+# Install the package in development mode (dependencies from pyproject.toml)
 echo "📦 Installing package and dependencies..."
 pip install -e .
-pip install -r requirements.txt
 
 echo "✅ Installation complete!"
 echo ""
