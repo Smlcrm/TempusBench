@@ -1,5 +1,5 @@
 task:
-  name: goldindia_dense_multivariate
+  task_name: dense
   context_window: 2048
   forecast_horizon: 64
   dataset:

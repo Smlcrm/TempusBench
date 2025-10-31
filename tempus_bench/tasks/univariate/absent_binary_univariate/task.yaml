@@ -1,5 +1,5 @@
 task:
-  name: absent_binary_univariate
+  task_name: binary
   context_window: 512
   forecast_horizon: 8
   dataset:

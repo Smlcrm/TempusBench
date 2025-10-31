@@ -130,7 +130,7 @@ class TestTaskConfig:
     def test_valid_config(self):
         """Test valid task configuration."""
         config = TaskConfig(
-            name="test_task",
+            task_name="test_task",
             task_path="/path/to/task",
             forecast_horizon=24,
             context_window=100,
@@ -145,7 +145,7 @@ class TestTaskConfig:
         """Test that forecast_horizon > 128 raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             TaskConfig(
-                name="test_task",
+                task_name="test_task",
                 task_path="/path/to/task",
                 forecast_horizon=200,
                 context_window=100,
@@ -157,7 +157,7 @@ class TestTaskConfig:
         """Test that forecast_horizon < 1 raises ValidationError."""
         with pytest.raises(ValidationError):
             TaskConfig(
-                name="test_task",
+                task_name="test_task",
                 task_path="/path/to/task",
                 forecast_horizon=0,
                 context_window=100,
@@ -168,7 +168,7 @@ class TestTaskConfig:
         """Test that context_window < 1 raises ValidationError."""
         with pytest.raises(ValidationError):
             TaskConfig(
-                name="test_task",
+                task_name="test_task",
                 task_path="/path/to/task",
                 forecast_horizon=24,
                 context_window=0,

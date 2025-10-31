@@ -1,5 +1,5 @@
 task:
-  name: synthetic_additive2_univariate
+  task_name: additive2
   context_window: 2048
   forecast_horizon: 32
   dataset:

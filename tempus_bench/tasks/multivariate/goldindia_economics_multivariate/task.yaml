@@ -1,5 +1,5 @@
 task:
-  name: goldindia_economics_multivariate
+  task_name: economics
   context_window: 2048
   forecast_horizon: 64
   dataset:

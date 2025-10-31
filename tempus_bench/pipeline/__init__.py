@@ -17,11 +17,11 @@ Usage:
     from tempus_bench.pipeline import DataLoader, ModelExecutor
 
     # Load data
-    data_loader = DataLoader(job_config, logger=job_config.logger)
+    data_loader = DataLoader(job_config.task_config, job_config.evaluation_config)
     datasets = data_loader.load_several_chunks(3)
 
     # Execute models (runs in isolated conda environment via CLI)
-    model_executor = ModelExecutor(job_config, logger=job_config.logger)
+    model_executor = ModelExecutor(job_config)
     results = model_executor.execute_model(
         model_name='arima',
         hyperparameters={'p': 2, 'd': 1, 'q': 2},

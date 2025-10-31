@@ -15,9 +15,8 @@ The DataLoader treats all data as multivariate where univariate is simply num_ta
 Targets are kept as raw arrays without artificial column naming for maximum flexibility.
 
 Example:
-    >>> loader = DataLoader(config_path="config.yaml", run_path="./runs")
+    >>> loader = DataLoader(task_config, evaluation_config)
     >>> for window_idx, dataset in loader.generate_dataset_split(
-    ...     dataset_path="data.csv",
     ...     steps=[('context', 24), ('train', 12), ('validate', 6)],
     ...     stride=1
     ... ):
@@ -28,8 +27,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..utils.configs import JobConfig
-from ..utils.logger import LoggerManager
+from ..utils.configs import EvaluationConfig, TaskConfig
 from .data_types import Dataset, DatasetSplit
 from .preprocessor import Preprocessor
 
@@ -47,21 +45,20 @@ class DataLoader:
     artificial column naming for maximum flexibility.
     """
 
-    def __init__(self, job_config: JobConfig, logger: LoggerManager):
+    def __init__(self, task_config: TaskConfig, evaluation_config: EvaluationConfig):
         """
-        Initialize the loader for a specific job configuration.
+        Initialize the loader for a specific task and evaluation configuration.
 
         Args:
-            job_config: Aggregated configuration object that includes benchmark settings,
-                dataset metadata, and preprocessing directives for the active task.
-            logger: Logger instance for logging.
+            task_config: Task configuration object that includes dataset metadata
+                and preprocessing directives for the active task.
+            evaluation_config: Evaluation configuration object that includes
+                benchmark settings for evaluation.
         """
-        self.job_config = job_config
-        self.evaluation_config = job_config.evaluation_config
-        self.task_config = job_config.task_config
+        self.task_config = task_config
+        self.evaluation_config = evaluation_config
         task_path = Path(self.task_config.task_path)
         self.dataset_path = task_path / self.task_config.dataset.file_name
-        self.logger = logger
 
         self._load_dataset()
 
@@ -100,11 +97,14 @@ class DataLoader:
         normalize = self.task_config.dataset.normalize
         handle_missing = self.task_config.dataset.handle_missing
 
-        preprocessor = Preprocessor(self.job_config, self.logger)
+        preprocessor = Preprocessor(self.task_config, self.evaluation_config)
         # All targets are 2D after cleaning: (n_steps, n_variates)
         timestamps, time_start, time_freq, target, scaler = preprocessor.clean(
             time_start, time_freq, target_raw, normalize, handle_missing
         )
+
+        assert target.ndim == 2  # (num_steps, num_targets)
+        assert timestamps.ndim == 1  # (num_steps,)
 
         # Construct the Dataset with dynamically assigned splits from steps
         self.dataset = Dataset(
@@ -117,56 +117,3 @@ class DataLoader:
                 "time_freq": time_freq,
             },
         )
-
-    def generate_dataset_split(self, steps: list[tuple[str, int]], stride: int):
-        """
-        Generate rolling windows over a time series with configurable segments.
-
-        Creates sliding windows over the time series data, where each window is split
-        into multiple segments (e.g., context, train, validation) as specified.
-
-        Args:
-            dataset_path (str): Path to the CSV dataset file to process.
-            steps (list[tuple[str, int]]): List of (segment_name, num_steps) tuples
-                defining how to split each window. Example:
-                [('context', 24), ('train', 12), ('validate', 6)]
-            stride (int): Number of time steps to advance between consecutive windows.
-                stride=1 creates overlapping windows, stride=window_size creates non-overlapping.
-
-        Yields:
-            tuple[int, Dataset]: Generator yielding (window_index, dataset) pairs where:
-                - window_index (int): Zero-based index of the current window
-                - dataset (Dataset): Dataset object containing the window data with
-                    segment splits (context, train, validation, etc.) and metadata
-                stride=1 creates overlapping windows, stride=window_size creates non-overlapping.
-
-        Notes:
-            - Windows are limited by the `evaluation.max_windows` configuration parameter.
-            - Each yielded `Dataset` includes timestamps, target data, scaler, and metadata.
-            - Target data is preprocessed and normalized by the `Preprocessor`.
-        """
-        self.logger.debug("DataLoader", f"Extracting data from {self.dataset_path}")
-
-        # Resolve actual dataset file path and load task-specific options
-
-        num_steps = self.dataset.target.shape[
-            0
-        ]  # (n_steps, n_features): first dim is time-steps
-        window_size = sum(seg_len for (_, seg_len) in steps)
-        max_windows = self.evaluation_config.max_windows
-
-        window_idx = 0
-        while window_idx < max_windows:
-            start = window_idx * stride
-            end = start + window_size
-            if end > num_steps:
-                break
-
-            # Compute segment ranges for each step
-            splits = {}
-            for seg_name, seg_len in steps:
-                end = start + seg_len
-                splits[seg_name] = DatasetSplit(start=start, end=end)
-                start = end
-
-            yield splits

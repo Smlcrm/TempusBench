@@ -22,7 +22,7 @@ from .configs import (
     TaskConfig,
     convert_pydantic_errors,
 )
-from .logger import LoggerManager
+from .log_manager import LogManager
 from .paths import (
     get_project_root,
     get_models_dir,
@@ -53,7 +53,7 @@ class Manager:
         task_path (str): Task path pattern from the benchmark configuration.
         models_evalated (KeysView): Keys of models to be evaluated.
         run_path (str): Path to run directory for outputs.
-        logger (LoggerManager): Logger instance for logging (includes both standard and TensorBoard logging).
+        logger (LogManager): Logger instance for logging (includes both standard and TensorBoard logging).
         evaluation_config (EvaluationConfig): Evaluation configuration from the benchmark configuration.
         evaluation_setting (EvaluationSetting): Global logging/runtime options from `tasks/settings.yaml`.
         models_config (Dict[str, ModelConfig]): Model hyperparameters for each model.
@@ -96,6 +96,9 @@ class Manager:
         # Initialize logger first (needed by Manager)
 
         # Setup paths and settings
+
+        # Initialize unified logger with both standard and TensorBoard logging
+
         self.config_path = config_path
 
         config_data = self._load_config(self.config_path)
@@ -105,15 +108,10 @@ class Manager:
 
         self.models_evaluated = config_data["model"].keys()
 
-        self.task_path = config_data["task_path"]
+        self.task_path = config_data["evaluation"]["task_path"]
 
         self.evaluation_config = EvaluationConfig(**config_data["evaluation"])
         self.evaluation_setting = EvaluationSetting(**evaluation_setting)
-
-        self.model_configs = self.init_models_config(config_data["model"])
-        self.model_settings = self.init_model_setting()
-
-        self.task_configs = self.init_tasks()
 
         run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.runs_path = get_project_root() / "runs"
@@ -122,8 +120,7 @@ class Manager:
 
         tensorboard_dir = str(Path(self.run_path) / "tensorboard")
 
-        # Initialize unified logger with both standard and TensorBoard logging
-        self.logger = LoggerManager(
+        self.logger = LogManager(
             logs_path=str(self.logs_path),
             console_logging=self.evaluation_setting.console_logging,
             file_logging=self.evaluation_setting.file_logging,
@@ -138,8 +135,10 @@ class Manager:
             f"Initializing run at {run_timestamp}; logs at: {self.logs_path}",
         )
 
-        # Keep tf_logger as an alias for backward compatibility
-        self.tf_logger = self.logger
+        self.model_configs = self.init_models_config(config_data["model"])
+        self.model_settings = self.init_model_setting()
+
+        self.task_configs = self.init_tasks()
 
     def init_tasks(self) -> Dict[str, TaskConfig]:
         """
@@ -158,19 +157,29 @@ class Manager:
         task_configs = {}
         tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
 
-        for task_name, task_path in tasks.items():
-            from pathlib import Path
+        for task_path in tasks.values():
 
             task_config_path = Path(task_path) / "task.yaml"
 
-            task_data = self._load_config(task_config_path)
-            dataset_config = DatasetConfig(**task_data["task"].pop("dataset"))
-            task_configs[task_name] = TaskConfig(
-                name=task_name,
-                **task_data["task"],
-                task_path=task_path,
-                dataset=dataset_config,
-            )
+
+            with open(task_config_path, "r") as f:
+                tasks_data = list(yaml.safe_load_all(f))
+
+            for task_data in tasks_data:
+                
+                dataset_file = task_data["task"]["dataset"]["file_name"]
+                
+                dataset_name = Path(dataset_file).stem
+                
+                task_name = f"{dataset_name}_{task_data['task']['task_name']}"
+                dataset_config = DatasetConfig(**task_data['task'].pop('dataset'))
+
+                task_configs[task_name] = TaskConfig(
+                    task_name=task_name,
+                    task_path=str(task_path),
+                    **task_data['task'],
+                    dataset=dataset_config,
+                )
 
         return task_configs
 
@@ -190,6 +199,8 @@ class Manager:
             model_hparams[model_name] = ModelConfig(
                 model_name=model_name, **models_config[model_name]
             )
+        self.logger.info("Manager", f"model_hparams: {model_hparams}")
+
         return model_hparams
 
     def init_model_setting(self) -> Dict[str, Any]:

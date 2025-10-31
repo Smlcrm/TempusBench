@@ -1,5 +1,5 @@
 task:
-  name: electricity_energy_univariate
+  task_name: energy
   context_window: 256
   forecast_horizon: 8
   dataset:

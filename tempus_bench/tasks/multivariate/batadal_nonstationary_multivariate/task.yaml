@@ -1,5 +1,5 @@
 task:
-  name: batadal_nonstationary_multivariate
+  task_name: nonstationary
   context_window: 1536
   forecast_horizon: 8
   dataset:

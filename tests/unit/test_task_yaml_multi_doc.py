@@ -16,6 +16,7 @@ from tempus_bench.utils.configs import TaskConfig
 def sample_task_yaml_content():
     """Sample task.yaml content with multiple task configs."""
     return """task:
+  task_name: test_task
   forecast_horizon: 24
   context_window: 50
   dataset:     file_name: test_dataset
@@ -23,6 +24,7 @@ def sample_task_yaml_content():
     handle_missing: interpolate
 ---
 task:
+  task_name: test_task
   forecast_horizon: 48
   context_window: 100
   dataset:     file_name: test_dataset
@@ -35,6 +37,7 @@ task:
 def single_task_yaml_content():
     """Sample task.yaml content with single task config."""
     return """task:
+  task_name: test_task
   forecast_horizon: 24
   context_window: 50
   dataset:     file_name: test_dataset
@@ -47,6 +50,7 @@ def single_task_yaml_content():
 def invalid_task_yaml_content():
     """Invalid task.yaml content (missing 'task' key in one document)."""
     return """task:
+  task_name: test_task
   forecast_horizon: 24
   context_window: 50
   dataset:     file_name: test_dataset
@@ -294,6 +298,7 @@ class TestTaskYamlMultiDoc:
     def test_invalid_task_config_schema(self, tmp_path):
         """Test that invalid task config schema raises ValidationError."""
         invalid_yaml = """task:
+  task_name: test_task
   forecast_horizon: 24
   # Missing context_window and dataset
 """

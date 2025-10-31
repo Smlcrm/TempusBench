@@ -1,5 +1,5 @@
 task:
-  name: multivariate_test
+  task_name: test
   context_window: 64
   forecast_horizon: 8
   dataset:

@@ -324,7 +324,9 @@ class TestManagerValidateModelSettings:
             "tempus_bench.utils.manager.get_models_dir",
             return_value=models_dir.parent,
         ):
-            with pytest.raises(ValueError):  # _load_config raises ValueError for invalid YAML
+            with pytest.raises(
+                ValueError
+            ):  # _load_config raises ValueError for invalid YAML
                 Manager.init_model_setting(manager)
 
     def test_validate_model_settings_filters_by_main_model(self, tmp_path):
@@ -368,7 +370,8 @@ class TestManagerValidateTaskConfigs:
         manager.logger = Mock()
 
         with patch(
-            "tempus_bench.utils.manager.find_task_directories", return_value={"task1": str(task_dir)}
+            "tempus_bench.utils.manager.find_task_directories",
+            return_value={"task1": str(task_dir)},
         ):
             with pytest.raises(ValidationError, match="Task config not found"):
                 Manager.init_tasks(manager)
@@ -392,7 +395,7 @@ class TestManagerValidateTaskConfigs:
             }
         }
         task_file.write_text(yaml.dump(task_data))
-        
+
         # Note: Manager.init_tasks will add task_path automatically
 
         # Create the CSV file that the test expects
@@ -404,7 +407,8 @@ class TestManagerValidateTaskConfigs:
         manager.logger = Mock()
 
         with patch(
-            "tempus_bench.utils.manager.find_task_directories", return_value={"test_task": str(task_dir)}
+            "tempus_bench.utils.manager.find_task_directories",
+            return_value={"test_task": str(task_dir)},
         ):
             result = Manager.init_tasks(manager)
             assert "test_task" in result
@@ -439,7 +443,8 @@ task:
         manager.logger = Mock()
 
         with patch(
-            "tempus_bench.utils.manager.find_task_directories", return_value={"test_task": str(task_dir)}
+            "tempus_bench.utils.manager.find_task_directories",
+            return_value={"test_task": str(task_dir)},
         ):
             # Note: The Manager's init_tasks expects single task config per file
             # Multi-doc support would need to be checked separately
@@ -464,7 +469,8 @@ task:
         manager.logger = Mock()
 
         with patch(
-            "tempus_bench.utils.manager.find_task_directories", return_value={"test_task": str(task_dir)}
+            "tempus_bench.utils.manager.find_task_directories",
+            return_value={"test_task": str(task_dir)},
         ):
             with pytest.raises(ValidationError):
                 Manager.init_tasks(manager)
@@ -482,7 +488,8 @@ task:
         manager.logger = Mock()
 
         with patch(
-            "tempus_bench.utils.manager.find_task_directories", return_value={"test_task": str(task_dir)}
+            "tempus_bench.utils.manager.find_task_directories",
+            return_value={"test_task": str(task_dir)},
         ):
             with pytest.raises(ValueError, match="empty or invalid YAML"):
                 Manager.init_tasks(manager)
@@ -491,12 +498,17 @@ task:
 class TestManagerFullIntegration:
     """Test suite for full Manager initialization."""
 
-    @patch("tempus_bench.utils.manager.LoggerManager")
+    @patch("tempus_bench.utils.manager.LogManager")
     @patch("tempus_bench.utils.manager.get_project_root")
     @patch("tempus_bench.utils.manager.get_models_dir")
     @patch("tempus_bench.utils.manager.get_tasks_dir")
     def test_config_manager_full_initialization(
-        self, mock_tasks_dir, mock_models_dir, mock_get_project_root, mock_logger, tmp_path
+        self,
+        mock_tasks_dir,
+        mock_models_dir,
+        mock_get_project_root,
+        mock_logger,
+        tmp_path,
     ):
         """Test full Manager initialization to cover __init__ lines 61-68."""
         # Setup project root structure
@@ -505,7 +517,7 @@ class TestManagerFullIntegration:
         tempus_bench_dir.mkdir()
         config_dir = tempus_bench_dir / "config"
         config_dir.mkdir()
-        
+
         # Setup benchmark config
         config_file = project_root / "benchmark.yaml"
         config_data = {
@@ -572,9 +584,7 @@ class TestManagerExceptionHandling:
     """Test suite for exception handling paths."""
 
     @patch("tempus_bench.utils.manager.get_logger")
-    def test_validate_config_validation_error_handling(
-        self, mock_logger, tmp_path
-    ):
+    def test_validate_config_validation_error_handling(self, mock_logger, tmp_path):
         """Test ValidationError handling in config validation."""
         config_file = tmp_path / "benchmark.yaml"
         # Create invalid config that will trigger ValidationError
@@ -650,7 +660,8 @@ class TestManagerTaskConfigBranch:
         manager.logger = Mock()
 
         with patch(
-            "tempus_bench.utils.manager.find_task_directories", return_value={"test_task": str(task_dir)}
+            "tempus_bench.utils.manager.find_task_directories",
+            return_value={"test_task": str(task_dir)},
         ):
             with pytest.raises(ValidationError):
                 Manager.init_tasks(manager)

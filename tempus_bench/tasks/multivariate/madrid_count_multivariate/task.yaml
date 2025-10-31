@@ -1,5 +1,5 @@
 task:
-  name: madrid_count_multivariate
+  task_name: count
   context_window: 2048
   forecast_horizon: 64
   dataset:

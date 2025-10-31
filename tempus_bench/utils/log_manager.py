@@ -22,7 +22,7 @@ os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 
-class LoggerManager:
+class LogManager:
     """
     Unified logging utility for orchestration, status messages, and TensorBoard logging.
 
@@ -30,7 +30,41 @@ class LoggerManager:
     - Standard Python logging to console and/or file
     - TensorBoard logging for metrics, plots, and hyperparameters
     - Independent control over each logging type
+
+    This class implements a singleton pattern where the first instance created is stored
+    in `LogManager.log_manager`, and subsequent instantiations return the same instance.
     """
+
+    log_manager: Optional["LogManager"] = None
+
+    @staticmethod
+    def get_logger() -> "LogManager":
+        """
+        Get the LogManager singleton instance.
+
+        Returns:
+            LogManager: The singleton LogManager instance.
+
+        Raises:
+            RuntimeError: If LogManager has not been initialized yet.
+        """
+        if LogManager.log_manager is None:
+            raise RuntimeError(
+                "LogManager has not been initialized. Please create a LogManager instance first."
+            )
+        return LogManager.log_manager
+
+    def __new__(cls, *args, **kwargs):
+        """
+        Override __new__ to implement singleton pattern.
+
+        Returns the first instance created, stored in cls.log_manager.
+        If no instance exists yet, creates a new one and stores it.
+        """
+        if cls.log_manager is None:
+            cls.log_manager = super().__new__(cls)
+            cls.log_manager._initialized = False
+        return cls.log_manager
 
     def __init__(
         self,
@@ -50,6 +84,9 @@ class LoggerManager:
         Note: Logger and SummaryWriter objects are always created regardless of flag values.
         The actual logging behavior is controlled by `enable_logging` and `tensorboard_logging`.
 
+        Note: This method only initializes the logger on the first call. Subsequent
+        instantiations will return the same instance without re-initialization.
+
         Args:
             logs_path: Directory to write standard log files
             name: Name for the logger instance
@@ -61,6 +98,10 @@ class LoggerManager:
             tf_logs_path: Directory to write TensorBoard log files (optional, defaults to logs_path/tensorboard)
             tensorboard_logging: Controls whether TensorBoard logging methods actually log (SummaryWriter is always created)
         """
+        # Prevent re-initialization of singleton instance
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+
         self.name = name
         self.enable_logging = enable_logging
         self.tensorboard_logging = tensorboard_logging
@@ -112,6 +153,9 @@ class LoggerManager:
         # Always create TensorBoard writer
         os.makedirs(self.tf_logs_path, exist_ok=True)
         self.tf_writer = tf.summary.create_file_writer(self.tf_logs_path)
+
+        # Mark as initialized
+        self._initialized = True
 
     def _should_log(self) -> bool:
         """Check if standard logging should occur."""

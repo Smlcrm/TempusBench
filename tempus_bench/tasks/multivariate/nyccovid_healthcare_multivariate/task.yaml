@@ -1,5 +1,5 @@
 task:
-  name: nyccovid_healthcare_multivariate
+  task_name: healthcare
   context_window: 1536
   forecast_horizon: 16
   dataset:

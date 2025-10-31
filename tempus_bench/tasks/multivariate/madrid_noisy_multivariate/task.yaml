@@ -1,5 +1,5 @@
 task:
-  name: madrid_noisy_multivariate
+  task_name: noisy
   context_window: 2048
   forecast_horizon: 64
   dataset:

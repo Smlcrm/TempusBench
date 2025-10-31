@@ -8,7 +8,7 @@ from typing import Any, Dict
 import numpy as np
 
 from ..metrics.base_metric import BaseMetric
-from ..utils.logger import LoggerManager
+from ..utils.log_manager import LogManager
 from ..utils.paths import get_available_metrics
 
 

@@ -1,6 +1,7 @@
 """
 Seasonal Naive model implementation.
 """
+
 import numpy as np
 import pandas as pd
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 from sktime.forecasting.naive import NaiveForecaster
 
 from ...base_model import BaseModel, validate_inputs
+
 
 class SeasonalNaiveHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
@@ -29,7 +31,7 @@ class SeasonalNaiveModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> "SeasonalNaiveModel":
         """
         Train the Seasonal Naive model on given data. For this model, "training"
@@ -66,7 +68,7 @@ class SeasonalNaiveModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ):
         """
         Make predictions using the trained Seasonal Naive model.

@@ -70,7 +70,7 @@ tempus_bench/
 └── utils/                     # Utility functions
     ├── __init__.py
     ├── envs.py               # Conda environment management
-    ├── logger.py             # Unified logging (standard and TensorBoard)
+    ├── log_manager.py        # Unified logging (standard and TensorBoard)
     ├── model_config.py       # Model configuration handling
     └── paths.py              # Path management
 ```
@@ -128,13 +128,29 @@ The pipeline automatically handles:
 
 ```python
 from tempus_bench.pipeline.data_loader import DataLoader
+from tempus_bench.utils.configs import TaskConfig, EvaluationConfig, DatasetConfig
+
+# Create task and evaluation configurations
+task_config = TaskConfig(
+    name="chickenpox_dense_univariate",
+    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    forecast_horizon=25,
+    context_window=50,
+    dataset=DatasetConfig(
+        file_name="chickenpox_dense_univariate.csv",
+        normalize=True,
+        handle_missing="interpolate"
+    )
+)
+
+evaluation_config = EvaluationConfig(
+    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    max_windows=10,
+    max_num_variates=None
+)
 
 # Initialize data loader
-data_loader = DataLoader(
-    config_path="config/benchmark.yaml",
-    tasks_dir="tempus_bench/tasks",
-    run_dir="./runs"
-)
+data_loader = DataLoader(task_config, evaluation_config)
 
 # Generate rolling windows
 steps = [
@@ -143,14 +159,13 @@ steps = [
     ('validate', 25)
 ]
 window_iter = data_loader.generate_dataset_split(
-    dataset_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate/chickenpox_dense_univariate.csv",
     steps=steps,
     stride=1
 )
 
 # Iterate over windows
-for window_idx, window in window_iter:
-    print(f"Context: {window.context}, Train: {window.train}, Validate: {window.validate}")
+for window_idx, window_splits in window_iter:
+    print(f"Window {window_idx}: {window_splits}")
 ```
 
 ### 4. Flexible Configuration
@@ -209,7 +224,7 @@ model:
 2. **Install dependencies**:
    ```bash
    # Run the installation script
-   ./install.sh
+   source install.sh
    ```
 
 3. **Verify installation**:
@@ -261,23 +276,19 @@ runner.run()
 ```python
 from tempus_bench.utils.manager import Manager
 from tempus_bench.pipeline.model_executor import ModelExecutor
-from tempus_bench.utils.logger import LoggerManager
+from tempus_bench.utils.log_manager import LogManager
 
 # First, create a Manager to load configurations
-logger = LoggerManager(logs_path="./logs", console_logging=True, file_logging=True)
 manager = Manager(
     config_path="tempus_bench/config/benchmark.yaml",
-    run_path="./runs",
-    logger=logger
 )
 
 # Get a job config
 job_config, _ = next(manager.generate_run_configs())
 
-# Initialize executor with model settings and logger
+# Initialize executor
 executor = ModelExecutor(
-    model_settings=job_config.model_settings,
-    logger=logger
+    job_config=job_config
 )
 
 # Execute a single model with specific hyperparameters

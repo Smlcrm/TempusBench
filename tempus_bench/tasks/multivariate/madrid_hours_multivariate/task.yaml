@@ -1,5 +1,5 @@
 task:
-  name: madrid_hours_multivariate
+  task_name: hours
   context_window: 2048
   forecast_horizon: 64
   dataset:

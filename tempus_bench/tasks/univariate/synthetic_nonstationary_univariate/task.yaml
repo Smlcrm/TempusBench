@@ -1,5 +1,5 @@
 task:
-  name: synthetic_nonstationary_univariate
+  task_name: nonstationary
   context_window: 2048
   forecast_horizon: 32
   dataset:
