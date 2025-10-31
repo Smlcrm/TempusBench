@@ -2,18 +2,15 @@
 Model evaluation.
 """
 
+import importlib
+import inspect
 from typing import Any, Dict
 
 import numpy as np
 
-from ..metrics.crps import CRPS
-from ..metrics.mae import MAE
-from ..metrics.mape import MAPE
-from ..metrics.mase import MASE
-from ..metrics.quantile_score import QuantileScore
-from ..metrics.rmse import RMSE
-from ..metrics.weighted_interval_score import WeightedIntervalScore
+from ..metrics.base_metric import BaseMetric
 from ..utils.logger import LoggerManager
+from ..utils.paths import get_available_metrics
 
 
 class MetricRegistry:
@@ -24,15 +21,7 @@ class MetricRegistry:
         Args:
             logger: Logger instance to use for logging (optional)
         """
-        self.metric_registry = {
-            "rmse": RMSE(),
-            "mae": MAE(),
-            "mase": MASE(),
-            "mape": MAPE(),
-            "crps": CRPS(),
-            "quantile_score": QuantileScore(),
-            "weighted_interval_score": WeightedIntervalScore(),
-        }
+        self.metric_registry = self._build_metric_registry()
         self.stochastic_metrics = [
             metric_name
             for metric_name, metric in self.metric_registry.items()
@@ -84,3 +73,50 @@ class MetricRegistry:
                 num_quantiles=kwargs["num_quantiles"],
             )
         return results
+
+    def _build_metric_registry(self) -> Dict[str, BaseMetric]:
+        """
+        Dynamically build metric registry from available metric files.
+
+        Returns:
+            Dict[str, BaseMetric]: Dictionary mapping metric names to metric instances
+        """
+        metric_registry = {}
+        metric_files = get_available_metrics()
+
+        for metric_file in metric_files:
+            # Convert file path to module name
+            # e.g., /path/to/tempus_bench/metrics/mae.py -> tempus_bench.metrics.mae
+            file_stem = metric_file.stem  # e.g., "mae", "quantile_score"
+
+            # Find the tempus_bench part in the path
+            parts = metric_file.parts
+            try:
+                tempus_bench_idx = parts.index("tempus_bench")
+                # Construct module name: tempus_bench.metrics.{file_stem}
+                module_parts = parts[tempus_bench_idx:]
+                module_name = ".".join(module_parts[:-1]) + "." + file_stem
+            except ValueError:
+                # Fallback: assume standard structure
+                module_name = f"tempus_bench.metrics.{file_stem}"
+
+            try:
+                # Import the module
+                module = importlib.import_module(module_name)
+
+                # Find the class that inherits from BaseMetric
+                for name, obj in inspect.getmembers(module, inspect.isclass):
+                    if (
+                        issubclass(obj, BaseMetric)
+                        and obj is not BaseMetric
+                        and obj.__module__ == module_name
+                    ):
+                        # Use file stem as the registry key (e.g., "mae", "quantile_score")
+                        metric_registry[file_stem] = obj()
+                        break
+
+            except (ImportError, AttributeError) as e:
+                # Skip files that can't be imported or don't have valid metric classes
+                continue
+
+        return metric_registry

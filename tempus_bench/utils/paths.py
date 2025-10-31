@@ -55,23 +55,6 @@ def get_models_dir() -> Path:
     return models_dir
 
 
-# TODO: REMOVE
-def get_configs_dir() -> Path:
-    """
-    Get the absolute path to the configs directory.
-
-    Returns:
-        Path: Absolute path to tempus_bench/config/
-
-    Raises:
-        FileNotFoundError: If the configs directory doesn't exist
-    """
-    configs_dir = get_project_root() / "tempus_bench" / "config"
-    if not configs_dir.exists():
-        raise FileNotFoundError(f"Configs directory not found: {configs_dir}")
-    return configs_dir
-
-
 def get_available_models() -> set:
     """
     Get all available model names from the models directory structure.
@@ -252,3 +235,36 @@ def ensure_directory_exists(path: Path) -> None:
         path: Path to the directory to ensure exists
     """
     path.mkdir(parents=True, exist_ok=True)
+
+
+def get_available_metrics() -> list[Path]:
+    """
+    Get all files containing subclasses of the BaseMetric class.
+
+    This function scans the metrics directory for Python files and assumes all files
+    (except base_metric.py, __init__.py, and cache files) contain BaseMetric subclasses.
+
+    Returns:
+        list[Path]: List of absolute file paths containing BaseMetric subclasses
+
+    Raises:
+        FileNotFoundError: If the metrics directory doesn't exist
+    """
+    # Get the absolute path to the metrics directory
+    metrics_dir = get_project_root() / "tempus_bench" / "metrics"
+    if not metrics_dir.exists():
+        raise FileNotFoundError(f"Metrics directory not found: {metrics_dir}")
+
+    metric_files = []
+
+    # Scan all Python files in the metrics directory
+    for file_path in metrics_dir.glob("*.py"):
+        # Skip files starting with "." or "__", and base_metric.py
+        if (
+            not file_path.name.startswith(".")
+            and not file_path.name.startswith("__")
+            and file_path.name != "base_metric.py"
+        ):
+            metric_files.append(file_path.resolve())
+
+    return metric_files

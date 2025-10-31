@@ -25,7 +25,6 @@ from .configs import (
 from ..utils.logger import LoggerManager
 from ..utils.paths import (
     get_project_root,
-    get_configs_dir,
     get_models_dir,
     get_task_path,
     get_tasks_dir,
