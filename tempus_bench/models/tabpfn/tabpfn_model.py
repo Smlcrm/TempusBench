@@ -5,7 +5,7 @@ import pandas as pd
 from pydantic import BaseModel as PydanticBaseModel, Field
 from tabpfn import TabPFNRegressor
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class TabpfnHyperparams(PydanticBaseModel):
@@ -53,7 +53,6 @@ class TabpfnModel(BaseModel):
         # Build time features and fit TabPFN on the context window
         X_hist = make_time_features(len(y_hist)).values
         regressor = TabPFNRegressor()
-        self.logger.info("TabPFNModel.predict", "Fitting TabPFN")
         regressor.fit(X_hist, y_hist)
 
         # Roll out forecasts in chunks

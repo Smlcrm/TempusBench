@@ -1,6 +1,7 @@
 """
 Multivariate VARMAX model.
 """
+
 import math
 import os
 import pickle
@@ -14,7 +15,7 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 from statsmodels.tsa.statespace.varmax import VARMAX
 from statsmodels.tsa.stattools import adfuller
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 warnings.filterwarnings("ignore")
 
@@ -24,7 +25,10 @@ class VarmaxHyperparams(PydanticBaseModel):
     p: int = Field(..., ge=0, description="Number of AR parameters")
     q: int = Field(..., ge=0, description="Number of MA parameters")
     # Fixed Hyperparameters - Optional for User to override
-    trend: Literal["c", "t", "ct"] = Field(default="c", description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)")
+    trend: Literal["c", "t", "ct"] = Field(
+        default="c",
+        description="Deterministic trend: 'c' (constant), 't' (linear), 'ct' (both)",
+    )
 
 
 class VarmaxModel(BaseModel):
@@ -64,11 +68,7 @@ class VarmaxModel(BaseModel):
 
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
-            model = VARMAX(
-                endog=y_context, exog=None,
-                order=(p, q),
-                trend=trend
-            )
+            model = VARMAX(endog=y_context, exog=None, order=(p, q), trend=trend)
 
             self._model = model.fit()
 
@@ -106,7 +106,7 @@ class VarmaxModel(BaseModel):
 
         forecast_steps = timestamps_target.shape[0]
         forecasts = self._model.forecast(steps=forecast_steps)
-        return np.asarray(forecasts).T # (forecast_steps, num_targets)
+        return np.asarray(forecasts)  # (forecast_steps, num_targets)
 
     def _convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
