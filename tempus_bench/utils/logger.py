@@ -32,8 +32,6 @@ class LoggerManager:
     - Independent control over each logging type
     """
 
-    logger: LoggerManager
-
     def __init__(
         self,
         logs_path: str,
@@ -49,37 +47,37 @@ class LoggerManager:
         """
         Initialize logger with configuration for both standard and TensorBoard logging.
 
+        Note: Logger and SummaryWriter objects are always created regardless of flag values.
+        The actual logging behavior is controlled by `enable_logging` and `tensorboard_logging`.
+
         Args:
             logs_path: Directory to write standard log files
             name: Name for the logger instance
-            enable_logging: Master switch for standard logging (if False, no standard logging occurs)
-            console_logging: Whether to log to console
-            file_logging: Whether to log to file
+            enable_logging: Controls whether standard logging methods actually log (Logger is always created)
+            console_logging: Whether to create console handler
+            file_logging: Whether to create file handler
             console_log_level: Console logging level (DEBUG, INFO, WARNING, ERROR)
             file_log_level: File logging level (DEBUG, INFO, WARNING, ERROR)
             tf_logs_path: Directory to write TensorBoard log files (optional, defaults to logs_path/tensorboard)
-            tensorboard_logging: Whether to enable TensorBoard logging (optional)
+            tensorboard_logging: Controls whether TensorBoard logging methods actually log (SummaryWriter is always created)
         """
         self.name = name
         self.enable_logging = enable_logging
-        self.console_logging = console_logging
-        self.file_logging = file_logging
-        self.console_log_level = console_log_level
-        self.file_log_level = file_log_level
-        self.tensorboard_logging = tensorboard_logging
+        self.tensorboard_logging = (
+            tensorboard_logging if tensorboard_logging is not None else False
+        )
 
-        # Create log directory if file logging is enabled
-        if enable_logging and file_logging:
-            Path(logs_path).mkdir(parents=True, exist_ok=True)
+        # Always create log directory
+        Path(logs_path).mkdir(parents=True, exist_ok=True)
 
-        # Setup standard logger
+        # Always setup standard logger
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all levels
         # Clear any existing handlers to avoid duplicates
         self.logger.handlers.clear()
 
-        # Console handler (configurable level) - only if enabled
-        if enable_logging and console_logging:
+        # Always create console handler (configurable level)
+        if console_logging:
             console_handler = logging.StreamHandler(sys.stdout)
             # Convert string level to logging constant
             log_level = getattr(logging, console_log_level.upper(), logging.INFO)
@@ -90,8 +88,8 @@ class LoggerManager:
             console_handler.setFormatter(console_format)
             self.logger.addHandler(console_handler)
 
-        # File handler (configurable level) - only if enabled
-        if enable_logging and file_logging:
+        # Always create file handler (configurable level)
+        if file_logging:
             log_file = Path(logs_path) / f"{name}.log"
             file_handler = logging.FileHandler(log_file)
             # Convert string level to logging constant
@@ -106,18 +104,16 @@ class LoggerManager:
         # Prevent propagation to root logger
         self.logger.propagate = False
 
-        # Setup TensorBoard logging
+        # Always setup TensorBoard logging
         if tf_logs_path is None:
             # Default to tensorboard subdirectory of logs_path
             self.tf_logs_path = str(Path(logs_path).parent / "tensorboard")
         else:
             self.tf_logs_path = tf_logs_path
 
-        if tensorboard_logging:
-            os.makedirs(self.tf_logs_path, exist_ok=True)
-            self.tf_writer = tf.summary.create_file_writer(self.tf_logs_path)
-        else:
-            self.tf_writer = None
+        # Always create TensorBoard writer
+        os.makedirs(self.tf_logs_path, exist_ok=True)
+        self.tf_writer = tf.summary.create_file_writer(self.tf_logs_path)
 
     def _should_log(self) -> bool:
         """Check if standard logging should occur."""
@@ -125,7 +121,7 @@ class LoggerManager:
 
     def _should_log_tensorboard(self) -> bool:
         """Check if TensorBoard logging should occur."""
-        return self.tensorboard_logging and self.tf_writer is not None
+        return self.tensorboard_logging
 
     # ==================== Standard Logging Methods ====================
 
@@ -219,7 +215,7 @@ class LoggerManager:
         buf = io.BytesIO()
         figure.savefig(buf, format="png")
         buf.seek(0)
-        image = tf.image.decode_png(buf.getvalue(), channels=4)
+        image = tf.image.decode_png(buf.getvalue())
         image = tf.expand_dims(image, 0)
         with self.tf_writer.as_default():
             tf.summary.image(tag, image, step=step)
@@ -240,7 +236,7 @@ class LoggerManager:
         try:
             with open(image_path, "rb") as f:
                 data = f.read()
-            image = tf.image.decode_image(data, channels=4)
+            image = tf.image.decode_image(data)
             image = tf.expand_dims(image, 0)
             with self.tf_writer.as_default():
                 tf.summary.image(tag, image, step=step)
@@ -334,5 +330,4 @@ class LoggerManager:
 
     def close(self):
         """Closes the TensorBoard writer to ensure all data is written to disk."""
-        if self.tf_writer is not None:
-            self.tf_writer.close()
+        self.tf_writer.close()
