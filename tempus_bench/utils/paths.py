@@ -76,7 +76,8 @@ def get_available_models() -> set:
         ):
             # Check if it has a model file
             model_file = model_folder / f"{model_folder.name}_model.py"
-            if model_file.exists():
+            settings_file = model_folder / "settings.yaml"
+            if model_file.exists() and settings_file.exists():
                 available_models.add(model_folder.name)
 
     return available_models

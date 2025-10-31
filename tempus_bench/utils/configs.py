@@ -13,9 +13,7 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
 
-
-from .log_manager import LogManager
-
+from tempus_bench.utils.paths import get_available_models
 
 ######################################################## UTILITY FUNCTIONS ########################################################
 
@@ -81,6 +79,7 @@ class EvaluationConfig(BaseModel):
     )
     max_num_variates: Optional[int] = Field(
         default=None,
+        ge=1,
         description="Maximum number of variates to extract from dataset for evaluation (use None for all variates)",
     )
     num_samples: int = Field(
@@ -98,27 +97,6 @@ class EvaluationConfig(BaseModel):
         description="Statistic to use for converting stochastic predictions to point forecasts",
     )
 
-    # @field_validator("max_num_variates")
-    # @classmethod
-    # def validate_max_num_variates(cls, v):
-    #     """Validate max_num_variates is either inf or a positive number."""
-    #     if v == None:
-    #         return v
-    #     if isinstance(v, (int, float)) and v < 1:
-    #         raise ValueError("max_num_variates must be at least 1 or inf")
-    #     return v
-
-    # @field_validator("tuning_loss")
-    # @classmethod
-    # def validate_tuning_loss(cls, v):
-    #     """Validate that tuning_loss is a deterministic metric."""
-    #     allowed_metrics = {"mae", "mase", "mape", "rmse"}
-    #     if v is not None and v not in allowed_metrics:
-    #         raise ValueError(
-    #             f"tuning_loss must be one of: {', '.join(sorted(allowed_metrics))}"
-    #         )
-    #     return v
-
 
 class ModelConfig(BaseModel):
     """
@@ -134,58 +112,31 @@ class ModelConfig(BaseModel):
             to lists of candidate values for grid search.
     """
 
-    # TODO: Validate that every class variable other than model_name is a list of values
+    model_config = ConfigDict(extra="forbid")
+
+    # Model identifier
     model_name: str = Field(..., description="Model name")
 
-    # @model_validator(mode="after")
-    # def validate_model_availability(self):
-    #     """
-    #     Validate that all models specified in config are available.
+    @classmethod
+    def validate_model_config(cls, model_config: dict):
+        """
+        Validate that every object in the model_config dict is a list (of any type).
 
-    #     This method checks that each model specified in the configuration
-    #     has a corresponding model file in the models directory structure.
+        Args:
+            model_config (dict): The dictionary to validate.
 
-    #     Raises:
-    #         ValueError: If any specified model is not available in the models directory
-    #     """
-    #     available_models = get_available_models()
-    #     model_dict = self.model_dump(exclude_none=True)
-
-    #     for model_name in model_dict.keys():
-    #         if model_name not in available_models:
-    #             raise ValueError(
-    #                 f"Model '{model_name}' is not available. "
-    #                 f"Available models: {sorted(available_models)}"
-    #             )
-    #     return self
-
-    # @field_validator("*", mode="before")
-    # @classmethod
-    # def validate_model_parameters(cls, v, info):
-    #     """Validate model parameters structure."""
-    #     if v is None:
-    #         return v
-
-    #     if not isinstance(v, dict):
-    #         raise ValueError(f"Model parameters must be a dict, got {type(v).__name__}")
-
-    #     # Traditional models should have lists of values for hyperparameter tuning
-    #     for param_name, param_val in v.items():
-    #         if not isinstance(param_val, list):
-    #             raise ValueError(
-    #                 f"Parameter '{param_name}' for model '{info.field_name}' must be a list of values, "
-    #                 f"got {type(param_val).__name__}"
-    #             )
-    #         if len(param_val) == 0:
-    #             raise ValueError(
-    #                 f"Parameter '{param_name}' for model '{info.field_name}' cannot be an empty list"
-    #             )
-
-    #     return v
+        Raises:
+            ValueError: If any value in model_config is not a list.
+        """
+        for k, v in model_config.items():
+            if not isinstance(v, list):
+                raise ValueError(
+                    f"All values in model_config must be lists. "
+                    f"Key '{k}' has value of type {type(v).__name__}."
+                )
 
 
 ######################################################## TASK CONFIGS ########################################################
-
 
 class DatasetConfig(BaseModel):
     """
