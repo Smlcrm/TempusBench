@@ -9,8 +9,8 @@ model evaluation across multiple task-model combinations.
 import argparse
 import datetime
 import os
-import tempfile
 import pickle
+import shutil
 
 from pathlib import Path
 
@@ -60,14 +60,13 @@ class BenchmarkRunner:
     def __enter__(self):
 
         # Create the temporary directory at a specific path (e.g., under project root "temp")
-        temp_root = Path(get_project_root()) / "temp_task_datasets"
-        temp_root.mkdir(parents=True, exist_ok=True)
+        self.temp_task_datasets_dir = Path(get_project_root()) / "temp_task_datasets"
+        self.temp_task_datasets_dir.mkdir(parents=True, exist_ok=True)
 
-        self.temp_task_datasets_dir = tempfile.TemporaryDirectory(dir=str(temp_root))
-
+        # self.temp_task_datasets_dir = temp_root
         for task_name, task_config in self.manager.task_configs.items():
 
-            task_path = Path(self.temp_task_datasets_dir.name) / task_name
+            task_path = Path(self.temp_task_datasets_dir) / f"{task_name}.pkl"
             data_loader = DataLoader(task_config, self.manager.evaluation_config)
 
             dataset = data_loader.dataset
@@ -75,11 +74,11 @@ class BenchmarkRunner:
             with open(task_path, "wb") as f:
                 pickle.dump(dataset, f)
 
-
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.temp_task_datasets_dir.cleanup()
+        # self.temp_task_datasets_dir.cleanup()
+        shutil.rmtree(self.temp_task_datasets_dir)
         self.logger.close()
 
     def run(self):

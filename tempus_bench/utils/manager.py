@@ -160,23 +160,22 @@ class Manager:
 
             task_config_path = Path(task_path) / "task.yaml"
 
-
             with open(task_config_path, "r") as f:
                 tasks_data = list(yaml.safe_load_all(f))
 
             for task_data in tasks_data:
-                
+
                 dataset_file = task_data["task"]["dataset"]["file_name"]
-                
+
                 dataset_name = Path(dataset_file).stem
-                
-                task_name = f"{dataset_name}_{task_data['task']['task_name']}"
-                dataset_config = DatasetConfig(**task_data['task'].pop('dataset'))
+
+                task_name = f"{dataset_name}_{task_data['task'].pop('task_name')}"
+                dataset_config = DatasetConfig(**task_data["task"].pop("dataset"))
 
                 task_configs[task_name] = TaskConfig(
                     task_name=task_name,
                     task_path=str(task_path),
-                    **task_data['task'],
+                    **task_data["task"],
                     dataset=dataset_config,
                 )
 
@@ -195,9 +194,12 @@ class Manager:
         """
         model_hparams = {}
         for model_name in self.models_evaluated:
+            print("MODEL_NAME: ", model_name)
+            print("MODELS_CONFIG[MODEL_NAME]: ", models_config[model_name])
             model_hparams[model_name] = ModelConfig(
                 model_name=model_name, **models_config[model_name]
             )
+            print("MODEL_HPARAMS[MODEL_NAME]: ", model_hparams[model_name])
         self.logger.info("Manager", f"model_hparams: {model_hparams}")
 
         return model_hparams
