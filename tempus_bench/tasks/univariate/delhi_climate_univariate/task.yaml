@@ -1,5 +1,5 @@
 task:
-  name: delhi_climate_univariate
+  task_name: climate
   context_window: 1024
   forecast_horizon: 16
   dataset:

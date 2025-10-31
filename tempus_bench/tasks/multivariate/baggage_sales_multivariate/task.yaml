@@ -1,5 +1,5 @@
 task:
-  name: baggage_sales_multivariate
+  task_name: sales
   context_window: 32
   forecast_horizon: 16
   dataset:

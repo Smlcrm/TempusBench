@@ -13,8 +13,11 @@ evaluation:
   point_forecast_statistic: mean
 
 model:
-  # Universal Models
-  lafn_hybrid: {}
+  # # Universal Models
+  # lafn_hybrid: {}
+
+  seasonal_naive: 
+    sp: [12, 24]
 
   # Deterministic Models
   # arima:

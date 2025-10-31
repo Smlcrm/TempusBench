@@ -1,5 +1,5 @@
 task:
-  name: employees_healthcare_univariate
+  task_name: healthcare
   context_window: 128
   forecast_horizon: 8
   dataset:

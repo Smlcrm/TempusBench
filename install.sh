@@ -4,9 +4,11 @@
 echo "🚀 Installing SMLCRM Benchmark Pipeline..."
 
 echo "🔧 Creating conda environment tempus_bench..."
-conda create -n tempus_bench python=3.11.13
+conda create -y -n tempus_bench python=3.11.13
+
 
 echo "🔧 Activating conda environment tempus_bench..."
+conda init bash
 conda activate tempus_bench
 
 
@@ -17,4 +19,4 @@ pip install -e .
 echo "✅ Installation complete!"
 echo ""
 echo "🎯 You can now run benchmarks with:"
-echo "   python tempus_bench/run_benchmark.py --config tempus_bench/configs/all_model_univariate.yaml"
+echo "   python tempus_bench/run_benchmark.py --config tempus_bench/config/benchmark.yaml"

@@ -1,5 +1,5 @@
 task:
-  name: soil_nature_univariate
+  task_name: nature
   context_window: 256
   forecast_horizon: 16
   dataset:

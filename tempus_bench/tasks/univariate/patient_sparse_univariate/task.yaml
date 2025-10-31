@@ -1,5 +1,5 @@
 task:
-  name: patient_sparse_univariate
+  task_name: sparse
   context_window: 2048
   forecast_horizon: 64
   dataset:

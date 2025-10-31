@@ -8,13 +8,13 @@ validation, type checking, and documentation of the benchmarking pipeline.
 import yaml
 
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
 
-if TYPE_CHECKING:
-    from .logger import LoggerManager
+
+from .log_manager import LogManager
 
 
 ######################################################## UTILITY FUNCTIONS ########################################################
@@ -47,6 +47,8 @@ class EvaluationConfig(BaseModel):
     """Evaluation configuration model."""
 
     model_config = ConfigDict(extra="forbid")
+
+    task_path: str = Field(..., description="Task path")
 
     tuning_loss: Optional[Literal["mae", "mase", "mape", "rmse"]] = Field(
         default="mae",
@@ -102,8 +104,7 @@ class EvaluationConfig(BaseModel):
 class ModelConfig(BaseModel):
     """Model configuration model."""
 
-    model_config = ConfigDict(extra="forbid")
-
+    # TODO: Validate that every class variable other than model_name is a list of values
     model_name: str = Field(..., description="Model name")
 
     # @model_validator(mode="after")
@@ -173,7 +174,7 @@ class TaskConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(..., description="Task name (must match folder name)")
+    task_name: str = Field(..., description="Task name (must match folder name)")
     task_path: str = Field(..., description="Task path")
     forecast_horizon: int = Field(
         ..., ge=1, le=128, description="Number of steps to forecast ahead (max 128)"

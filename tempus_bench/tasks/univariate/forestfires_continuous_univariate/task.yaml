@@ -1,5 +1,5 @@
 task:
-  name: forestfires_continuous_univariate
+  task_name: continuous
   context_window: 256
   forecast_horizon: 8
   dataset:

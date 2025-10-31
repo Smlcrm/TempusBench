@@ -1,5 +1,5 @@
 task:
-  name: indiagold_days_multivariate
+  task_name: days
   context_window: 2048
   forecast_horizon: 64
   dataset:

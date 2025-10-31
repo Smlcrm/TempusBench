@@ -16,17 +16,15 @@ import importlib.util
 import tempfile
 import pickle
 
-from .data_loader import DataLoader
-from .data_types import Dataset
+
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from tempus_bench.utils.configs import JobConfig
 from tempus_bench.utils.envs import CondaEnvManager
-from tempus_bench.utils.logger import LoggerManager
+from tempus_bench.utils.log_manager import LogManager
+from tempus_bench.utils.paths import get_project_root, get_models_dir
 
-
-from ..utils.paths import get_models_dir, get_tasks_dir
 
 
 class ModelExecutor:
@@ -40,17 +38,14 @@ class ModelExecutor:
     def __init__(
         self,
         job_config: JobConfig,
-        logger: LoggerManager,
     ):
         """
         Initialize the executor with execution metadata.
 
         Args:
             job_config: Job configuration object.
-            logger: Logger instance for logging.
         """
         self.job_config = job_config
-        self.logger = logger
 
     def execute_model(
         self,
@@ -75,7 +70,7 @@ class ModelExecutor:
             dict: Evaluation metrics and optional artifacts produced by the model command.
         """
         model_name = self.job_config.model_config.model_name
-        self.logger.info(
+        LogManager.get_logger().info(
             "ModelExecutor",
             f"Executing model {model_name} with hyperparameters {hyperparameters}",
         )
@@ -90,8 +85,10 @@ class ModelExecutor:
             reinstall=self.job_config.evaluation_setting.reinstall_conda,
         )
 
+
         with tempfile.TemporaryDirectory() as temp_dir:
             job_config_path = os.path.join(temp_dir, "job_config.pkl")
+            
             with open(job_config_path, "wb") as f:
                 pickle.dump(self.job_config, f)
 
@@ -100,6 +97,7 @@ class ModelExecutor:
             hyperparameters_json = json.dumps(hyperparameters)
             command = (
                 f"python -m tempus_bench.pipeline.model_executor "
+                f"--task-name {self.job_config.task_config.task_name} "
                 f"--model-name {model_name} "
                 f"--hyperparameters '{hyperparameters_json}' "
                 f"--context-steps {context_steps} "
@@ -108,11 +106,13 @@ class ModelExecutor:
                 f"--job-config-path {job_config_path} "
             )
 
-            self.logger.debug("ModelExecutor", f"Running command: {command}")
+            LogManager.get_logger().debug(
+                "ModelExecutor", f"Running command: {command}"
+            )
 
             result = conda_env.run(command=command)
 
-            self.logger.success(
+            LogManager.get_logger().success(
                 "ModelExecutor", f"Command ran successfully for model {model_name}"
             )
 
@@ -160,6 +160,9 @@ def main():
         description="Execute a forecasting model with specific hyperparameters on a dataset window"
     )
     parser.add_argument(
+        "--task-name", type=str, required=True, help="Temporary task dataset path"
+    )
+    parser.add_argument(
         "--model-name", required=True, help="Name of the model to execute"
     )
     parser.add_argument(
@@ -177,21 +180,27 @@ def main():
     parser.add_argument(
         "--job-config-path", required=True, help="Path to job configuration file"
     )
+    
 
     args = parser.parse_args()
 
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
 
+
     # Load configuration to get JobConfig
 
     with open(args.job_config_path, "rb") as f:
         job_config = pickle.load(f)
 
-    # Access logger from job_config
-    logger = job_config.logger
-    data_loader = DataLoader(job_config, logger)
-    dataset = data_loader.dataset
+
+    task_name = args.task_name
+    temp_task_dataset_path = Path(get_project_root()) / "temp_task_datasets" / task_name
+    
+    with open(temp_task_dataset_path, "rb") as f:
+        dataset = pickle.load(f)
+
+    # Create data loader
     context_steps = args.context_steps
     train_steps = args.train_steps
     validate_steps = args.validate_steps
@@ -203,8 +212,9 @@ def main():
         ("validate", validate_steps),
     ]
 
-    window_generator = data_loader.generate_dataset_split(
-        steps=steps, stride=args.validate_steps
+
+    window_generator = dataset.generate_dataset_split(
+        steps=steps, stride=args.validate_steps, max_windows=job_config.evaluation_config.max_windows
     )
 
     outputs = []

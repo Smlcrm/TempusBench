@@ -1,5 +1,5 @@
 task:
-  name: ltstock_longest_multivariate
+  task_name: longest
   context_window: 2048
   forecast_horizon: 64
   dataset:

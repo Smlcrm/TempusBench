@@ -1,5 +1,5 @@
 task:
-  name: splitsmart_energy_multivariate
+  task_name: energy
   context_window: 2048
   forecast_horizon: 64
   dataset:

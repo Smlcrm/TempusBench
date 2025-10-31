@@ -1,5 +1,5 @@
 task:
-  name: invetories_manufacturing_univariate
+  task_name: manufacturing
   context_window: 128
   forecast_horizon: 8
   dataset:

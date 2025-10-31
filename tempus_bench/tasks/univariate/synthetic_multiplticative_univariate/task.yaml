@@ -1,5 +1,5 @@
 task:
-  name: synthetic_multiplticative_univariate
+  task_name: multiplticative
   context_window: 2048
   forecast_horizon: 32
   dataset:

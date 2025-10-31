@@ -1,5 +1,5 @@
 task:
-  name: madrid_transport_multivariate
+  task_name: transport
   context_window: 2048
   forecast_horizon: 64
   dataset:

@@ -1,5 +1,5 @@
 task:
-  name: goldindia_continuous_multivariate
+  task_name: continuous
   context_window: 2048
   forecast_horizon: 64
   dataset:
