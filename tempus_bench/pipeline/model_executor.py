@@ -1,11 +1,11 @@
 """
 Model executor for isolated benchmarking runs.
 
-This module provides the ModelExecutor class that executes individual models
-in isolated conda environments to avoid dependency conflicts.
-It handles model execution with specific hyperparameters and returns evaluation results.
+This module provides the ModelExecutor class that executes individual models in
+isolated conda environments to avoid dependency conflicts. It handles model execution
+with specific hyperparameters and returns evaluation results.
 
-Can also be invoked directly from CLI as:
+The module can also be invoked directly from the command line:
     python -m tempus_bench.pipeline.model_executor --model-name <name> --hyperparameters '{}' ...
 """
 
@@ -29,10 +29,15 @@ from tempus_bench.utils.paths import get_project_root, get_models_dir
 
 class ModelExecutor:
     """
-    Execute a single model inside its dedicated Conda environment.
+    Executes a single model inside its dedicated Conda environment.
 
     The executor prepares the command-line invocation, ensures the requested environment
-    is available, and parses JSON results emitted by the child process.
+    is available, and parses JSON results emitted by the child process. This isolation
+    allows different models to have conflicting dependencies without interference.
+
+    Attributes:
+        job_config (JobConfig): Complete job configuration including task and model settings.
+        logger (LoggerManager): Logger instance for logging operations.
     """
 
     def __init__(
@@ -55,19 +60,27 @@ class ModelExecutor:
         validate_steps: int,
     ) -> dict:
         """
-        Execute a single model with specific hyperparameters on a specific dataset window.
+        Execute a single model with specific hyperparameters on dataset windows.
+
+        This method creates or uses an existing conda environment for the model, executes
+        the model via CLI with the specified hyperparameters, and processes the results
+        across multiple rolling windows of the dataset.
 
         Args:
-            model_name: Registered name of the model implementation to execute.
-            hyperparameters: Concrete hyperparameter assignment to forward to the model.
-            context_steps: Number of context steps extracted from each window.
-            train_steps: Number of steps used for fitting inside each window.
-            validate_steps: Number of steps reserved for evaluation.
-            task_path: Absolute path to the dataset folder that holds the CSV payload.
-            window_idx: Index of the window to use for execution.
+            hyperparameters (dict): Concrete hyperparameter assignment to forward to
+                the model.
+            context_steps (int): Number of context steps extracted from each window.
+            train_steps (int): Number of steps used for fitting inside each window.
+            validate_steps (int): Number of steps reserved for evaluation.
 
         Returns:
-            dict: Evaluation metrics and optional artifacts produced by the model command.
+            dict: List of dictionaries containing evaluation metrics and optional
+                artifacts (predictions, true values) produced by the model for each
+                window. Each dictionary contains metrics and results for one window.
+
+        Raises:
+            RuntimeError: If model execution fails in the conda environment.
+            ValueError: If no valid JSON output is found in command results.
         """
         model_name = self.job_config.model_config.model_name
         LogManager.get_logger().info(
@@ -134,9 +147,18 @@ class ModelExecutor:
 
         return eval_results
 
-    def _get_model_requirements(self, model_name: str):
+    def _get_model_requirements(self, model_name: str) -> str:
         """
-        Returns the absolute path to requirements.txt for the requested model.
+        Get the absolute path to requirements.txt for the requested model.
+
+        Args:
+            model_name (str): Name of the model to get requirements for.
+
+        Returns:
+            str: Absolute path to the requirements.txt file for the model.
+
+        Raises:
+            FileNotFoundError: If requirements.txt is not found at the expected path.
         """
         # Models are now directly in the models directory
         models_dir = get_models_dir()
@@ -154,7 +176,26 @@ class ModelExecutor:
 def main():
     """
     CLI entry point for executing a model with specific hyperparameters.
-    Uses DataLoader to handle complex data formats.
+
+    This function parses command-line arguments, loads the job configuration, executes
+    the model across multiple rolling windows, and outputs evaluation results as JSON.
+    The model is loaded dynamically based on the model name, and predictions are computed
+    for each validation window.
+
+    Command-line Arguments:
+        --model-name: Name of the model to execute.
+        --hyperparameters: JSON string of hyperparameter values.
+        --context-steps: Number of context steps.
+        --train-steps: Number of training steps.
+        --validate-steps: Number of validation steps.
+        --job-config-path: Path to pickled job configuration file.
+
+    Returns:
+        None: Results are printed to stdout as JSON.
+
+    Raises:
+        ImportError: If the model module cannot be loaded.
+        ValueError: If required arguments are missing or invalid.
     """
     parser = argparse.ArgumentParser(
         description="Execute a forecasting model with specific hyperparameters on a dataset window"

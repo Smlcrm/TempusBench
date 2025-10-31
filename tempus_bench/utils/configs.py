@@ -24,14 +24,17 @@ def convert_pydantic_errors(validation_error: PydanticValidationError) -> str:
     """
     Convert Pydantic validation errors to a readable string format.
 
-    This method takes a Pydantic ValidationError and formats it into a human-readable
-    string that shows the field path and error message for each validation failure.
+    This function takes a Pydantic ValidationError and formats it into a
+    human-readable string that shows the field path and error message for
+    each validation failure.
 
     Args:
-        validation_error: The Pydantic ValidationError to convert
+        validation_error (PydanticValidationError): The Pydantic ValidationError
+            to convert.
 
     Returns:
         str: Formatted error string with field paths and error messages
+            separated by semicolons.
     """
     error_messages = []
     for error in validation_error.errors():
@@ -44,7 +47,23 @@ def convert_pydantic_errors(validation_error: PydanticValidationError) -> str:
 
 
 class EvaluationConfig(BaseModel):
-    """Evaluation configuration model."""
+    """
+    Evaluation configuration model.
+
+    This class defines the configuration parameters for model evaluation including
+    tuning loss selection, window generation, and metric computation settings.
+
+    Attributes:
+        tuning_loss (Optional[Literal["mae", "mase", "mape", "rmse"]]): Loss metric
+            for hyperparameter tuning. Only deterministic metrics allowed.
+        max_windows (int): Maximum number of rolling windows to generate for evaluation.
+        max_num_variates (Optional[int]): Maximum number of variates to extract from
+            dataset. None means all variates.
+        num_samples (int): Number of samples to generate for stochastic metrics.
+        num_quantiles (int): Number of quantiles to compute for quantile-based metrics.
+        point_forecast_statistic (str): Statistic to use for converting stochastic
+            predictions to point forecasts (e.g., "mean").
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -102,7 +121,18 @@ class EvaluationConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    """Model configuration model."""
+    """
+    Model configuration model.
+
+    This class defines the configuration for a single model including its name
+    and hyperparameter search space. The hyperparameter values are specified as
+    lists to enable grid search over all combinations.
+
+    Attributes:
+        model_name (str): Name of the model (must match folder name in models directory).
+        model_config (Dict[str, List[Any]]): Dictionary mapping hyperparameter names
+            to lists of candidate values for grid search.
+    """
 
     # TODO: Validate that every class variable other than model_name is a list of values
     model_name: str = Field(..., description="Model name")
@@ -158,7 +188,18 @@ class ModelConfig(BaseModel):
 
 
 class DatasetConfig(BaseModel):
-    """Dataset configuration model for individual task folders."""
+    """
+    Dataset configuration model for individual task folders.
+
+    This class defines dataset-specific configuration including file name,
+    missing value handling strategy, and normalization settings.
+
+    Attributes:
+        handle_missing (Literal[...]): Strategy for handling missing values.
+            Options: 'interpolate', 'mean', 'median', 'drop', 'forward_fill', 'backward_fill'.
+        file_name (str): Dataset file name (CSV file).
+        normalize (bool): Whether to normalize the data using StandardScaler.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -170,7 +211,19 @@ class DatasetConfig(BaseModel):
 
 
 class TaskConfig(BaseModel):
-    """Task configuration model for individual task folders."""
+    """
+    Task configuration model for individual task folders.
+
+    This class defines task-specific configuration including task name, paths,
+    forecast horizon, context window, and dataset settings.
+
+    Attributes:
+        name (str): Task name (must match folder name).
+        task_path (str): Path to the task directory.
+        forecast_horizon (int): Number of steps to forecast ahead (1-128).
+        context_window (int): Number of context steps for training (>=1).
+        dataset (DatasetConfig): Dataset configuration for this task.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -191,7 +244,21 @@ class TaskConfig(BaseModel):
 
 
 class EvaluationSetting(BaseModel):
-    """Systems configuration model."""
+    """
+    System-wide evaluation settings configuration.
+
+    This class defines global settings for logging, TensorBoard, and conda
+    environment management across all models and tasks.
+
+    Attributes:
+        file_logging (bool): Enable file logging.
+        file_log_level (Literal["DEBUG", "INFO", "WARNING", "ERROR"]): File logging level.
+        console_logging (bool): Enable console logging.
+        console_log_level (Literal["DEBUG", "INFO", "WARNING", "ERROR"]): Console logging level.
+        tensorboard_logging (bool): Enable TensorBoard logging.
+        conda_env_prefix (str): Prefix for conda environment names.
+        reinstall_conda (bool): Whether to reinstall conda environments for each model.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -212,7 +279,23 @@ class EvaluationSetting(BaseModel):
 
 
 class JobConfig:
-    """Unified configuration model for the benchmarking pipeline (single-model only)."""
+    """
+    Unified configuration model for a single benchmarking job.
+
+    This class aggregates all configuration components for a single job execution,
+    combining evaluation settings, model configuration, task configuration, and
+    runtime settings into a single object.
+
+    Attributes:
+        evaluation_config (EvaluationConfig): Evaluation-specific configuration.
+        evaluation_setting (EvaluationSetting): System-wide evaluation settings.
+        model_config (ModelConfig): Model-specific configuration and hyperparameters.
+        model_setting (Dict[str, Any]): Model execution settings (Python version,
+            device, conda environment).
+        task_config (TaskConfig): Task-specific configuration including dataset settings.
+        run_path (str): Path to run directory for outputs.
+        logger (LoggerManager): Logger instance for this job.
+    """
 
     def __init__(
         self,
@@ -223,6 +306,17 @@ class JobConfig:
         task_config: TaskConfig,
         run_path: str,
     ):
+        """
+        Initialize job configuration with all components.
+
+        Args:
+            evaluation_config (EvaluationConfig): Evaluation-specific configuration.
+            evaluation_setting (EvaluationSetting): System-wide evaluation settings.
+            model_config (ModelConfig): Model-specific configuration and hyperparameters.
+            model_setting (Dict[str, Any]): Model execution settings.
+            task_config (TaskConfig): Task-specific configuration.
+            run_path (str): Path to run directory for outputs.
+        """
 
         self.evaluation_config = evaluation_config
         self.evaluation_setting = evaluation_setting
