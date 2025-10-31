@@ -196,8 +196,7 @@ model:
 ### Prerequisites
 
 - Python 3.8+
-- Conda (recommended for environment management)
-- Git LFS (for large model checkpoints)
+- Conda
 
 ### Setup
 
@@ -211,11 +210,6 @@ model:
    ```bash
    # Run the installation script
    ./install.sh
-   
-   # Or manually create conda environment
-   conda create -n tempus_bench python=3.11.13
-   conda activate tempus_bench
-   pip install -e .
    ```
 
 3. **Verify installation**:
@@ -265,7 +259,7 @@ runner.run()
 ### Running Individual Models
 
 ```python
-from tempus_bench.config.manager import Manager
+from tempus_bench.utils.manager import Manager
 from tempus_bench.pipeline.model_executor import ModelExecutor
 from tempus_bench.utils.logger import LoggerManager
 

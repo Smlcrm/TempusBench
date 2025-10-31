@@ -22,8 +22,8 @@ from .configs import (
     TaskConfig,
     convert_pydantic_errors,
 )
-from ..utils.logger import LoggerManager
-from ..utils.paths import (
+from .logger import LoggerManager
+from .paths import (
     get_project_root,
     get_models_dir,
     get_task_path,

@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic import ValidationError as PydanticValidationError
 
 if TYPE_CHECKING:
-    from ..utils.logger import LoggerManager
+    from .logger import LoggerManager
 
 
 ######################################################## UTILITY FUNCTIONS ########################################################

@@ -19,7 +19,7 @@ import numpy as np
 
 from pydantic import BaseModel as PydanticBaseModel
 
-from ..config.configs import JobConfig
+from ..utils.configs import JobConfig
 from ..pipeline.metric_registry import MetricRegistry
 
 

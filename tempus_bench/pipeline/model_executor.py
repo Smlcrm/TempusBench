@@ -21,7 +21,7 @@ from .data_types import Dataset
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from tempus_bench.config import JobConfig
+from tempus_bench.utils.configs import JobConfig
 from tempus_bench.utils.envs import CondaEnvManager
 from tempus_bench.utils.logger import LoggerManager
 

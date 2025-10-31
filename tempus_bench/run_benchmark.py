@@ -4,7 +4,7 @@ import os
 
 from pathlib import Path
 
-from tempus_bench.config import Manager
+from tempus_bench.utils.manager import Manager
 from tempus_bench.pipeline.hyperparameter_tuning import HyperparameterTuner
 from tempus_bench.utils.paths import get_project_root
 
@@ -71,7 +71,7 @@ class BenchmarkRunner:
                 f"Final Model Evaluation Executed for task: {job_config.task_config.name}",
             )
 
-        # Cleanup TensorBoard writer
+        # Close logger
         self.logger.close()
 
 
@@ -89,6 +89,13 @@ if __name__ == "__main__":
 
     config_path = args.config
 
-    # Run the Benchmarks
-    runner = BenchmarkRunner(config_path=config_path)
-    runner.run()
+    try:
+        # Run the Benchmarks
+        runner = BenchmarkRunner(config_path=config_path)
+        runner.run()
+    except Exception as e:
+        print(f"Error: {e}")
+
+    finally:
+        # Close logger
+        runner.logger.close()
