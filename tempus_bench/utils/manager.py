@@ -194,12 +194,10 @@ class Manager:
         """
         model_hparams = {}
         for model_name in self.models_evaluated:
-            print("MODEL_NAME: ", model_name)
-            print("MODELS_CONFIG[MODEL_NAME]: ", models_config[model_name])
             model_hparams[model_name] = ModelConfig(
                 model_name=model_name, **models_config[model_name]
             )
-            print("MODEL_HPARAMS[MODEL_NAME]: ", model_hparams[model_name])
+
         self.logger.info("Manager", f"model_hparams: {model_hparams}")
 
         return model_hparams
