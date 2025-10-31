@@ -1,13 +1,15 @@
 """
 Exponential Smoothing model implementation.
 """
+
 from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
 from pydantic import BaseModel as PydanticBaseModel, Field
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
+
 
 class ExponentialSmoothingHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
@@ -17,31 +19,42 @@ class ExponentialSmoothingHyperparams(PydanticBaseModel):
     damped_trend: bool = Field(..., description="Whether to use damped trend")
     # Fixed Hyperparameters - Optional for User to override
     seasonal: Optional[Literal["add", "mul", "null"]] = Field(
-        default=None, description="Seasonal component: 'add', 'mul', or None (no seasonality)"
+        default=None,
+        description="Seasonal component: 'add', 'mul', or None (no seasonality)",
     )
     seasonal_periods: Optional[Union[int, Literal["null"]]] = Field(
-        default=None, ge=1, description="Number of seasonal periods (None if no seasonality)"
+        default=None,
+        ge=1,
+        description="Number of seasonal periods (None if no seasonality)",
     )
 
     @classmethod
     def validate(cls, value):
         # Only check *combinations* of values; field types/ranges handled by pydantic
-        trend = value.get('trend')
-        seasonal = value.get('seasonal')
-        seasonal_periods = value.get('seasonal_periods')
-        damped_trend = value.get('damped_trend')
+        trend = value.get("trend")
+        seasonal = value.get("seasonal")
+        seasonal_periods = value.get("seasonal_periods")
+        damped_trend = value.get("damped_trend")
 
         # 1. seasonal is set but seasonal_periods is not set
-        if seasonal in ("add", "mul") and (seasonal_periods is None or seasonal_periods == "null"):
-            raise ValueError("You must specify 'seasonal_periods' when using a seasonal component.")
+        if seasonal in ("add", "mul") and (
+            seasonal_periods is None or seasonal_periods == "null"
+        ):
+            raise ValueError(
+                "You must specify 'seasonal_periods' when using a seasonal component."
+            )
 
         # 2. seasonal is None but seasonal_periods is set
         if (seasonal in (None, "null")) and (seasonal_periods not in (None, "null")):
-            raise ValueError("You cannot specify 'seasonal_periods' without a 'seasonal' component.")
+            raise ValueError(
+                "You cannot specify 'seasonal_periods' without a 'seasonal' component."
+            )
 
         # 3. damped_trend=True but no trend
         if (trend in (None, "null")) and damped_trend:
-            raise ValueError("Cannot use 'damped_trend' without a trend component (trend=None/'null').")
+            raise ValueError(
+                "Cannot use 'damped_trend' without a trend component (trend=None/'null')."
+            )
 
         return value
 
@@ -55,7 +68,8 @@ class ExponentialSmoothingHyperparams(PydanticBaseModel):
 
 class ExponentialSmoothingModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
-        super().__init__(params, settings, ExponentialSmoothingHyperparams)
+        super().__init__(params, settings, ExponentialSmoothingHyperparams)  # type: ignore
+        self._models = []
 
     @validate_inputs
     def _train(
@@ -64,49 +78,39 @@ class ExponentialSmoothingModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
-    ) -> "ExponentialSmoothingModel":
+        **kwargs: dict,
+    ):
         """
-        Train a single Exponential Smoothing model on univariate data.
-        """
-        self.logger.debug(
-            "ExponentialSmoothingModel._train",
-            f"y_context type: {type(y_context)}, shape: {getattr(y_context, 'shape', 'N/A')}"
-        )
+        Fit the Exponential Smoothing model on the provided context data.
 
-        trend = self.trend
-        seasonal = self.seasonal
-        seasonal_periods = self.seasonal_periods
-        damped_trend = self.damped_trend
+        Args:
+            y_context (np.ndarray): Historical target values for model fitting.
+            y_target (np.ndarray): Future target values (unused; included for compatibility).
+            timestamps_context (np.ndarray): Timestamps corresponding to y_context (unused).
+            timestamps_target (np.ndarray): Timestamps corresponding to y_target (unused).
+
+        Returns:
+            The fitted ExponentialSmoothing model instance.
+
+        Notes:
+            Only y_context is used for fitting the Exponential Smoothing model. All other arguments are ignored to avoid data leakage.
+        """
+        trend = self.trend  # type: ignore
+        seasonal = self.seasonal  # type: ignore
+        seasonal_periods = self.seasonal_periods  # type: ignore
+        damped_trend = self.damped_trend  # type: ignore
 
         endog = y_context.squeeze()
 
-        self.logger.debug(
-            "ExponentialSmoothingModel._train",
-            f"endog shape: {endog.shape}, first 5 values: {endog[:5]}"
-        )
-        self.logger.debug(
-            "ExponentialSmoothingModel._train",
-            (
-                f"parameters: trend={trend}, seasonal={seasonal}, "
-                f"seasonal_periods={seasonal_periods}, damped_trend={damped_trend}"
-            )
-        )
-        try:
-            self._model = ExponentialSmoothing(
-                endog=endog,
-                trend=trend,
-                seasonal=seasonal,
-                seasonal_periods=seasonal_periods,
-                damped_trend=damped_trend,
-            ).fit()
-            self.is_fitted = True
-            self.logger.info("ExponentialSmoothingModel._train", "Model fitted successfully")
-        except Exception as e:
-            self.logger.error("ExponentialSmoothingModel._train", f"Error fitting model: {e}")
-            raise
+        fitted_model = ExponentialSmoothing(
+            endog=endog,
+            trend=trend,
+            seasonal=seasonal,
+            seasonal_periods=seasonal_periods,
+            damped_trend=damped_trend,
+        ).fit()
 
-        return self
+        return fitted_model
 
     @validate_inputs
     def train(
@@ -115,70 +119,68 @@ class ExponentialSmoothingModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> "ExponentialSmoothingModel":
         """
-        Trains a separate Exponential Smoothing model for each variate in the input data.
+        Trains a separate Exponential Smoothing model for each variate in a (potentially multivariate) time series.
 
-        Assumes y_context and y_target are 2D ndarrays: (num_steps, num_targets).
+        Expects y_context and y_target as 2D arrays: (num_steps, num_targets).
         """
         num_targets = y_context.shape[1]
-        self.logger.debug("ExponentialSmoothingModel.train", f"Number of variates detected: {num_targets}")
 
-        self._models = []
         for idx in range(num_targets):
-            self.logger.debug("ExponentialSmoothingModel.train", f"Training variate index {idx}")
-            model = ExponentialSmoothingModel(params=self.dict())
-            model._train(
-                y_context=y_context[:, idx],
-                y_target=y_target[:, idx],
+            fitted_model = self._train(
+                y_context=y_context[:, idx : idx + 1],
+                y_target=y_target[:, idx : idx + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
                 **kwargs,
             )
-            self._models.append(model)
+            self._models.append(fitted_model)
+
         self.is_fitted = True
-        self.logger.info(
-            "ExponentialSmoothingModel.train",
-            f"Training completed for {num_targets} variate(s)."
-        )
+
         return self
 
     @validate_inputs
     def _predict(
         self,
+        fitted_model,
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> np.ndarray:
         """
-        Predict using a single Exponential Smoothing model on univariate data.
+        Predicts future values using the trained Exponential Smoothing model.
+
+        Args:
+            fitted_model: The fitted ExponentialSmoothing model instance.
+            y_context: Past target values (unused, present for interface consistency)
+            timestamps_context: Context timestamps (unused)
+            timestamps_target: Timestamps for the forecast horizon
+
+        Returns:
+            np.ndarray: Predictions with shape (forecast_horizon, 1)
+
+        Raises:
+            ValueError: If the model is not fitted or forecast horizon is invalid.
         """
         if not self.is_fitted:
-            raise ValueError("Model not initialized. Call train first.")
+            raise ValueError(
+                "ExponentialSmoothingModel not fitted. Call train() first."
+            )
+
+        if timestamps_target is None or len(timestamps_target) == 0:
+            raise ValueError(
+                "timestamps_target must be provided and non-empty for Exponential Smoothing prediction."
+            )
 
         forecast_steps = len(timestamps_target)
-        self.logger.debug(
-            "ExponentialSmoothingModel._predict",
-            f"Forecasting {forecast_steps} steps"
-        )
+        forecast = fitted_model.forecast(steps=forecast_steps)
+        y_pred = np.asarray(forecast).reshape(-1, 1)
 
-        try:
-            forecast = np.asarray(self._model.forecast(steps=forecast_steps))
-            if forecast.ndim == 1: forecast = forecast[:, np.newaxis]
-            self.logger.debug(
-                "ExponentialSmoothingModel._predict",
-                f"Result shape: {forecast.shape}"
-            )
-            return forecast
-
-        except Exception as e:
-            self.logger.error(
-                "ExponentialSmoothingModel._predict",
-                f"Error during forecast: {e}"
-            )
-            raise
+        return y_pred
 
     @validate_inputs
     def predict(
@@ -186,35 +188,38 @@ class ExponentialSmoothingModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        **kwargs: dict
+        **kwargs: dict,
     ) -> np.ndarray:
         """
-        Wrapper to predict per variate and stack columns for multivariate data.
+        Predicts future values for each variate and concatenates the results.
+
+        Args:
+            y_context (np.ndarray): Context values, shape (num_steps, num_variates).
+            timestamps_context (np.ndarray): Timestamps for context data.
+            timestamps_target (np.ndarray): Timestamps for target/future data.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            np.ndarray: Predictions with shape (forecast_horizon, num_variates).
+
+        Raises:
+            ValueError: If the model has not been fitted.
         """
-        self.logger.debug(
-            "ExponentialSmoothingModel.predict",
-            f"Multivariate prediction for {len(self._models)} variates"
-        )
-        preds = []
-        for target_idx, model in enumerate(self._models):
-            self.logger.debug(
-                "ExponentialSmoothingModel.predict",
-                f"Predicting for variate index {target_idx}"
+        if not self.is_fitted:
+            raise ValueError(
+                "ExponentialSmoothingModel not fitted. Call train() first."
             )
-            pred = model._predict(
-                y_context=y_context[:, target_idx],
+
+        preds = []
+        for idx, fitted_model in enumerate(self._models):
+            prediction = self._predict(
+                fitted_model=fitted_model,
+                y_context=y_context[:, idx : idx + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
-                **kwargs
+                **kwargs,
             )
-            preds.append(pred.reshape(-1, 1))
-        result = np.concatenate(preds, axis=1)
-        self.logger.debug(
-            "ExponentialSmoothingModel.predict",
-            f"Final concatenated prediction shape: {result.shape}"
-        )
-        self.logger.info(
-            "ExponentialSmoothingModel.predict",
-            "Multivariate prediction completed successfully"
-        )
+            preds.append(prediction)
+
+        result = np.concatenate(preds, axis=-1)
         return result

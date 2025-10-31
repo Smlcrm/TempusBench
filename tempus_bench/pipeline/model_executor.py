@@ -339,6 +339,7 @@ def main():
             timestamps_context=timestamps[cstart:cend],
             timestamps_target=timestamps[tstart:tend],
             freq=freq,
+            tuning_loss=job_config.evaluation_config.tuning_loss,
         )
 
         logger.info(

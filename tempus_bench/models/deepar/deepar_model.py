@@ -4,6 +4,7 @@ DeepAR model implementation for stochastic time series forecasting.
 This module provides a DeepAR model implementation that inherits from BaseModel
 and returns probabilistic forecasts through sampling.
 """
+
 import math
 import os
 import pickle
@@ -18,31 +19,42 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 from pytorch_forecasting import DeepAR, TimeSeriesDataSet
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class DeeparHyperparams(PydanticBaseModel):
-    hidden_size: Optional[int] = Field(default=32, ge=1, description="Hidden size of RNN")
-    rnn_layers: Optional[int] = Field(default=2, ge=1, description="Number of RNN layers")
-    dropout: Optional[float] = Field(default=0.1, ge=0, le=1, description="Dropout rate")
-    learning_rate: Optional[float] = Field(default=0.001, gt=0, description="Learning rate")
+    hidden_size: Optional[int] = Field(
+        default=32, ge=1, description="Hidden size of RNN"
+    )
+    rnn_layers: Optional[int] = Field(
+        default=2, ge=1, description="Number of RNN layers"
+    )
+    dropout: Optional[float] = Field(
+        default=0.1, ge=0, le=1, description="Dropout rate"
+    )
+    learning_rate: Optional[float] = Field(
+        default=0.001, gt=0, description="Learning rate"
+    )
     batch_size: Optional[int] = Field(default=64, ge=1, description="Batch size")
-    max_encoder_length: Optional[int] = Field(default=24, ge=1, description="Maximum encoder length")
-    max_prediction_length: Optional[int] = Field(default=6, ge=1, description="Maximum prediction length")
-    epochs: Optional[int] = Field(default=10, ge=1, description="Number of training epochs")
-    gradient_clip_val: Optional[float] = Field(default=0.01, gt=0, description="Gradient clipping value")
-    optimizer: Optional[Literal["adam", "adamw", "sgd"]] = Field(default="adam", description="Optimizer to use")
+    max_encoder_length: Optional[int] = Field(
+        default=24, ge=1, description="Maximum encoder length"
+    )
+    max_prediction_length: Optional[int] = Field(
+        default=6, ge=1, description="Maximum prediction length"
+    )
+    epochs: Optional[int] = Field(
+        default=10, ge=1, description="Number of training epochs"
+    )
+    gradient_clip_val: Optional[float] = Field(
+        default=0.01, gt=0, description="Gradient clipping value"
+    )
+    optimizer: Optional[Literal["adam", "adamw", "sgd"]] = Field(
+        default="adam", description="Optimizer to use"
+    )
 
-# Using this link to assist in building this model file implementation:
-# https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/deepar.html
 
-# Useful for understanding how to work with TimeSeriesDataset
-# https://pytorch-forecasting.readthedocs.io/en/latest/tutorials/building.html#passing-data
-# time_idx is the index of the particular element in the time series
-# group_ids or group is what time series the element belongs to.
-# If you only have one time series, you can set group to be 0.
 
-class DeepARModel(BaseModel):
+class DeeparModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize DeepAR model with given configuration.
@@ -63,12 +75,10 @@ class DeepARModel(BaseModel):
         else:
             values = series
 
-
         if train:
             # Increase speed of training
             list_of_sub_chunks = self._evenly_split_array(values, self.batch_size)
-            #for sub_chunk in list_of_sub_chunks:
-
+            # for sub_chunk in list_of_sub_chunks:
 
             # Each array, besides the last one, has to have the same number of elements
             list_of_ids = []
@@ -79,19 +89,23 @@ class DeepARModel(BaseModel):
                 list_of_ids.extend(current_id_list)
                 sub_chunk_idx += 1
 
-
-            dataset_altered_form = pd.DataFrame({
-                "value": values,
-                "time_idx": np.concatenate([np.arange(len(sub_chunk)) for sub_chunk in list_of_sub_chunks]),
-                "group_id": list_of_ids
-            })
+            dataset_altered_form = pd.DataFrame(
+                {
+                    "value": values,
+                    "time_idx": np.concatenate(
+                        [np.arange(len(sub_chunk)) for sub_chunk in list_of_sub_chunks]
+                    ),
+                    "group_id": list_of_ids,
+                }
+            )
         else:
-            dataset_altered_form = pd.DataFrame({
-                "value": values,
-                "time_idx": list(range(len(series))),
-                "group_id": ["0"] * len(series)
-            })
-
+            dataset_altered_form = pd.DataFrame(
+                {
+                    "value": values,
+                    "time_idx": list(range(len(series))),
+                    "group_id": ["0"] * len(series),
+                }
+            )
 
         dataset = TimeSeriesDataSet(
             dataset_altered_form,
@@ -99,28 +113,31 @@ class DeepARModel(BaseModel):
             target="value",
             group_ids=["group_id"],
             time_varying_unknown_reals=["value"],
-            max_encoder_length = self.max_encoder_length,
-            max_prediction_length = self.max_prediction_length,
-            static_categoricals=["group_id"]
+            max_encoder_length=self.max_encoder_length,
+            max_prediction_length=self.max_prediction_length,
+            static_categoricals=["group_id"],
         )
 
         return dataset
 
     def _build_model(self, training_dataset):
-        self._model = DeepAR.from_dataset(training_dataset,
-                                           learning_rate=self.learning_rate,
-                                           hidden_size=self.hidden_size,
-                                           rnn_layers=self.rnn_layers,
-                                           dropout=self.dropout)
+        self._model = DeepAR.from_dataset(
+            training_dataset,
+            learning_rate=self.learning_rate,
+            hidden_size=self.hidden_size,
+            rnn_layers=self.rnn_layers,
+            dropout=self.dropout,
+        )
 
     @validate_inputs
-    def train(self,
-              y_context: np.ndarray,
-              y_target: np.ndarray,
-              timestamps_context: np.ndarray,
-              timestamps_target: np.ndarray,
-              **kwargs,
-    ) -> 'DeepARModel':
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs,
+    ) -> "DeepARModel":
         """
         Train the DeepAR model on given data.
 
@@ -152,34 +169,37 @@ class DeepARModel(BaseModel):
 
         if self._model is None:
             self._build_model(training_dataset)
-        self.logger.info("DeepARModel.train", "Model built!")
 
         train_dataloader = training_dataset.to_dataloader(
-            train=True, batch_size=self.batch_size, batch_sampler="synchronized",
-            num_workers=self.num_workers, persistent_workers=True
+            train=True,
+            batch_size=self.batch_size,
+            batch_sampler="synchronized",
+            num_workers=self.num_workers,
+            persistent_workers=True,
         )
-        self.logger.info("DeepARModel.train", "Train Dataloader Finished")
 
-        #validation_dataloader = validation_dataset.to_dataloader(
+        # validation_dataloader = validation_dataset.to_dataloader(
         #    train=False, batch_size=self.batch_size, batch_sampler="synchronized",
         #    num_workers=self.num_workers, persistent_workers=True
-        #)
+        # )
         # TensorBoard logging is handled by the main benchmark runner
         # Create the PyTorch Lightning trainer without separate logger
-        trainer = pl.Trainer(logger=False, accelerator="auto", gradient_clip_val=self.gradient_clip_val, max_epochs=self.epochs)
-        self.logger.info("DeepARModel.train", "Trainer initialized")
-        #trainer.fit(self._model,train_dataloader,validation_dataloader)
-        trainer.fit(self._model,train_dataloader)
-        self.logger.info("DeepARModel.train", "Trainer fitted")
+        trainer = pl.Trainer(
+            logger=False,
+            accelerator="auto",
+            gradient_clip_val=self.gradient_clip_val,
+            max_epochs=self.epochs,
+        )
+        # trainer.fit(self._model,train_dataloader,validation_dataloader)
+        trainer.fit(self._model, train_dataloader)
         return self
-
 
     def predict(
         self,
         y_context: Optional[np.ndarray] = None,
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
-        **kwargs
+        **kwargs,
     ) -> np.ndarray:
         """
         Make autoregressive predictions using the trained model.
@@ -215,11 +235,11 @@ class DeepARModel(BaseModel):
             raise ValueError("Model not initialized. Call train first.")
         # Fix this so we
 
-        #train_dataset = self._series_to_TimeSeriesDataset(y_context, train=False)
-        #train_dataloader = train_dataset.to_dataloader(
+        # train_dataset = self._series_to_TimeSeriesDataset(y_context, train=False)
+        # train_dataloader = train_dataset.to_dataloader(
         #    train=False, batch_size=1, batch_sampler="synchronized",
         #    num_workers=self.num_workers, persistent_workers=True
-        #)
+        # )
 
         # Fix this code so we do sliding window inference on previously made predictions.
         all_predictions = []
@@ -232,7 +252,9 @@ class DeepARModel(BaseModel):
 
         # We need at least self.max_encoder_length+self.max_prediction_length values to get enough data to predict
         # So we get that amount of values by sampling the end of y_context
-        all_predictions.extend(values[-(self.max_encoder_length+self.max_prediction_length):])
+        all_predictions.extend(
+            values[-(self.max_encoder_length + self.max_prediction_length) :]
+        )
 
         val_length = len(y_target)
 
@@ -241,28 +263,40 @@ class DeepARModel(BaseModel):
 
             # Get enough input to formulate next prediction
 
-            current_encoder_sequence = all_predictions[-(self.max_encoder_length+self.max_prediction_length):]
-            self.logger.debug("DeepARModel.predict", "DEBUG: Current Encoder Sequence")
+            current_encoder_sequence = all_predictions[
+                -(self.max_encoder_length + self.max_prediction_length) :
+            ]
 
             # Convert to form compatible with data loader
-            current_encoder_sequence_TimeSeriesDataset = self._series_to_TimeSeriesDataset(np.array(current_encoder_sequence), train=False)
-            self.logger.debug("DeepARModel.predict", "Time Series Dataset Conversion Finished")
+            current_encoder_sequence_TimeSeriesDataset = (
+                self._series_to_TimeSeriesDataset(
+                    np.array(current_encoder_sequence), train=False
+                )
+            )
 
             # Create dataloader - dataloaders are needed to predict with Pytorch Lightning models
-            current_encoder_sequence_dataloader = current_encoder_sequence_TimeSeriesDataset.to_dataloader(
-                train=False, batch_size=1, batch_sampler="synchronized",
-                num_workers=self.num_workers, persistent_workers=True
+            current_encoder_sequence_dataloader = (
+                current_encoder_sequence_TimeSeriesDataset.to_dataloader(
+                    train=False,
+                    batch_size=1,
+                    batch_sampler="synchronized",
+                    num_workers=self.num_workers,
+                    persistent_workers=True,
+                )
             )
-            self.logger.debug("DeepARModel.predict", "Time Series Dataset Dataloader Finished")
 
             # Get the prediction for the current encoder sequence input
-            current_predictions = self._model.predict(current_encoder_sequence_dataloader).cpu().numpy()
-            self.logger.debug("DeepARModel.predict", f"Current predictions: {current_predictions}")
-            self.logger.debug("DeepARModel.predict", f"Window {window} out of {num_windows}")
+            current_predictions = (
+                self._model.predict(current_encoder_sequence_dataloader).cpu().numpy()
+            )
             # Append model predictions all_predictions, to prep for future forecasting
             all_predictions.extend(current_predictions[0])
 
-        return np.array(all_predictions[self.max_prediction_length:self.max_prediction_length+val_length])
+        return np.array(
+            all_predictions[
+                self.max_prediction_length : self.max_prediction_length + val_length
+            ]
+        )
 
     @validate_inputs
     def predict(
@@ -271,7 +305,7 @@ class DeepARModel(BaseModel):
         timestamps_context: Optional[np.ndarray] = None,
         timestamps_target: Optional[np.ndarray] = None,
         freq: str = None,
-        **kwargs
+        **kwargs,
     ) -> np.ndarray:
         """
         Make autoregressive predictions using the trained model.
@@ -299,30 +333,62 @@ class DeepARModel(BaseModel):
         values = y_context.flatten() if y_context.ndim > 1 else y_context
 
         # We need at least max_encoder_length+max_prediction_length values
-        all_predictions.extend(values[-(self._model_config["max_encoder_length"]+self._model_config["max_prediction_length"]):])
+        all_predictions.extend(
+            values[
+                -(
+                    self._model_config["max_encoder_length"]
+                    + self._model_config["max_prediction_length"]
+                ) :
+            ]
+        )
 
         val_length = forecast_horizon
-        num_windows = math.ceil(val_length / self._model_config["max_prediction_length"])
+        num_windows = math.ceil(
+            val_length / self._model_config["max_prediction_length"]
+        )
 
         deterministic_preds = []
         for window in range(num_windows):
-            current_encoder_sequence = all_predictions[-(self._model_config["max_encoder_length"]+self._model_config["max_prediction_length"]):]
+            current_encoder_sequence = all_predictions[
+                -(
+                    self._model_config["max_encoder_length"]
+                    + self._model_config["max_prediction_length"]
+                ) :
+            ]
 
             # Convert to form compatible with data loader
-            current_encoder_sequence_TimeSeriesDataset = self._series_to_TimeSeriesDataset(np.array(current_encoder_sequence), train=False)
+            current_encoder_sequence_TimeSeriesDataset = (
+                self._series_to_TimeSeriesDataset(
+                    np.array(current_encoder_sequence), train=False
+                )
+            )
 
             # Create dataloader
-            current_encoder_sequence_dataloader = current_encoder_sequence_TimeSeriesDataset.to_dataloader(
-                train=False, batch_size=1, batch_sampler="synchronized",
-                num_workers=self._model_config["num_workers"], persistent_workers=True
+            current_encoder_sequence_dataloader = (
+                current_encoder_sequence_TimeSeriesDataset.to_dataloader(
+                    train=False,
+                    batch_size=1,
+                    batch_sampler="synchronized",
+                    num_workers=self._model_config["num_workers"],
+                    persistent_workers=True,
+                )
             )
 
             # Get the prediction for the current encoder sequence input
-            current_predictions = self._model.predict(current_encoder_sequence_dataloader).cpu().numpy()
+            current_predictions = (
+                self._model.predict(current_encoder_sequence_dataloader).cpu().numpy()
+            )
             deterministic_preds.extend(current_predictions[0])
             all_predictions.extend(current_predictions[0])
 
-        deterministic_preds = np.array(deterministic_preds[self._model_config["max_prediction_length"]:self._model_config["max_prediction_length"]+val_length])
+        deterministic_preds = np.array(
+            deterministic_preds[
+                self._model_config["max_prediction_length"] : self._model_config[
+                    "max_prediction_length"
+                ]
+                + val_length
+            ]
+        )
 
         # Generate samples by adding noise to deterministic predictions
         # This is a simplified approach - real DeepAR would use the model's probabilistic output
@@ -332,7 +398,9 @@ class DeepARModel(BaseModel):
         for _ in range(num_samples):
             # Add Gaussian noise to deterministic predictions
             noise_std = np.std(deterministic_preds) * 0.1  # 10% of std as noise
-            sample = deterministic_preds + np.random.normal(0, noise_std, deterministic_preds.shape)
+            sample = deterministic_preds + np.random.normal(
+                0, noise_std, deterministic_preds.shape
+            )
             samples.append(sample)
 
         samples = np.array(samples)  # Shape: (num_samples, forecast_horizon)

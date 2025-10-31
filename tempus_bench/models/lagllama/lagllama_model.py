@@ -13,7 +13,7 @@ from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 # Add the lagllama directory to the Python path for absolute imports
 lagllama_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +48,6 @@ class LagllamaModel(BaseModel):
 
         # Model-specific attributes
         self._model = None
-        self.logger.info("LagllamaModel.__init__", f"🦙 Lag-Llama initialized - Context: {self.context_length}")
 
     def _create_predictor_for_horizon(self, forecast_horizon: int):
         """Create a predictor for a specific forecast horizon."""

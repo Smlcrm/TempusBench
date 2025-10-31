@@ -7,7 +7,7 @@ from pydantic import BaseModel as PydanticBaseModel
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 class MomentHyperparams(PydanticBaseModel):
     pass
@@ -124,7 +124,6 @@ class MomentModel(BaseModel):
                 y_context_trimmed = np.concatenate(
                     [np.zeros((pad_rows, num_targets)), y_context_scaled], axis=0
                 )
-                self.logger.warning("MomentModel.predict", f"Time Series is shorter than context_length {context_length}. Padded with zeros.")
 
             y_context_tensor = torch.from_numpy(
                 y_context_trimmed.T.copy()
@@ -140,7 +139,6 @@ class MomentModel(BaseModel):
         return forecast
 
     def _load_model(self, forecast_horizon: int):
-        self.logger.info("MomentModel._load_model", f"Loading MOMENT model for forecast horizon: {forecast_horizon}")
         self._model = MOMENTPipeline.from_pretrained(
             "AutonLab/MOMENT-1-large",
             model_kwargs={
@@ -156,4 +154,3 @@ class MomentModel(BaseModel):
         )
         self._model.init()
         self._model = self._model.to(self.device)
-        self.logger.info("MomentModel._load_model", "MOMENT model loaded successfully!")

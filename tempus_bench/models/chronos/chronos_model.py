@@ -16,7 +16,7 @@ import torch
 from chronos import ChronosPipeline as BaseChronosPipeline
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class ChronosHyperparams(PydanticBaseModel):
@@ -78,13 +78,11 @@ class ChronosModel(BaseModel):
         # Load the Chronos model fresh for each prediction (like the working version)
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.logger.info("ChronosModel.train", f"Loading Chronos model '{hf_model_name}' to device '{device}'...")
         self._model = BaseChronosPipeline.from_pretrained(
             hf_model_name,
             device_map="auto",
             torch_dtype=torch.bfloat16,
         )
-        self.logger.info("ChronosModel.train", "Chronos model loaded successfully!")
 
         self.is_fitted = True
         return self
@@ -134,7 +132,6 @@ class ChronosModel(BaseModel):
             prediction_length=forecast_horizon,
             num_samples=self.eval_config["num_samples"]
         )
-        self.logger.debug("ChronosModel.predict", f"Shape of Stochastic Forecasts {forecasts.shape}")
         forecasts = np.asarray(forecasts)
 
         # Chronos returns shape (num_targets, num_samples, forecast_horizon)
