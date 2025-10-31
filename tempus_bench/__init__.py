@@ -45,5 +45,5 @@ Usage:
 """
 
 __version__ = "1.0.0"
-__author__ = "Benchmarking Pipeline Team"
+__author__ = "Tempus Bench Pipeline Team"
 __description__ = "Comprehensive time series forecasting model benchmarking framework"

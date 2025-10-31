@@ -1,5 +1,10 @@
 """
-Model evaluation.
+Model evaluation metric registry.
+
+This module provides the MetricRegistry class which dynamically discovers and
+registers evaluation metrics from the metrics directory. It computes metrics
+based on model type (deterministic, stochastic, or hybrid) and handles both
+point and probabilistic forecasting evaluation.
 """
 
 import importlib
@@ -13,12 +18,28 @@ from ..utils.paths import get_available_metrics
 
 
 class MetricRegistry:
+    """
+    Registry for dynamically discovering and computing evaluation metrics.
+
+    The MetricRegistry automatically discovers metric classes from the metrics
+    directory and provides methods to compute all appropriate metrics based on
+    the model type. It separates deterministic and stochastic metrics and
+    applies them based on the model's capabilities.
+
+    Attributes:
+        metric_registry (Dict[str, BaseMetric]): Dictionary mapping metric names
+            to metric instances.
+        stochastic_metrics (List[str]): List of metric names that support stochastic
+            predictions.
+        deterministic_metrics (List[str]): List of metric names for point forecasts.
+    """
+
     def __init__(self):
         """
-        Initialize metric registry with configuration.
+        Initialize metric registry by discovering available metrics.
 
-        Args:
-            logger: Logger instance to use for logging (optional)
+        This method scans the metrics directory, imports metric classes, and
+        categorizes them as deterministic or stochastic based on their metric_type.
         """
         self.metric_registry = self._build_metric_registry()
         self.stochastic_metrics = [
@@ -34,17 +55,32 @@ class MetricRegistry:
 
     def compute_metrics(
         self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs: Dict[str, Any]
-    ):
+    ) -> Dict[str, Any]:
         """
         Compute evaluation metrics for model performance on given data.
 
+        This method computes all appropriate metrics based on the model type. For
+        deterministic models, only deterministic metrics are computed. For stochastic
+        or hybrid models, both deterministic and stochastic metrics are computed.
+
         Args:
-            y_true (np.ndarray): True target values.
-            y_pred (np.ndarray): Model predictions (point forecasts)
-            **metric_kwargs: Additional keyword arguments for metrics.
+            y_true (np.ndarray): True target values with shape (num_steps, num_targets).
+            y_pred (np.ndarray): Model predictions. Shape depends on model type:
+                - Deterministic: (num_steps, num_targets)
+                - Stochastic: (num_samples, num_steps, num_targets)
+                - Hybrid: Tuple of (point_forecasts, samples)
+            **kwargs (Dict[str, Any]): Additional keyword arguments for metrics:
+                - model_type (str): 'deterministic', 'stochastic', or 'hybrid' (required)
+                - point_forecast_statistic (str): Statistic for converting stochastic
+                  to point forecasts (e.g., 'mean').
+                - num_quantiles (int): Number of quantiles for quantile-based metrics.
 
         Returns:
-            dict: Dictionary of evaluation metrics.
+            Dict[str, Any]: Dictionary mapping metric names to computed metric values.
+                Values may be scalars, arrays, or nested dictionaries depending on the metric.
+
+        Raises:
+            ValueError: If model_type is not provided or is invalid.
         """
         if "model_type" not in kwargs:
             raise ValueError(
@@ -77,8 +113,14 @@ class MetricRegistry:
         """
         Dynamically build metric registry from available metric files.
 
+        This method scans the metrics directory for Python files, imports metric
+        classes that inherit from BaseMetric, and instantiates them. Metric names
+        are derived from file names (e.g., mae.py -> Mae class -> 'mae' key).
+
         Returns:
-            Dict[str, BaseMetric]: Dictionary mapping metric names to metric instances
+            Dict[str, BaseMetric]: Dictionary mapping metric names (file stems)
+                to instantiated metric instances. Only includes classes that
+                inherit from BaseMetric but are not BaseMetric itself.
         """
         metric_registry = {}
         metric_files = get_available_metrics()
