@@ -128,25 +128,29 @@ class ModelExecutor:
                 "ModelExecutor", f"Command ran successfully for model {model_name}"
             )
 
-            # Parse the JSON output from the command
-            # Find the last line that contains JSON (the script outputs debug info first)
             lines = result.stdout.strip().split("\n")
-            if "\n" in result.stdout:
-                print("RESULT.STDOUT CONTAINS NEWLINES")
-            json_line = None
-            for line in reversed(lines):
-                if line.strip().startswith("{") and line.strip().endswith("}"):
-                    json_line = line.strip()
+            outputs_line = None
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    outputs_line = stripped
                     break
 
-            if json_line is None:
+            if outputs_line is None:
                 raise ValueError(
-                    f"No valid JSON found in command output. Output was: {result.stdout}"
+                    f"No evaluation results found in stdout. "
+                    f"Expected a line starting with '[' and ending with ']'. "
+                    f"Stdout: {result.stdout[:500]}"
                 )
 
-            eval_results = json.loads(json_line)
-
-        return eval_results
+            try:
+                outputs = json.loads(outputs_line)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Error parsing evaluation results as JSON: {e}. "
+                    f"Line: {outputs_line[:200]}"
+                )
+        return outputs
 
     def _get_model_requirements(self, model_name: str) -> str:
         """
@@ -355,7 +359,10 @@ def main():
         )
         # Compute evaluation metrics
         eval_metrics = trained_model.compute_metrics(
-            y_true=target[vstart:vend], y_pred=results
+            y_true=target[vstart:vend],
+            y_pred=results,
+            point_forecast_statistic=job_config.evaluation_config.point_forecast_statistic,
+            num_quantiles=job_config.evaluation_config.num_quantiles,
         )
 
         # Include predictions in output for plotting

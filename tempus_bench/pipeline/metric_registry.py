@@ -145,12 +145,29 @@ class MetricRegistry:
                 # Import the module
                 module = importlib.import_module(module_name)
 
-                # Convert file stem to CamelCase class name
-                # e.g., "mae" -> "Mae", "quantile_score" -> "QuantileScore"
-                class_name = "".join(word.capitalize() for word in file_stem.split("_"))
+                # Try multiple naming conventions to find the metric class
+                # Single-word metrics use all-uppercase (e.g., "mae" -> "MAE")
+                # Multi-word metrics use CamelCase (e.g., "quantile_score" -> "QuantileScore")
+                class_name_candidates = []
 
-                # Get the class from the module
-                metric_class = getattr(module, class_name)
+                # If single word, try uppercase first (e.g., "mae" -> "MAE")
+                if "_" not in file_stem:
+                    class_name_candidates.append(file_stem.upper())
+
+                # Always try CamelCase (e.g., "mae" -> "Mae", "quantile_score" -> "QuantileScore")
+                class_name_candidates.append(
+                    "".join(word.capitalize() for word in file_stem.split("_"))
+                )
+
+                metric_class = None
+                for class_name in class_name_candidates:
+                    if hasattr(module, class_name):
+                        metric_class = getattr(module, class_name)
+                        break
+
+                if metric_class is None:
+                    # No matching class found in module
+                    continue
 
                 # Verify it's a subclass of BaseMetric
                 if (
