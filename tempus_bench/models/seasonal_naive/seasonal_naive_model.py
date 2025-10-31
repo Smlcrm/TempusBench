@@ -9,7 +9,7 @@ from typing import Any, Dict
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sktime.forecasting.naive import NaiveForecaster
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class SeasonalNaiveHyperparams(PydanticBaseModel):
@@ -87,7 +87,8 @@ class SeasonalNaiveModel(BaseModel):
             raise ValueError("Model is not trained yet. Call train() first.")
 
         # extract freq (validated by base pattern elsewhere if needed)
-        forecast_horizon, num_targets = timestamps_target.shape
+        forecast_horizon = timestamps_target.shape[0]
+        num_targets = y_context.shape[1]
         fh = np.arange(1, forecast_horizon + 1)
 
         predictions = np.zeros((forecast_horizon, num_targets))

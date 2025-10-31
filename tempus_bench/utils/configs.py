@@ -120,7 +120,7 @@ class EvaluationConfig(BaseModel):
     #     return v
 
 
-class ModelConfig(BaseModel):
+class ModelConfig:
     """
     Model configuration model.
 
@@ -134,54 +134,25 @@ class ModelConfig(BaseModel):
             to lists of candidate values for grid search.
     """
 
-    # TODO: Validate that every class variable other than model_name is a list of values
-    model_name: str = Field(..., description="Model name")
+    def __init__(self, model_name: str, **kwargs):
+        self.model_name = model_name
 
-    # @model_validator(mode="after")
-    # def validate_model_availability(self):
-    #     """
-    #     Validate that all models specified in config are available.
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
-    #     This method checks that each model specified in the configuration
-    #     has a corresponding model file in the models directory structure.
-
-    #     Raises:
-    #         ValueError: If any specified model is not available in the models directory
-    #     """
-    #     available_models = get_available_models()
-    #     model_dict = self.model_dump(exclude_none=True)
-
-    #     for model_name in model_dict.keys():
-    #         if model_name not in available_models:
-    #             raise ValueError(
-    #                 f"Model '{model_name}' is not available. "
-    #                 f"Available models: {sorted(available_models)}"
-    #             )
-    #     return self
-
-    # @field_validator("*", mode="before")
-    # @classmethod
-    # def validate_model_parameters(cls, v, info):
-    #     """Validate model parameters structure."""
-    #     if v is None:
-    #         return v
-
-    #     if not isinstance(v, dict):
-    #         raise ValueError(f"Model parameters must be a dict, got {type(v).__name__}")
-
-    #     # Traditional models should have lists of values for hyperparameter tuning
-    #     for param_name, param_val in v.items():
-    #         if not isinstance(param_val, list):
-    #             raise ValueError(
-    #                 f"Parameter '{param_name}' for model '{info.field_name}' must be a list of values, "
-    #                 f"got {type(param_val).__name__}"
-    #             )
-    #         if len(param_val) == 0:
-    #             raise ValueError(
-    #                 f"Parameter '{param_name}' for model '{info.field_name}' cannot be an empty list"
-    #             )
-
-    #     return v
+        # Validate: every attribute other than model_name is a list
+        for attr, val in self.__dict__.items():
+            if attr == "model_name":
+                continue
+            if not isinstance(val, list):
+                raise ValueError(
+                    f"ModelConfig: Attribute '{attr}' for model '{model_name}' must be a list of values, "
+                    f"got {type(val).__name__}."
+                )
+            if len(val) == 0:
+                raise ValueError(
+                    f"ModelConfig: Attribute '{attr}' for model '{model_name}' cannot be an empty list."
+                )
 
 
 ######################################################## TASK CONFIGS ########################################################
