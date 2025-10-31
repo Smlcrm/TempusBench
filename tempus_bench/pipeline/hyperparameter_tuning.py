@@ -105,7 +105,7 @@ class HyperparameterTuner:
 
         LogManager.get_logger().info(
             "HyperparameterTuner",
-            f"Generated hyperparameter grid for {model_name}: number of combinations = {len(grid)}",
+            f"Generated hyperparameter grid for {model_name}: the number of combinations = {len(grid)}",
         )
 
         return grid

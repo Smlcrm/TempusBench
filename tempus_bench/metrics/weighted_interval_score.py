@@ -44,7 +44,7 @@ class WeightedIntervalScore(BaseMetric):
         Raises:
             ValueError: If task_type is not 'stochastic'
         """
-        
+
         alphas = np.linspace(0.0, 1.0, num=num_quantiles)  # (num_quantiles,)
         # Exclude alpha=0 (interval width 0) for numerical stability (avoid 2/0 in IS_a)
         valid = alphas > 0
