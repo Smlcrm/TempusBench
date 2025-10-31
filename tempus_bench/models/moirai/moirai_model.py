@@ -25,7 +25,7 @@ class MoiraiModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize Moirai model.
-        
+
         Args:
             params: Model parameters dictionary
             settings: Settings dictionary containing device, python_version, etc.
@@ -59,7 +59,7 @@ class MoiraiModel(BaseModel):
         """
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
-        
+
         # Reference params, settings, device, python_version
         model_name = self.model_name
         size = self.size
@@ -68,7 +68,7 @@ class MoiraiModel(BaseModel):
         bsz = self.bsz
         test = self.test
         num_samples = self.num_samples
-        
+
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
@@ -150,9 +150,9 @@ class MoiraiModel(BaseModel):
         # Transpose from (num_targets, num_samples, prediction_length) to (num_samples, prediction_length, num_targets)
         # Then the base class will handle point forecasts if needed
         samples = np.transpose(forecast_np, (1, 2, 0))
-        
+
         # If univariate, ensure shape is (num_samples, prediction_length, 1)
         if samples.ndim == 2:
             samples = samples[:, :, np.newaxis]
-        
+
         return samples
