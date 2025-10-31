@@ -7,7 +7,7 @@ from einops import rearrange
 from pydantic import BaseModel as PydanticBaseModel, Field
 from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class MoiraiMoeHyperparams(PydanticBaseModel):
@@ -65,7 +65,6 @@ class MoiraiMoeModel(BaseModel):
         if not self.is_fitted:
             self._model_config["pdt"] = y_target.shape[0]
             self._model_config["ctx"] = y_context.shape[0]
-            self.logger.debug("MoiraiMoEModel.train", f"[DEBUG TRAINING] pdt: {self._model_config['pdt']}")
             self._model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
                     pretrained_model_name_or_path=f"Salesforce/{self._model_config['model_name']}-1.0-R-{self._model_config['size']}"

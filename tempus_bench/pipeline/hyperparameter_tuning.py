@@ -210,6 +210,15 @@ class HyperparameterTuner:
                 )
 
         num_windows = len(optimal_hyperparameters)
+        # Handle case where no evaluations were successful
+        if evaluation_metrics is None or num_windows == 0:
+            # Return empty/default results if no evaluations succeeded
+            LogManager.get_logger().warning(
+                "HyperparameterTuner",
+                f"No successful evaluations for model {self.model_name}. Returning empty results.",
+            )
+            return {}, {}
+
         # Aggregate test loss over all windows, for each metric
         test_loss = {metric: [] for metric in evaluation_metrics}  # type: ignore
         for window_j in range(num_windows - 1):

@@ -7,13 +7,14 @@ import torch
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from ...base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class TimesfmHyperparams(PydanticBaseModel):
     pass
 
-class TimesFMModel(BaseModel):
+
+class TimesfmModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize TimesFM model.
@@ -78,7 +79,9 @@ class TimesFMModel(BaseModel):
                 path=None,
                 version=self.version,
                 huggingface_repo_id=self.huggingface_repo_id,
-                local_dir=os.path.abspath(os.path.join(os.path.dirname(__file__), "checkpoints")),
-            )
+                local_dir=os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "checkpoints")
+                ),
+            ),
         )
         self.is_fitted = True
