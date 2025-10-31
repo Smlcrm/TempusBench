@@ -76,16 +76,15 @@ class Manager:
         8. Initializes task configurations
 
         Args:
-            config_path: Path to the main benchmark configuration YAML file
-            run_path: Directory for run outputs (evaluations, plots, etc.)
-            logs_path: Path to logs directory
+            config_path (str): Path to the main benchmark configuration YAML file.
 
         Initializes:
             - self.config_path: Configuration file path.
             - self.task_path: Task path pattern from the benchmark configuration.
             - self.models_evaluated: Keys of models to be evaluated.
-            - self.run_path: Path to run directory.
-            - self.logger: Logger instance.
+            - self.run_path: Path to run directory (created with timestamp).
+            - self.logs_path: Path to logs directory within run_path.
+            - self.logger: Logger instance with TensorBoard support.
             - self.tf_logger: Alias to logger instance (for backward compatibility).
             - self.evaluation_config: Evaluation configuration.
             - self.evaluation_setting: System settings (logging format, tensorboard, etc.).
@@ -266,14 +265,14 @@ class Manager:
         Load configuration from YAML file and return as dictionary.
 
         Args:
-            config_path: Path to the configuration YAML file
+            path (Union[str, Path]): Path to the configuration YAML file.
 
         Returns:
-            Dict[str, Any]: Dictionary containing the configuration data
+            Dict[str, Any]: Dictionary containing the configuration data.
 
         Raises:
-            FileNotFoundError: If the configuration file doesn't exist
-            ValueError: If the file is empty or contains invalid YAML
+            FileNotFoundError: If the configuration file doesn't exist.
+            ValueError: If the file is empty or contains invalid YAML.
         """
         path = Path(path)
 

@@ -1,3 +1,12 @@
+"""
+Hyperparameter tuning for time series forecasting models.
+
+This module provides the HyperparameterTuner class which performs rolling-window
+hyperparameter optimization using a grid search approach across multiple validation
+windows. It evaluates each hyperparameter combination and selects the best performing
+parameters based on the specified tuning loss metric.
+"""
+
 import csv
 import importlib.util
 
@@ -15,11 +24,31 @@ from .model_executor import ModelExecutor
 
 
 class HyperparameterTuner:
-    """Run rolling-window hyperparameter sweeps for the active task/model pair."""
+    """
+    Performs rolling-window hyperparameter sweeps for a task-model pair.
+
+    The tuner evaluates hyperparameter combinations across rolling validation windows,
+    selects optimal parameters based on tuning loss, generates visualizations, and
+    aggregates cross-window evaluation metrics.
+
+    Attributes:
+        job_config (JobConfig): Complete job configuration including task and model settings.
+        evaluation_config (EvaluationConfig): Evaluation-specific configuration.
+        evaluation_setting (EvaluationSetting): System-wide evaluation settings.
+        model_config (ModelConfig): Model-specific configuration and hyperparameter grid.
+        model_setting (dict): Model execution settings (device, Python version, etc.).
+        task_config (TaskConfig): Task-specific configuration including dataset metadata.
+        model_name (str): Name of the model being tuned.
+        tuning_loss (str): Loss metric used for hyperparameter selection.
+        dataset_path (Path): Path to the dataset directory.
+        dataset_file_path (Path): Path to the dataset CSV file.
+        logger (LoggerManager): Logger instance for logging operations.
+        data_loader (DataLoader): Data loader instance for accessing dataset windows.
+    """
 
     def __init__(self, job_config: JobConfig):
         """
-        Build a tuner that is pre-configured for a single job.
+        Initialize tuner with job configuration.
 
         Args:
             job_config: Fully validated `JobConfig` produced by `ConfigManager.generate_run_configs`.
@@ -40,14 +69,20 @@ class HyperparameterTuner:
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
         """
-        Materialize the Cartesian product of the configured hyperparameter search space.
+        Generate the Cartesian product of the configured hyperparameter search space.
+
+        This method creates all possible combinations of hyperparameter values from
+        the model configuration, where each hyperparameter can have multiple candidate
+        values defined as a list.
 
         Returns:
-            List[dict]: Each element is a dict mapping hyperparameter names to concrete values
-                for the single model defined in the active job.
+            List[dict]: List of dictionaries, where each dictionary maps hyperparameter
+                names to concrete values for the single model defined in the active job.
+                Each dictionary represents one hyperparameter combination to evaluate.
 
         Raises:
-            ValueError: If more than one model is defined for the job (the tuner only supports a single model).
+            ValueError: If more than one model is defined for the job (the tuner only
+                supports a single model).
         """
         model_config = self.job_config.model_config
 
@@ -73,21 +108,25 @@ class HyperparameterTuner:
         self, context_steps: int, train_steps: int, validate_steps: int
     ) -> Tuple[dict, dict]:
         """
-        Evaluate every hyperparameter combination on rolling windows and pick the best performer.
+        Evaluate every hyperparameter combination on rolling windows and select the best.
 
-        The tuner iterates over the dataset using context/train/validate windows, executes the model
-        for each hyperparameter configuration, logs metrics, generates visualizations, and aggregates
-        cross-window statistics.
+        The tuner iterates over the dataset using context/train/validate windows, executes
+        the model for each hyperparameter configuration, logs metrics, generates visualizations,
+        and aggregates cross-window statistics. The best hyperparameters are selected based on
+        the tuning loss metric averaged across validation windows.
 
         Args:
-            context_steps: Number of historical context points supplied to the model.
-            train_steps: Number of points used for the training/fit segment within each window.
-            validate_steps: Number of points reserved for evaluation within each window.
+            context_steps (int): Number of historical context points supplied to the model.
+            train_steps (int): Number of points used for the training/fit segment within
+                each window.
+            validate_steps (int): Number of points reserved for evaluation within each window.
 
         Returns:
-            Tuple[dict, dict]: Two nested dictionaries keyed by model name then dataset path.
-            The first contains averaged evaluation metrics, the second stores the ordered list
-            of window-level best hyperparameter assignments.
+            Tuple[dict, dict]: A tuple containing:
+                - First dict: Nested dictionary keyed by model name then dataset path,
+                  containing averaged evaluation metrics across windows.
+                - Second dict: Nested dictionary keyed by model name then dataset path,
+                  containing ordered lists of best hyperparameter assignments for each window.
         """
         all_evals = {}
         best_hyperparameters = {}
@@ -214,17 +253,29 @@ class HyperparameterTuner:
 
     def _generate_forecast_plot(
         self,
-        hyperparameters,
-        context_steps,
-        train_steps,
-        validate_steps,
-        window_idx,
+        hyperparameters: dict,
+        context_steps: int,
+        train_steps: int,
+        validate_steps: int,
+        window_idx: int,
     ):
         """
-        Produce and log a time-series plot contrasting predictions with the underlying window data.
+        Generate and log a time-series plot comparing predictions with actual data.
 
-        The plot contains the concatenated context/train/validation segments alongside the model
-        forecasts, and is written to disk and TensorBoard for later inspection.
+        This method creates visualization plots showing the context, training, validation,
+        and predicted segments for the specified window. The plot is saved to disk and
+        logged to TensorBoard for later inspection.
+
+        Args:
+            hyperparameters (dict): Dictionary of hyperparameter values used for this forecast.
+            context_steps (int): Number of context steps used in the window.
+            train_steps (int): Number of training steps used in the window.
+            validate_steps (int): Number of validation steps used in the window.
+            window_idx (int): Index of the window to visualize.
+
+        Note:
+            This method logs errors but does not raise exceptions, allowing the tuning
+            process to continue even if visualization fails.
         """
         try:
             import matplotlib.pyplot as plt
