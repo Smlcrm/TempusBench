@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from ..config.configs import JobConfig
+from ..utils.configs import JobConfig
 from ..utils.logger import LoggerManager
 from ..utils.paths import get_task_path
 from .data_loader import DataLoader

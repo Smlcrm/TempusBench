@@ -7,8 +7,9 @@ the main pipeline functionality.
 
 from .paths import get_available_models, find_task_directories
 
-# Configuration utilities moved to tempus_bench.config
-# Import from there instead:
-# from tempus_bench.config import ConfigValidationError, validate_config_file
+# Configuration utilities are in this package
+# Import from utils.configs or utils.manager:
+# from tempus_bench.utils.configs import JobConfig, TaskConfig, etc.
+# from tempus_bench.utils.manager import Manager, ValidationError
 
 __all__ = ["get_available_models", "find_task_directories"]

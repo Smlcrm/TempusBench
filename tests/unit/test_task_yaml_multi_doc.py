@@ -8,8 +8,8 @@ task configurations separated by '---' (YAML multi-document format).
 import pytest
 import yaml
 from pathlib import Path
-from tempus_bench.config.manager import Manager, ValidationError
-from tempus_bench.config.configs import TaskConfig
+from tempus_bench.utils.manager import Manager, ValidationError
+from tempus_bench.utils.configs import TaskConfig
 
 
 @pytest.fixture
