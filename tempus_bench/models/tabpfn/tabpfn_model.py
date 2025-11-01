@@ -3,7 +3,15 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel as PydanticBaseModel, Field
-from tabpfn import TabPFNRegressor
+
+try:
+    from tabpfn import TabPFNRegressor
+except ImportError as e:
+    raise ImportError(
+        "Failed to import TabPFNRegressor from tabpfn. "
+        "Please ensure tabpfn is installed in the conda environment. "
+        "Install with: pip install tabpfn==2.1.2"
+    ) from e
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
@@ -63,13 +71,14 @@ class TabpfnModel(BaseModel):
             # Generate future feature positions immediately following history
             X_future = make_time_features(len(y_hist) + step).values[-step:]
             y_step = regressor.predict(X_future)
-            y_step = np.asarray(y_step, dtype=np.float32)
-            preds.append(y_step.reshape(-1, 1))
+            y_step = np.asarray(y_step, dtype=np.float32).flatten()
+            preds.append(y_step)
             # Autoregressively extend history
             y_hist = np.concatenate([y_hist, y_step])
             remaining -= step
 
-        return np.concatenate(preds, axis=0)
+        # Concatenate all prediction steps and ensure shape (forecast_horizon, 1)
+        return np.concatenate(preds, axis=0).reshape(-1, 1)
 
     @validate_inputs
     def predict(
@@ -79,14 +88,15 @@ class TabpfnModel(BaseModel):
         timestamps_target: np.ndarray,
         **kwargs: dict
     ):
-        preds = []
+        forecast_horizon = timestamps_target.shape[0]
         num_targets = y_context.shape[1]
+        preds = np.zeros((forecast_horizon, num_targets), dtype=np.float32)
         for k in range(num_targets):
-            yc = y_context[:, k]
+            yc = y_context[:, k:k+1]
             pk = self._predict(y_context=yc, timestamps_context=timestamps_context,
                                timestamps_target=timestamps_target, **kwargs)
-            preds.append(pk)
-        return np.array(preds)
+            preds[:, k:k+1] = pk
+        return preds
 
 def make_time_features(n: int) -> pd.DataFrame:
     """

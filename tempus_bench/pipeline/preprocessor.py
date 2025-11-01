@@ -177,6 +177,26 @@ class Preprocessor:
             # Transpose: (num_targets, num_steps) -> (num_steps, num_targets)
             target = np.array(cleaned_features, dtype=float).T
 
+        # Ensure target is always 2D with shape (num_steps, num_targets)
+        if target.ndim == 1:
+            # If somehow 1D, reshape to (num_steps, 1)
+            target = target.reshape(-1, 1)
+        elif target.ndim != 2:
+            raise ValueError(
+                f"Target array must be 2D (num_steps, num_targets) after parsing, "
+                f"got shape: {target.shape}, ndim: {target.ndim}"
+            )
+        
+        # Ensure we have at least one step and one target
+        if target.shape[0] == 0:
+            raise ValueError(
+                f"Target array has zero steps after parsing (num_steps=0)"
+            )
+        if target.shape[1] == 0:
+            raise ValueError(
+                f"Target array has zero targets after parsing (num_targets=0)"
+            )
+        
         LogManager.get_logger().debug(
             "Preprocessor._parse_and_clean_target",
             f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_targets))",
@@ -273,6 +293,30 @@ class Preprocessor:
             for col_idx in range(result.shape[1]):
                 col_filled = self._forward_fill_column(result[:, col_idx])
                 result[:, col_idx] = self._backward_fill_column(col_filled)
+
+        # Validate output shape is (num_steps, num_targets)
+        if result.ndim != 2:
+            raise ValueError(
+                f"Result array must be 2D (num_steps, num_targets) after handling missing values, "
+                f"got shape: {result.shape}, ndim: {result.ndim}"
+            )
+        
+        if result.shape[0] == 0:
+            raise ValueError(
+                "Result array has zero steps after handling missing values (num_steps=0)"
+            )
+        
+        if result.shape[1] == 0:
+            raise ValueError(
+                "Result array has zero targets after handling missing values (num_targets=0)"
+            )
+        
+        # Ensure timestamps length matches result steps
+        if len(timestamps) != result.shape[0]:
+            raise ValueError(
+                f"Timestamps length ({len(timestamps)}) does not match "
+                f"result num_steps ({result.shape[0]}) after handling missing values"
+            )
 
         return timestamps, result
 
@@ -376,6 +420,23 @@ class Preprocessor:
             LogManager.get_logger().debug(
                 "Preprocessor._cap_variates",
                 f"[DEBUG] After capping, target shape: {target.shape}",
+            )
+
+        # Validate output shape is (num_steps, num_targets)
+        if target.ndim != 2:
+            raise ValueError(
+                f"Target array must be 2D (num_steps, num_targets) after capping variates, "
+                f"got shape: {target.shape}, ndim: {target.ndim}"
+            )
+        
+        if target.shape[0] == 0:
+            raise ValueError(
+                "Target array has zero steps after capping variates (num_steps=0)"
+            )
+        
+        if target.shape[1] == 0:
+            raise ValueError(
+                "Target array has zero targets after capping variates (num_targets=0)"
             )
 
         return target
@@ -498,8 +559,35 @@ class Preprocessor:
                 f"[DEBUG] After normalization, target shape: {target_cleaned.shape}",
             )
 
+        # Final validation: ensure target shape is (num_steps, num_targets)
+        if target_cleaned.ndim != 2:
+            raise ValueError(
+                f"Target array must be 2D (num_steps, num_targets) after cleaning, "
+                f"got shape: {target_cleaned.shape}, ndim: {target_cleaned.ndim}"
+            )
+        
+        num_steps_actual = target_cleaned.shape[0]
+        num_targets_actual = target_cleaned.shape[1]
+        
+        if num_steps_actual == 0:
+            raise ValueError(
+                "Target array has zero steps after cleaning (num_steps=0)"
+            )
+        
+        if num_targets_actual == 0:
+            raise ValueError(
+                "Target array has zero targets after cleaning (num_targets=0)"
+            )
+        
+        # Ensure timestamps match target steps
+        if len(timestamps_cleaned) != num_steps_actual:
+            raise ValueError(
+                f"Timestamps length ({len(timestamps_cleaned)}) does not match "
+                f"target num_steps ({num_steps_actual})"
+            )
+        
         LogManager.get_logger().debug(
             "Preprocessor.clean",
-            f"[DEBUG] Final result - timestamps: {timestamps_cleaned.shape}, target: {target_cleaned.shape}",
+            f"[DEBUG] Final result - timestamps: {timestamps_cleaned.shape}, target: {target_cleaned.shape} (num_steps={num_steps_actual}, num_targets={num_targets_actual})",
         )
         return timestamps_cleaned, time_start, freq, target_cleaned, scaler
