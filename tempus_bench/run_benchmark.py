@@ -11,7 +11,6 @@ import datetime
 import os
 import pickle
 import shutil
-from tqdm.auto import tqdm
 from pathlib import Path
 
 from tempus_bench.utils.config_manager import ConfigManager
@@ -87,16 +86,7 @@ class BenchmarkRunner:
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
 
         run_configs = list(self.manager.generate_run_configs())
-        for job_idx, job_config in enumerate(
-            tqdm(
-                run_configs,
-                desc="✨ Benchmark Jobs",
-                ncols=80,
-                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
-                colour="cyan",
-                position=0,
-            )
-        ):
+        for job_idx, job_config in enumerate(run_configs):
             hyperparameter_tuner = HyperparameterTuner(job_config=job_config)
 
             # Hyper-parameter Tuning
