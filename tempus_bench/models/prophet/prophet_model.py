@@ -10,6 +10,9 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 class ProphetHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
+    growth: Literal["linear", "logistic", "flat"] = Field(
+        default="linear", description="Growth type"
+    )
     seasonality_mode: Literal["additive", "multiplicative"] = Field(
         ..., description="Seasonality mode"
     )
@@ -84,7 +87,13 @@ class ProphetModel(BaseModel):
 
         train_df = pd.DataFrame({"ds": timestamps_context, "y": y_context})
 
-        model = Prophet(**self.params.model_dump(exclude_none=True))
+        # Construct model_params dict: {param_name: value for valid Prophet parameters}
+        model_params = {
+            k: getattr(self, k)
+            for k in self.params_class.model_fields.keys()
+            if hasattr(self, k)
+        }
+        model = Prophet(**model_params)
         fitted_model = model.fit(train_df)
 
         return fitted_model
@@ -113,13 +122,6 @@ class ProphetModel(BaseModel):
         Raises:
             ValueError: If the model is not fitted or forecast horizon is invalid.
         """
-        if not self.is_fitted:
-            raise ValueError("ProphetModel not fitted. Call train() first.")
-
-        if timestamps_target is None or len(timestamps_target) == 0:
-            raise ValueError(
-                "timestamps_target must be provided and non-empty for Prophet prediction."
-            )
 
         future_df = pd.DataFrame(
             {"ds": self._convert_to_datetimeindex(timestamps_target)}

@@ -2,7 +2,8 @@ model_type: "deterministic"
 device: cpu
 freeze_embedder: true
 freeze_encoder: true
-freeze_head: false
+freeze_head: true
 head_dropout: 0.1
 python_version: '3.11'
 weight_decay: 0
+context_window: 512
