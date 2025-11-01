@@ -52,21 +52,22 @@ class WeightedIntervalScore(BaseMetric):
             valid
         ]  # shape (num_quantiles',) where num_quantiles' = number of nonzero alpha
 
-        l = np.quantile(
-            y_pred, alphas[:, None, None] / 2, axis=0
-        )  # shape (num_quantiles', H, M)
-        u = np.quantile(
-            y_pred, 1 - alphas[:, None, None] / 2, axis=0
-        )  # shape (num_quantiles', H, M)
+        # Compute quantiles for each alpha value
+        # q must be 1D for np.quantile, and it will broadcast across the quantile dimension
+        q_lower = alphas / 2  # shape (num_quantiles',)
+        q_upper = 1 - alphas / 2  # shape (num_quantiles',)
+
+        l = np.quantile(y_pred, q_lower, axis=0)  # shape (num_quantiles', H, M)
+        u = np.quantile(y_pred, q_upper, axis=0)  # shape (num_quantiles', H, M)
 
         y_true_b = np.broadcast_to(y_true, l.shape)
-        dist = np.maximum(
+        quantile_scores = np.maximum(
             0, np.maximum(l - y_true_b, y_true_b - u)
         )  # shape (num_quantiles', H, M)
 
         interval_scores = (u - l) + (
             2.0 / alphas[:, None, None]
-        ) * dist  # shape (num_quantiles', H, M)
+        ) * quantile_scores  # shape (num_quantiles', H, M)
         weighted_interval_scores = np.sum(
             alphas[:, None, None] * interval_scores, axis=0
         )
