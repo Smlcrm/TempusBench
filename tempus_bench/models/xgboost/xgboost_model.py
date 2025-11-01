@@ -65,7 +65,7 @@ class XgboostModel(BaseModel):
             settings: Settings dictionary containing device, python_version, etc.
         """
         super().__init__(params, settings, XgboostHyperparams)
-        self._build_model()
+        self._build_model(params, settings)
 
     def _create_multivariate_features(
         self, y_series: np.ndarray, **kwargs: dict
@@ -262,9 +262,6 @@ class XgboostModel(BaseModel):
         # Reference params, settings, device, python_version
         lookback_window = self.lookback_window
 
-        if self._model is None:
-            self._build_model()
-
         # Use full target data if available and has more data than context
         if y_target is not None and y_target.shape[1] > y_context.shape[1]:
             training_data = y_target
@@ -414,18 +411,13 @@ class XgboostModel(BaseModel):
         )
         return preds
 
-    def _build_model(self):
+    def _build_model(self, params, settings):
         """
         Build the XGBRegressor model instance from the configuration.
         """
         # Get hyperparameters from params, excluding non-estimator parameters
         # Convert Pydantic model to dict if needed
-        params_dict = (
-            self.params.model_dump()
-            if hasattr(self.params, "model_dump")
-            else self.params
-        )
-        all_params = {**params_dict, **self.settings}
+        all_params = {**params, **settings}
 
         # Filter out keys that are not valid for XGBRegressor
         valid_keys = set(XGBRegressor().get_params().keys())

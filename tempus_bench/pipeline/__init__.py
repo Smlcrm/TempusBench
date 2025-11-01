@@ -11,7 +11,7 @@ Components:
 - preprocessor: Applies data preprocessing steps
 - model_executor: Executes model training and evaluation in isolated environments
 - visualizer: Creates plots and visualizations
-- hyperparameter_tuning: Handles hyperparameter optimization
+- hyperparameter_tuner: Handles hyperparameter optimization
 
 Usage:
     from tempus_bench.pipeline import DataLoader, ModelExecutor

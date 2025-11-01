@@ -6,3 +6,6 @@ task:
     handle_missing: interpolate
     normalize: true
     file_name: madrid_transport_multivariate.csv
+
+# number of variates : 14
+# number of time-steps : 181753

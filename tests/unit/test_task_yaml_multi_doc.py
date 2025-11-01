@@ -1,14 +1,14 @@
 """
-Unit tests for multi-document task.yaml file validation in Manager.
+Unit tests for multi-document task.yaml file validation in ConfigManager.
 
-This test ensures that Manager correctly validates task.yaml files with multiple
+This test ensures that ConfigManager correctly validates task.yaml files with multiple
 task configurations separated by '---' (YAML multi-document format).
 """
 
 import pytest
 import yaml
 from pathlib import Path
-from tempus_bench.utils.manager import Manager, ValidationError
+from tempus_bench.utils.config_manager import ConfigManager, ValidationError
 from tempus_bench.utils.configs import TaskConfig
 
 
@@ -76,7 +76,7 @@ class TestTaskYamlMultiDoc:
         task_file = task_dir / "task.yaml"
         task_file.write_text(sample_task_yaml_content)
         
-        # Create a minimal Manager instance for testing
+        # Create a minimal ConfigManager instance for testing
         # We'll use a mock approach since we don't have full benchmark config
         class TestManager:
             def __init__(self, task_file):

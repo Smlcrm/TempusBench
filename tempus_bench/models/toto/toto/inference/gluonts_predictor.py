@@ -25,7 +25,6 @@ from gluonts.transform import (
     TestSplitSampler,
     Transformation,
 )
-from tqdm import tqdm
 
 from toto.data.util.dataset import MaskedTimeseries
 from toto.inference.forecaster import TotoForecaster
@@ -86,7 +85,7 @@ class TotoSampleForecastGenerator(SampleForecastGenerator):
         INT_MAX = np.iinfo(np.int32).max
         INT_MIN = np.iinfo(np.int32).min
 
-        for batch in tqdm(inference_data_loader):
+        for batch in inference_data_loader:
             if len(batch["past_target"].shape) <= 2:
                 inputs = (
                     batch["past_target"]

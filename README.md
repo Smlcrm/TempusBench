@@ -23,7 +23,6 @@ tempus_bench/
 ├── config/                    # Configuration system
 │   ├── benchmark.yaml         # Default configuration
 │   ├── settings.yaml          # System configuration
-│   ├── manager.py             # Configuration management
 │   ├── models.py              # Model configuration handling
 │   └── validator.py           # Configuration validation
 ├── tasks/                     # Time series datasets
@@ -65,10 +64,11 @@ tempus_bench/
 │   ├── data_types.py         # Data structures and types
 │   ├── preprocessor.py       # Data preprocessing
 │   ├── model_executor.py     # Model execution in isolated environments
-│   ├── hyperparameter_tuning.py
+│   ├── hyperparameter_tuner.py
 │   └── visualizer.py
 └── utils/                     # Utility functions
     ├── __init__.py
+    ├── config_manager.py     # Configuration management
     ├── envs.py               # Conda environment management
     ├── log_manager.py        # Unified logging (standard and TensorBoard)
     ├── model_config.py       # Model configuration handling
@@ -276,12 +276,12 @@ runner.run()
 ### Running Individual Models
 
 ```python
-from tempus_bench.utils.manager import Manager
+from tempus_bench.utils.config_manager import ConfigManager
 from tempus_bench.pipeline.model_executor import ModelExecutor
 from tempus_bench.utils.log_manager import LogManager
 
-# First, create a Manager to load configurations
-manager = Manager(
+# First, create a ConfigManager to load configurations
+manager = ConfigManager(
     config_path="tempus_bench/config/benchmark.yaml",
 )
 
