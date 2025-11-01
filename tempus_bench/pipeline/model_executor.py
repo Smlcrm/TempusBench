@@ -381,8 +381,7 @@ def main():
             freq=freq,
             num_samples=job_config["evaluation_config"]["num_samples"],
         )
-        
-    
+
 
         # Compute evaluation metrics
         eval_metrics = trained_model.compute_metrics(
