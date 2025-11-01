@@ -14,11 +14,6 @@ class MoiraiHyperparams(PydanticBaseModel):
     size: Optional[str] = Field(default="tiny", description="Model size")
     ctx: Optional[int] = Field(default=None, description="Context length")
     psz: Optional[int] = Field(default=16, ge=1, description="Patch size")
-    bsz: Optional[int] = Field(default=32, ge=1, description="Batch size")
-    test: Optional[int] = Field(default=100, ge=1, description="Test parameter")
-    num_samples: Optional[int] = Field(
-        default=100, ge=1, description="Number of samples"
-    )
 
 
 class MoiraiModel(BaseModel):
@@ -62,22 +57,22 @@ class MoiraiModel(BaseModel):
         freq = kwargs["freq"]
 
         # Reference params, settings, device, python_version
-        model_name = self.model_name
         size = self.size
         ctx = self.ctx
         psz = self.psz
         bsz = self.bsz
         test = self.test
-        num_samples = self.num_samples
+        num_samples = kwargs["num_samples"]
 
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
+            print("fitting moirai model")
             pdt = y_target.shape[0]
             ctx = y_context.shape[0]
             self._model = MoiraiForecast(
                 module=MoiraiModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/{model_name}-1.1-R-{size}"
+                    pretrained_model_name_or_path=f"Salesforce/moirai-1.1-R-{size}"
                 ),
                 prediction_length=pdt,
                 context_length=ctx,
@@ -87,6 +82,8 @@ class MoiraiModel(BaseModel):
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
             )
+
+            print(" moirai model fitted")
 
         self.is_fitted = True
         return self
@@ -114,14 +111,10 @@ class MoiraiModel(BaseModel):
         Raises:
             ValueError: If model is not fitted, freq is not provided, or forecast length cannot be determined
         """
-        if not self.is_fitted:
-            raise ValueError("Model not fitted. Call train() first.")
 
-        prediction_length = timestamps_target.shape[0]
+        num_targets = y_context.shape[1]
 
-        context_steps, num_targets = y_context.shape
-
-        ctx = self._model_config["ctx"]
+        ctx = y_context.shape[0]
         # Create mask with the padded size (ctx, num_targets)
         observed_mask = np.ones((ctx, num_targets), dtype=bool)
 
@@ -137,7 +130,7 @@ class MoiraiModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
-        forecast = self._model(
+        forecast = self._model.forward(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,
@@ -145,13 +138,11 @@ class MoiraiModel(BaseModel):
 
         # forecast shape: (num_targets, num_samples, prediction_length)
         # Convert to numpy array
-        forecast_np = (
-            forecast.cpu().numpy() if hasattr(forecast, "cpu") else np.array(forecast)
-        )
+        forecast = np.asarray(forecast)
 
         # Transpose from (num_targets, num_samples, prediction_length) to (num_samples, prediction_length, num_targets)
         # Then the base class will handle point forecasts if needed
-        samples = np.transpose(forecast_np, (1, 2, 0))
+        samples = np.transpose(forecast, (1, 2, 0))
 
         # If univariate, ensure shape is (num_samples, prediction_length, 1)
         if samples.ndim == 2:
