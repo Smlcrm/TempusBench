@@ -23,10 +23,7 @@ from lag_llama.gluon.estimator import LagLlamaEstimator
 
 
 class LagllamaHyperparams(PydanticBaseModel):
-    context_length: Optional[int] = Field(
-        default=2048, ge=1, description="Context window size"
-    )
-    batch_size: Optional[int] = Field(default=1, ge=1, description="Batch size")
+    pass
 
 
 # Try to import lag_llama, install if not available
@@ -46,10 +43,6 @@ class LagllamaModel(BaseModel):
         """
         # Initialize base model
         super().__init__(params, settings, LagllamaHyperparams)
-        # Create predictor for this horizon (always univariate, input_size=1)
-
-        # Model-specific attributes
-        self._model = None
 
     def _create_predictor_for_horizon(
         self, forecast_horizon: int, input_size: int = 1, num_samples: int = 10
