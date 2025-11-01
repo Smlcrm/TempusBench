@@ -155,6 +155,7 @@ class BaseModel(ABC):
             self: The model instance with updated parameters
         """
         validated_params = self.params_class.model_validate(params)
+        self.params = validated_params  # Store validated params for get_params() and model_dump()
 
         self.set_attrs(**validated_params.model_dump())
         self.is_fitted = False  # Mark as unfitted if parameters change
