@@ -1,9 +1,7 @@
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-import pandas as pd
 import torch
-from einops import rearrange
 from pydantic import BaseModel as PydanticBaseModel, Field
 from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 
@@ -11,29 +9,20 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class MoiraiMoeHyperparams(PydanticBaseModel):
-    model_name: Optional[str] = Field(default="moirai-moe", description="Model name")
-    size: Optional[str] = Field(default=None, description="Model size")
-    ctx: Optional[int] = Field(default=None, description="Context length")
-    psz: Optional[int] = Field(default=16, ge=1, description="Patch size")
-    bsz: Optional[int] = Field(default=32, ge=1, description="Batch size")
-    test: Optional[int] = Field(default=100, ge=1, description="Test parameter")
-    num_samples: Optional[int] = Field(default=100, ge=1, description="Number of samples")
+    pass
 
 
 class MoiraiMoeModel(BaseModel):
 
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
-        Initialize MoiraiMoE model.
-        
+        Initialize Moirai model.
+
         Args:
-            config: JobConfig instance containing model and task configuration
-            logs_path: Directory for storing log files (required)
+            params: Model parameters dictionary
+            settings: Settings dictionary containing device, python_version, etc.
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self._model_config = MoiraiMoeHyperparams(**self._model_config).model_dump()
+        super().__init__(params, settings, MoiraiMoeHyperparams)
 
         self._model = None
         self.is_fitted = False
@@ -45,7 +34,7 @@ class MoiraiMoeModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> "MoiraiMoeModel":
         """
         "Train" the Moirai model (no training required for foundation models).
@@ -63,16 +52,16 @@ class MoiraiMoeModel(BaseModel):
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
-            self._model_config["pdt"] = y_target.shape[0]
-            self._model_config["ctx"] = y_context.shape[0]
+            pdt = y_target.shape[0]
+            ctx = y_context.shape[0]
             self._model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/{self._model_config['model_name']}-1.0-R-{self._model_config['size']}"
+                    pretrained_model_name_or_path=f"Salesforce/moirai-moe-1.0-R-{self.model_size}"
                 ),
-                prediction_length=self._model_config["pdt"],
-                context_length=self._model_config["ctx"],
-                patch_size=self._model_config["psz"],
-                num_samples=self._model_config["num_samples"],
+                prediction_length=pdt,
+                context_length=ctx,
+                patch_size=self.psz,
+                num_samples=kwargs["num_samples"],
                 target_dim=y_context.shape[1],
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
@@ -103,14 +92,9 @@ class MoiraiMoeModel(BaseModel):
         Raises:
             ValueError: If model is not fitted, freq is not provided, or forecast length cannot be determined
         """
-        if not self.is_fitted:
-            raise ValueError("Model not fitted. Call train() first.")
+        num_targets = y_context.shape[1]
 
-        prediction_length = timestamps_target.shape[0]
-
-        context_steps, num_targets = y_context.shape
-
-        ctx = self._model_config["ctx"]
+        ctx = y_context.shape[0]
         # Create mask with the padded size (ctx, num_targets)
         observed_mask = np.ones((ctx, num_targets), dtype=bool)
 
@@ -134,16 +118,13 @@ class MoiraiMoeModel(BaseModel):
 
         # forecast shape: (num_targets, num_samples, prediction_length)
         # Convert to numpy array
-        forecast_np = (
-            forecast.cpu().numpy() if hasattr(forecast, "cpu") else np.array(forecast)
-        )
+        forecast = np.squeeze(np.asarray(forecast), axis=0)
 
         # Transpose from (num_targets, num_samples, prediction_length) to (num_samples, prediction_length, num_targets)
         # Then the base class will handle point forecasts if needed
-        samples = np.transpose(forecast_np, (1, 2, 0))
-        
+
         # If univariate, ensure shape is (num_samples, prediction_length, 1)
-        if samples.ndim == 2:
-            samples = samples[:, :, np.newaxis]
-        
-        return samples
+        if forecast.ndim == 2:
+            forecast = np.expand_dims(forecast, axis=-1)
+
+        return forecast
