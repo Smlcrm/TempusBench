@@ -127,7 +127,6 @@ class ModelExecutor:
 
             result = conda_env.run(command=command)
 
-
             print("result.stdout: ", result.stdout)
             lines = result.stdout.strip().split("\n")
             outputs_line = None
@@ -326,32 +325,34 @@ def main():
 
     outputs = []
 
+    # Import model - models are now directly in the models directory
+    models_dir = get_models_dir()
+    model_dir = models_dir / args.model_name
+    model_file = f"{model_name}_model"
+    module_path = str(model_dir / f"{model_file}.py")
+
+    # Generate class name (PascalCase + Model suffix)
+    class_name = (
+        "".join(word.capitalize() for word in args.model_name.split("_")) + "Model"
+    )
+
+    spec = importlib.util.spec_from_file_location(model_file, module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(
+            f"Failed to load module spec for {model_file} from {module_path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+
+    spec.loader.exec_module(module)
+
+    model_class = getattr(module, class_name)
+
     for window_idx, dataset_splits in enumerate(window_generator):
 
-        print(f"window_idx: {window_idx}")
+
         timestamps = np.asarray(dataset.timestamps)
         target = np.asarray(dataset.target)
         freq = dataset.metadata["time_freq"]  # type: ignore
-
-        # Import model - models are now directly in the models directory
-        models_dir = get_models_dir()
-        model_dir = models_dir / args.model_name
-        model_file = f"{model_name}_model"
-        module_path = str(model_dir / f"{model_file}.py")
-
-        # Generate class name (PascalCase + Model suffix)
-        class_name = (
-            "".join(word.capitalize() for word in args.model_name.split("_")) + "Model"
-        )
-
-        spec = importlib.util.spec_from_file_location(model_file, module_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(
-                f"Failed to load module spec for {model_file} from {module_path}"
-            )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        model_class = getattr(module, class_name)
 
         # Extract split indices
         cstart, cend = dataset_splits["context"].start, dataset_splits["context"].end
@@ -381,7 +382,6 @@ def main():
             freq=freq,
             num_samples=job_config["evaluation_config"]["num_samples"],
         )
-
 
         # Compute evaluation metrics
         eval_metrics = trained_model.compute_metrics(
