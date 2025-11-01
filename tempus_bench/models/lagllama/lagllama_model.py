@@ -8,11 +8,10 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
-import torch
 from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
 from pydantic import BaseModel as PydanticBaseModel, Field
-
+import torch
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 # Add the lagllama directory to the Python path for absolute imports
@@ -24,9 +23,14 @@ from lag_llama.gluon.estimator import LagLlamaEstimator
 
 
 class LagllamaHyperparams(PydanticBaseModel):
-    context_length: Optional[int] = Field(default=2048, ge=1, description="Context window size")
-    num_samples: Optional[int] = Field(default=10, ge=1, description="Number of probabilistic samples")
+    context_length: Optional[int] = Field(
+        default=2048, ge=1, description="Context window size"
+    )
+    num_samples: Optional[int] = Field(
+        default=10, ge=1, description="Number of probabilistic samples"
+    )
     batch_size: Optional[int] = Field(default=1, ge=1, description="Batch size")
+
 
 # Try to import lag_llama, install if not available
 class LagllamaModel(BaseModel):
@@ -51,7 +55,7 @@ class LagllamaModel(BaseModel):
 
     def _create_predictor_for_horizon(self, forecast_horizon: int):
         """Create a predictor for a specific forecast horizon."""
-        
+
         # Reference params, settings, device, python_version
         context_length = self.context_length
         batch_size = self.batch_size
@@ -63,7 +67,7 @@ class LagllamaModel(BaseModel):
             context_length=context_length,
             batch_size=batch_size,
             num_parallel_samples=num_samples,
-            device=self.device,
+            device=torch.device(self.device),
         )
 
         # Create predictor from estimator
@@ -101,16 +105,24 @@ class LagllamaModel(BaseModel):
                 unit = None
                 if isinstance(min_ts, (int, np.integer)):
                     # Try nanoseconds
-                    if in_bounds(min_ts, NS_LOWER, NS_UPPER) and in_bounds(max_ts, NS_LOWER, NS_UPPER):
+                    if in_bounds(min_ts, NS_LOWER, NS_UPPER) and in_bounds(
+                        max_ts, NS_LOWER, NS_UPPER
+                    ):
                         unit = "ns"
                     # Try microseconds
-                    elif in_bounds(min_ts, US_LOWER, US_UPPER) and in_bounds(max_ts, US_LOWER, US_UPPER):
+                    elif in_bounds(min_ts, US_LOWER, US_UPPER) and in_bounds(
+                        max_ts, US_LOWER, US_UPPER
+                    ):
                         unit = "us"
                     # Try milliseconds
-                    elif in_bounds(min_ts, MS_LOWER, MS_UPPER) and in_bounds(max_ts, MS_LOWER, MS_UPPER):
+                    elif in_bounds(min_ts, MS_LOWER, MS_UPPER) and in_bounds(
+                        max_ts, MS_LOWER, MS_UPPER
+                    ):
                         unit = "ms"
                     # Try seconds
-                    elif in_bounds(min_ts, S_LOWER, S_UPPER) and in_bounds(max_ts, S_LOWER, S_UPPER):
+                    elif in_bounds(min_ts, S_LOWER, S_UPPER) and in_bounds(
+                        max_ts, S_LOWER, S_UPPER
+                    ):
                         unit = "s"
                     else:
                         raise ValueError(
@@ -174,11 +186,11 @@ class LagllamaModel(BaseModel):
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
         num_samples = kwargs["num_samples"]
-        
+
         # Reference params, settings, device, python_version
         context_length = self.context_length
         batch_size = self.batch_size
-        
+
         forecast_horizon = timestamps_target.shape[0]
         # Create predictor for this horizon
         predictor = self._create_predictor_for_horizon(forecast_horizon)
@@ -191,7 +203,9 @@ class LagllamaModel(BaseModel):
         # Create series DataFrame
         # Ensure y_context is 1D for single series prediction
         if y_context.ndim > 1:
-            y_context_1d = y_context[:, 0] if y_context.shape[1] > 0 else y_context.flatten()
+            y_context_1d = (
+                y_context[:, 0] if y_context.shape[1] > 0 else y_context.flatten()
+            )
         else:
             y_context_1d = y_context
 
@@ -214,7 +228,7 @@ class LagllamaModel(BaseModel):
         forecast_it, ts_it = make_evaluation_predictions(
             dataset=context_df,
             predictor=predictor,
-            num_samples=self._model_config["num_samples"],
+            num_samples=self.num_samples,
         )
 
         forecasts = list(forecast_it)
@@ -223,17 +237,17 @@ class LagllamaModel(BaseModel):
         samples_list = []
         for forecast in forecasts:
             # Get samples from forecast object
-            if hasattr(forecast, 'samples'):
+            if hasattr(forecast, "samples"):
                 samples = forecast.samples  # Shape: (num_samples, forecast_horizon)
             else:
                 # Fallback: generate samples from mean and std if available
                 mean = forecast.mean
-                std = getattr(forecast, 'std', None)
+                std = getattr(forecast, "std", None)
                 if std is not None:
-                    samples = np.random.normal(mean, std, (self._model_config["num_samples"], len(mean)))
+                    samples = np.random.normal(mean, std, (self.num_samples, len(mean)))
                 else:
                     # If no std, create samples by adding small noise to mean
-                    samples = np.tile(mean, (self._model_config["num_samples"], 1))
+                    samples = np.tile(mean, (self.num_samples, 1))
                     samples += np.random.normal(0, 0.01, samples.shape)
 
             samples_list.append(samples)
@@ -264,32 +278,8 @@ class LagllamaModel(BaseModel):
         """
         Anyvariate wrapper: for multivariate, no separate fitting is needed; we keep separate handles.
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-        
-        # Reference params, settings, device, python_version
-        context_length = self.context_length
-        num_samples = self.num_samples
-        batch_size = self.batch_size
-        
-        if y_context.ndim > 1 and y_context.shape[1] > 1:
-            # Treat each feature (column) as an independent series
-            self._models = []
-            num_targets = y_context.shape[1]
-            for k in range(num_targets):
-                m = LagllamaModel(params=self.model_dump(), settings=self.settings)
-                yc = y_context[:, k]
-                yt = y_target[:, k] if (y_target is not None and y_target.ndim > 1 and y_target.shape[1] > k) else y_target
-                m._train(
-                    y_context=yc,
-                    y_target=yt,
-                    timestamps_context=timestamps_context,
-                    timestamps_target=timestamps_target,
-                    freq=freq)
-                self._models.append(m)
-            self.is_fitted = True
-            return self
-        return self._train(y_context, y_target, timestamps_context, timestamps_target, freq)
+
+        return self
 
     @validate_inputs
     def predict(
@@ -314,20 +304,28 @@ class LagllamaModel(BaseModel):
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
         num_samples = kwargs["num_samples"]
-        
-        # Reference params, settings, device, python_version
-        context_length = self.context_length
-        batch_size = self.batch_size
-        
-        if hasattr(self, "models") and self._models:
+        if y_context.ndim > 1 and y_context.shape[1] > 1:
+            # Treat each feature (column) as an independent series
             preds = []
-            for k, m in enumerate(self._models):
-                yc = y_context[:, k] if y_context is not None and y_context.ndim > 1 else y_context
-                pk = m._predict(y_context=yc, timestamps_context=timestamps_context,
-                                timestamps_target=timestamps_target, freq=freq, **kwargs)
-                preds.append(pk.reshape(-1, 1) if pk.ndim == 1 else pk)
+            num_targets = y_context.shape[1]
+            for k in range(num_targets):
+                pred = self._predict(
+                    y_context=y_context[:, k : k + 1],
+                    timestamps_context=timestamps_context,
+                    timestamps_target=timestamps_target,
+                    freq=freq,
+                    num_samples=num_samples,
+                )
+                preds.append(pred)
             return np.concatenate(preds, axis=1)
-        return self._predict(y_context, timestamps_context, timestamps_target, freq, **kwargs)
+        else:
+            return self._predict(
+                y_context=y_context,
+                timestamps_context=timestamps_context,
+                timestamps_target=timestamps_target,
+                freq=freq,
+                num_samples=num_samples,
+            )
 
     def predict_quantiles(
         self,
