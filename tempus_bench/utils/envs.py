@@ -185,7 +185,6 @@ class CondaEnvManager:
             [
                 "conda",
                 "run",
-                "-y",
                 "-n",
                 self.env_name,
                 "pip",

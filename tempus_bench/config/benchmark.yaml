@@ -84,7 +84,7 @@ model:
   # # Stochastic models
   # chronos: {}
   
-  # moirai: {}
+  moirai: {}
   # moirai_moe: {}
   # lagllama: {}
   # toto: {}
