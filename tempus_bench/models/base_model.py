@@ -56,8 +56,7 @@ class BaseModel(ABC):
         super().__init__()
 
         # Setup parameters
-        if settings is None:
-            settings = {}
+        if settings is None: settings = {}
 
         self.params_class = ParamsClass
 
@@ -196,7 +195,6 @@ class BaseModel(ABC):
             "is_fitted": self.is_fitted,
             "parameters": self.get_params(),
         }
-
 
 def validate_inputs(func):
     """
