@@ -127,7 +127,6 @@ class ModelExecutor:
 
             result = conda_env.run(command=command)
 
-            print("result.stdout: ", result.stdout)
             lines = result.stdout.strip().split("\n")
             outputs_line = None
             for line in lines:
@@ -393,13 +392,14 @@ def main():
         )
 
         if job_config["model_setting"]["model_type"] == "hybrid":
-            results = results[0]
+            results = results[0].tolist()
         else:
             results = results.tolist()
+
         # Include predictions in output for plotting
         output = {
             **eval_metrics,
-            "y_pred": results.tolist(),
+            "y_pred": results,
             "y_true": target[vstart:vend].tolist(),
             "timestamps_pred": timestamps[vstart:vend].tolist(),
         }

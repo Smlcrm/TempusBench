@@ -1,25 +1,21 @@
 # Main configuration for the benchmarking pipeline
 # This file provides sensible defaults for all configuration options
 
-
-
 evaluation:
   task_path: 'multivariate/baggage_100_multivariate'
   tuning_loss: mae
-  max_windows: 20
+  max_windows: 4
   max_num_variates: 10
   num_samples: 100
   num_quantiles: 10
   point_forecast_statistic: mean
 
 model:
-  # # Universal Models
-  # lafn_hybrid: {}
-
+  
   # seasonal_naive: 
   #   sp: [12, 24]
 
-  # Deterministic Models
+  # # Deterministic Models
   # arima:
   #   p: [1, 2]
   #   d: [1]
@@ -31,16 +27,13 @@ model:
   #   gamma: [0.1, 0.3, 0.5]
 
   # exponential_smoothing:
-  #   trend: [null]
-  #   damped_trend: [false, true]
-  #   seasonal: [null]
-  #   seasonal_periods: [12, 24]
+  #   trend: ["null", "add"]
+  #   seasonal: ["null"]
+  #   seasonal_periods: [4, 8, 16, 32]
 
   # lstm:
-  #   units: [32]
-  #   layers: [1]
-  #   dropout: [0.1, 0.3, 0.5]
-  #   learning_rate: [0.01, 0.001, 0.0001, 000001]
+  #   dropout: [0.3, 0.5]
+  #   learning_rate: [0.01, 0.001, 0.0001]
     
 
   # prophet:
@@ -77,7 +70,7 @@ model:
     
   
 
-  # moment: {}
+  moment: {}
   # timesfm: {}
   # tiny_time_mixer: {}
 
@@ -92,4 +85,4 @@ model:
   # tabpfn: {}
   
 
-  lafn: {}
+  # lafn: {}

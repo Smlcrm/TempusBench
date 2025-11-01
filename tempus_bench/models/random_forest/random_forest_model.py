@@ -35,6 +35,8 @@ class RandomForestModel(BaseModel):
         """
         super().__init__(params, settings, RandomForestHyperparams)
 
+        self._build_model(params, settings)
+
     @validate_inputs
     def train(
         self,
@@ -64,8 +66,6 @@ class RandomForestModel(BaseModel):
         Returns:
             self: The fitted model instance.
         """
-
-        self._build_model()
 
         # Calculate forecast_horizon from y_target if not provided in kwargs
         forecast_horizon = kwargs.get("forecast_horizon", y_target.shape[0])
@@ -144,24 +144,20 @@ class RandomForestModel(BaseModel):
 
         return preds_reshaped
 
-    def _build_model(self):
+    def _build_model(self, params, settings):
         """
         Build the RandomForestRegressor model instance from the configuration.
         """
         # Get hyperparameters from params, excluding non-estimator parameters
         # Convert Pydantic model to dict if needed
-        params_dict = (
-            self.params.model_dump()
-            if hasattr(self.params, "model_dump")
-            else self.params
-        )
-        all_params = {**params_dict, **self.settings}
+        all_params = {**params, **settings}
 
         # Filter out keys that are not valid for RandomForestRegressor
         valid_keys = set(RandomForestRegressor().get_params().keys())
         filtered_params = {k: v for k, v in all_params.items() if k in valid_keys}
 
         self._model = RandomForestRegressor(**filtered_params)
+
         self.is_fitted = False
 
     def _create_features(
