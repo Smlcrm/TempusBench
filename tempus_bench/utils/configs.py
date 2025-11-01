@@ -225,6 +225,7 @@ class EvaluationSetting(BaseModel):
     reinstall_conda: bool = Field(
         ..., description="Whether to reinstall the conda environments for each model"
     )
+    verbose: bool = Field(default=False, description="Whether to print verbose output")
 
 
 class JobConfig:

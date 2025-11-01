@@ -12,7 +12,7 @@ class CRPS(BaseMetric):
     def __init__(self):
         super().__init__("stochastic")
 
-    def __call__(
+    def _compute(
         self, y_true: np.ndarray, y_pred: np.ndarray, num_quantiles: int = 100, **kwargs
     ) -> float:
         """
@@ -23,8 +23,8 @@ class CRPS(BaseMetric):
         - Average the weighted quantile losses over a grid of K quantiles in (0, 1).
 
         Args:
-            y_true: True values, shape (n_timesteps,) or (n_timesteps, num_targets)
-            y_pred: Sample predictions, shape (num_samples, n_timesteps) or (num_samples, n_timesteps, num_targets)
+            y_true: True values, shape (n_timesteps, num_targets)
+            y_pred: Sample predictions (preprocessed by base class), shape (num_samples, n_timesteps, num_targets)
             **kwargs: Optional parameters including 'num_quantiles' for the number of quantiles to compute
 
         Returns:

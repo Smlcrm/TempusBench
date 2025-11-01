@@ -11,11 +11,10 @@ import datetime
 import os
 import pickle
 import shutil
-
 from pathlib import Path
 
-from tempus_bench.utils.manager import Manager
-from tempus_bench.pipeline.hyperparameter_tuning import HyperparameterTuner
+from tempus_bench.utils.config_manager import ConfigManager
+from tempus_bench.pipeline.hyperparameter_tuner import HyperparameterTuner
 from tempus_bench.utils.paths import get_project_root
 from tempus_bench.pipeline.data_loader import DataLoader
 
@@ -31,7 +30,7 @@ class BenchmarkRunner:
     Attributes:
         config_path (str): Path to the configuration YAML file.
         config_name (str): Name of the configuration file (without extension).
-        manager (Manager): Configuration manager instance.
+        manager (ConfigManager): Configuration manager instance.
         logger (LoggerManager): Logger instance for logging operations.
     """
 
@@ -44,8 +43,8 @@ class BenchmarkRunner:
                 this benchmark run.
         """
         self.config_path = config_path
-        # Initialize the Manager (which creates its own unified Logger with TensorBoard support)
-        self.manager = Manager(
+        # Initialize the ConfigManager (which creates its own unified Logger with TensorBoard support)
+        self.manager = ConfigManager(
             config_path=self.config_path,
         )
 
@@ -85,7 +84,9 @@ class BenchmarkRunner:
         """Execute the end-to-end benchmarking pipeline."""
 
         # We execute multiple jobs per run, each with a different configuration (JobConfig).
-        for job_idx, job_config in enumerate(self.manager.generate_run_configs()):
+
+        run_configs = list(self.manager.generate_run_configs())
+        for job_idx, job_config in enumerate(run_configs):
             hyperparameter_tuner = HyperparameterTuner(job_config=job_config)
 
             # Hyper-parameter Tuning
