@@ -1,3 +1,9 @@
 model_type: "stochastic"
-python_version: "3.12"
+python_version: "3.11"
 device: "cpu"
+size: "base"
+bsz: 1
+model_size: "base"
+# ctx: None # context length
+psz: "auto" # patch size
+bsz: 1 # batch size

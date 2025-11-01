@@ -3,17 +3,15 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import pandas as pd
 import torch
-from einops import rearrange
 from pydantic import BaseModel as PydanticBaseModel, Field
+
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class MoiraiHyperparams(PydanticBaseModel):
-    size: Optional[str] = Field(default="tiny", description="Model size")
-    ctx: Optional[int] = Field(default=None, description="Context length")
-    psz: Optional[int] = Field(default=16, ge=1, description="Patch size")
+    pass
 
 
 class MoiraiModel(BaseModel):
@@ -54,7 +52,6 @@ class MoiraiModel(BaseModel):
             self: The fitted model instance (for compatibility)
         """
         size = self.size
-        ctx = self.ctx
         psz = self.psz
         num_samples = kwargs["num_samples"]
 
@@ -85,7 +82,7 @@ class MoiraiModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> np.ndarray:
         """
         Make predictions using the Moirai model.
@@ -121,7 +118,7 @@ class MoiraiModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
-        forecast = self._model.forward(
+        forecast = self._model(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,
@@ -129,14 +126,13 @@ class MoiraiModel(BaseModel):
 
         # forecast shape: (num_targets, num_samples, prediction_length)
         # Convert to numpy array
-        forecast = np.asarray(forecast)
+        forecast = np.squeeze(np.asarray(forecast), axis=0)
 
         # Transpose from (num_targets, num_samples, prediction_length) to (num_samples, prediction_length, num_targets)
         # Then the base class will handle point forecasts if needed
-        samples = np.transpose(forecast, (1, 2, 0))
 
         # If univariate, ensure shape is (num_samples, prediction_length, 1)
-        if samples.ndim == 2:
-            samples = samples[:, :, np.newaxis]
+        if forecast.ndim == 2:
+            forecast = np.expand_dims(forecast, axis=-1)
 
-        return samples
+        return forecast
