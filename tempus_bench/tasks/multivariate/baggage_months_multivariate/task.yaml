@@ -1,8 +1,11 @@
 task:
   task_name: months
   context_window: 32
-  forecast_horizon: 16
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
     normalize: true
     file_name: baggage_months_multivariate.csv
+
+# number of variates : 4
+# number of time-steps : 84

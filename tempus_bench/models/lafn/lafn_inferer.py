@@ -396,7 +396,7 @@ class LAFNInferer(nnx.Module):
             context_y=context_y,
             context_t=context_t,
             target_t=target_t,
-            forecast_horizon=forecast_horizon,
+            forecast_horizon=64,
         )
 
         data = self.scale_and_pad_data(

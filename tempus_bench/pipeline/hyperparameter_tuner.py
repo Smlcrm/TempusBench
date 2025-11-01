@@ -155,15 +155,7 @@ class HyperparameterTuner:
         y_pred = []
         timestamps_pred = []
         # Try each hyperparameter combination
-        for params in tqdm(
-            self._generate_hyperparameter_grid(),
-            desc="🔍 Hyperparameter Combinations",
-            ncols=80,
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
-            colour="green",
-            position=1,
-            leave=True,
-        ):
+        for params in tqdm(self._generate_hyperparameter_grid(), desc="Hyperparameter Combinations"):
 
             try:
                 # Execute model with these hyperparameters
