@@ -75,7 +75,7 @@ class MoiraiMoeModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs: dict,
     ) -> np.ndarray:
         """
         Make predictions using the MoiraiMoE model.
