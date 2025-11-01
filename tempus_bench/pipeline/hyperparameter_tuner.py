@@ -13,7 +13,7 @@ import importlib.util
 from itertools import product
 from pathlib import Path
 from typing import List, Tuple
-
+from tqdm.auto import tqdm
 import numpy as np
 
 from tempus_bench.utils.utils import compute_point_forecast
@@ -102,12 +102,8 @@ class HyperparameterTuner:
         grid: list[dict] = []
 
         for combo in product(*values_lists):
-            grid.append(dict(zip(keys, combo)))
 
-        LogManager.get_logger().info(
-            "HyperparameterTuner",
-            f"Generated hyperparameter grid for {model_name}: the number of combinations = {len(grid)}",
-        )
+            yield dict(zip(keys, combo))
 
         return grid
 
@@ -140,7 +136,11 @@ class HyperparameterTuner:
 
         # Initialize model executor
         model_executor = ModelExecutor(job_config=self.job_config.to_dict())
-        # Generate windows for this dataset
+
+        LogManager.get_logger().info(
+            "HyperparameterTuner",
+            f"=================== Starting hyperparameter optimization for {self.model_name} ===================",
+        )
 
         # Store results for each window
         window_results = []
@@ -155,7 +155,15 @@ class HyperparameterTuner:
         y_pred = []
         timestamps_pred = []
         # Try each hyperparameter combination
-        for params in self._generate_hyperparameter_grid():
+        for params in tqdm(
+            self._generate_hyperparameter_grid(),
+            desc="🔍 Hyperparameter Combinations",
+            ncols=80,
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+            colour="green",
+            position=1,
+            leave=True,
+        ):
 
             try:
                 # Execute model with these hyperparameters
@@ -199,7 +207,8 @@ class HyperparameterTuner:
                 self.visualizer.plot_forecast_window(
                     y_pred=compute_point_forecast(
                         np.array(y_pred[window_idx]),
-                        self.job_config.evaluation_config.point_forecast_statistic),
+                        self.job_config.evaluation_config.point_forecast_statistic,
+                    ),
                     y_true=np.array(y_true[window_idx]),
                     timestamps_pred=np.array(timestamps_pred[window_idx]),
                     model_name=self.model_name,
