@@ -1,3 +1,6 @@
 model_type: "stochastic"
-python_version: "3.12"
+python_version: "3.11"
 device: "cpu"
+model_size: "base"
+psz: "auto"
+bsz: 1
