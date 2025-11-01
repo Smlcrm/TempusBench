@@ -69,7 +69,7 @@ class LafnModel(BaseModel):
         timestamps_context = np.expand_dims(timestamps_context, axis=(0, -1))
         timestamps_target = np.expand_dims(timestamps_target, axis=(0, -1))
 
-        forecasts = inferer.forecast(
+        forecasts = self.model.forecast(
             context_y=y_context,
             context_x=timestamps_context,
             context_target=timestamps_target,
@@ -78,7 +78,7 @@ class LafnModel(BaseModel):
         forecasts = jnp.squeeze(forecasts, axis=0)
         forecasts = np.asarray(forecasts)
 
-        samples = inferer.sample(
+        samples = self.model.sample(
             context_y=y_context,
             context_x=timestamps_context,
             context_target=timestamps_target,
