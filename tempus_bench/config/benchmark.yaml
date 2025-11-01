@@ -61,10 +61,10 @@ model:
     q: [1, 2]
     trend: [c, t]  
 
-  xgboost:
-    n_estimators: [200]
-    max_depth: [4]
-    learning_rate: [0.05, 0.01, 0.001]
+  # xgboost:
+  #   n_estimators: [200]
+  #   max_depth: [4]
+  #   learning_rate: [0.05, 0.01, 0.001]
 
     
   moment: {}
