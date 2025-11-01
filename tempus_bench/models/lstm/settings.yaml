@@ -1,10 +1,6 @@
-model_type: "deterministic"
-python_version: "3.12"
-device: "cpu"
+model_type: deterministic
+python_version: '3.12'
+device: cpu
 beta_1: 0.9
 beta_2: 0.999
 epsilon: 1e-7
-batch_size: 32
-epochs: 1000
-context_length: 16
-prediction_window: 8

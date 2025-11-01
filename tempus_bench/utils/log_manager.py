@@ -77,6 +77,7 @@ class LogManager:
         file_log_level: str = "DEBUG",
         tf_logs_path: Optional[str] = None,
         tensorboard_logging: bool = False,
+        verbose: bool = False,
     ):
         """
         Initialize logger with configuration for both standard and TensorBoard logging.
@@ -105,7 +106,7 @@ class LogManager:
         self.name = name
         self.enable_logging = enable_logging
         self.tensorboard_logging = tensorboard_logging
-
+        self.verbose = verbose
         # Always create log directory
         Path(logs_path).mkdir(parents=True, exist_ok=True)
 
@@ -203,7 +204,7 @@ class LogManager:
 
     # ==================== Standard Logging Methods ====================
 
-    def info(self, module: str, message: str):
+    def info(self, module: str, message: str, is_verbose: bool = False):
         """
         Log an informational message with module context.
 
@@ -211,7 +212,7 @@ class LogManager:
             module (str): Module name for context.
             message (str): Message to log.
         """
-        if self._should_log():
+        if self._should_log() and (self.verbose or not is_verbose):
             self.logger.info(f"[{module}] {message}")
 
     def warning(self, module: str, message: str):
