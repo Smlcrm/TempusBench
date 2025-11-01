@@ -90,6 +90,7 @@ tensorboard==2.19.0
 tensorboard-data-server==0.7.2
 toolz==0.12.1
 torch==2.4.1
+torch>=2.1,<2.5
 torchmetrics==1.7.4
 tornado==6.5.1
 tqdm==4.67.1
