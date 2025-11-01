@@ -127,6 +127,7 @@ class ModelExecutor:
 
             result = conda_env.run(command=command)
 
+            print("result.stdout: ", result.stdout)
             lines = result.stdout.strip().split("\n")
             outputs_line = None
             for line in lines:
@@ -368,6 +369,7 @@ def main():
             timestamps_target=timestamps[tstart:tend],
             freq=freq,
             tuning_loss=job_config["evaluation_config"]["tuning_loss"],
+            num_samples=job_config["evaluation_config"]["num_samples"],
         )
 
         # Generate predictions
