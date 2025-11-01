@@ -349,7 +349,6 @@ def main():
 
     for window_idx, dataset_splits in enumerate(window_generator):
 
-
         timestamps = np.asarray(dataset.timestamps)
         target = np.asarray(dataset.target)
         freq = dataset.metadata["time_freq"]  # type: ignore
@@ -393,6 +392,10 @@ def main():
             num_quantiles=job_config["evaluation_config"]["num_quantiles"],
         )
 
+        if job_config["model_setting"]["model_type"] == "hybrid":
+            results = results[0]
+        else:
+            results = results.tolist()
         # Include predictions in output for plotting
         output = {
             **eval_metrics,
