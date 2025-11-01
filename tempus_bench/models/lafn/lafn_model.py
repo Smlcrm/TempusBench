@@ -1,3 +1,7 @@
+import os
+
+os.environ["JAX_TRACEBACK_FILTERING"] = "off"
+
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -19,9 +23,13 @@ from typing import (
 from tempus_bench.models.base_model import BaseModel, PydanticBaseModel
 
 from chronarium import Chronarium
+from tempus_bench.models.lafn.lafn_inferer import DataProcessor
+from tempus_bench.models.lafn.lafn_inferer import LAFNInferer
+
 
 class LafnHyperparams(PydanticBaseModel):
     pass
+
 
 class LafnModel(BaseModel):
     """Chronarium-backed Large Adaptive Forecasting Network (Hybrid)."""
@@ -40,14 +48,30 @@ class LafnModel(BaseModel):
             model_name=self.model_name,
             model_version=self.model_version,
         )
+        remote_prefix = manager._remote_repo.remote_version_prefix(
+            self.model_name, self.model_version
+        )
+
+        model_params = manager._remote_repo._download_model_config(remote_prefix)
+
+        data_processor = DataProcessor(
+            scaling_method="z_score",
+            transform_method="arcsinh",
+            in_length=model_params["in_length"],
+            out_length=model_params["out_length"],
+            in_features=model_params["num_y_features"],
+            out_features=model_params["num_y_features"],
+        )
+
+        self.inferer = LAFNInferer(model=self.model, data_processor=data_processor)
 
     def train(
         self,
-        y_context: Optional[np.ndarray],
-        y_target: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs,
     ) -> "LafnModel":
         """Pre-trained model – no fine-tuning required."""
 
@@ -55,10 +79,10 @@ class LafnModel(BaseModel):
 
     def predict(
         self,
-        y_context: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs,
     ) -> np.ndarray:
         self.model.eval()
 
@@ -69,23 +93,23 @@ class LafnModel(BaseModel):
         timestamps_context = np.expand_dims(timestamps_context, axis=(0, -1))
         timestamps_target = np.expand_dims(timestamps_target, axis=(0, -1))
 
-        forecasts = self.model.forecast(
+        print("y_context shape:", y_context.shape)
+        print("timestamps_context shape:", timestamps_context.shape)
+        print("timestamps_target shape:", timestamps_target.shape)
+
+        forecasts = self.inferer.forecast(
             context_y=y_context,
-            context_x=timestamps_context,
-            context_target=timestamps_target,
+            forecast_horizon=forecast_horizon,
         )
-        forecasts = forecasts[:, :forecast_horizon, :num_forecast_features]
-        forecasts = jnp.squeeze(forecasts, axis=0)
+
         forecasts = np.asarray(forecasts)
 
-        samples = self.model.sample(
+        samples = self.inferer.sample(
             context_y=y_context,
-            context_x=timestamps_context,
-            context_target=timestamps_target,
-            num_samples=self.num_samples,
+            forecast_horizon=forecast_horizon,
+            num_samples=kwargs["num_samples"],
         )
-        samples = samples[:, :forecast_horizon, :num_forecast_features]
-        samples = jnp.squeeze(samples, axis=1)
+
         samples = np.asarray(samples)
 
         return forecasts, samples
