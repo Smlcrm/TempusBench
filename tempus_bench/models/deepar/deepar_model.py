@@ -103,52 +103,57 @@ class DeeparModel(BaseModel):
         else:
             values = series
 
-        # Handle 2D arrays (multivariate) by taking mean across targets
         # Convert to numpy array if needed
         if not isinstance(values, np.ndarray):
             values = np.array(values)
 
-        # If 2D array (num_steps, num_targets), flatten to 1D
-        if values.ndim == 2:
-            # For multivariate, take mean across targets to get 1D series
-            values = np.mean(values, axis=1)
+        # Handle different input shapes
+        if values.ndim == 1:
+            # Univariate: reshape to (num_steps, 1) for consistency
+            values = values[:, np.newaxis]
         elif values.ndim > 2:
             raise ValueError(f"Series must be 1D or 2D, got {values.ndim}D")
 
-        # Ensure it's 1D
-        values = values.flatten()
+        num_steps, num_features = values.shape
+
+        # Reshape multivariate data to long format for pytorch-forecasting
+        # Each feature becomes a separate time series identified by group_id
+        data_rows = []
 
         if train:
-            # Increase speed of training
-            list_of_sub_chunks = self._evenly_split_array(values, self.batch_size)
-            # for sub_chunk in list_of_sub_chunks:
+            # For training, split data into chunks for faster training
+            # Process each feature separately and create chunks
+            for feature_idx in range(num_features):
+                feature_values = values[:, feature_idx]
+                list_of_sub_chunks = self._evenly_split_array(
+                    feature_values, self.batch_size
+                )
 
-            # Each array, besides the last one, has to have the same number of elements
-            list_of_ids = []
-            sub_chunk_idx = 0
-            for sub_chunk in list_of_sub_chunks:
-                current_number_of_ids = len(sub_chunk)
-                current_id_list = [str(sub_chunk_idx)] * current_number_of_ids
-                list_of_ids.extend(current_id_list)
-                sub_chunk_idx += 1
-
-            dataset_altered_form = pd.DataFrame(
-                {
-                    "value": values,
-                    "time_idx": np.concatenate(
-                        [np.arange(len(sub_chunk)) for sub_chunk in list_of_sub_chunks]
-                    ),
-                    "group_id": list_of_ids,
-                }
-            )
+                sub_chunk_idx = 0
+                for sub_chunk in list_of_sub_chunks:
+                    for time_idx, value in enumerate(sub_chunk):
+                        data_rows.append(
+                            {
+                                "value": value,
+                                "time_idx": time_idx,
+                                "group_id": f"feature_{feature_idx}_chunk_{sub_chunk_idx}",
+                            }
+                        )
+                    sub_chunk_idx += 1
         else:
-            dataset_altered_form = pd.DataFrame(
-                {
-                    "value": values,
-                    "time_idx": list(range(len(values))),
-                    "group_id": ["0"] * len(values),
-                }
-            )
+            # For prediction, don't split into chunks - use single group per feature
+            for feature_idx in range(num_features):
+                feature_values = values[:, feature_idx]
+                for time_idx, value in enumerate(feature_values):
+                    data_rows.append(
+                        {
+                            "value": value,
+                            "time_idx": time_idx,
+                            "group_id": f"feature_{feature_idx}",
+                        }
+                    )
+
+        dataset_altered_form = pd.DataFrame(data_rows)
 
         dataset = TimeSeriesDataSet(
             dataset_altered_form,
@@ -371,105 +376,135 @@ class DeeparModel(BaseModel):
 
         forecast_horizon = timestamps_target.shape[0]
 
-        # Get original number of targets from y_context BEFORE flattening
-        if y_context.ndim == 2:
-            num_targets = y_context.shape[1]
-        else:
-            num_targets = 1
+        # Ensure y_context is 2D (num_steps, num_features)
+        if y_context.ndim == 1:
+            y_context = y_context[:, np.newaxis]
+        elif y_context.ndim > 2:
+            raise ValueError(f"y_context must be 1D or 2D, got {y_context.ndim}D")
 
-        # For DeepAR, we need to generate samples through multiple forward passes
-        # This is a simplified implementation - in practice, you'd want to use the model's
-        # built-in sampling capabilities
+        num_steps, num_targets = y_context.shape
 
-        # Get deterministic predictions first
-        all_predictions = []
-        # Store original shape info before flattening
-        original_shape = y_context.shape
-        values = y_context.flatten() if y_context.ndim > 1 else y_context
+        # For multivariate: predict each feature separately and aggregate
+        # Store predictions for each feature
+        all_feature_samples = []
 
-        # We need at least max_encoder_length+max_prediction_length values
-        all_predictions.extend(
-            values[-(self.max_encoder_length + self.max_prediction_length) :]
-        )
+        for feature_idx in range(num_targets):
+            feature_context = y_context[:, feature_idx]  # Shape: (num_steps,)
 
-        val_length = forecast_horizon
-        num_windows = math.ceil(val_length / self.max_prediction_length)
-
-        deterministic_preds = []
-        for window in range(num_windows):
-            current_encoder_sequence = all_predictions[
-                -(self.max_encoder_length + self.max_prediction_length) :
-            ]
-
-            # Convert to form compatible with data loader
-            current_encoder_sequence_TimeSeriesDataset = (
-                self._series_to_TimeSeriesDataset(
-                    np.array(current_encoder_sequence), train=False
+            # Get deterministic predictions for this feature
+            all_predictions = []
+            # We need at least max_encoder_length+max_prediction_length values
+            min_required = self.max_encoder_length + self.max_prediction_length
+            if len(feature_context) < min_required:
+                # Pad with first value if needed
+                padding = np.full(
+                    min_required - len(feature_context), feature_context[0]
                 )
+                feature_context = np.concatenate([padding, feature_context])
+
+            all_predictions.extend(
+                feature_context[
+                    -(self.max_encoder_length + self.max_prediction_length) :
+                ]
             )
 
-            # Create dataloader
-            current_encoder_sequence_dataloader = (
-                current_encoder_sequence_TimeSeriesDataset.to_dataloader(
-                    train=False,
-                    batch_size=1,
-                    batch_sampler="synchronized",
-                    num_workers=self.num_workers,
-                    persistent_workers=True if self.num_workers > 0 else False,
+            val_length = forecast_horizon
+            num_windows = math.ceil(val_length / self.max_prediction_length)
+
+            deterministic_preds = []
+            for window in range(num_windows):
+                current_encoder_sequence = all_predictions[
+                    -(self.max_encoder_length + self.max_prediction_length) :
+                ]
+
+                # Convert to numpy array
+                current_encoder_sequence = np.array(current_encoder_sequence)
+
+                # Convert to form compatible with data loader
+                # Reshape to (num_steps, 1) for multivariate handling
+                current_encoder_sequence_reshaped = current_encoder_sequence[
+                    :, np.newaxis
+                ]
+
+                current_encoder_sequence_TimeSeriesDataset = (
+                    self._series_to_TimeSeriesDataset(
+                        current_encoder_sequence_reshaped, train=False
+                    )
                 )
-            )
 
-            # Get the prediction for the current encoder sequence input
-            current_predictions = (
-                self._model.predict(current_encoder_sequence_dataloader).cpu().numpy()
-            )
-            deterministic_preds.extend(current_predictions[0])
-            all_predictions.extend(current_predictions[0])
+                # Create dataloader
+                current_encoder_sequence_dataloader = (
+                    current_encoder_sequence_TimeSeriesDataset.to_dataloader(
+                        train=False,
+                        batch_size=1,
+                        batch_sampler="synchronized",
+                        num_workers=self.num_workers,
+                        persistent_workers=True if self.num_workers > 0 else False,
+                    )
+                )
 
-        deterministic_preds = np.array(
-            deterministic_preds[
-                self.max_prediction_length : self.max_prediction_length + val_length
-            ]
-        )
+                # Get the prediction for the current encoder sequence input
+                # The model predicts for all groups, we need to extract predictions for our feature
+                current_predictions = (
+                    self._model.predict(current_encoder_sequence_dataloader)
+                    .cpu()
+                    .numpy()
+                )
 
-        # Ensure deterministic_preds is 1D (we converted multivariate to univariate by taking mean)
-        deterministic_preds = np.array(deterministic_preds)
-        if deterministic_preds.ndim > 1:
-            deterministic_preds = deterministic_preds.flatten()
+                # Extract predictions for this feature (first group)
+                # The predictions come back as an array, we take the first element
+                if current_predictions.ndim > 1:
+                    pred_values = current_predictions[0]  # Take first sample/batch
+                    if pred_values.ndim > 1:
+                        pred_values = pred_values.flatten()
+                    deterministic_preds.extend(pred_values)
+                    all_predictions.extend(pred_values)
+                else:
+                    deterministic_preds.extend([current_predictions])
+                    all_predictions.extend([current_predictions])
 
-        # Ensure we have the right length
-        if len(deterministic_preds) != forecast_horizon:
-            # Trim or pad if needed
-            if len(deterministic_preds) > forecast_horizon:
-                deterministic_preds = deterministic_preds[:forecast_horizon]
-            else:
+            # Extract the relevant portion
+            deterministic_preds_array = np.array(deterministic_preds)
+            if deterministic_preds_array.ndim > 1:
+                deterministic_preds_array = deterministic_preds_array.flatten()
+
+            # Trim to forecast_horizon
+            if len(deterministic_preds_array) > forecast_horizon:
+                deterministic_preds_array = deterministic_preds_array[:forecast_horizon]
+            elif len(deterministic_preds_array) < forecast_horizon:
                 # Pad with last value if needed
                 padding = np.full(
-                    forecast_horizon - len(deterministic_preds), deterministic_preds[-1]
+                    forecast_horizon - len(deterministic_preds_array),
+                    (
+                        deterministic_preds_array[-1]
+                        if len(deterministic_preds_array) > 0
+                        else 0.0
+                    ),
                 )
-                deterministic_preds = np.concatenate([deterministic_preds, padding])
+                deterministic_preds_array = np.concatenate(
+                    [deterministic_preds_array, padding]
+                )
 
-        # Generate samples by adding noise to deterministic predictions
-        # This is a simplified approach - real DeepAR would use the model's probabilistic output
-        samples = []
+            # Generate samples by adding noise to deterministic predictions
+            feature_samples = []
+            for _ in range(num_samples):
+                # Add Gaussian noise to deterministic predictions
+                noise_std = (
+                    np.std(deterministic_preds_array) * 0.1
+                )  # 10% of std as noise
+                sample = deterministic_preds_array + np.random.normal(
+                    0, noise_std, deterministic_preds_array.shape
+                )
+                feature_samples.append(sample)
 
-        for _ in range(num_samples):
-            # Add Gaussian noise to deterministic predictions
-            noise_std = np.std(deterministic_preds) * 0.1  # 10% of std as noise
-            sample = deterministic_preds + np.random.normal(
-                0, noise_std, deterministic_preds.shape
-            )
-            samples.append(sample)
+            feature_samples = np.array(
+                feature_samples
+            )  # Shape: (num_samples, forecast_horizon)
+            all_feature_samples.append(feature_samples)
 
-        samples = np.array(samples)  # Shape: (num_samples, forecast_horizon)
-
-        # Ensure correct shape: (num_samples, forecast_horizon, num_targets)
-        # Broadcast univariate predictions to match original multivariate structure
-        if samples.ndim == 2:
-            # Expand to (num_samples, forecast_horizon, num_targets)
-            samples = samples[:, :, np.newaxis]
-            # Broadcast to match original number of targets by repeating
-            if num_targets > 1:
-                samples = np.repeat(samples, num_targets, axis=2)
+        # Stack all features: (num_samples, forecast_horizon, num_targets)
+        samples = np.stack(
+            all_feature_samples, axis=2
+        )  # Shape: (num_samples, forecast_horizon, num_targets)
 
         return samples

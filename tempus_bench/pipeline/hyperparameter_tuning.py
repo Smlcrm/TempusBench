@@ -67,7 +67,6 @@ class HyperparameterTuner:
         self.tuning_loss = self.evaluation_config.tuning_loss
         self.dataset_path = Path(self.task_config.task_path)
         self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
-        self.data_loader = DataLoader(self.task_config, self.evaluation_config)
         self.visualizer = Visualizer()
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
@@ -138,7 +137,7 @@ class HyperparameterTuner:
         best_hyperparameters = {}
 
         # Initialize model executor
-        model_executor = ModelExecutor(self.job_config)
+        model_executor = ModelExecutor(job_config=self.job_config.to_dict())
         # Generate windows for this dataset
 
         # Store results for each window
@@ -187,10 +186,6 @@ class HyperparameterTuner:
 
                 eval_metrics[immutable_params] = eval_outputs
 
-                LogManager.get_logger().debug(
-                    "HyperparameterTuner",
-                    f"Evaluated model {self.model_name} with params {params}: {eval_outputs}",
-                )
                 # Log hyperparameters and metrics to TensorBoard
                 LogManager.get_logger().log_hparams(params, eval_outputs)
 

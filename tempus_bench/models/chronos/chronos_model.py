@@ -8,6 +8,7 @@ forecasting tasks and can handle both univariate and multivariate data.
 The model supports multiple sizes (tiny, mini, small, base, large) and can be configured
 with different context lengths and sampling strategies.
 """
+
 from typing import Any, Dict, Literal, Optional
 
 import numpy as np
@@ -21,6 +22,7 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 class ChronosHyperparams(PydanticBaseModel):
     pass
+
 
 class ChronosModel(BaseModel):
     """
@@ -116,21 +118,17 @@ class ChronosModel(BaseModel):
         padding_length = context_length - y_context.shape[0]
         if padding_length <= 0:
             # Use the most recent context_length data points
-            y_context = y_context[-context_length :, :]
+            y_context = y_context[-context_length:, :]
         else:
             # If not enough data, pad with the last available value
             y_context = np.pad(
-                y_context,
-                ((padding_length, 0), (0, 0)),
-                mode="constant"
+                y_context, ((padding_length, 0), (0, 0)), mode="constant"
             )
 
         y_context = torch.tensor(y_context.T)
         # Generate forecasts
         forecasts = self._model.predict(
-            context=y_context,
-            prediction_length=forecast_horizon,
-            num_samples=self.eval_config["num_samples"]
+            context=y_context, prediction_length=forecast_horizon
         )
         forecasts = np.asarray(forecasts)
 
@@ -138,20 +136,3 @@ class ChronosModel(BaseModel):
         # We need to transpose to (num_samples, forecast_horizon, num_targets)
         forecasts = np.transpose(forecasts, (1, 2, 0))
         return forecasts
-
-    def get_model_summary(self) -> Dict[str, Any]:
-        """
-        Get a summary of the Chronos model's properties.
-
-        Returns:
-            Dict[str, Any]: Dictionary containing model summary information
-        """
-        return {
-            "model_type": "Chronos",
-            "model_size": self._model_config["model_size"],
-            "context_length": self._model_config["context_length"],
-            "num_samples": self.num_samples,
-            "forecast_horizon": self.forecast_horizon,
-            "is_fitted": self.is_fitted,
-            "device": "cuda" if torch.cuda.is_available() else "cpu",
-        }
