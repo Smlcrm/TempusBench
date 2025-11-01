@@ -24,7 +24,6 @@ class TimesfmModel(BaseModel):
             settings: Settings dictionary containing device, python_version, etc.
         """
         super().__init__(params, settings, TimesfmHyperparams)
-        self._build_model()
 
     @validate_inputs
     def train(
@@ -34,10 +33,11 @@ class TimesfmModel(BaseModel):
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
         **kwargs,
-    ) -> "TimesFMModel":
+    ) -> "TimesfmModel":
         """
         Foundation model: no training needed. Mark as fitted and return self.
         """
+        self._build_model()
         self.is_fitted = True
         return self
 
@@ -56,8 +56,7 @@ class TimesfmModel(BaseModel):
             raise ValueError("TimesFMModel is not fitted. Call train() first.")
 
         forecast_horizon = timestamps_target.shape[0]
-        predictions = self._model.forecast(y_context)[0]
-        predictions = predictions[:forecast_horizon]
+        predictions = self._model.forecast(y_context.T)[0].T[:forecast_horizon]
         return predictions
 
     def _build_model(self):
@@ -71,8 +70,6 @@ class TimesfmModel(BaseModel):
                 # Se this to True for v1.0 checkpoints
                 output_patch_len=self.output_patch_len,
                 use_positional_embedding=self.use_positional_embedding,
-                # Note that we could set this to as high as 2048 but keeping it 512 here so that
-                # both v1.0 and 2.0 checkpoints work
                 context_len=self.context_len,
             ),
             checkpoint=timesfm.TimesFmCheckpoint(
