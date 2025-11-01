@@ -273,3 +273,32 @@ class JobConfig:
         self.model_setting = model_setting
         self.task_config = task_config
         self.run_path = run_path
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert this JobConfig object to a dictionary for JSON serialization.
+
+        This method serializes all components of this JobConfig into a
+        dictionary format that can be safely converted to JSON. Pydantic models
+        are converted using model_dump(), and ModelConfig attributes are extracted
+        from its __dict__.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation of the JobConfig suitable
+                for JSON serialization.
+        """
+        return {
+            "evaluation_config": self.evaluation_config.model_dump(),
+            "evaluation_setting": self.evaluation_setting.model_dump(),
+            "model_config": {
+                "model_name": self.model_config.model_name,
+                **{
+                    k: v
+                    for k, v in self.model_config.__dict__.items()
+                    if k != "model_name"
+                },
+            },
+            "model_setting": self.model_setting,
+            "task_config": self.task_config.model_dump(),
+            "run_path": self.run_path,
+        }

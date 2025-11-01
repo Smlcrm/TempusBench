@@ -213,6 +213,8 @@ model:
 - Python 3.8+
 - Conda
 
+**Note**: All models added to the `tempus_bench/models` directory must be compatible with Python 3.0 or later (Python 3.x series).
+
 ### Setup
 
 1. **Clone the repository**:
@@ -319,6 +321,8 @@ bash scripts/bash/cleanup_conda_envs.sh
 
 ### Adding New Models
 
+**Important**: All models must be compatible with Python 3.0 or later (Python 3.x series). Ensure your model implementation and dependencies work with Python 3.x.
+
 1. **Choose model type** (deterministic, stochastic, or hybrid):
    - **Deterministic**: Point forecasts (mean/median predictions)
    - **Stochastic**: Probabilistic forecasts (samples/quantiles)
@@ -336,8 +340,10 @@ bash scripts/bash/cleanup_conda_envs.sh
    ```yaml
    # settings.yaml
    model_type: deterministic  # or 'stochastic' or 'hybrid'
-   python_version: "3.11.13"
+   python_version: "3.11.13"  # Must be Python 3.0 or later (3.x series)
    ```
+   
+   **Note**: The `python_version` specified in `settings.yaml` must be Python 3.0 or later. The framework requires all models to be compatible with Python 3.x series.
 
 4. **Implement model class**:
    ```python

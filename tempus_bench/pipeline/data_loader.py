@@ -97,14 +97,15 @@ class DataLoader:
             time_start, time_freq, target_raw, normalize, handle_missing
         )
 
+        self.scaler = scaler
+
         assert target.ndim == 2  # (num_steps, num_targets)
         assert timestamps.ndim == 1  # (num_steps,)
 
         # Construct the Dataset with dynamically assigned splits from steps
         self.dataset = Dataset(
-            timestamps=timestamps,
-            target=target,
-            scaler=scaler,
+            timestamps=timestamps.tolist(),
+            target=target.tolist(),
             metadata={
                 "dataset_path": str(self.dataset_path),
                 "time_start": time_start,
