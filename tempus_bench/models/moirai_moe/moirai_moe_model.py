@@ -60,7 +60,7 @@ class MoiraiMoeModel(BaseModel):
                 ),
                 prediction_length=pdt,
                 context_length=ctx,
-                patch_size=self.psz,
+                patch_size=pdt + ctx,
                 num_samples=kwargs["num_samples"],
                 target_dim=y_context.shape[1],
                 feat_dynamic_real_dim=0,
@@ -75,7 +75,7 @@ class MoiraiMoeModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
-        freq: str,
+        **kwargs,
     ) -> np.ndarray:
         """
         Make predictions using the MoiraiMoE model.
