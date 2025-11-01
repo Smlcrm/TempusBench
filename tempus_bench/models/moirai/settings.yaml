@@ -1,3 +1,4 @@
 model_type: "stochastic"
 python_version: "3.12"
 device: "cpu"
+model_name: "moirai"

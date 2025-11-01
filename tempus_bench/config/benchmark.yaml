@@ -86,7 +86,7 @@ model:
   
   # moirai: {}
   # moirai_moe: {}
-  lagllama: {}
+  # lagllama: {}
   # toto: {}
   # tabpfn: {}
   

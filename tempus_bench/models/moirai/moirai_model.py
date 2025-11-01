@@ -11,13 +11,14 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
 class MoiraiHyperparams(PydanticBaseModel):
-    model_name: Optional[str] = Field(default="moirai", description="Model name")
-    size: Optional[str] = Field(default=None, description="Model size")
+    size: Optional[str] = Field(default="tiny", description="Model size")
     ctx: Optional[int] = Field(default=None, description="Context length")
     psz: Optional[int] = Field(default=16, ge=1, description="Patch size")
     bsz: Optional[int] = Field(default=32, ge=1, description="Batch size")
     test: Optional[int] = Field(default=100, ge=1, description="Test parameter")
-    num_samples: Optional[int] = Field(default=100, ge=1, description="Number of samples")
+    num_samples: Optional[int] = Field(
+        default=100, ge=1, description="Number of samples"
+    )
 
 
 class MoiraiModel(BaseModel):
@@ -86,6 +87,7 @@ class MoiraiModel(BaseModel):
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
             )
+
         self.is_fitted = True
         return self
 
