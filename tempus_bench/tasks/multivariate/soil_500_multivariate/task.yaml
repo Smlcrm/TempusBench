@@ -1,8 +1,11 @@
 task:
   task_name: 500
-  context_window: 2048
+  context_window: 1024
   forecast_horizon: 64
   dataset:
     handle_missing: interpolate
     normalize: true
     file_name: soil_500_multivariate.csv
+
+# number of variates : 127
+# number of time-steps : 4323
