@@ -98,6 +98,7 @@ class MetricRegistry:
                 "'model_type' must be 'deterministic', 'stochastic', or 'hybrid'"
             )
 
+    
         results = {}
         for metric_name in metrics_to_calculate:
             results[metric_name] = self.metric_registry[metric_name](

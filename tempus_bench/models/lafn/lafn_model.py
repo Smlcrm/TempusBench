@@ -93,10 +93,6 @@ class LafnModel(BaseModel):
         timestamps_context = np.expand_dims(timestamps_context, axis=(0, -1))
         timestamps_target = np.expand_dims(timestamps_target, axis=(0, -1))
 
-        print("y_context shape:", y_context.shape)
-        print("timestamps_context shape:", timestamps_context.shape)
-        print("timestamps_target shape:", timestamps_target.shape)
-
         forecasts = self.inferer.forecast(
             context_y=y_context,
             forecast_horizon=forecast_horizon,
