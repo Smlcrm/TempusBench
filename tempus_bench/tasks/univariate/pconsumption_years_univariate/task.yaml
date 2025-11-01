@@ -1,8 +1,11 @@
 task:
   task_name: years
-  context_window: 64
+  context_window: 32
   forecast_horizon: 8
   dataset:
     handle_missing: interpolate
     normalize: true
     file_name: pconsumption_years_univariate.csv
+
+# number of variates : 1
+# number of time-steps : 96
