@@ -196,7 +196,6 @@ class HyperparameterTuner:
                 optimal_hyperparameters.append(best_params)
                 evaluations.append(eval_metrics)
 
-
                 self.visualizer.plot_forecast_window(
                     y_pred=compute_point_forecast(
                         np.array(y_pred[window_idx]),

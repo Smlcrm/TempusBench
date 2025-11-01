@@ -51,13 +51,8 @@ class MoiraiModel(BaseModel):
         Returns:
             self: The fitted model instance (for compatibility)
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-
-        # Reference params, settings, device, python_version
         size = self.size
         psz = self.psz
-
         num_samples = kwargs["num_samples"]
 
         # Prepare MoiraiForecast model with target_dim equal to num_targets
