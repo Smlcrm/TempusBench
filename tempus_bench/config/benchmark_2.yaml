@@ -79,7 +79,7 @@ model:
 
 
   # moment: {}
-  timesfm: {}
+  # timesfm: {}
   # tiny_time_mixer: {}
 
   # # Stochastic models
@@ -87,7 +87,7 @@ model:
 
   # moirai: {}
   # moirai_moe: {}
-  # lagllama: {}
+  lagllama: {}
   # toto: {}
   # tabpfn: {}
 
