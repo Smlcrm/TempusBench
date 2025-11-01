@@ -88,7 +88,6 @@ class CondaEnvManager:
             self._installed = True
         else:
             # Environment doesn't exist, not healthy, or reinstall requested
-            self.python_version = "3.11"
             self.create_env()
             self.install(self.requirements_path)
 
