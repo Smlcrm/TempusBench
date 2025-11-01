@@ -92,7 +92,7 @@ class EvaluationConfig(BaseModel):
         ge=1,
         description="Number of quantiles to compute for quantile-based metrics",
     )
-    point_forecast_statistic: str = Field(
+    point_forecast_statistic: Literal["mean", "median"] = Field(
         default="mean",
         description="Statistic to use for converting stochastic predictions to point forecasts",
     )
