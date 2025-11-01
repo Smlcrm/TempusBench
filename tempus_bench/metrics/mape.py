@@ -11,13 +11,13 @@ class MAPE(BaseMetric):
     def __init__(self):
         super().__init__("deterministic")
 
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
+    def _compute(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
         """
         Computes the MAPE.
 
         Args:
             y_true: Actual observed values.
-            y_pred: Predicted values.
+            y_pred: Predicted values (preprocessed by base class).
             **kwargs: Optional kwargs (unused)
 
         Returns:
