@@ -83,12 +83,12 @@ model:
   # tiny_time_mixer: {}
 
   # # Stochastic models
-  chronos: {}
+  # chronos: {}
   
   # moirai: {}
   # moirai_moe: {}
   # lagllama: {}
-  # toto: {}
+  toto: {}
   # tabpfn: {}
   
 
