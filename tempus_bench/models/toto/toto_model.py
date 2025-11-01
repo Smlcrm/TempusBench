@@ -9,9 +9,24 @@ import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
 
 from tempus_bench.models.base_model import BaseModel
-from .toto.data.util.dataset import MaskedTimeseries
-from .toto.inference.forecaster import TotoForecaster
-from .toto.model.toto import Toto
+
+# Import from toto package using absolute imports from the tempus_bench.models.toto package
+# Since toto_model.py is in tempus_bench.models.toto and toto/ is a subpackage,
+# we can import it as a relative subpackage
+try:
+    from .toto.data.util.dataset import MaskedTimeseries
+    from .toto.inference.forecaster import TotoForecaster
+    from .toto.model.toto import Toto
+except ImportError:
+    # Fallback: if relative imports fail, try absolute imports by adding parent to path
+    import sys
+    from pathlib import Path
+    _toto_model_dir = Path(__file__).parent
+    if str(_toto_model_dir) not in sys.path:
+        sys.path.insert(0, str(_toto_model_dir))
+    from toto.data.util.dataset import MaskedTimeseries
+    from toto.inference.forecaster import TotoForecaster
+    from toto.model.toto import Toto
 
 
 class TotoHyperparams(PydanticBaseModel):
@@ -20,7 +35,7 @@ class TotoHyperparams(PydanticBaseModel):
 
 
 class TotoModel(BaseModel):
-    def __init__(self, config: JobConfig, logs_path: str):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize TOTO model with configuration.
 
@@ -28,31 +43,24 @@ class TotoModel(BaseModel):
             config: JobConfig instance containing model and task configuration
             logs_path: Directory for storing log files (required)
         """
-        super().__init__(config, logs_path)
-        
-        # Validate and set model config using Pydantic
-        self._model_config = TotoHyperparams(**self._model_config).model_dump()
+        super().__init__(params, settings, TotoHyperparams)
 
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
-        torch.use_deterministic_algorithms(True)
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        toto = Toto.from_pretrained("Datadog/Toto-Open-Base-1.0")
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = self.CUBLAS_WORKSPACE_CONFIG
+        torch.use_deterministic_algorithms(self.use_deterministic_algorithms)
+        torch.device(self.device)
+        toto = Toto.from_pretrained(self.model_name)
         toto.to(self.device)
-
         # JIT compilation for faster inference
         toto.compile()
         self._model = TotoForecaster(toto.model)
 
     def train(
         self,
-        y_context: Optional[np.ndarray],
-        y_target: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict,
     ) -> "TotoModel":
         """
         Train/fine-tune the foundation model on given data.
@@ -72,11 +80,10 @@ class TotoModel(BaseModel):
 
     def predict(
         self,
-        y_context: Optional[np.ndarray] = None,
-        timestamps_context: Optional[np.ndarray] = None,
-        timestamps_target: Optional[np.ndarray] = None,
-        freq: str = None,
-        **kwargs,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict,
     ) -> np.ndarray:
         """
         Make predictions using the trained TOTO model.
@@ -91,39 +98,56 @@ class TotoModel(BaseModel):
             np.ndarray: Model prediction samples with shape (num_samples, forecast_horizon, num_targets)
         """
 
-        forecast_horizon, num_variates = timestamps_target.shape
-
+        freq = kwargs["freq"]
+        num_samples = kwargs["num_samples"]
+        
+        # y_context shape: (num_steps, num_variates)
+        # timestamps_context shape: (num_steps,)
+        # timestamps_target shape: (forecast_horizon,)
+        num_steps, num_variates = y_context.shape
+        forecast_horizon = len(timestamps_target)
+        
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
-
-        y_context = torch.tensor(y_context.T, dtype=torch.float)
-        timestamps_context = torch.tensor(timestamps_context.T, dtype=torch.float)
         time_diff = self.freq_to_seconds(freq)
 
+        # Convert to tensors and transpose to (num_variates, num_steps)
+        # Then add batch dimension to get (1, num_variates, num_steps)
+        y_context_tensor = torch.tensor(y_context.T, dtype=torch.float)  # (num_variates, num_steps)
+        y_context_tensor = y_context_tensor.unsqueeze(0)  # (1, num_variates, num_steps)
+        
+        timestamps_context_tensor = torch.tensor(timestamps_context, dtype=torch.float)  # (num_steps,)
+        # Expand timestamps to match series shape: (1, num_variates, num_steps)
+        timestamps_context_tensor = timestamps_context_tensor.unsqueeze(0).unsqueeze(0)  # (1, 1, num_steps)
+        timestamps_context_tensor = timestamps_context_tensor.expand(1, num_variates, -1)  # (1, num_variates, num_steps)
+
         # Create a MaskedTimeseries object
+        # All tensors need shape: (batch=1, variates, seq_len)
         inputs = MaskedTimeseries(
-            series=y_context,
-            padding_mask=torch.full_like(y_context, True, dtype=torch.bool),
-            id_mask=torch.zeros_like(y_context, dtype=torch.float),
-            timestamp_seconds=timestamps_context,
-            time_interval_seconds=torch.full((num_variates,), time_diff, dtype=torch.float),
+            series=y_context_tensor,  # (1, num_variates, num_steps)
+            padding_mask=torch.full_like(y_context_tensor, True, dtype=torch.bool),  # (1, num_variates, num_steps)
+            id_mask=torch.zeros_like(y_context_tensor[:, :, :1], dtype=torch.float),  # (1, num_variates, 1) - broadcastable
+            timestamp_seconds=timestamps_context_tensor,  # (1, num_variates, num_steps)
+            time_interval_seconds=torch.full((1, num_variates), time_diff, dtype=torch.float),  # (1, num_variates)
         )
 
-        # Generate forecasts for the next 336 timesteps
+        # Generate forecasts
         forecast = self._model.forecast(
             inputs,
             prediction_length=forecast_horizon,
-            num_samples=self.num_samples,  # Use configured number of samples
-            samples_per_batch=self.num_samples,  # Control memory usage during inference
+            num_samples=num_samples,  # Use configured number of samples
+            samples_per_batch=num_samples,  # Control memory usage during inference
         )
 
-        forecast_samples = np.squeeze(np.asarray(forecast.samples), axis=0)
-
-        # Return samples with shape (num_samples, forecast_horizon, num_targets)
-        # Ensure correct shape for multivariate case
-        if forecast_samples.ndim == 2:
-            # If univariate, add target dimension
-            forecast_samples = forecast_samples[:, :, np.newaxis]
+        # forecast.samples shape: (batch=1, variate, future_time_steps, samples)
+        # We need: (samples, future_time_steps, variate)
+        forecast_samples = forecast.samples  # (1, num_variates, forecast_horizon, num_samples)
+        forecast_samples = forecast_samples.squeeze(0)  # (num_variates, forecast_horizon, num_samples)
+        # Transpose to (num_samples, forecast_horizon, num_variates)
+        forecast_samples = forecast_samples.permute(2, 1, 0)  # (num_samples, forecast_horizon, num_variates)
         
+        # Convert to numpy
+        forecast_samples = np.asarray(forecast_samples.cpu())
+
         return forecast_samples
 
     def freq_to_seconds(self, freq: Union[str, float, int]) -> float:
