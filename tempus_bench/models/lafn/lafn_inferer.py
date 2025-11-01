@@ -399,21 +399,9 @@ class LAFNInferer(nnx.Module):
             forecast_horizon=forecast_horizon,
         )
 
-        print("context_x shape:", context_x.shape)
-        print("target_x shape:", target_x.shape)
-
         data = self.scale_and_pad_data(
             context_x=context_x, context_y=context_y, target_x=target_x  # type: ignore
         )
-
-        print("data['context_x'] shape:", data["context_x"].shape)
-        print("data['context_y'] shape:", data["context_y"].shape)
-        print("data['context_mask'] shape:", data["context_mask"].shape)
-        print("data['target_x'] shape:", data["target_x"].shape)
-        print("data['target_mask'] shape:", data["target_mask"].shape)
-
-        print("data['loc'] shape:", data["loc"].shape)
-        print("data['scale'] shape:", data["scale"].shape)
 
         forecast_embed = self.model(**data)
 
