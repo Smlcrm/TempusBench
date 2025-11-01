@@ -16,7 +16,7 @@ model:
   # # Universal Models
   # lafn_hybrid: {}
 
-  # seasonal_naive: 
+  # seasonal_naive:
   #   sp: [12, 24]
 
   # Deterministic Models
@@ -41,7 +41,7 @@ model:
   #   layers: [1]
   #   dropout: [0.1, 0.3, 0.5]
   #   learning_rate: [0.01, 0.001, 0.0001, 000001]
-    
+
 
   # prophet:
   #   seasonality_mode: [additive]
@@ -52,7 +52,7 @@ model:
   #   n_estimators: [10]
   #   max_depth: [2]
 
-  
+
   # svr:
   #   kernel: [rbf]
   #   C: [1.0]
@@ -67,7 +67,7 @@ model:
   # varmax:
   #   p: [1, 2]
   #   q: [1, 2]
-  #   trend: [c, t, ct]  
+  #   trend: [c, t, ct]
 
   # xgboost:
   #   n_estimators: [200]
@@ -75,20 +75,20 @@ model:
   #   learning_rate: [0.05]
 
 
-    
-  
+
+
 
   # moment: {}
-  # timesfm: {}
+  timesfm: {}
   # tiny_time_mixer: {}
 
   # # Stochastic models
   # chronos: {}
-  
+
   # moirai: {}
-  moirai_moe: {}
+  # moirai_moe: {}
   # lagllama: {}
   # toto: {}
   # tabpfn: {}
-  
+
 

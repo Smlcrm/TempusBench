@@ -53,21 +53,14 @@ class MoiraiModel(BaseModel):
         Returns:
             self: The fitted model instance (for compatibility)
         """
-        # Extract kwargs (NO defaults, use kwargs["var_name"])
-        freq = kwargs["freq"]
-
-        # Reference params, settings, device, python_version
         size = self.size
         ctx = self.ctx
         psz = self.psz
-        bsz = self.bsz
-        test = self.test
         num_samples = kwargs["num_samples"]
 
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
-            print("fitting moirai model")
             pdt = y_target.shape[0]
             ctx = y_context.shape[0]
             self._model = MoiraiForecast(
@@ -82,8 +75,6 @@ class MoiraiModel(BaseModel):
                 feat_dynamic_real_dim=0,
                 past_feat_dynamic_real_dim=0,
             )
-
-            print(" moirai model fitted")
 
         self.is_fitted = True
         return self
