@@ -11,10 +11,15 @@ class MASE(BaseMetric):
     def __init__(self):
         super().__init__("deterministic")
 
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
+    def _compute(self, y_true: np.ndarray, y_pred: np.ndarray, **kwargs) -> float:
         """
         Computes the MASE.
         Requires 'y_train' and optionally 'seasonal_period' in kwargs.
+        
+        Args:
+            y_true: Actual observed values.
+            y_pred: Predicted values (preprocessed by base class).
+            **kwargs: Optional kwargs (unused)
         """
         denom = np.maximum(1e-10, np.mean(np.abs(y_true[1:] - y_true[:-1])))
         mase = np.mean(np.abs(y_true - y_pred)) / denom
