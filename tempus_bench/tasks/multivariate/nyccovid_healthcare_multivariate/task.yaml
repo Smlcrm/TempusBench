@@ -1,8 +1,11 @@
 task:
   task_name: healthcare
-  context_window: 1536
-  forecast_horizon: 16
+  context_window: 512
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
     normalize: true
     file_name: nyccovid_healthcare_multivariate.csv
+
+# number of variates : 54
+# number of time-steps : 2005

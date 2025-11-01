@@ -81,8 +81,9 @@ class Preprocessor:
             target_cleaned_str = re.sub(r",\s*,", ", None,", target_cleaned_str)
         # Handle leading empty values like "[, 1, 2]" -> "[None, 1, 2]"
         target_cleaned_str = re.sub(r"\[\s*,", "[None,", target_cleaned_str)
-        # Handle trailing empty values like "[1, 2, ]" -> "[1, 2, None]"
-        target_cleaned_str = re.sub(r",\s*\]", ", None]", target_cleaned_str)
+        # Handle trailing commas by removing them (e.g., "[1, 2, 3, ]" -> "[1, 2, 3]")
+        # This ignores trailing commas instead of treating them as empty values
+        target_cleaned_str = re.sub(r",\s*\]", "]", target_cleaned_str)
 
         LogManager.get_logger().debug(
             "Preprocessor._parse_and_clean_target",
@@ -158,7 +159,11 @@ class Preprocessor:
             # It is a list of lists: [[feature1], [feature2], ...] -> shape (num_targets, num_steps)
             # We'll treat each sublist as one feature, and transpose after cleaning
             cleaned_features = []
+            sequence_lengths = []
             for fi, feature_seq in enumerate(target_parsed):
+                if not isinstance(feature_seq, list):
+                    # If a feature is not a list, convert it to a list
+                    feature_seq = [feature_seq]
                 cleaned_seq = []
                 for ti, val in enumerate(feature_seq):
                     if val is None or val == "" or val == "None":
@@ -174,8 +179,32 @@ class Preprocessor:
                             f"[DEBUG] Feature {fi}, time {ti}, value: {cleaned_seq[-1]}",
                         )
                 cleaned_features.append(cleaned_seq)
+                sequence_lengths.append(len(cleaned_seq))
+
+            # Check for inconsistent sequence lengths
+            if len(set(sequence_lengths)) > 1:
+                max_length = max(sequence_lengths)
+                LogManager.get_logger().debug(
+                    "Preprocessor._parse_and_clean_target",
+                    f"[DEBUG] Inconsistent sequence lengths detected: {sequence_lengths}. "
+                    f"Padding all sequences to length {max_length} with NaN.",
+                )
+                # Pad all sequences to the same length with NaN
+                for i, seq in enumerate(cleaned_features):
+                    if len(seq) < max_length:
+                        cleaned_features[i] = seq + [np.nan] * (max_length - len(seq))
+
             # Transpose: (num_targets, num_steps) -> (num_steps, num_targets)
-            target = np.array(cleaned_features, dtype=float).T
+            try:
+                target = np.array(cleaned_features, dtype=float).T
+            except (ValueError, TypeError) as e:
+                # If still fails, provide detailed error
+                lengths_str = ", ".join(str(len(seq)) for seq in cleaned_features)
+                raise ValueError(
+                    f"Cannot convert cleaned features to numpy array. "
+                    f"Feature sequence lengths: [{lengths_str}]. "
+                    f"Original error: {e}"
+                )
 
         # Ensure target is always 2D with shape (num_steps, num_targets)
         if target.ndim == 1:
@@ -186,17 +215,15 @@ class Preprocessor:
                 f"Target array must be 2D (num_steps, num_targets) after parsing, "
                 f"got shape: {target.shape}, ndim: {target.ndim}"
             )
-        
+
         # Ensure we have at least one step and one target
         if target.shape[0] == 0:
-            raise ValueError(
-                f"Target array has zero steps after parsing (num_steps=0)"
-            )
+            raise ValueError(f"Target array has zero steps after parsing (num_steps=0)")
         if target.shape[1] == 0:
             raise ValueError(
                 f"Target array has zero targets after parsing (num_targets=0)"
             )
-        
+
         LogManager.get_logger().debug(
             "Preprocessor._parse_and_clean_target",
             f"[DEBUG] Final target shape: {target.shape} (should be (num_steps, num_targets))",
@@ -243,10 +270,51 @@ class Preprocessor:
             "Q": "QE",  # Quarterly -> Quarter End
             "A": "YE",  # Annual -> Year End
         }
-        mapped_freq = freq_mapping.get(freq)
-        timestamps = pd.date_range(
-            start=start, periods=num_steps, freq=mapped_freq
-        ).to_numpy()
+        mapped_freq = freq_mapping.get(freq, freq)
+
+        # Convert start to pandas Timestamp if it's a string or numeric
+        try:
+            if isinstance(start, str):
+                start_ts = pd.Timestamp(start)
+            elif isinstance(start, (int, float)):
+                # Handle Unix timestamps (seconds, milliseconds, microseconds, nanoseconds)
+                if start > 1e12:  # Likely nanoseconds or microseconds
+                    start_ts = pd.Timestamp(start, unit="ns")
+                elif start > 1e9:  # Likely milliseconds
+                    start_ts = pd.Timestamp(start, unit="ms")
+                else:
+                    start_ts = pd.Timestamp(start, unit="s")
+            else:
+                start_ts = pd.Timestamp(start)
+        except (ValueError, TypeError, OverflowError) as e:
+            raise ValueError(
+                f"Invalid start time format: {start!r}. Cannot convert to pandas Timestamp. "
+                f"Original error: {e}"
+            )
+
+        # Generate date range with error handling for overflow
+        try:
+            timestamps = pd.date_range(
+                start=start_ts, periods=num_steps, freq=mapped_freq
+            ).to_numpy()
+        except (ValueError, OverflowError) as e:
+            # If overflow occurs, try using end parameter instead of periods
+            # Calculate end date from start + (num_steps - 1) periods using pandas offsets
+            try:
+                from pandas.tseries.frequencies import to_offset
+
+                offset = to_offset(mapped_freq)
+                # Compute end date: start + (num_steps - 1) * frequency offset
+                end_ts = start_ts + offset * (num_steps - 1)
+                timestamps = pd.date_range(
+                    start=start_ts, end=end_ts, freq=mapped_freq
+                ).to_numpy()
+            except Exception as e2:
+                raise ValueError(
+                    f"Cannot generate date range with start={start_ts}, periods={num_steps}, freq={mapped_freq!r}. "
+                    f"Original error: {e}. Fallback error: {e2}. "
+                    f"This might be due to very large number of periods causing overflow."
+                )
 
         # Convert to float and handle None
         if arr.dtype == object:
@@ -300,17 +368,17 @@ class Preprocessor:
                 f"Result array must be 2D (num_steps, num_targets) after handling missing values, "
                 f"got shape: {result.shape}, ndim: {result.ndim}"
             )
-        
+
         if result.shape[0] == 0:
             raise ValueError(
                 "Result array has zero steps after handling missing values (num_steps=0)"
             )
-        
+
         if result.shape[1] == 0:
             raise ValueError(
                 "Result array has zero targets after handling missing values (num_targets=0)"
             )
-        
+
         # Ensure timestamps length matches result steps
         if len(timestamps) != result.shape[0]:
             raise ValueError(
@@ -428,12 +496,12 @@ class Preprocessor:
                 f"Target array must be 2D (num_steps, num_targets) after capping variates, "
                 f"got shape: {target.shape}, ndim: {target.ndim}"
             )
-        
+
         if target.shape[0] == 0:
             raise ValueError(
                 "Target array has zero steps after capping variates (num_steps=0)"
             )
-        
+
         if target.shape[1] == 0:
             raise ValueError(
                 "Target array has zero targets after capping variates (num_targets=0)"
@@ -565,27 +633,25 @@ class Preprocessor:
                 f"Target array must be 2D (num_steps, num_targets) after cleaning, "
                 f"got shape: {target_cleaned.shape}, ndim: {target_cleaned.ndim}"
             )
-        
+
         num_steps_actual = target_cleaned.shape[0]
         num_targets_actual = target_cleaned.shape[1]
-        
+
         if num_steps_actual == 0:
-            raise ValueError(
-                "Target array has zero steps after cleaning (num_steps=0)"
-            )
-        
+            raise ValueError("Target array has zero steps after cleaning (num_steps=0)")
+
         if num_targets_actual == 0:
             raise ValueError(
                 "Target array has zero targets after cleaning (num_targets=0)"
             )
-        
+
         # Ensure timestamps match target steps
         if len(timestamps_cleaned) != num_steps_actual:
             raise ValueError(
                 f"Timestamps length ({len(timestamps_cleaned)}) does not match "
                 f"target num_steps ({num_steps_actual})"
             )
-        
+
         LogManager.get_logger().debug(
             "Preprocessor.clean",
             f"[DEBUG] Final result - timestamps: {timestamps_cleaned.shape}, target: {target_cleaned.shape} (num_steps={num_steps_actual}, num_targets={num_targets_actual})",

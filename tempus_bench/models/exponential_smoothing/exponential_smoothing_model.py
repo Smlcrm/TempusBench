@@ -16,8 +16,11 @@ class ExponentialSmoothingHyperparams(PydanticBaseModel):
     trend: Optional[Literal["add", "mul", "null"]] = Field(
         ..., description="Trend component: 'add', 'mul', or None (no trend)"
     )
-    damped_trend: bool = Field(..., description="Whether to use damped trend")
+
     # Fixed Hyperparameters - Optional for User to override
+    damped_trend: Optional[bool] = Field(
+        default=False, description="Whether to use damped trend"
+    )
     seasonal: Optional[Literal["add", "mul", "null"]] = Field(
         default=None,
         description="Seasonal component: 'add', 'mul', or None (no seasonality)",

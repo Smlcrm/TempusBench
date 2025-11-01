@@ -26,14 +26,14 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 class LstmHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
-    units: int = Field(..., ge=1, description="Number of LSTM units")
-    layers: int = Field(..., ge=1, description="Number of LSTM layers")
-    dropout: float = Field(..., ge=0, le=1, description="Dropout rate")
+    units: int = Field(default=32, ge=1, description="Number of LSTM units")
+    layers: int = Field(default=2, ge=1, description="Number of LSTM layers")
+    dropout: float = Field(default=0.3, ge=0, le=1, description="Dropout rate")
     learning_rate: float = Field(..., gt=0, description="Learning rate for optimizer")
     ### Fixed Hyperparameters - Optional for User to override
     batch_size: int = Field(default=32, ge=1, description="Batch size for training")
     epochs: int = Field(default=500, ge=1, description="Number of training epochs")
-    context_length: int = Field(default=256, ge=1, description="Context length")
+    context_length: int = Field(default=32, ge=1, description="Context length")
     prediction_window: int = Field(default=8, ge=1, description="Prediction window")
 
 

@@ -27,15 +27,15 @@ class WeightedIntervalScore(BaseMetric):
     def __init__(self):
         super().__init__("stochastic")
 
-    def __call__(
+    def _compute(
         self, y_true: np.ndarray, y_pred: np.ndarray, num_quantiles: int = 100, **kwargs
     ) -> float:
         """
         Computes Weighted Interval Score (WIS) for deciles.
 
         Args:
-            y_true: True values, shape (n_timesteps, 1) or (n_timesteps, num_targets)
-            y_pred: Prediction samples, shape (num_samples, forecast_horizon, num_targets)
+            y_true: True values, shape (n_timesteps, num_targets)
+            y_pred: Prediction samples (preprocessed by base class), shape (num_samples, forecast_horizon, num_targets)
             **kwargs: Optional parameters including 'num_quantiles' for the number of intervals to compute
 
         Returns:

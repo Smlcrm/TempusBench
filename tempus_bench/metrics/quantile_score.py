@@ -11,21 +11,20 @@ class QuantileScore(BaseMetric):
     def __init__(self):
         super().__init__("stochastic")
 
-    def __call__(
+    def _compute(
         self, y_true: np.ndarray, y_pred: np.ndarray, num_quantiles: int = 100, **kwargs
     ) -> float:
         """
         Computes the Quantile Score (QS) for deciles using the tilted ℓ₁ loss.
 
         Args:
-            y_true: True observed values, shape (num_steps, 1) or (num_steps, num_targets)
-            y_pred: Forecast samples, shape (num_samples, num_steps, num_targets)
+            y_true: True observed values, shape (num_steps, num_targets)
+            y_pred: Forecast samples (preprocessed by base class), shape (num_samples, num_steps, num_targets)
             **kwargs: Requires 'num_quantiles' parameter
 
         Returns:
             float: The mean Quantile Score across all timesteps and targets.
         """
-
         taus = np.linspace(0.0, 1.0, num=num_quantiles)
         # Compute quantile predictions for all taus at once: (num_quantiles, num_steps, num_targets)
         q_taus = np.quantile(y_pred, taus, axis=0)

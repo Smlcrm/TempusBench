@@ -1,8 +1,11 @@
 task:
   task_name: dense
-  context_window: 256
-  forecast_horizon: 8
+  context_window: 128
+  forecast_horizon: 64
   dataset:
     handle_missing: interpolate
     normalize: true
     file_name: chickenpox_dense_univariate.csv
+
+# number of variates : 1
+# number of time-steps : 522

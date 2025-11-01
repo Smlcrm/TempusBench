@@ -127,7 +127,6 @@ class ModelExecutor:
 
             result = conda_env.run(command=command)
 
-            print("result.stdout: ", result.stdout)
             lines = result.stdout.strip().split("\n")
             outputs_line = None
             for line in lines:
@@ -349,7 +348,6 @@ def main():
 
     for window_idx, dataset_splits in enumerate(window_generator):
 
-
         timestamps = np.asarray(dataset.timestamps)
         target = np.asarray(dataset.target)
         freq = dataset.metadata["time_freq"]  # type: ignore
@@ -393,10 +391,15 @@ def main():
             num_quantiles=job_config["evaluation_config"]["num_quantiles"],
         )
 
+        if job_config["model_setting"]["model_type"] == "hybrid":
+            results = results[0].tolist()
+        else:
+            results = results.tolist()
+
         # Include predictions in output for plotting
         output = {
             **eval_metrics,
-            "y_pred": results.tolist(),
+            "y_pred": results,
             "y_true": target[vstart:vend].tolist(),
             "timestamps_pred": timestamps[vstart:vend].tolist(),
         }
