@@ -16,6 +16,8 @@ from typing import List, Tuple
 
 import numpy as np
 
+from tempus_bench.utils.utils import compute_point_forecast
+
 from ..utils.configs import JobConfig
 from ..utils.log_manager import LogManager
 from ..utils.visualizer import Visualizer
@@ -194,9 +196,11 @@ class HyperparameterTuner:
                 optimal_hyperparameters.append(best_params)
                 evaluations.append(eval_metrics)
 
-                # Generate forecast plot for best hyperparameters
+
                 self.visualizer.plot_forecast_window(
-                    y_pred=np.array(y_pred[window_idx]),
+                    y_pred=compute_point_forecast(
+                        np.array(y_pred[window_idx]),
+                        self.job_config.evaluation_config.point_forecast_statistic),
                     y_true=np.array(y_true[window_idx]),
                     timestamps_pred=np.array(timestamps_pred[window_idx]),
                     model_name=self.model_name,
