@@ -1,1 +1,3 @@
 uni2ts
+tensorflow>=2.13.0,<3.0.0
+tensorboard>=2.13.0,<3.0.0
