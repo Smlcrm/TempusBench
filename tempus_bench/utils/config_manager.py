@@ -2,7 +2,7 @@
 Configuration manager for the benchmarking pipeline.
 
 This module provides comprehensive validation and management of configuration files using Pydantic
-to ensure they comply with the expected schema before execution. The Manager class handles
+to ensure they comply with the expected schema before execution. The ConfigManager class handles
 validation of benchmark configurations, model settings, task configurations, and system settings.
 """
 
@@ -40,7 +40,7 @@ class ValidationError(Exception):
         super().__init__(message)
 
 
-class Manager:
+class ConfigManager:
     """
     Configuration manager with comprehensive validation rules.
 
@@ -92,7 +92,7 @@ class Manager:
             - self.model_settings: Model execution settings (Python version, device, conda env) for models.
             - self.task_configs: Validated task configurations.
         """
-        # Initialize logger first (needed by Manager)
+        # Initialize logger first (needed by ConfigManager)
 
         # Setup paths and settings
 
@@ -127,11 +127,13 @@ class Manager:
             file_log_level=self.evaluation_setting.file_log_level,
             tf_logs_path=tensorboard_dir,
             tensorboard_logging=self.evaluation_setting.tensorboard_logging,
+            verbose=self.evaluation_setting.verbose,
         )
 
         self.logger.info(
-            "Manager",
+            "ConfigManager",
             f"Initializing run at {run_timestamp}; logs at: {self.logs_path}",
+            is_verbose=True,
         )
 
         self.model_configs = self.init_models_config(config_data["model"])
@@ -201,7 +203,9 @@ class Manager:
             else:
                 model_hparams[model_name] = ModelConfig(model_name=model_name)
 
-        self.logger.info("Manager", f"model_hparams: {model_hparams}")
+        self.logger.info(
+            "ConfigManager", f"model_hparams: {model_hparams}", is_verbose=True
+        )
 
         return model_hparams
 
