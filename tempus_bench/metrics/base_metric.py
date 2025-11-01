@@ -1,5 +1,7 @@
 import numpy as np
 
+from ..utils.utils import compute_point_forecast
+
 
 class BaseMetric:
 
@@ -29,7 +31,7 @@ class BaseMetric:
         elif model_type == "stochastic":
             if self.metric_type == "deterministic":
                 # process stochastic predictions by applying the specified statistic
-                forecast = self._process_stochastic_prediction(
+                forecast = compute_point_forecast(
                     y_pred, point_forecast_statistic
                 )
             else:
@@ -68,32 +70,4 @@ class BaseMetric:
         if len(y_pred.shape) > 2:
             raise ValueError(
                 "y_pred can't have more than 2 dimensions for deterministic evaluation"
-            )
-
-    @staticmethod
-    def _process_stochastic_prediction(
-        y_pred: np.ndarray, point_forecast_statistic: str | None = None
-    ) -> np.ndarray:
-        """Process stochastic predictions by applying the specified statistic.
-
-        Args:
-            y_pred: Prediction array with shape (num_samples, time_steps, num_targets)
-            point_forecast_statistic: The statistic to apply ('mean' is currently supported)
-
-        Returns:
-            Processed prediction array
-
-        Raises:
-            ValueError: If point_forecast_statistic is None or unsupported
-        """
-        if point_forecast_statistic is None:
-            raise ValueError(
-                "point_forecast_statistic must be provided for stochastic evaluation"
-            )
-
-        if point_forecast_statistic == "mean":
-            return np.mean(y_pred, axis=0)
-        else:
-            raise ValueError(
-                "RMSE can only handle point_forecast_statistic == 'mean' for stochastic evaluation."
             )
