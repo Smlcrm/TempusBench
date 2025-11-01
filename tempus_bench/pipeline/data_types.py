@@ -6,10 +6,7 @@ datasets, dataset splits, and task results in the benchmarking pipeline.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional
-
-import numpy as np
-from sklearn.preprocessing import StandardScaler
+from typing import Any, Dict, Literal, Optional, List
 
 
 @dataclass
@@ -49,9 +46,8 @@ class Dataset:
             frequency, start time, and other dataset properties.
     """
 
-    timestamps: np.ndarray  # Array of timestamps (same length as num_steps) or None
-    target: np.ndarray  # 2D np.ndarray of Target values
-    scaler: Optional[StandardScaler] = None  # Scaler used for normalization (if any)
+    timestamps: List[float]  # Array of timestamps (same length as num_steps) or None
+    target: List[List[float]]  # 2D np.ndarray of Target values
     metadata: Optional[Dict[str, Any]] = None
 
     def generate_dataset_split(
@@ -86,10 +82,7 @@ class Dataset:
 
         # Resolve actual dataset file path and load task-specific options
 
-        num_steps = self.target.shape[
-            0
-        ]  # (n_steps, n_features): first dim is time-steps
-
+        num_steps = len(self.target)
         window_size = sum(seg_len for (_, seg_len) in steps)
 
         window_idx = 0

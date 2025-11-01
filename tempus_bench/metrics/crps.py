@@ -47,9 +47,7 @@ class CRPS(BaseMetric):
         # quantiles: (num_quantiles,)
         # y_pred: (S, T, M)
         # Compute quantile predictions for all quantiles at once: (num_quantiles, T, M)
-        q_preds = np.quantile(
-            y_pred, quantiles[:, None, None], axis=0
-        )  # shape (num_quantiles, T, M)
+        q_preds = np.quantile(y_pred, quantiles, axis=0)  # shape (num_quantiles, T, M)
 
         # Broadcast y_true for computation: shape (num_quantiles, T, M)
         y_true_broadcast = np.broadcast_to(y_true, (num_quantiles, T, M))

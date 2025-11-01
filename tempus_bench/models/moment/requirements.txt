@@ -26,9 +26,10 @@ six==1.17.0
 sympy==1.14.0
 threadpoolctl==3.6.0
 tokenizers==0.13.3
-torch==2.8.0
+torch==2.0.1
 tqdm==4.67.1
 transformers==4.33.3
 typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.5.0
+

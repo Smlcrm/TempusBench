@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 
@@ -58,7 +57,8 @@ class TinyTimeMixerModel(BaseModel):
         timestamps_target: np.ndarray,
         **kwargs,
     ):
-        forecast_horizon, num_targets = y_context.shape
+        num_targets = y_context.shape[1]
+        forecast_horizon = timestamps_target.shape[0]
         columns = list(range(num_targets))
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
         df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
@@ -66,7 +66,7 @@ class TinyTimeMixerModel(BaseModel):
         self._model = TinyTimeMixerForecaster()
         self._model.fit(df, fh=fh)
         forecast = self._model.predict()
-        return np.asarray(forecast).T # (forecast_horizon, num_targets)
+        return np.asarray(forecast)  # (forecast_horizon, num_targets)
 
     def _convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
@@ -96,16 +96,24 @@ class TinyTimeMixerModel(BaseModel):
                 unit = None
                 if isinstance(min_ts, (int, np.integer)):
                     # Try nanoseconds
-                    if in_bounds(min_ts, NS_LOWER, NS_UPPER) and in_bounds(max_ts, NS_LOWER, NS_UPPER):
+                    if in_bounds(min_ts, NS_LOWER, NS_UPPER) and in_bounds(
+                        max_ts, NS_LOWER, NS_UPPER
+                    ):
                         unit = "ns"
                     # Try microseconds
-                    elif in_bounds(min_ts, US_LOWER, US_UPPER) and in_bounds(max_ts, US_LOWER, US_UPPER):
+                    elif in_bounds(min_ts, US_LOWER, US_UPPER) and in_bounds(
+                        max_ts, US_LOWER, US_UPPER
+                    ):
                         unit = "us"
                     # Try milliseconds
-                    elif in_bounds(min_ts, MS_LOWER, MS_UPPER) and in_bounds(max_ts, MS_LOWER, MS_UPPER):
+                    elif in_bounds(min_ts, MS_LOWER, MS_UPPER) and in_bounds(
+                        max_ts, MS_LOWER, MS_UPPER
+                    ):
                         unit = "ms"
                     # Try seconds
-                    elif in_bounds(min_ts, S_LOWER, S_UPPER) and in_bounds(max_ts, S_LOWER, S_UPPER):
+                    elif in_bounds(min_ts, S_LOWER, S_UPPER) and in_bounds(
+                        max_ts, S_LOWER, S_UPPER
+                    ):
                         unit = "s"
                     else:
                         raise ValueError(
