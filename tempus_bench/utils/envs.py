@@ -68,7 +68,7 @@ class CondaEnvManager:
 
         # Check if the conda environment already exists and has tempus_bench installed
         check_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version && conda run -n {self.env_name} python -c 'import tempus_bench'",
+            f"conda run -n {self.env_name} python --version && conda run  -n {self.env_name} python -c 'import tempus_bench'",
             shell=True,
             executable="/bin/bash",
             capture_output=True,
@@ -185,6 +185,7 @@ class CondaEnvManager:
             [
                 "conda",
                 "run",
+                "-y",
                 "-n",
                 self.env_name,
                 "pip",
@@ -250,7 +251,7 @@ class CondaEnvManager:
 
             # Build command list: base command + script + split args
             cmd_list = ["conda", "run", "-n", self.env_name, "python", script]
-            
+
             if args:
                 # Split args string into separate list elements
                 cmd_list.extend(args.split())
