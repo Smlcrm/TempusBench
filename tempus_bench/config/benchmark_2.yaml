@@ -86,9 +86,9 @@ model:
   # chronos: {}
   
   # moirai: {}
-  # moirai_moe: {}
+  moirai_moe: {}
   # lagllama: {}
   # toto: {}
-  tabpfn: {}
+  # tabpfn: {}
   
 
