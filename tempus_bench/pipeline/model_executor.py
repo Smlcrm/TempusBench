@@ -15,15 +15,15 @@ import os
 import importlib.util
 import tempfile
 import pickle
-import datetime
-
+import re
+import numpy as np
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from tempus_bench.utils.configs import JobConfig
+
 from tempus_bench.utils.envs import CondaEnvManager
-from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.paths import get_project_root, get_models_dir
+from tempus_bench.pipeline.data_types import Dataset
 
 
 class ModelExecutor:
@@ -36,12 +36,11 @@ class ModelExecutor:
 
     Attributes:
         job_config (JobConfig): Complete job configuration including task and model settings.
-        logger (LoggerManager): Logger instance for logging operations.
     """
 
     def __init__(
         self,
-        job_config: JobConfig,
+        job_config: Dict,
     ):
         """
         Initialize the executor with execution metadata.
@@ -81,35 +80,43 @@ class ModelExecutor:
             RuntimeError: If model execution fails in the conda environment.
             ValueError: If no valid JSON output is found in command results.
         """
-        model_name = self.job_config.model_config.model_name
-        LogManager.get_logger().info(
-            "ModelExecutor",
-            f"Executing model {model_name} with hyperparameters {hyperparameters}",
-        )
+        model_name = self.job_config["model_config"]["model_name"]
 
-        # Create Conda Environment
+        # Get model requirements path
         requirements_path = self._get_model_requirements(model_name=model_name)
-        python_version = self.job_config.model_setting["python_version"]
-        conda_env = CondaEnvManager(
-            name=f"benchmark.{model_name}",
-            python=python_version,
-            requirements_path=requirements_path,
-            reinstall=self.job_config.evaluation_setting.reinstall_conda,
-        )
 
+        # Create temporary directory for augmented requirements and job config
+        # Note: The temporary directory and any augmented requirements file
+        # created within it are automatically deleted when this 'with' block exits
         with tempfile.TemporaryDirectory() as temp_dir:
-            job_config_path = os.path.join(temp_dir, "job_config.pkl")
+            # Ensure all packages required by main() function are included
+            final_requirements_path = self._ensure_required_packages(
+                requirements_path=requirements_path, temp_dir=temp_dir
+            )
 
-            with open(job_config_path, "wb") as f:
-                pickle.dump(self.job_config, f)
+            # Create Conda Environment
+            # Note: CondaEnvManager reads the requirements file synchronously during
+            # initialization if a new environment is created or reinstall is requested.
+            # The temporary file (if created) will exist until this 'with' block exits.
+            python_version = self.job_config["model_setting"]["python_version"]
+            conda_env = CondaEnvManager(
+                name=f"benchmark.{model_name}",
+                python=python_version,
+                requirements_path=final_requirements_path,
+                reinstall=self.job_config["evaluation_setting"]["reinstall_conda"],
+            )
+            job_config_path = os.path.join(temp_dir, "job_config.json")
 
-            # Create a temporary directory to store the pickled job_config
+            # Write job config dict to JSON file
+            with open(job_config_path, "w") as f:
+                json.dump(self.job_config, f)
+
             # Build CLI command
             hyperparameters_json = json.dumps(hyperparameters)
 
             command = (
                 f"python -m tempus_bench.pipeline.model_executor "
-                f"--task-name {self.job_config.task_config.task_name} "
+                f"--task-name {self.job_config['task_config']['task_name']} "
                 f"--model-name {model_name} "
                 f"--hyperparameters '{hyperparameters_json}' "
                 f"--context-steps {context_steps} "
@@ -118,15 +125,7 @@ class ModelExecutor:
                 f"--job-config-path {job_config_path} "
             )
 
-            LogManager.get_logger().debug(
-                "ModelExecutor", f"Running command: {command}"
-            )
-
             result = conda_env.run(command=command)
-
-            LogManager.get_logger().success(
-                "ModelExecutor", f"Command ran successfully for model {model_name}"
-            )
 
             lines = result.stdout.strip().split("\n")
             outputs_line = None
@@ -177,6 +176,67 @@ class ModelExecutor:
             )
         return str(req_path.resolve())
 
+    def _ensure_required_packages(self, requirements_path: str, temp_dir: str) -> str:
+        """
+        Ensure that all packages required by main() function are in the requirements file.
+
+        This method checks if packages used in the main() function (lines 183-390) are
+        present in the model's requirements.txt. If any are missing, it creates a
+        temporary requirements file that includes both the original requirements and
+        the missing packages.
+
+        Packages checked:
+        - numpy: Used in main() for array operations
+
+        Args:
+            requirements_path (str): Path to the original model requirements.txt file.
+            temp_dir (str): Temporary directory where augmented requirements file
+                can be created if needed.
+
+        Returns:
+            str: Path to requirements file to use (original if no additions needed,
+                temporary augmented file if packages were missing).
+        """
+        # Packages required by main() function (lines 183-390)
+        # Only include third-party packages (standard library packages don't need installation)
+        required_packages = {
+            "numpy": "numpy",  # numpy is used as np in main()
+        }
+
+        # Read the original requirements file
+        with open(requirements_path, "r") as f:
+            original_requirements = f.read()
+
+        # Check which required packages are missing
+        missing_packages = []
+        for package_name, install_name in required_packages.items():
+            # Check if package is in requirements (case-insensitive, allow version specs)
+            # Match package name at start of line or after a newline
+            pattern = rf"(^|\n)\s*{package_name}(\s|==|>=|<=|>|<|$)"
+
+            if not re.search(
+                pattern, original_requirements, re.IGNORECASE | re.MULTILINE
+            ):
+                missing_packages.append(install_name)
+
+        # If no packages are missing, return original path
+        if not missing_packages:
+            return requirements_path
+
+        # Create augmented requirements file
+        augmented_path = os.path.join(temp_dir, "augmented_requirements.txt")
+        with open(augmented_path, "w") as f:
+            # Write original requirements
+            f.write(original_requirements)
+            # Add missing packages if file doesn't end with newline
+            if original_requirements and not original_requirements.endswith("\n"):
+                f.write("\n")
+            # Append missing packages
+            for package in missing_packages:
+                f.write(f"{package}\n")
+
+        return augmented_path
+
 
 def main():
     """
@@ -193,7 +253,7 @@ def main():
         --context-steps: Number of context steps.
         --train-steps: Number of training steps.
         --validate-steps: Number of validation steps.
-        --job-config-path: Path to pickled job configuration file.
+        --job-config-path: Path to JSON job configuration file.
 
     Returns:
         None: Results are printed to stdout as JSON.
@@ -232,10 +292,9 @@ def main():
     # Parse hyperparameters JSON
     hyperparameters = json.loads(args.hyperparameters)
 
-    # Load configuration to get JobConfig
-
-    with open(args.job_config_path, "rb") as f:
-        job_config = pickle.load(f)
+    # Load configuration as dictionary
+    with open(args.job_config_path, "r") as f:
+        job_config = json.load(f)
 
     task_name = args.task_name
     temp_task_dataset_path = (
@@ -251,32 +310,6 @@ def main():
     validate_steps = args.validate_steps
     model_name = args.model_name
 
-    run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    logs_path = (
-        Path(get_project_root())
-        / "model_logs"
-        / run_timestamp
-        / f"{model_name}_{task_name}"
-    )
-
-    tensorboard_dir = (
-        Path(get_project_root())
-        / "model_logs"
-        / run_timestamp
-        / "tensorboard"
-        / f"{model_name}_{task_name}"
-    )
-
-    logger = LogManager(
-        logs_path=str(logs_path),
-        console_logging=False,
-        file_logging=True,
-        console_log_level="INFO",
-        file_log_level="INFO",
-        tf_logs_path=str(tensorboard_dir),
-        tensorboard_logging=True,
-    )
-
     steps = [
         ("context", context_steps),
         ("train", train_steps),
@@ -286,19 +319,16 @@ def main():
     window_generator = dataset.generate_dataset_split(
         steps=steps,
         stride=args.validate_steps,
-        max_windows=job_config.evaluation_config.max_windows,
+        max_windows=job_config["evaluation_config"]["max_windows"],
     )
 
     outputs = []
 
     for window_idx, dataset_splits in enumerate(window_generator):
 
-        logger.info(
-            "Model Executor", f"========= Window index: {window_idx} =========="
-        )
-
-        timestamps = dataset.timestamps
-        target = dataset.target
+        print(f"window_idx: {window_idx}")
+        timestamps = np.asarray(dataset.timestamps)
+        target = np.asarray(dataset.target)
         freq = dataset.metadata["time_freq"]  # type: ignore
 
         # Import model - models are now directly in the models directory
@@ -327,11 +357,9 @@ def main():
         vstart, vend = dataset_splits["validate"].start, dataset_splits["validate"].end
 
         # Create and train model
-        logger.info(
-            "Model Executor",
-            f"========= Training model {model_name} with hyperparameters {hyperparameters} on window {window_idx} ==========",
+        model = model_class(
+            params=hyperparameters, settings=job_config["model_setting"]
         )
-        model = model_class(params=hyperparameters, settings=job_config.model_setting)
 
         trained_model = model.train(
             y_context=target[cstart:cend],
@@ -339,32 +367,26 @@ def main():
             timestamps_context=timestamps[cstart:cend],
             timestamps_target=timestamps[tstart:tend],
             freq=freq,
-            tuning_loss=job_config.evaluation_config.tuning_loss,
+            tuning_loss=job_config["evaluation_config"]["tuning_loss"],
         )
 
-        logger.info(
-            "Model Executor",
-            f"========= Predicting model {model_name} on window {window_idx} ==========",
-        )
         # Generate predictions
         results = trained_model.predict(
             y_context=target[cstart:tend],
             timestamps_context=timestamps[cstart:tend],
             timestamps_target=timestamps[vstart:vend],
             freq=freq,
-            num_samples=job_config.evaluation_config.num_samples,
+            num_samples=job_config["evaluation_config"]["num_samples"],
         )
 
-        logger.info(
-            "Model Executor",
-            f"========= Computing evaluation metrics for model {model_name} on window {window_idx} ==========",
-        )
         # Compute evaluation metrics
         eval_metrics = trained_model.compute_metrics(
             y_true=target[vstart:vend],
             y_pred=results,
-            point_forecast_statistic=job_config.evaluation_config.point_forecast_statistic,
-            num_quantiles=job_config.evaluation_config.num_quantiles,
+            point_forecast_statistic=job_config["evaluation_config"][
+                "point_forecast_statistic"
+            ],
+            num_quantiles=job_config["evaluation_config"]["num_quantiles"],
         )
 
         # Include predictions in output for plotting
