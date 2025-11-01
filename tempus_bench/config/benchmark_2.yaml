@@ -14,7 +14,7 @@ evaluation:
 
 model:
   # # Universal Models
-  # lafn_hybrid: {}
+  lafn: {}
 
   # seasonal_naive:
   #   sp: [12, 24]
@@ -87,7 +87,7 @@ model:
 
   # moirai: {}
   # moirai_moe: {}
-  lagllama: {}
+  # lagllama: {}
   # toto: {}
   # tabpfn: {}
 
