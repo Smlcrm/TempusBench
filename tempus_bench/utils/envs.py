@@ -66,9 +66,17 @@ class CondaEnvManager:
                 text=True,
             )
 
+        # First, check if the environment exists (separate from health check)
+        env_exists_result = subprocess.run(
+            ["conda", "env", "list"],
+            capture_output=True,
+            text=True,
+        )
+        env_exists = env_exists_result.returncode == 0 and self.env_name in env_exists_result.stdout
+
         # Check if the conda environment already exists and has tempus_bench installed
         check_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version && conda run  -n {self.env_name} python -c 'import tempus_bench'",
+            f"conda run -n {self.env_name} python --version && conda run -n {self.env_name} python -c 'import tempus_bench'",
             shell=True,
             executable="/bin/bash",
             capture_output=True,
@@ -88,6 +96,13 @@ class CondaEnvManager:
             self._installed = True
         else:
             # Environment doesn't exist, not healthy, or reinstall requested
+            # If environment exists but is unhealthy, remove it first before creating
+            if env_exists:
+                subprocess.run(
+                    ["conda", "env", "remove", "-n", self.env_name, "-y"],
+                    capture_output=True,
+                    text=True,
+                )
             self.create_env()
             self.install(self.requirements_path)
 
