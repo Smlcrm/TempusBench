@@ -103,6 +103,10 @@ class ExponentialSmoothingModel(BaseModel):
         seasonal_periods = self.seasonal_periods  # type: ignore
         damped_trend = self.damped_trend  # type: ignore
 
+        # Cannot use damped_trend without a trend component
+        if trend is None or trend == "null":
+            damped_trend = False
+
         endog = y_context.squeeze()
 
         fitted_model = ExponentialSmoothing(
