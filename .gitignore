@@ -77,3 +77,8 @@ gcp_credentials.json
 *.key
 *.pem
 *.p12
+
+# Plots and results
+runs
+temp_*
+tensorboard/
