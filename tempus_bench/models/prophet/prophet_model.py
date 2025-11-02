@@ -3,7 +3,7 @@ from typing import Any, Dict, Literal, Optional, Union
 import numpy as np
 import pandas as pd
 from prophet import Prophet
-from pydantic import BaseModel as PydanticBaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel, Field, model_validator
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
@@ -36,8 +36,8 @@ class ProphetHyperparams(PydanticBaseModel):
         description="Enable daily seasonality (bool) or increase the number of Fourier terms (int)",
     )
 
-    def __init__(self, **data):
-        super().__init__(**data)
+    @model_validator(mode='after')
+    def validate_combinations(self):
         # Enforce that only one of the seasonality options can be enabled (truthy)
         seasonality_options = [
             self.yearly_seasonality,
@@ -51,6 +51,7 @@ class ProphetHyperparams(PydanticBaseModel):
             raise ValueError(
                 "Only one of yearly_seasonality, weekly_seasonality, or daily_seasonality can be enabled at the same time."
             )
+        return self
 
 
 class ProphetModel(BaseModel):

@@ -5,7 +5,7 @@ Exponential Smoothing model implementation.
 from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
-from pydantic import BaseModel as PydanticBaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel, Field, model_validator
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
@@ -31,13 +31,20 @@ class ExponentialSmoothingHyperparams(PydanticBaseModel):
         description="Number of seasonal periods (None if no seasonality)",
     )
 
-    @classmethod
-    def validate(cls, value):
+    def __init__(self, **data):
+        # Handle string "null" values by converting them to None
+        for k, v in data.items():
+            if isinstance(v, str) and v.lower() == "null":
+                data[k] = None
+        super().__init__(**data)
+
+    @model_validator(mode='after')
+    def validate_combinations(self):
         # Only check *combinations* of values; field types/ranges handled by pydantic
-        trend = value.get("trend")
-        seasonal = value.get("seasonal")
-        seasonal_periods = value.get("seasonal_periods")
-        damped_trend = value.get("damped_trend")
+        trend = self.trend
+        seasonal = self.seasonal
+        seasonal_periods = self.seasonal_periods
+        damped_trend = self.damped_trend
 
         # 1. seasonal is set but seasonal_periods is not set
         if seasonal in ("add", "mul") and (
@@ -59,14 +66,7 @@ class ExponentialSmoothingHyperparams(PydanticBaseModel):
                 "Cannot use 'damped_trend' without a trend component (trend=None/'null')."
             )
 
-        return value
-
-    def __init__(self, **data):
-        # Handle string "null" values by converting them to None
-        for k, v in data.items():
-            if isinstance(v, str) and v.lower() == "null":
-                data[k] = None
-        super().__init__(**data)
+        return self
 
 
 class ExponentialSmoothingModel(BaseModel):

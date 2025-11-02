@@ -9,7 +9,7 @@ from typing import Any, Dict, Literal, Optional
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel as PydanticBaseModel, Field
+from pydantic import BaseModel as PydanticBaseModel, Field, model_validator
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
@@ -31,6 +31,17 @@ class SvrHyperparams(PydanticBaseModel):
         default="scale",
         description="Kernel coefficient for 'rbf', 'poly' and 'sigmoid'",
     )
+
+    @model_validator(mode='after')
+    def validate_combinations(self):
+        # gamma parameter is only used for 'rbf', 'poly', and 'sigmoid' kernels
+        # For 'linear' kernel, gamma is ignored by sklearn, but we validate to prevent confusion
+        if self.kernel == "linear" and self.gamma != "scale":
+            raise ValueError(
+                f"gamma parameter is not used with 'linear' kernel. "
+                f"gamma is only applicable for 'rbf', 'poly', and 'sigmoid' kernels."
+            )
+        return self
 
 
 class SvrModel(BaseModel):
