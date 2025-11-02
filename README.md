@@ -66,6 +66,11 @@ tempus_bench/
 │   ├── model_executor.py     # Model execution in isolated environments
 │   ├── hyperparameter_tuner.py
 │   └── visualizer.py
+├── aggregators/               # Performance aggregation metrics
+│   ├── __init__.py
+│   ├── base_aggregator.py    # Base class for aggregators
+│   ├── win_rate.py           # Average win rate aggregator
+│   └── skill_score.py        # Skill score aggregator
 └── utils/                     # Utility functions
     ├── __init__.py
     ├── config_manager.py     # Configuration management
@@ -406,6 +411,30 @@ The framework supports various evaluation metrics:
 - **Point Forecast Metrics**: MAE, RMSE, MAPE, SMAPE
 - **Probabilistic Metrics**: CRPS, Interval Score
 - **Custom Metrics**: Easy to add new evaluation functions
+
+### Performance Aggregation
+
+The framework includes aggregators to summarize model performance across multiple tasks:
+
+- **Win Rate**: Computes the average win rate for each model, representing the probability that a model achieves lower error than another randomly chosen model on a randomly chosen task.
+  ```python
+  from tempus_bench.aggregators import WinRate
+  
+  # Pivot table with models as rows, tasks as columns, scores as values
+  win_rate = WinRate(pivot_table)
+  win_rates = win_rate()  # Returns Series with win rates for each model
+  ```
+
+- **Skill Score**: Computes skill score for each model compared to a baseline model (default: `seasonal_naive`), quantifying how much a model reduces forecasting error compared to the baseline.
+  ```python
+  from tempus_bench.aggregators import SkillScore
+  
+  # Compute skill score compared to baseline
+  skill_score = SkillScore(pivot_table, baseline_model="seasonal_naive")
+  skill_scores = skill_score()  # Returns Series with skill scores for each model
+  ```
+
+Both aggregators handle missing values (NaN) gracefully and can be extended by implementing the `BaseAggregator` interface.
 
 ## Contributing
 
