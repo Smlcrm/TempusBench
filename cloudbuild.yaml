@@ -1,0 +1,43 @@
+# Cloud Build configuration for building and pushing Docker image
+# Project: sim-tempus-bench
+# Usage: gcloud builds submit --config cloudbuild.yaml
+
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/tempus-bench:latest'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/tempus-bench:$BUILD_ID'
+      - '.'
+    id: 'build-image'
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/tempus-bench'
+    id: 'push-images'
+    waitFor: ['build-image']
+
+# Images to be pushed to the registry
+images:
+  - 'gcr.io/$PROJECT_ID/tempus-bench:latest'
+  - 'gcr.io/$PROJECT_ID/tempus-bench:$BUILD_ID'
+
+# Substitutions (can be overridden)
+substitutions:
+  _PROJECT_ID: 'sim-tempus-bench'
+
+# Options
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  # Enable Docker layer caching for faster builds
+  substitution_option: 'ALLOW_LOOSE'
+
+timeout: '3600s'
+
