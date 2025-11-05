@@ -1,0 +1,7 @@
+model_type: "stochastic"
+python_version: "3.11"
+device: "cpu"
+hf_model_name: "NX-AI/TiRex"
+backend: "torch"  # Options: "torch" or "cuda" (requires CUDA 8.0+ and custom compilation)
+context_length: 2048
+
