@@ -1,0 +1,11 @@
+tirex-ts>=1.1.0
+torch>=2.0.0
+numpy>=1.23.0
+pandas>=2.0.0
+
+# Optional: For GluonTS and HuggingFace dataset adapters
+# tirex-ts[gluonts,hfdataset]>=1.1.0
+
+# Optional: For CUDA kernels (requires CUDA 8.0+)
+# tirex-ts[cuda,gluonts,hfdataset]>=1.1.0
+
