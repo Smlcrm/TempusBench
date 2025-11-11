@@ -1,0 +1,13 @@
+evaluation:
+  task_path: univariate/*
+  tuning_loss: mae
+  max_windows: 4
+  max_num_variates: 10
+  num_samples: 100
+  num_quantiles: 10
+  point_forecast_statistic: mean
+model:
+  exponential_smoothing:
+    trend: ['null', add]
+    seasonal: ['null']
+    seasonal_periods: [4, 8, 16, 32]

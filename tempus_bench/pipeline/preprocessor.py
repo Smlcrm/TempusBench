@@ -8,6 +8,8 @@ for model training and evaluation.
 
 import ast
 import re
+import random
+from datetime import datetime
 
 from pathlib import Path
 from typing import Optional, Tuple
@@ -264,6 +266,7 @@ class Preprocessor:
         # Input requirement: arr shape (num_steps, num_targets)
         num_steps = arr.shape[0]
         # Generate timestamps for each step (length = num_steps)
+        # Note: Frequency should already be validated/fixed in clean() method
         # Map deprecated frequency strings to new ones
         freq_mapping = {
             "M": "ME",  # Monthly -> Month End
@@ -329,21 +332,13 @@ class Preprocessor:
             result = result[valid_rows]
             timestamps = timestamps[valid_rows]
         elif handle_missing == "mean":
-            # Fill NaN with column means (feature means)
+            # Fill NaN sequences with mean of enclosing non-NaN values
             for col_idx in range(result.shape[1]):
-                col_data = result[:, col_idx]
-                mean_val = np.nanmean(col_data)
-                if not np.isnan(mean_val):
-                    col_data[np.isnan(col_data)] = mean_val
-                    result[:, col_idx] = col_data
+                result[:, col_idx] = self._fill_nan_sequences_with_mean(result[:, col_idx])
         elif handle_missing == "median":
-            # Fill NaN with column medians (feature medians)
+            # Fill NaN sequences with median (mean) of enclosing non-NaN values
             for col_idx in range(result.shape[1]):
-                col_data = result[:, col_idx]
-                median_val = np.nanmedian(col_data)
-                if not np.isnan(median_val):
-                    col_data[np.isnan(col_data)] = median_val
-                    result[:, col_idx] = col_data
+                result[:, col_idx] = self._fill_nan_sequences_with_median(result[:, col_idx])
         elif handle_missing == "interpolate":
             # Interpolate missing values for each column (feature)
             for col_idx in range(result.shape[1]):
@@ -391,7 +386,10 @@ class Preprocessor:
     def _interpolate_column(self, col_data: np.ndarray) -> np.ndarray:
         """
         Interpolate missing values in a single column.
-
+          
+        For sequences like [non-nan, nan, nan, nan, non-nan], linearly interpolates
+        all NaNs in that sequence between the two enclosing non-NaN values.
+        
         Args:
             col_data (np.ndarray): Column data with possible NaN values.
 
@@ -399,70 +397,240 @@ class Preprocessor:
             np.ndarray: Column data with interpolated missing values. If all values
                 are NaN, returns zeros.
         """
-        if not np.isnan(col_data).any():
-            return col_data
-
-        # Get valid indices and values
-        valid_mask = ~np.isnan(col_data)
-        if not valid_mask.any():
+        result = col_data.copy()
+        n = len(result)
+        
+        # Find all NaN positions
+        nan_mask = np.isnan(result)
+        
+        if not nan_mask.any():
+            return result
+        
+        # Find valid (non-NaN) positions
+        valid_indices = np.where(~nan_mask)[0]
+        
+        if len(valid_indices) == 0:
             # All values are NaN, fill with 0
-            return np.zeros_like(col_data)
-
-        valid_indices = np.where(valid_mask)[0]
-        valid_values = col_data[valid_mask]
-
+            return np.zeros_like(result)
+        
         if len(valid_indices) == 1:
             # Only one valid value, fill all with that value
-            return np.full_like(col_data, valid_values[0])
+            return np.full_like(result, result[valid_indices[0]])
+        
+        # Handle leading NaNs: [nan, nan, val1, ...] - use backward fill from first valid
+        if nan_mask[0]:
+            first_valid_idx = valid_indices[0]
+            first_valid_val = result[first_valid_idx]
+            result[:first_valid_idx] = first_valid_val
+        
+        # Handle trailing NaNs: [..., val1, nan, nan] - use forward fill from last valid
+        if nan_mask[-1]:
+            last_valid_idx = valid_indices[-1]
+            last_valid_val = result[last_valid_idx]
+            result[last_valid_idx + 1:] = last_valid_val
+        
+        # Handle sequences between two valid values: [val1, nan, nan, val2]
+        # Linearly interpolate between val1 and val2
+        for i in range(len(valid_indices) - 1):
+            start_idx = valid_indices[i]
+            end_idx = valid_indices[i + 1]
+            
+            # Check if there are NaNs between these two valid values
+            if end_idx > start_idx + 1 and nan_mask[start_idx + 1:end_idx].any():
+                val1 = result[start_idx]
+                val2 = result[end_idx]
+                
+                # Number of NaN positions to fill
+                num_nans = end_idx - start_idx - 1
+                
+                # Create linear interpolation from val1 to val2
+                # Include both endpoints in the interpolation range
+                interp_indices = np.linspace(0, 1, num_nans + 2)
+                interp_values = val1 + (val2 - val1) * interp_indices
+                
+                # Fill the NaN positions (skip first and last which are val1 and val2)
+                result[start_idx + 1:end_idx] = interp_values[1:-1]
+        
+        return result
 
-        # Create interpolation indices for all positions
-        all_indices = np.arange(len(col_data))
+    def _fill_nan_sequences_with_mean(self, col_data: np.ndarray) -> np.ndarray:
+        """
+        Fill NaN sequences with mean of enclosing non-NaN values.
+        
+        For sequences like [non-nan, nan, nan, nan, non-nan], fills all NaNs
+        in that sequence with the mean of the two enclosing non-NaN values.
+        
+        Args:
+            col_data (np.ndarray): Column data with possible NaN values.
+            
+        Returns:
+            np.ndarray: Column data with NaN sequences filled using mean of enclosing values.
+        """
+        result = col_data.copy()
+        n = len(result)
+        
+        # Find all NaN positions
+        nan_mask = np.isnan(result)
+        
+        if not nan_mask.any():
+            return result
+        
+        # Find valid (non-NaN) positions
+        valid_indices = np.where(~nan_mask)[0]
+        
+        if len(valid_indices) == 0:
+            # All values are NaN, fill with 0
+            return np.zeros_like(result)
+        
+        # Handle leading NaNs: [nan, nan, val1, ...]
+        if nan_mask[0]:
+            first_valid_idx = valid_indices[0]
+            first_valid_val = result[first_valid_idx]
+            result[:first_valid_idx] = first_valid_val
+        
+        # Handle trailing NaNs: [..., val1, nan, nan]
+        if nan_mask[-1]:
+            last_valid_idx = valid_indices[-1]
+            last_valid_val = result[last_valid_idx]
+            result[last_valid_idx + 1:] = last_valid_val
+        
+        # Handle sequences between two valid values: [val1, nan, nan, val2]
+        for i in range(len(valid_indices) - 1):
+            start_idx = valid_indices[i]
+            end_idx = valid_indices[i + 1]
+            
+            # Check if there are NaNs between these two valid values
+            if end_idx > start_idx + 1 and nan_mask[start_idx + 1:end_idx].any():
+                val1 = result[start_idx]
+                val2 = result[end_idx]
+                mean_val = (val1 + val2) / 2.0
+                result[start_idx + 1:end_idx] = mean_val
+        
+        return result
 
-        # Interpolate using numpy
-        interpolated = np.interp(all_indices, valid_indices, valid_values)
-
-        return interpolated
+    def _fill_nan_sequences_with_median(self, col_data: np.ndarray) -> np.ndarray:
+        """
+        Fill NaN sequences with median (mean) of enclosing non-NaN values.
+        
+        For sequences like [non-nan, nan, nan, nan, non-nan], fills all NaNs
+        in that sequence with the median (mean) of the two enclosing non-NaN values.
+        Note: For two values, median equals mean.
+        
+        Args:
+            col_data (np.ndarray): Column data with possible NaN values.
+            
+        Returns:
+            np.ndarray: Column data with NaN sequences filled using median of enclosing values.
+        """
+        # For two values, median equals mean
+        return self._fill_nan_sequences_with_mean(col_data)
 
     def _forward_fill_column(self, col_data: np.ndarray) -> np.ndarray:
         """
         Forward fill missing values in a single column.
-
+        
+        For sequences like [non-nan, nan, nan, nan, non-nan], fills all NaNs
+        in that sequence with the first non-NaN value before the sequence.
+        
         Args:
             col_data (np.ndarray): Column data with possible NaN values.
 
         Returns:
-            np.ndarray: Column data with forward-filled missing values (carries
-                last valid value forward).
+            np.ndarray: Column data with forward-filled missing values.
         """
         result = col_data.copy()
-        last_valid = None
-
-        for i in range(len(result)):
-            if not np.isnan(result[i]):
-                last_valid = result[i]
-            elif last_valid is not None:
-                result[i] = last_valid
+        n = len(result)
+        
+        # Find all NaN positions
+        nan_mask = np.isnan(result)
+        
+        if not nan_mask.any():
+            return result
+        
+        # Find valid (non-NaN) positions
+        valid_indices = np.where(~nan_mask)[0]
+        
+        if len(valid_indices) == 0:
+            # All values are NaN, fill with 0
+            return np.zeros_like(result)
+        
+        # Handle leading NaNs: [nan, nan, val1, ...] - use backward fill from first valid
+        if nan_mask[0]:
+            first_valid_idx = valid_indices[0]
+            first_valid_val = result[first_valid_idx]
+            result[:first_valid_idx] = first_valid_val
+        
+        # Handle trailing NaNs: [..., val1, nan, nan] - use forward fill from last valid
+        if nan_mask[-1]:
+            last_valid_idx = valid_indices[-1]
+            last_valid_val = result[last_valid_idx]
+            result[last_valid_idx + 1:] = last_valid_val
+        
+        # Handle sequences between two valid values: [val1, nan, nan, val2]
+        # Fill with val1 (forward fill)
+        for i in range(len(valid_indices) - 1):
+            start_idx = valid_indices[i]
+            end_idx = valid_indices[i + 1]
+            
+            # Check if there are NaNs between these two valid values
+            if end_idx > start_idx + 1 and nan_mask[start_idx + 1:end_idx].any():
+                val1 = result[start_idx]
+                result[start_idx + 1:end_idx] = val1
+        
         return result
 
     def _backward_fill_column(self, col_data: np.ndarray) -> np.ndarray:
         """
         Backward fill missing values in a single column.
-
+        
+        For sequences like [non-nan, nan, nan, nan, non-nan], fills all NaNs
+        in that sequence with the first non-NaN value after the sequence.
+        
         Args:
             col_data (np.ndarray): Column data with possible NaN values.
 
         Returns:
-            np.ndarray: Column data with backward-filled missing values (carries
-                next valid value backward).
+            np.ndarray: Column data with backward-filled missing values.
         """
         result = col_data.copy()
-        next_valid = None
-
-        for i in range(len(result) - 1, -1, -1):
-            if not np.isnan(result[i]):
-                next_valid = result[i]
-            elif next_valid is not None:
-                result[i] = next_valid
+        n = len(result)
+        
+        # Find all NaN positions
+        nan_mask = np.isnan(result)
+        
+        if not nan_mask.any():
+            return result
+        
+        # Find valid (non-NaN) positions
+        valid_indices = np.where(~nan_mask)[0]
+        
+        if len(valid_indices) == 0:
+            # All values are NaN, fill with 0
+            return np.zeros_like(result)
+        
+        # Handle leading NaNs: [nan, nan, val1, ...] - use backward fill from first valid
+        if nan_mask[0]:
+            first_valid_idx = valid_indices[0]
+            first_valid_val = result[first_valid_idx]
+            result[:first_valid_idx] = first_valid_val
+        
+        # Handle trailing NaNs: [..., val1, nan, nan] - use backward fill from last valid
+        if nan_mask[-1]:
+            last_valid_idx = valid_indices[-1]
+            last_valid_val = result[last_valid_idx]
+            result[last_valid_idx + 1:] = last_valid_val
+        
+        # Handle sequences between two valid values: [val1, nan, nan, val2]
+        # Fill with val2 (backward fill)
+        for i in range(len(valid_indices) - 1):
+            start_idx = valid_indices[i]
+            end_idx = valid_indices[i + 1]
+            
+            # Check if there are NaNs between these two valid values
+            if end_idx > start_idx + 1 and nan_mask[start_idx + 1:end_idx].any():
+                val2 = result[end_idx]
+                result[start_idx + 1:end_idx] = val2
+        
         return result
 
     def _cap_variates(self, target: np.ndarray) -> np.ndarray:
@@ -581,13 +749,24 @@ class Preprocessor:
             time_start = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # 4. Validate freq strictly (must come from data, no defaults)
+        # Handle "unknown" frequency by randomly selecting a valid frequency
+        original_freq = freq
+        if freq is None or str(freq).lower() in ["unknown", "none", "null", ""]:
+            # Random frequency >= 1 minute from standard pandas aliases
+            frequencies = ["1min", "5min", "15min", "1h", "3h", "1D", "1W"]
+            freq = random.choice(frequencies)
+            LogManager.get_logger().info(
+                "Preprocessor.clean",
+                f"Frequency was {original_freq!r}, randomly selected: {freq!r}",
+            )
+        
         # Map deprecated frequency strings to new ones
         freq_mapping = {
             "M": "ME",  # Monthly -> Month End
             "Q": "QE",  # Quarterly -> Quarter End
             "A": "YE",  # Annual -> Year End
         }
-        mapped_freq = freq_mapping.get(freq)
+        mapped_freq = freq_mapping.get(freq, freq)  # Use original freq if not in mapping
 
         try:
             pd.date_range(start=time_start, periods=2, freq=mapped_freq)
@@ -601,8 +780,9 @@ class Preprocessor:
             "Preprocessor.clean",
             f"[DEBUG] Before missing value handling, target shape: {target.shape}",
         )
+        # Use mapped_freq (which may have been updated if freq was unknown)
         timestamps_cleaned, target_cleaned = self._handle_missing_values(
-            target, time_start, freq, handle_missing
+            target, time_start, mapped_freq, handle_missing
         )
         LogManager.get_logger().debug(
             "Preprocessor.clean",

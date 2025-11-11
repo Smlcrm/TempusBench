@@ -14,5 +14,5 @@ tabpfn==2.1.2
 threadpoolctl==3.6.0
 tzdata==2025.2
 # TensorFlow and TensorBoard - use flexible versions to allow pip to resolve compatibility
-tensorflow>=2.12.0,<2.16.0
-tensorboard>=2.12.0,<2.16.0
+tensorflow==2.16.1
+tensorboard==2.16.1

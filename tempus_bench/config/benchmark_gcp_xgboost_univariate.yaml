@@ -1,0 +1,13 @@
+evaluation:
+  task_path: univariate/*
+  tuning_loss: mae
+  max_windows: 4
+  max_num_variates: 10
+  num_samples: 100
+  num_quantiles: 10
+  point_forecast_statistic: mean
+model:
+  xgboost:
+    n_estimators: [200]
+    max_depth: [4]
+    learning_rate: [0.05, 0.01, 0.001]

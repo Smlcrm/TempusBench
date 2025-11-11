@@ -1,6 +1,0 @@
-functions-framework
-google-cloud-run
-google-cloud-compute
-google-cloud-build
-protobuf>=3.20.0
-

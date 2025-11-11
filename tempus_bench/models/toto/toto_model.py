@@ -35,6 +35,11 @@ class TotoHyperparams(PydanticBaseModel):
 
 
 class TotoModel(BaseModel):
+    # Class-level cache to store loaded Toto models by model name
+    # This prevents repeated API calls to HuggingFace when loading the same model
+    _toto_cache: Dict[str, Toto] = {}
+    _forecaster_cache: Dict[str, TotoForecaster] = {}
+
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize TOTO model with configuration.
@@ -48,11 +53,19 @@ class TotoModel(BaseModel):
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = self.CUBLAS_WORKSPACE_CONFIG
         torch.use_deterministic_algorithms(self.use_deterministic_algorithms)
         torch.device(self.device)
-        toto = Toto.from_pretrained(self.model_name)
-        toto.to(self.device)
-        # JIT compilation for faster inference
-        toto.compile()
-        self._model = TotoForecaster(toto.model)
+
+        # Check if model is already cached (class-level cache to avoid repeated HF API calls)
+        # This prevents rate limiting when processing many windows/tasks
+        if self.model_name not in TotoModel._toto_cache:
+            toto = Toto.from_pretrained(self.model_name)
+            toto.to(self.device)
+            # JIT compilation for faster inference
+            toto.compile()
+            TotoModel._toto_cache[self.model_name] = toto
+            TotoModel._forecaster_cache[self.model_name] = TotoForecaster(toto.model)
+
+        # Reuse cached model instance
+        self._model = TotoModel._forecaster_cache[self.model_name]
 
     def train(
         self,
@@ -100,13 +113,13 @@ class TotoModel(BaseModel):
 
         freq = kwargs["freq"]
         num_samples = kwargs["num_samples"]
-        
+
         # y_context shape: (num_steps, num_variates)
         # timestamps_context shape: (num_steps,)
         # timestamps_target shape: (forecast_horizon,)
         num_steps, num_variates = y_context.shape
         forecast_horizon = len(timestamps_target)
-        
+
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
         time_diff = self.freq_to_seconds(freq)
 
@@ -114,7 +127,7 @@ class TotoModel(BaseModel):
         # Then add batch dimension to get (1, num_variates, num_steps)
         y_context_tensor = torch.tensor(y_context.T, dtype=torch.float)  # (num_variates, num_steps)
         y_context_tensor = y_context_tensor.unsqueeze(0)  # (1, num_variates, num_steps)
-        
+
         timestamps_context_tensor = torch.tensor(timestamps_context, dtype=torch.float)  # (num_steps,)
         # Expand timestamps to match series shape: (1, num_variates, num_steps)
         timestamps_context_tensor = timestamps_context_tensor.unsqueeze(0).unsqueeze(0)  # (1, 1, num_steps)
@@ -131,11 +144,20 @@ class TotoModel(BaseModel):
         )
 
         # Generate forecasts
+        # Use samples_per_batch from settings to control memory/tensor size issues
+        # The forecaster processes samples in batches - smaller batch size avoids attention mask mismatches
+        samples_per_batch = getattr(self, 'samples_per_batch', 10)  # Default to 10 if not in settings
+        # Ensure samples_per_batch doesn't exceed num_samples and is a divisor
+        samples_per_batch = min(samples_per_batch, num_samples)
+        # Ensure num_samples is divisible by samples_per_batch (required by forecaster)
+        while num_samples % samples_per_batch != 0 and samples_per_batch > 1:
+            samples_per_batch -= 1
+        
         forecast = self._model.forecast(
             inputs,
             prediction_length=forecast_horizon,
             num_samples=num_samples,  # Use configured number of samples
-            samples_per_batch=num_samples,  # Control memory usage during inference
+            samples_per_batch=samples_per_batch,  # Control memory usage during inference
         )
 
         # forecast.samples shape: (batch=1, variate, future_time_steps, samples)
@@ -144,7 +166,7 @@ class TotoModel(BaseModel):
         forecast_samples = forecast_samples.squeeze(0)  # (num_variates, forecast_horizon, num_samples)
         # Transpose to (num_samples, forecast_horizon, num_variates)
         forecast_samples = forecast_samples.permute(2, 1, 0)  # (num_samples, forecast_horizon, num_variates)
-        
+
         # Convert to numpy
         forecast_samples = np.asarray(forecast_samples.cpu())
 
@@ -269,9 +291,14 @@ class TotoModel(BaseModel):
         # Also accept pandas-like unit spellings directly:
         # 'sec', 'second', 'minutes', etc. handled via aliases above.
         if unit not in SECS:
-            # Try a few pandas-like quirks: 'w-mon' already handled; 'qs', 'a' not supported as they’re not fixed.
-            # If someone passes 'w-mon', we caught it at the top. Anything else unknown → error.
-            raise ValueError(f"Unsupported or non-fixed frequency unit: {unit!r} from {freq!r}")
+            # Handle quarterly frequency (Q, q, quarter, quarters) - treat as 3 months
+            if unit in ['q', 'quarter', 'quarters', 'qs']:
+                unit = 'mon'
+                val = val * 3  # 1 quarter = 3 months
+            else:
+                # Try a few pandas-like quirks: 'w-mon' already handled; 'qs', 'a' not supported as they're not fixed.
+                # If someone passes 'w-mon', we caught it at the top. Anything else unknown → error.
+                raise ValueError(f"Unsupported or non-fixed frequency unit: {unit!r} from {freq!r}")
 
         return float(val) * SECS[unit]
 

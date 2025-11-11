@@ -113,6 +113,35 @@ class BenchmarkRunner:
                 f"Final Model Evaluation Executed for task: {job_config.task_config.task_name}",
             )
 
+        # Upload results to GCS if running in Cloud Run
+        if os.getenv("CLOUD_RUN") == "true":
+            try:
+                from tempus_bench.utils.gcs_uploader import upload_run_results
+
+                self.logger.info(
+                    "BenchmarkRunner",
+                    f"Uploading results to GCS for run: {self.manager.run_path}",
+                )
+
+                gcs_bucket = os.getenv("GCS_BUCKET", "tempus_bench_results")
+                gcs_path = upload_run_results(
+                    run_path=str(self.manager.run_path),
+                    gcs_bucket=gcs_bucket,
+                    skip_upload=False,
+                )
+
+                self.logger.success(
+                    "BenchmarkRunner",
+                    f"Results successfully uploaded to {gcs_path}",
+                )
+            except Exception as e:
+                self.logger.error(
+                    "BenchmarkRunner",
+                    f"Failed to upload results to GCS: {str(e)}",
+                )
+                # Don't fail the entire run if upload fails
+                # Results are still available locally
+
         # Close logger
         self.logger.close()
 

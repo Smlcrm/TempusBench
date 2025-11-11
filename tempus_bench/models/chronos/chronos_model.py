@@ -37,6 +37,10 @@ class ChronosModel(BaseModel):
         num_samples: Number of predictive samples to generate
     """
 
+    # Class-level cache to store loaded models by model name
+    # This prevents repeated API calls to HuggingFace when loading the same model
+    _model_cache: Dict[str, BaseChronosPipeline] = {}
+
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
         Initialize the Chronos model wrapper.
@@ -75,16 +79,18 @@ class ChronosModel(BaseModel):
         """
         hf_model_name = self.hf_model_name
 
-        # For foundation models, we don't need to load the model here
-        # It will be loaded fresh for each prediction (like it was in the working version)
-        # Load the Chronos model fresh for each prediction (like the working version)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Check if model is already cached (class-level cache to avoid repeated HF API calls)
+        # This prevents rate limiting when processing many windows/tasks
+        if hf_model_name not in ChronosModel._model_cache:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            ChronosModel._model_cache[hf_model_name] = BaseChronosPipeline.from_pretrained(
+                hf_model_name,
+                device_map="auto",
+                torch_dtype=torch.bfloat16,
+            )
 
-        self._model = BaseChronosPipeline.from_pretrained(
-            hf_model_name,
-            device_map="auto",
-            torch_dtype=torch.bfloat16,
-        )
+        # Reuse cached model instance
+        self._model = ChronosModel._model_cache[hf_model_name]
 
         self.is_fitted = True
         return self

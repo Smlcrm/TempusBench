@@ -15,6 +15,9 @@ class MoiraiHyperparams(PydanticBaseModel):
 
 
 class MoiraiModel(BaseModel):
+    # Class-level cache to store loaded MoiraiModule by model path
+    # This prevents repeated API calls to HuggingFace when loading the same model
+    _module_cache: Dict[str, MoiraiModule] = {}
 
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         """
@@ -60,10 +63,19 @@ class MoiraiModel(BaseModel):
         if not self.is_fitted:
             pdt = y_target.shape[0]
             ctx = y_context.shape[0]
+            model_path = f"Salesforce/moirai-1.1-R-{size}"
+
+            # Check if module is already cached (class-level cache to avoid repeated HF API calls)
+            # This prevents rate limiting when processing many windows/tasks
+            if model_path not in MoiraiModel._module_cache:
+                MoiraiModel._module_cache[model_path] = MoiraiModule.from_pretrained(
+                    pretrained_model_name_or_path=model_path
+                )
+
+            # Reuse cached module instance
+            cached_module = MoiraiModel._module_cache[model_path]
             self._model = MoiraiForecast(
-                module=MoiraiModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/moirai-1.1-R-{size}"
-                ),
+                module=cached_module,
                 prediction_length=pdt,
                 context_length=ctx,
                 patch_size=psz,

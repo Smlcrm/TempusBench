@@ -6,5 +6,5 @@ scipy
 pandas
 huggingface_hub[cli]
 matplotlib
-tensorflow>=2.11,<2.16
+tensorflow==2.16.1
 

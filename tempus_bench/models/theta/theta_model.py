@@ -125,6 +125,9 @@ class ThetaModel(BaseModel):
         diff_data = np.diff(detrended_data, axis=0)
         theta_matrix = np.eye(num_targets)
         corr_matrix = np.corrcoef(diff_data.T)
+        # Handle NaNs in correlation matrix (can occur with constant data or zero variance)
+        # Replace NaNs with 0 (no correlation)
+        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)
         for i in range(num_targets):
             for j in range(num_targets):
                 if i != j:
@@ -206,11 +209,27 @@ class ThetaModel(BaseModel):
 
         # Step 4: Create θ-lines
         theta_lines = self._create_theta_lines(detrended_data, self.theta_matrix)
+        
+        # Ensure theta_lines don't contain NaNs (can occur from correlation matrix NaNs)
+        # Replace any NaNs with 0 (fallback to mean of the column if needed)
+        for i in range(num_targets):
+            col = theta_lines[:, i]
+            if np.isnan(col).any():
+                # Replace NaNs with the mean of non-NaN values, or 0 if all are NaN
+                col_mean = np.nanmean(col)
+                if np.isnan(col_mean):
+                    col_mean = 0.0
+                theta_lines[:, i] = np.nan_to_num(col, nan=col_mean)
 
         # Step 5: Fit individual Theta models to each θ-line
         for i in range(num_targets):
             # Convert to pandas Series for sktime
             theta_line_series = pd.Series(theta_lines[:, i])
+            
+            # Final check: ensure no NaNs remain (ThetaForecaster cannot handle NaNs)
+            if theta_line_series.isna().any():
+                # Replace any remaining NaNs with forward fill, then backward fill, then 0
+                theta_line_series = theta_line_series.ffill().bfill().fillna(0.0)
 
             # Check if data has non-positive values (common with normalized data)
             # If so, disable deseasonalization to avoid multiplicative seasonality errors

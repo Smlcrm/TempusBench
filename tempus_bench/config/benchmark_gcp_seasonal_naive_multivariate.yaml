@@ -1,0 +1,11 @@
+evaluation:
+  task_path: multivariate/*
+  tuning_loss: mae
+  max_windows: 4
+  max_num_variates: 10
+  num_samples: 100
+  num_quantiles: 10
+  point_forecast_statistic: mean
+model:
+  seasonal_naive:
+    sp: [12, 24]

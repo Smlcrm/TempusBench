@@ -4,3 +4,4 @@ device: "cpu"
 CUBLAS_WORKSPACE_CONFIG: ":4096:8"
 use_deterministic_algorithms: true
 model_name: "Datadog/Toto-Open-Base-1.0"
+samples_per_batch: 1

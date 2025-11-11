@@ -62,6 +62,12 @@ class LagllamaModel(BaseModel):
         batch_size = self.batch_size
 
         # Create the estimator with the specified horizon and input_size
+        # Use lags_seq that avoids deprecated frequencies that cause issues with GluonTS
+        # GluonTS's get_lags_for_frequency has compatibility issues with pandas new format
+        # Only W (weekly) and D (daily) work reliably with current GluonTS version
+        # Using minimal lags_seq to avoid errors - model will still work but with fewer lag features
+        compatible_lags_seq = ["W", "D"]  # Only frequencies that work with current GluonTS
+        
         estimator = LagLlamaEstimator(
             prediction_length=forecast_horizon,
             context_length=context_length,
@@ -69,6 +75,7 @@ class LagllamaModel(BaseModel):
             batch_size=batch_size,
             num_parallel_samples=num_samples,
             device=torch.device(self.device),
+            lags_seq=compatible_lags_seq,  # Use compatible frequencies
         )
 
         # Create predictor from estimator
@@ -161,6 +168,15 @@ class LagllamaModel(BaseModel):
         """
         # Extract kwargs (NO defaults, use kwargs["var_name"])
         freq = kwargs["freq"]
+        
+        # Convert pandas new frequency format to old format for GluonTS compatibility
+        # GluonTS expects old format (Q, M, A) but preprocessor uses new format (QE, ME, YE)
+        gluonts_freq_mapping = {
+            "QE": "Q",  # Quarter End -> Quarterly
+            "ME": "M",  # Month End -> Monthly
+            "YE": "A",  # Year End -> Annual
+        }
+        freq_for_gluonts = gluonts_freq_mapping.get(freq, freq)  # Use original if not in mapping
         num_samples = kwargs["num_samples"]
 
         # Reference params, settings, device, python_version
@@ -203,7 +219,7 @@ class LagllamaModel(BaseModel):
             target="target",
             timestamp="ds",
             item_id="unique_id",
-            freq=freq,
+            freq=freq_for_gluonts,  # Use GluonTS-compatible frequency
         )
 
         # Generate forecasts

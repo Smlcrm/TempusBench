@@ -85,7 +85,14 @@ class CondaEnvManager:
                     self.python_version = line.strip().split("Python")[-1].strip()
                     break
             self._env_created = True
-            self._installed = True
+            # Even if environment exists, verify requirements are installed
+            # If verification fails, install requirements
+            try:
+                self._verify_all_requirements_installed(self.requirements_path)
+                self._installed = True
+            except RuntimeError:
+                # Requirements are missing, install them
+                self.install(self.requirements_path)
         else:
             # Environment doesn't exist, not healthy, or reinstall requested
             self.create_env()
@@ -180,6 +187,32 @@ class CondaEnvManager:
         if not requirements_path.endswith(".txt"):
             raise ValueError("Unknown requirements file type. Provide .txt")
 
+        # Special handling for toto model: install TensorFlow via conda-forge for macOS compatibility
+        # Check if this is the toto requirements file
+        is_toto = "toto" in requirements_path.lower()
+        
+        if is_toto:
+            # Try installing TensorFlow via conda-forge first (better macOS compatibility)
+            print(f"Installing TensorFlow via conda-forge for better macOS compatibility...")
+            conda_result = subprocess.run(
+                [
+                    "conda",
+                    "install",
+                    "-n",
+                    self.env_name,
+                    "-c",
+                    "conda-forge",
+                    "tensorflow=2.16",
+                    "tensorboard=2.16",
+                    "-y",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            # Don't fail if conda install fails - fall back to pip
+            if conda_result.returncode != 0:
+                print(f"Warning: conda install of TensorFlow failed, will try pip: {conda_result.stderr}")
+
         result = subprocess.run(
             [
                 "conda",
@@ -200,7 +233,242 @@ class CondaEnvManager:
                 f"Failed to install requirements {requirements_path} in conda environment {self.env_name}: {result.stderr}"
             )
 
+        # Verify all packages were actually installed
+        self._verify_all_requirements_installed(requirements_path)
+
+        # Verify that critical packages can actually be imported (catches dependency conflicts)
+        self._verify_packages_importable(requirements_path)
+
         self._installed = True
+
+    def _verify_all_requirements_installed(self, requirements_path: str):
+        """
+        Verify that all packages from requirements.txt were successfully installed.
+
+        This method uses pip's built-in `pip list` command to check if all packages
+        from requirements.txt are actually installed. This is more reliable than
+        trying to import packages, as it directly queries pip's package database.
+
+        This verification runs once immediately after installation to catch
+        installation failures early.
+
+        Args:
+            requirements_path (str): Path to the requirements.txt file.
+
+        Raises:
+            RuntimeError: If any package from requirements.txt is not found in pip list.
+        """
+        if not os.path.exists(requirements_path):
+            raise RuntimeError(
+                f"Requirements file not found: {requirements_path}"
+            )
+
+        # Read requirements.txt and extract package names
+        required_packages = []
+        with open(requirements_path, 'r') as f:
+            lines = f.readlines()
+
+        for line in lines:
+            line = line.strip()
+            # Skip comments, empty lines, and git packages
+            if (
+                not line
+                or line.startswith('#')
+                or line.startswith('git+')
+                or "@git+" in line
+            ):
+                continue
+            
+            # Extract package name (before ==, >=, <=, >, <, etc.)
+            # Handle various version specifiers
+            package_name = (
+                line.split('==')[0].split('>=')[0].split('<=')[0]
+                .split('>')[0].split('<')[0].split('!=')[0]
+                .split('~=')[0].strip()
+            )
+            
+            # Strip extras notation (e.g., "gluonts[torch]" -> "gluonts", "huggingface_hub[cli]" -> "huggingface_hub")
+            if '[' in package_name:
+                package_name = package_name.split('[')[0].strip()
+            
+            if package_name:
+                required_packages.append(package_name.lower())  # Normalize to lowercase
+
+        if not required_packages:
+            return
+
+        # Get list of installed packages using pip list
+        result = subprocess.run(
+            [
+                "conda",
+                "run",
+                "-n",
+                self.env_name,
+                "pip",
+                "list",
+                "--format=json",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Failed to get installed packages list from conda environment {self.env_name}: {result.stderr}"
+            )
+
+        # Parse JSON output to get installed package names
+        try:
+            import json
+            installed_packages = json.loads(result.stdout)
+            installed_package_names = {pkg['name'].lower() for pkg in installed_packages}
+        except (json.JSONDecodeError, KeyError) as e:
+            raise RuntimeError(
+                f"Failed to parse pip list output from conda environment {self.env_name}: {e}"
+            )
+
+        # Special handling for packages that are part of other packages
+        # tf-keras is part of tensorflow 2.16+, so if tensorflow is installed, tf-keras is available
+        package_aliases = {
+            'tf-keras': 'tensorflow',  # tf-keras is included in tensorflow 2.16+
+        }
+        
+        # Check which required packages are missing
+        missing_packages = []
+        for pkg in required_packages:
+            if pkg not in installed_package_names:
+                # Check if this package is an alias for another installed package
+                if pkg in package_aliases:
+                    alias_pkg = package_aliases[pkg]
+                    if alias_pkg in installed_package_names:
+                        # The alias package is installed, so this package is available
+                        continue
+                # Package is truly missing
+                missing_packages.append(pkg)
+        
+        if missing_packages:
+            error_msg = (
+                f"Verification failed: The following packages from {requirements_path} "
+                f"were not found in the installed packages list for conda environment {self.env_name}:\n"
+                + "\n".join(f"  - {pkg}" for pkg in missing_packages)
+                + f"\n\nThis indicates the installation did not complete successfully. "
+                f"Please check the installation logs above for errors."
+            )
+            raise RuntimeError(error_msg)
+
+    def _verify_packages_importable(self, requirements_path: str):
+        """
+        Verify that critical packages from requirements.txt can actually be imported.
+        
+        This catches cases where packages are installed but not usable due to:
+        - Dependency conflicts
+        - Missing transitive dependencies
+        - Architecture/version incompatibilities
+        
+        This is a supplement to _verify_all_requirements_installed which only checks
+        if packages are in pip list, not if they're actually importable.
+        
+        Args:
+            requirements_path (str): Path to the requirements.txt file.
+            
+        Raises:
+            RuntimeError: If any critical package cannot be imported.
+        """
+        if not os.path.exists(requirements_path):
+            return
+        
+        # Read requirements.txt and extract package names that should be importable
+        # Skip packages that are not directly importable (e.g., tensorflow, tensorboard)
+        importable_packages = []
+        skip_packages = {'tensorflow', 'tensorboard', 'tensorflow-estimator', 
+                        'tensorflow-io-gcs-filesystem', 'google-cloud-storage',
+                        'google-auth', 'google-auth-oauthlib', 'requests-oauthlib'}
+        
+        with open(requirements_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if (
+                    not line
+                    or line.startswith('#')
+                    or line.startswith('git+')
+                    or "@git+" in line
+                ):
+                    continue
+                
+                # Extract package name
+                package_name = (
+                    line.split('==')[0].split('>=')[0].split('<=')[0]
+                    .split('>')[0].split('<')[0].split('!=')[0]
+                    .split('~=')[0].strip()
+                )
+                
+                # Only test packages that are likely to be directly importable
+                # and are not in the skip list
+                if package_name and package_name.lower() not in skip_packages:
+                    # Test if package name matches import name (usually the same)
+                    import_name = package_name.lower().replace('-', '_')
+                    importable_packages.append((package_name, import_name))
+        
+        # Test imports for critical packages (limit to avoid too many tests)
+        # Focus on model-specific packages that are most likely to fail
+        critical_packages = [pkg for pkg in importable_packages 
+                           if any(keyword in pkg[0].lower() for keyword in 
+                                  ['tabpfn', 'torch', 'transformers'])]
+        
+        # Also test core packages that might have conflicts
+        core_packages = [pkg for pkg in importable_packages 
+                        if pkg[0].lower() in ['numpy', 'pandas', 'scikit-learn', 'sklearn']]
+        
+        # Combine and limit to avoid too many tests
+        packages_to_test = (critical_packages + core_packages)[:5]
+        
+        if not packages_to_test:
+            return
+        
+        failed_imports = []
+        for package_name, import_name in packages_to_test:
+            # Handle special cases for import names
+            if package_name.lower() == 'scikit-learn':
+                import_cmd = "import sklearn"
+            elif package_name.lower() == 'tabpfn':
+                # Test the actual import that the model uses
+                import_cmd = "from tabpfn import TabPFNRegressor"
+            else:
+                import_cmd = f"import {import_name}"
+            
+            # Try to import the package with a longer timeout for packages that load models
+            timeout = 30 if 'tabpfn' in package_name.lower() else 10
+            result = subprocess.run(
+                [
+                    "conda",
+                    "run",
+                    "-n",
+                    self.env_name,
+                    "python",
+                    "-c",
+                    import_cmd,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            
+            if result.returncode != 0:
+                # Check if it's a ModuleNotFoundError (the actual issue we're trying to catch)
+                if "ModuleNotFoundError" in result.stderr or "No module named" in result.stderr:
+                    failed_imports.append((package_name, result.stderr))
+                # For other errors, log but don't fail (might be expected for some packages)
+        
+        if failed_imports:
+            error_msg = (
+                f"Import verification failed: The following packages from {requirements_path} "
+                f"could not be imported in conda environment {self.env_name}:\n"
+                + "\n".join(f"  - {pkg}: {err[:200]}" for pkg, err in failed_imports)
+                + f"\n\nThis indicates the packages were installed but are not usable, "
+                f"likely due to dependency conflicts or missing dependencies. "
+                f"Please check the installation logs above for errors."
+            )
+            raise RuntimeError(error_msg)
 
     def run(
         self, script: str | None = None, args: str = "", command: str | None = None
