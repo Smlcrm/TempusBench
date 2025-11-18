@@ -36,7 +36,7 @@ class YingModel(BaseModel):
       self.model = AutoModelForCausalLM.from_pretrained('qcw2333/YingLong_6m', \
                                                         trust_remote_code=True,\
                                                           torch_dtype=torch.bfloat16)
-    return self.model 
+    return self
   
   @validate_inputs
   def predict(self,

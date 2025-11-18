@@ -35,7 +35,7 @@ class SundialModel(BaseModel):
     if self.model is None:
       self.model = AutoModelForCausalLM.from_pretrained('thuml/sundial-base-128m', \
                                                         trust_remote_code=True)
-    return self.model 
+    return self 
   
   #@validate_inputs
   def predict(self,
@@ -44,12 +44,17 @@ class SundialModel(BaseModel):
         timestamps_target: np.ndarray,
         **kwargs,) -> np.ndarray:
     
+    print("before tensor step",y_context.shape)
+
     if len(y_context.shape) == 1:
       torch_y_context = torch.tensor(y_context[-self.lookback_length:])
     else:
-      torch_y_context = torch.tensor(y_context[:, -self.lookback_length:])
+      torch_y_context = torch.tensor(y_context[:, -self.lookback_length:])\
 
-    torch_y_context = torch_y_context.unsqueeze(0).float()
+    torch_y_context = torch_y_context.float()
+    print("after tensor step",torch_y_context.shape)
+    print(torch_y_context.shape)
+
     predictions = self.model.generate(torch_y_context, max_new_tokens=self.forecast_length, \
                                       num_samples=self.num_samples)
     
