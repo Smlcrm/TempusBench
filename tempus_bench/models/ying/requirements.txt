@@ -1,0 +1,9 @@
+torch
+pandas
+numpy
+transformers
+einops
+pydantic
+xformers
+transformers
+flash-attn
