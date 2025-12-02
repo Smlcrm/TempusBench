@@ -2,5 +2,4 @@ model_type: "stochastic"
 python_version: '3.11'
 batch_size: 1
 lookback_length: 256
-forecast_length: 40
-num_samples: 4
+forecast_length: 50
