@@ -46,17 +46,29 @@ class SundialModel(BaseModel):
     
     print("before tensor step",y_context.shape)
 
-    if len(y_context.shape) == 1:
-      torch_y_context = torch.tensor(y_context[-self.lookback_length:])
-    else:
-      torch_y_context = torch.tensor(y_context[:, -self.lookback_length:])\
+
+
+
+    torch_y_context = torch.tensor(y_context[-self.lookback_length:].T)
 
     torch_y_context = torch_y_context.float()
     print("after tensor step",torch_y_context.shape)
+    print("timesteps", self.forecast_length)
+    print("samples", kwargs["num_samples"])
     print(torch_y_context.shape)
 
-    predictions = self.model.generate(torch_y_context, max_new_tokens=self.forecast_length, \
-                                      num_samples=self.num_samples)
+    forecast_length = int(timestamps_target.shape[0])
+    predictions = self.model.generate(torch_y_context, max_new_tokens=forecast_length, \
+                                      num_samples=kwargs["num_samples"])
+    predictions = np.asarray(predictions)
+
+    print("predictions shape", predictions.shape)
+    print("predictions shape squeeze", predictions.squeeze().shape)
     
-    return np.transpose(predictions.squeeze())
+    predictions_transposed = np.transpose(predictions, axes=(1,2,0))
+    print("Final tranpose shape", predictions_transposed.shape)
+    print("Timestamps target shape", timestamps_target.shape)
+
+
+    return predictions_transposed
     
