@@ -4,6 +4,7 @@ numpy
 transformers
 einops
 pydantic
-xformers
-transformers
-flash-attn
+tensorflow
+matplotlib
+seaborn
+scipy

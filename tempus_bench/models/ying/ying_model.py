@@ -1,9 +1,9 @@
-import numpy as np
 import torch
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 from transformers import AutoModelForCausalLM
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel as PydanticBaseModel
+import numpy as np
 
 
 class YingHyperparameters(PydanticBaseModel):
