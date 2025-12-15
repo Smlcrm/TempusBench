@@ -1,4 +1,0 @@
-model_type: "deterministic"
-python_version: '3.11'
-lookback_length: 256
-prediction_length: 40
