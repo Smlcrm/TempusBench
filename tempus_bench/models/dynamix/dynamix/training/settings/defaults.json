@@ -1,0 +1,45 @@
+{
+    "model": {
+        "latent_dim": 30,
+        "experts": 10,
+        "pwl_units": 2,
+        "expert_type": "almost_linear_rnn",
+        "hidden_dim": 50,
+        "probabilistic_expert": false
+    },
+    "training": {
+        "batch_size": 16,
+        "epochs": 2000,
+        "alpha": 1.0,
+        "n_interleave": 10,
+        "start_learning_rate": 4e-3,
+        "end_learning_rate": 1e-5,
+        "batches_per_epoch": 50,
+        "scalar_saving_interval": 25,
+        "noise_level": 0.05,
+        "regularization_strength": 0.1
+    },
+    "metrics": {
+        "state_space_divergence": {
+            "n_bins": 30
+        },
+        "power_spectrum": {
+            "smoothing": 20
+        },
+        "mase": {
+            "steps": 10
+        }
+    },
+    "system": {
+        "threads": 4,
+        "seed": 8,
+        "device": "cpu",
+        "gpu_id": 0
+    },
+    "paths": {
+        "data_path": "/path/to/data.npy",
+        "context_path": "/path/to/context.npy",
+        "test_path": "/path/to/testdata.npy",
+        "save_path": "results/DynaMix-default"
+    }
+}
