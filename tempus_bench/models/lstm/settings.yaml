@@ -3,8 +3,4 @@ python_version: '3.12'
 device: cpu
 beta_1: 0.9
 beta_2: 0.999
-<<<<<<< HEAD
 epsilon: 1e-7
-=======
-epsilon: 1e-7
->>>>>>> refs/remotes/origin/dev
