@@ -52,7 +52,7 @@ class DynamixModel(BaseModel):
     forecaster = DynaMixForecaster(self.model)
 
 
-    torch_y_context = torch.tensor(y_context[-self.lookback_length:].T,  dtype=torch.float32)
+    torch_y_context = torch.tensor(y_context[-self.lookback_length:],  dtype=torch.float32)
     
     print("after tensor step",torch_y_context.shape)
     #print("timesteps", self.forecast_length)
@@ -63,14 +63,14 @@ class DynamixModel(BaseModel):
     print("forecast length", forecast_length)
 
     with torch.no_grad():  # No gradient tracking needed for inference
-      predictions = forecaster.forecast(
+      predictions = np.asarray(forecaster.forecast(
           context=torch_y_context,
           horizon=forecast_length,
           preprocessing_method="pos_embedding",
           standardize=True,
           fit_nonstationary=False,
           initial_x=None
-      )
+      ))
 
     #predictions = self.model.generate(torch_y_context, max_new_tokens=forecast_length, \
     #                                  num_samples=kwargs["num_samples"])
