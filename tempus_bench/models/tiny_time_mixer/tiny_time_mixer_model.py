@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
@@ -31,6 +31,8 @@ class TinyTimeMixerModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "TinyTimeMixerModel":
         """
@@ -55,6 +57,8 @@ class TinyTimeMixerModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ):
         num_targets = y_context.shape[1]

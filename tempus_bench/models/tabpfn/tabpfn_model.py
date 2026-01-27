@@ -31,6 +31,8 @@ class TabpfnModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "TabpfnModel":
         # Zero-shot TabPFN uses context during predict; mark as fitted
@@ -43,6 +45,8 @@ class TabpfnModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict
     ):
         # Map legacy keys to expected ones for backward compatibility
@@ -86,6 +90,8 @@ class TabpfnModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict
     ):
         forecast_horizon = timestamps_target.shape[0]
@@ -94,7 +100,8 @@ class TabpfnModel(BaseModel):
         for k in range(num_targets):
             yc = y_context[:, k:k+1]
             pk = self._predict(y_context=yc, timestamps_context=timestamps_context,
-                               timestamps_target=timestamps_target, **kwargs)
+                               timestamps_target=timestamps_target,
+                               x_context=x_context, x_target=x_target, **kwargs)
             preds[:, k:k+1] = pk
         return preds
 
