@@ -142,6 +142,8 @@ class LagllamaModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -231,6 +233,8 @@ class LagllamaModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "LagllamaModel":
         """
@@ -251,6 +255,8 @@ class LagllamaModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -260,6 +266,8 @@ class LagllamaModel(BaseModel):
             y_context: Past target values (time series data)
             timestamps_context: Timestamps for context data
             timestamps_target: Timestamps for target data
+            x_context (Optional[np.ndarray]): Optional covariate data for context.
+            x_target (Optional[np.ndarray]): Optional covariate data for prediction horizon.
             **kwargs: Additional keyword arguments
 
         Returns:
@@ -279,6 +287,8 @@ class LagllamaModel(BaseModel):
                     y_context=y_context[:, k : k + 1],
                     timestamps_context=timestamps_context,
                     timestamps_target=timestamps_target,
+                    x_context=x_context,
+                    x_target=x_target,
                     freq=freq,
                     num_samples=num_samples,
                 )
@@ -293,6 +303,8 @@ class LagllamaModel(BaseModel):
                 y_context=y_context,
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
+                x_context=x_context,
+                x_target=x_target,
                 freq=freq,
                 num_samples=num_samples,
             )

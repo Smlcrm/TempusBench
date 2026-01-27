@@ -65,6 +65,8 @@ class ProphetModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ):
         """
@@ -105,6 +107,8 @@ class ProphetModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
@@ -141,6 +145,8 @@ class ProphetModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "ProphetModel":
         """
@@ -156,6 +162,8 @@ class ProphetModel(BaseModel):
                 y_target=y_target[:, k : k + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
+                x_context=x_context,
+                x_target=x_target,
                 **kwargs,
             )
             self._models.append(fitted_model)
@@ -170,6 +178,8 @@ class ProphetModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
@@ -179,6 +189,8 @@ class ProphetModel(BaseModel):
             y_context (np.ndarray): Context values, shape (num_steps, num_variates).
             timestamps_context (np.ndarray): Timestamps for context data.
             timestamps_target (np.ndarray): Timestamps for target/future data.
+            x_context (Optional[np.ndarray]): Optional covariate data for context.
+            x_target (Optional[np.ndarray]): Optional covariate data for prediction horizon.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -197,6 +209,8 @@ class ProphetModel(BaseModel):
                 y_context=y_context[:, idx : idx + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
+                x_context=x_context,
+                x_target=x_target,
                 **kwargs,
             )
             preds.append(prediction)

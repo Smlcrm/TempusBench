@@ -13,7 +13,7 @@ import inspect
 
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 
@@ -71,6 +71,8 @@ class BaseModel(ABC):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "BaseModel":
         """
@@ -81,6 +83,10 @@ class BaseModel(ABC):
             y_target: Segment used for supervised optimisation during tuning or evaluation.
             timestamps_context: Timestamp index aligned with `y_context`.
             timestamps_target: Timestamp index aligned with `y_target`.
+            x_context: Optional covariate data aligned with `y_context`,
+                shape (num_steps_context, num_covariates).
+            x_target: Optional covariate data aligned with `y_target`,
+                shape (num_steps_target, num_covariates).
 
         Returns:
             BaseModel: The fitted model instance.
@@ -93,6 +99,8 @@ class BaseModel(ABC):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
@@ -105,6 +113,10 @@ class BaseModel(ABC):
                 shape (num_steps_context,).
             timestamps_target (np.ndarray): Timestamp index for prediction targets,
                 shape (num_steps_target,).
+            x_context (Optional[np.ndarray]): Optional covariate data aligned with y_context,
+                shape (num_steps_context, num_covariates).
+            x_target (Optional[np.ndarray]): Optional covariate data aligned with timestamps_target,
+                shape (num_steps_target, num_covariates).
             **kwargs (dict): Additional keyword arguments for model-specific prediction
                 parameters (e.g., freq, num_samples for stochastic models).
 
@@ -204,6 +216,7 @@ def validate_inputs(func):
     Validates:
     - y_context, y_target: 2D arrays (num_steps, num_targets) with num_targets >= 1
     - timestamps_context, timestamps_target: 1D arrays (num_steps,)
+    - x_context, x_target: Optional 2D arrays (num_steps, num_covariates)
     - Matching dimensions between related parameters
     """
 
@@ -220,6 +233,8 @@ def validate_inputs(func):
         y_target = params.get("y_target")
         timestamps_context = params.get("timestamps_context")
         timestamps_target = params.get("timestamps_target")
+        x_context = params.get("x_context")
+        x_target = params.get("x_target")
 
         # Validate y_context (required parameter)
         if y_context is None:
@@ -305,6 +320,62 @@ def validate_inputs(func):
                     raise ValueError(
                         f"timestamps_target length must match y_target num_steps: "
                         f"expected {num_steps_target}, got {len(timestamps_target)}"
+                    )
+
+        # Validate x_context if present
+        if x_context is not None:
+            if not isinstance(x_context, np.ndarray):
+                raise TypeError(
+                    f"x_context must be np.ndarray, got {type(x_context)}"
+                )
+
+            if x_context.ndim != 2:
+                raise ValueError(
+                    f"x_context must be 2D array, got {x_context.ndim}D "
+                    f"with shape {x_context.shape}"
+                )
+
+            # Match with y_context num_steps
+            if x_context.shape[0] != num_steps_context:
+                raise ValueError(
+                    f"x_context num_steps must match y_context num_steps: "
+                    f"expected {num_steps_context}, got {x_context.shape[0]}"
+                )
+
+        # Validate x_target if present
+        if x_target is not None:
+            if not isinstance(x_target, np.ndarray):
+                raise TypeError(
+                    f"x_target must be np.ndarray, got {type(x_target)}"
+                )
+
+            if x_target.ndim != 2:
+                raise ValueError(
+                    f"x_target must be 2D array, got {x_target.ndim}D "
+                    f"with shape {x_target.shape}"
+                )
+
+            # Match with y_target num_steps if y_target present, otherwise with timestamps_target
+            if y_target is not None:
+                num_steps_target = y_target.shape[0]
+                if x_target.shape[0] != num_steps_target:
+                    raise ValueError(
+                        f"x_target num_steps must match y_target num_steps: "
+                        f"expected {num_steps_target}, got {x_target.shape[0]}"
+                    )
+            elif timestamps_target is not None:
+                if x_target.shape[0] != len(timestamps_target):
+                    raise ValueError(
+                        f"x_target num_steps must match timestamps_target length: "
+                        f"expected {len(timestamps_target)}, got {x_target.shape[0]}"
+                    )
+
+            # Check that x_context and x_target have matching num_covariates if both present
+            if x_context is not None:
+                if x_target.shape[1] != x_context.shape[1]:
+                    raise ValueError(
+                        f"x_target must have same num_covariates as x_context: "
+                        f"expected {x_context.shape[1]}, got {x_target.shape[1]}"
                     )
 
         # Call the original function
