@@ -9,7 +9,7 @@ The model supports multiple sizes (tiny, mini, small, base, large) and can be co
 with different context lengths and sampling strategies.
 """
 
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -54,6 +54,8 @@ class ChronosModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "ChronosModel":
         """
@@ -95,6 +97,8 @@ class ChronosModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """

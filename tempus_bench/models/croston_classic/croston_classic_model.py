@@ -2,7 +2,7 @@
 Croston's Classic Model implementation for intermittent demand forecasting.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 from pydantic import BaseModel as PydanticBaseModel, Field
@@ -31,6 +31,8 @@ class CrostonClassicModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "CrostonClassicModel":
         """
@@ -96,6 +98,8 @@ class CrostonClassicModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
