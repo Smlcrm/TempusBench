@@ -77,6 +77,10 @@ class ArimaModel(BaseModel):
 
         freq = kwargs["freq"]
 
+        exog = None
+
+        if x_context is not None:
+            exog = x_context.squeeze()
         endog = y_context.squeeze()
 
         if self.s > 1:
@@ -84,13 +88,13 @@ class ArimaModel(BaseModel):
                 endog=endog,
                 order=(self.p, self.d, self.q),
                 seasonal_order=(0, 0, 0, self.s),
-                exog=None,
+                exog=exog,
             )
         else:
             model = ARIMA(
                 endog=endog,
                 order=(self.p, self.d, self.q),
-                exog=None,
+                exog=exog,
             )
 
         fitted_model = model.fit()

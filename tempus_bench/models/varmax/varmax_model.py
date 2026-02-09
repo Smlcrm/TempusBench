@@ -68,9 +68,13 @@ class VarmaxModel(BaseModel):
         q = self.q
         trend = self.trend
 
+        exog = None
+        if x_context is not None:
+            exog = x_context.squeeze()
+
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
-            model = VARMAX(endog=y_context, exog=None, order=(p, q), trend=trend)
+            model = VARMAX(endog=y_context, exog=exog, order=(p, q), trend=trend)
 
             self._model = model.fit()
 
