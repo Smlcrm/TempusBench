@@ -1,5 +1,5 @@
 task:
-  task_name: days
+  task_name: sales
   context_window: 512
   forecast_horizon: 64
   dataset:

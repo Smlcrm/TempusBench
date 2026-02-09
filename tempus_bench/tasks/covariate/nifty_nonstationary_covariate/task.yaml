@@ -1,0 +1,11 @@
+task:
+  task_name: sales
+  context_window: 2048
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: nifty_nonstationary_covariate.csv
+
+# number of covariates : 1
+# number of time-steps : 400275
