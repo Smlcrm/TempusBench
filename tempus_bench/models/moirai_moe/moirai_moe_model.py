@@ -65,8 +65,8 @@ class MoiraiMoeModel(BaseModel):
                 patch_size=pdt + ctx,
                 num_samples=kwargs["num_samples"],
                 target_dim=y_context.shape[1],
-                feat_dynamic_real_dim=0,
-                past_feat_dynamic_real_dim=0,
+                feat_dynamic_real_dim=len(x_context),
+                past_feat_dynamic_real_dim=len(x_target),
             )
         self.is_fitted = True
         return self
@@ -114,10 +114,16 @@ class MoiraiMoeModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
+        past_feat_dynamic_real = torch.tensor(x_context,dtype=torch.float32).unsqueeze(0)
+
+        feat_dynamic_real = torch.tensor(x_target,dtype=torch.float32).unsqueeze(0)
+
         forecast = self._model(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,
+            past_feat_dynamic_real=past_feat_dynamic_real,
+            feat_dynamic_real=feat_dynamic_real
         )
 
         # forecast shape: (num_targets, num_samples, prediction_length)
