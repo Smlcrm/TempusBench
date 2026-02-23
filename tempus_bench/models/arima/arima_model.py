@@ -119,6 +119,7 @@ class ArimaModel(BaseModel):
             y_context: Past target values (unused, present for interface consistency)
             timestamps_context: Context timestamps (unused)
             timestamps_target: Timestamps for the forecast horizon
+            x_target: Exogenous variables for the forecast horizon (if model was trained with exog)
             freq: Frequency string (must be provided in kwargs)
 
         Returns:
@@ -137,7 +138,12 @@ class ArimaModel(BaseModel):
             )
 
         forecast_steps = len(timestamps_target)
-        forecast = arima_model.forecast(steps=forecast_steps)
+
+        exog = None
+        if x_target is not None:
+            exog = x_target.squeeze()
+
+        forecast = arima_model.forecast(steps=forecast_steps, exog=exog)
         y_pred = np.asarray(forecast).reshape(-1, 1)
 
         return y_pred
