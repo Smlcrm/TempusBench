@@ -287,6 +287,8 @@ def main():
         "--job-config-path", required=True, help="Path to job configuration file"
     )
 
+    print("In Model Executor")
+
     args = parser.parse_args()
 
     # Parse hyperparameters JSON
@@ -362,7 +364,28 @@ def main():
             params=hyperparameters, settings=job_config["model_setting"]
         )
 
+        x_context_train = None
+        x_target_train = None
+        x_context_predict = None
+        x_target_predict = None
+
+        if dataset.covariate is not None:
+            covariate = np.asarray(dataset.covariate)
+            x_context_train = covariate[cstart:cend]
+            x_target_train = covariate[tstart:tend]
+
+            x_context_predict = covariate[cstart:tend]
+            x_target_predict = covariate[vstart:vend]
+            print("model executor - covariates length:", len(covariate))
+            print("x_context_train length",len(x_context_train))
+            print("x_target_train length",len(x_target_train))
+            print("x_context_predict length",len(x_context_predict))
+            print("x_target_predict length" ,len(x_target_predict))
+
+        print("before train")
         trained_model = model.train(
+            x_context=x_context_train,
+            x_target=x_target_train,
             y_context=target[cstart:cend],
             y_target=target[tstart:tend],
             timestamps_context=timestamps[cstart:cend],
@@ -372,8 +395,11 @@ def main():
             num_samples=job_config["evaluation_config"]["num_samples"],
         )
 
+        print("before test")
         # Generate predictions
         results = trained_model.predict(
+            x_context=x_context_predict,
+            x_target=x_target_predict, 
             y_context=target[cstart:tend],
             timestamps_context=timestamps[cstart:tend],
             timestamps_target=timestamps[vstart:vend],
