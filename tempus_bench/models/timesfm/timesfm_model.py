@@ -55,12 +55,45 @@ class TimesfmModel(BaseModel):
     ):
         """
         Make predictions using the trained TimesFM model.
+
+        If covariates (x_context and x_target) are provided, uses forecast_with_covariates
+        to incorporate exogenous features.
         """
         if not self.is_fitted:
             raise ValueError("TimesFMModel is not fitted. Call train() first.")
 
         forecast_horizon = timestamps_target.shape[0]
-        predictions = self._model.forecast(y_context.T)[0].T[:forecast_horizon]
+        num_targets = y_context.shape[1]
+
+        if x_context is not None and x_target is not None:
+            # Combine x_context and x_target to get full covariate data
+            # Shape: (context_len + horizon_len, num_covariates)
+            full_covariates = np.concatenate([x_context, x_target], axis=0)
+            num_covariates = full_covariates.shape[1]
+
+            inputs = [y_context[:, i].tolist() for i in range(num_targets)]
+
+            # Prepare dynamic numerical covariates
+            # Each covariate needs to be a list of lists (one per time series)
+            dynamic_numerical_covariates = {}
+            for cov_idx in range(num_covariates):
+                cov_values = full_covariates[:, cov_idx].tolist()
+                # Replicate covariate for each time series
+                dynamic_numerical_covariates[f"cov_{cov_idx}"] = [cov_values] * num_targets
+
+            # Use forecast_with_covariates
+            cov_forecast, _ = self._model.forecast_with_covariates(
+                inputs=inputs,
+                dynamic_numerical_covariates=dynamic_numerical_covariates,
+                freq=[0] * num_targets,
+            )
+
+            # Transpose back to (forecast_horizon, num_targets)
+            predictions = cov_forecast.T
+        else:
+            # Standard forecast without covariates
+            predictions = self._model.forecast(y_context.T)[0].T[:forecast_horizon]
+
         return predictions
 
     def _build_model(self):

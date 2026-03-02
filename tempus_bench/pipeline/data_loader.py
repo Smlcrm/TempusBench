@@ -188,7 +188,10 @@ class DataLoader:
         preprocessor = Preprocessor(self.task_config, self.evaluation_config)
 
         # Process target data
+        print("target array shape",target_array.shape)
+        print("covariate array shape", covariate_array.shape)
         target_raw_str = str(target_array.tolist())  # Convert to string format expected by preprocessor
+        #print("time_start, time_freq, target_raw_str, normalize, handle_missing",time_start, time_freq, target_raw_str, normalize, handle_missing)
         timestamps, time_start, time_freq, target, scaler = preprocessor.clean(
             time_start, time_freq, target_raw_str, normalize, handle_missing
         )
@@ -209,7 +212,6 @@ class DataLoader:
         assert covariate.ndim == 2  # (num_steps, num_covariates)
 
         print("target shape, timestamps shape, covariate shape", target.shape, timestamps.shape, covariate.shape)
-        print("data_loader.py - covariate:", covariate)
 
         # Construct the Dataset with covariates
         self.dataset = Dataset(
