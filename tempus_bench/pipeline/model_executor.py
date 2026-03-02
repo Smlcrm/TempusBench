@@ -141,7 +141,7 @@ class ModelExecutor:
                     f"Expected a line starting with '[' and ending with ']'. "
                     f"Stdout: {result.stdout[:500]}"
                 )
-
+            #print("OUTPUTS LINE", outputs_line)
             try:
                 outputs = json.loads(outputs_line)
             except json.JSONDecodeError as e:
@@ -349,7 +349,6 @@ def main():
     model_class = getattr(module, class_name)
 
     for window_idx, dataset_splits in enumerate(window_generator):
-
         timestamps = np.asarray(dataset.timestamps)
         target = np.asarray(dataset.target)
         freq = dataset.metadata["time_freq"]  # type: ignore

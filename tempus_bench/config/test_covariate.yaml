@@ -1,0 +1,18 @@
+
+evaluation:
+  task_path: 'covariate/solar_100_covariate'
+  tuning_loss: mae
+  max_windows: 4
+  max_num_variates: 50
+  num_samples: 100
+  num_quantiles: 10
+  point_forecast_statistic: mean
+
+model:
+  
+
+  # Deterministic Models
+  exponential_smoothing:
+    trend: ["null"]
+    seasonal: ["null"]
+    seasonal_periods: [4]
