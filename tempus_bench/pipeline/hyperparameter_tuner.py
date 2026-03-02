@@ -131,6 +131,7 @@ class HyperparameterTuner:
                 - Second dict: Nested dictionary keyed by model name then dataset path,
                   containing ordered lists of best hyperparameter assignments for each window.
         """
+        print("Tuner start")
         all_evals = {}
         best_hyperparameters = {}
 
@@ -156,7 +157,7 @@ class HyperparameterTuner:
         timestamps_pred = []
         # Try each hyperparameter combination
         for params in tqdm(self._generate_hyperparameter_grid(), desc="Hyperparameter Combinations"):
-
+            #print(params)
             try:
                 # Execute model with these hyperparameters
                 windows_eval_outputs = model_executor.execute_model(
@@ -172,9 +173,9 @@ class HyperparameterTuner:
                     f"Error executing model {self.model_name} with params {params}: {e}",
                 )
                 continue
-
+            #print("windows_eval_outputs", windows_eval_outputs)
             for window_idx, eval_outputs in enumerate(windows_eval_outputs):
-
+                #print("eval outpus", eval_outputs)
                 immutable_params = tuple(sorted(params.items()))
                 # Set evaluation metrics list on first successful eval
 
@@ -210,6 +211,8 @@ class HyperparameterTuner:
 
         num_windows = len(optimal_hyperparameters)
         # Handle case where no evaluations were successful
+        #print("eval metrics", evaluation_metrics)
+        #print("num windows", num_windows)
         if evaluation_metrics is None or num_windows == 0:
             # Return empty/default results if no evaluations succeeded
             LogManager.get_logger().warning(

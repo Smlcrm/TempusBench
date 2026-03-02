@@ -196,7 +196,7 @@ class Preprocessor:
 
             # Transpose: (num_targets, num_steps) -> (num_steps, num_targets)
             try:
-                target = np.array(cleaned_features, dtype=float).T
+                target = np.array(cleaned_features, dtype=float)
             except (ValueError, TypeError) as e:
                 # If still fails, provide detailed error
                 lengths_str = ", ".join(str(len(seq)) for seq in cleaned_features)
