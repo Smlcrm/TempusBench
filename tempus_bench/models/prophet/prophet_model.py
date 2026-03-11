@@ -77,6 +77,8 @@ class ProphetModel(BaseModel):
             y_target (np.ndarray): Future target values (unused; included for compatibility).
             timestamps_context (np.ndarray): Timestamps corresponding to y_context.
             timestamps_target (np.ndarray): Timestamps corresponding to y_target (unused).
+            x_context (Optional[np.ndarray]): Optional covariate data for context.
+            x_target (Optional[np.ndarray]): Optional covariate data (unused in training).
 
         Returns:
             The fitted Prophet model instance.
@@ -89,13 +91,32 @@ class ProphetModel(BaseModel):
 
         train_df = pd.DataFrame({"ds": timestamps_context, "y": y_context})
 
-        # Construct model_params dict: {param_name: value for valid Prophet parameters}
+        if x_context is not None:
+            x_context_squeezed = x_context.squeeze()
+
+            if len(x_context_squeezed.shape) == 1:
+                train_df["regressor_0"] = x_context_squeezed
+            else:
+                for i in range(x_context_squeezed.shape[1]):
+                    train_df[f"regressor_{i}"] = x_context_squeezed[:, i]
+
         model_params = {
             k: getattr(self, k)
             for k in self.params_class.model_fields.keys()
             if hasattr(self, k)
         }
         model = Prophet(**model_params)
+
+        
+        if x_context is not None:
+            x_context_squeezed = x_context.squeeze()
+            if len(x_context_squeezed.shape) == 1:
+                num_regressors = 1  
+            else:
+                num_regressors = x_context_squeezed.shape[1]
+            for i in range(num_regressors):
+                model.add_regressor(f"regressor_{i}")
+
         fitted_model = model.fit(train_df)
 
         return fitted_model
@@ -119,6 +140,8 @@ class ProphetModel(BaseModel):
             y_context: Past target values (unused, present for interface consistency)
             timestamps_context: Context timestamps (unused)
             timestamps_target: Timestamps for the forecast horizon
+            x_context: Covariate data for context (unused in prediction)
+            x_target: Covariate data for the forecast horizon
 
         Returns:
             np.ndarray: Predictions with shape (forecast_horizon, 1)
@@ -130,6 +153,16 @@ class ProphetModel(BaseModel):
         future_df = pd.DataFrame(
             {"ds": self._convert_to_datetimeindex(timestamps_target)}
         )
+
+        
+        if x_target is not None:
+            x_target_squeezed = x_target.squeeze()
+            
+            if x_target_squeezed.ndim == 1:
+                future_df["regressor_0"] = x_target_squeezed
+            else:
+                for i in range(x_target_squeezed.shape[1]):
+                    future_df[f"regressor_{i}"] = x_target_squeezed[:, i]
 
         forecast_df = prophet_model.predict(future_df)
         predictions = np.asarray(forecast_df["yhat"])
