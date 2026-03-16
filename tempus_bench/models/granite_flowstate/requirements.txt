@@ -1,0 +1,4 @@
+granite-tsfm>=0.3.0
+torch>=2.0.0
+transformers>=4.36.0
+numpy>=1.21.0

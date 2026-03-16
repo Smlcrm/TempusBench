@@ -13,7 +13,7 @@ except ImportError as e:
         "Install with: pip install tabpfn==2.1.2"
     ) from e
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
 
 
 class TabpfnHyperparams(PydanticBaseModel):
@@ -35,6 +35,13 @@ class TabpfnModel(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "TabpfnModel":
+        validate_covariate_support(
+            x_context, x_target,
+            supports_past_only=True,
+            supports_future_only=False,
+            supports_both=False,
+            model_name="TabPFN",
+        )
         # Zero-shot TabPFN uses context during predict; mark as fitted
         self.is_fitted = True
         return self
@@ -49,6 +56,13 @@ class TabpfnModel(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs: dict
     ):
+        validate_covariate_support(
+            x_context, x_target,
+            supports_past_only=True,
+            supports_future_only=False,
+            supports_both=False,
+            model_name="TabPFN",
+        )
         # Map legacy keys to expected ones for backward compatibility
         context_window = int(kwargs.get("context_window", self.max_sequence_length))
         forecast_window = int(kwargs.get("forecast_window", kwargs.get("prediction_length", self.max_sequence_length)))
@@ -62,8 +76,15 @@ class TabpfnModel(BaseModel):
         # Use last context_window points
         y_hist = y_context[-context_window:]
 
-        # Build time features and fit TabPFN on the context window
+        # Build time features; extend with x_context (past covariates only) for non-native support
         X_hist = make_time_features(len(y_hist)).values
+        has_covariates = x_context is not None
+        if has_covariates:
+            x_hist = np.asarray(x_context[-len(y_hist):], dtype=np.float32)
+            if x_hist.ndim == 1:
+                x_hist = x_hist.reshape(-1, 1)
+            X_hist = np.concatenate([X_hist, x_hist], axis=1)
+            last_cov = x_hist[-1:].astype(np.float32)  # (1, num_covariates)
         regressor = TabPFNRegressor()
         regressor.fit(X_hist, y_hist)
 
@@ -74,6 +95,9 @@ class TabpfnModel(BaseModel):
             step = min(forecast_window, remaining)
             # Generate future feature positions immediately following history
             X_future = make_time_features(len(y_hist) + step).values[-step:]
+            if has_covariates:
+                x_future_pad = np.tile(last_cov, (step, 1))
+                X_future = np.concatenate([X_future, x_future_pad], axis=1)
             y_step = regressor.predict(X_future)
             y_step = np.asarray(y_step, dtype=np.float32).flatten()
             preds.append(y_step)

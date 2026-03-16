@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TempusBench Models</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    .th-sort-label.sorted-asc::before { content: "▲ "; font-size: 0.7em; opacity: 0.9; }
+    .th-sort-label.sorted-desc::before { content: "▼ "; font-size: 0.7em; opacity: 0.9; }
+    .th-cell { display: flex; flex-direction: row; align-items: center; gap: 0.35rem; flex-wrap: nowrap; white-space: nowrap; }
+    .th-sort-label { cursor: pointer; user-select: none; }
+    .th-sort-label:hover { opacity: 0.9; }
+    .th-funnel-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 4px; background: transparent; color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+    .th-funnel-btn:hover { background: rgba(255,255,255,0.2); color: white; }
+    .th-funnel-btn.has-filter { color: #fcd34d; }
+    .th-funnel-btn svg { width: 14px; height: 14px; }
+    .col-filter { position: relative; }
+    .col-filter-panel { display: none; position: absolute; top: 100%; left: 0; z-index: 50; min-width: 160px; max-width: 220px; max-height: 280px; overflow-y: auto; margin-top: 4px; padding: 0.5rem; background: white; border-radius: 8px; box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.15); border: 1px solid #e2e8f0; }
+    .col-filter.open .col-filter-panel { display: block; }
+    .col-filter-panel { color: #1e3a8a; }
+    .col-filter label { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
+    .col-filter label:hover { background: #f1f5f9; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; }
+    .model-card-links { display: flex; align-items: center; gap: 0.25rem; }
+    .model-card-name { font-weight: 600; color: #1e293b; }
+    .model-card-links { display: flex; align-items: center; justify-content: center; gap: 0.25rem; }
+    .model-card-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; transition: all 0.15s ease; }
+    .model-card-btn:hover { transform: translateY(-1px); }
+    .model-card-btn[href]:hover { background: #f1f5f9; }
+    .model-card-btn:not([href]) { opacity: 0.35; cursor: default; pointer-events: none; }
+    .model-card-btn svg { width: 16px; height: 16px; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-6 md:p-8">
+  <div class="max-w-7xl mx-auto">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-slate-800">TempusBench Models</h1>
+      <p class="text-slate-600 mt-1">60 forecasting models — sort, filter, and search</p>
+    </header>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="sticky top-0 z-10 bg-slate-800">
+            <tr class="text-white">
+              <th class="px-4 py-3 text-center text-sm font-semibold w-24 whitespace-nowrap align-top">Links</th>
+              <th data-col="model" class="px-4 py-3 text-left align-top whitespace-nowrap">
+                <div class="th-cell col-filter" id="col-model">
+                  <span class="th-sort-label text-sm font-semibold">Model</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter Model">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <input id="search" type="text" placeholder="Search models…" class="w-full px-3 py-2 text-sm rounded-md border border-slate-300 text-[#1e3a8a] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent" />
+                  </div>
+                </div>
+              </th>
+              <th data-col="modelType" class="px-4 py-3 text-left align-top whitespace-nowrap min-w-[100px]">
+                <div class="th-cell col-filter" id="col-type">
+                  <span class="th-sort-label text-sm font-semibold">Type</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter Type">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <label><input type="checkbox" data-value="statistical" /> Statistical</label>
+                    <label><input type="checkbox" data-value="ml" /> ML</label>
+                    <label><input type="checkbox" data-value="foundation" /> Foundation</label>
+                  </div>
+                </div>
+              </th>
+              <th data-col="year" class="px-4 py-3 text-left align-top whitespace-nowrap">
+                <div class="th-cell col-filter" id="col-year">
+                  <span class="th-sort-label text-sm font-semibold">Year</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter Year">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <input id="search-year" type="text" placeholder="Search year…" class="w-full px-3 py-2 text-sm rounded-md border border-slate-300 text-[#1e3a8a] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent" />
+                  </div>
+                </div>
+              </th>
+              <th data-col="outputType" class="px-4 py-3 text-left align-top whitespace-nowrap min-w-[100px]">
+                <div class="th-cell col-filter" id="col-output">
+                  <span class="th-sort-label text-sm font-semibold">Output</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter Output">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <label><input type="checkbox" data-value="deterministic" /> Deterministic</label>
+                    <label><input type="checkbox" data-value="stochastic" /> Stochastic</label>
+                    <label><input type="checkbox" data-value="hybrid" /> Hybrid</label>
+                  </div>
+                </div>
+              </th>
+              <th data-col="uniMulti" class="px-4 py-3 text-left align-top whitespace-nowrap min-w-[110px]">
+                <div class="th-cell col-filter" id="col-unimulti">
+                  <span class="th-sort-label text-sm font-semibold" title="Multivariate">Multiv.</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter Multivariate">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <label><input type="checkbox" data-value="native_multivariate" /> Native Multivariate</label>
+                    <label><input type="checkbox" data-value="channel_independent" /> Channel Independent</label>
+                  </div>
+                </div>
+              </th>
+              <th data-col="covariates" class="px-4 py-3 text-left align-top whitespace-nowrap min-w-[100px]">
+                <div class="th-cell col-filter" id="col-covariates">
+                  <span class="th-sort-label text-sm font-semibold">Covariates</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter Covariates">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <label><input type="checkbox" data-value="past_future" /> Past + Future</label>
+                    <label><input type="checkbox" data-value="future" /> Future only</label>
+                    <label><input type="checkbox" data-value="past" /> Past only</label>
+                    <label><input type="checkbox" data-value="none" /> No covariates</label>
+                  </div>
+                </div>
+              </th>
+              <th data-col="autoregressive" class="px-4 py-3 text-left align-top whitespace-nowrap min-w-[60px]">
+                <div class="th-cell col-filter" id="col-ar">
+                  <span class="th-sort-label text-sm font-semibold" title="Autoregressive models can forecast arbitrary horizons by iterating">AR</span>
+                  <button type="button" class="th-funnel-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter AR">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+                  </button>
+                  <div class="col-filter-panel" role="listbox">
+                    <label><input type="checkbox" data-value="yes" /> Yes</label>
+                    <label><input type="checkbox" data-value="no" /> No</label>
+                  </div>
+                </div>
+              </th>
+              <th data-col="params" class="px-4 py-3 text-right align-top whitespace-nowrap min-w-[85px]">
+                <div class="th-cell justify-end">
+                  <span class="th-sort-label text-sm font-semibold">Params (M)</span>
+                </div>
+              </th>
+              <th data-col="sizeBytes" class="px-4 py-3 text-right align-top whitespace-nowrap min-w-[75px]">
+                <div class="th-cell justify-end">
+                  <span class="th-sort-label text-sm font-semibold">Size (MB)</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="tbody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const _chronos_link = { paper: "https://arxiv.org/abs/2403.07815", repo: "https://github.com/amazon-science/chronos-forecasting" };
+    const _chronos_bolt_link = { paper: "https://arxiv.org/abs/2510.15821", repo: "https://github.com/amazon-science/chronos-forecasting" };
+    const _moirai_link = { paper: "https://arxiv.org/abs/2402.02592", repo: "https://github.com/SalesforceAIResearch/uni2ts" };
+    const _kairos_link = { paper: "https://arxiv.org/abs/2509.25826", repo: "https://github.com/foundation-model-research/Kairos" };
+    const _moment_link = { paper: "https://arxiv.org/abs/2402.03885", repo: "https://github.com/moment-timeseries-foundation-model/moment" };
+    const _time_moe_link = { paper: "https://arxiv.org/abs/2409.16040", repo: "https://github.com/Time-MoE/Time-MoE" };
+    const _timesfm_link = { paper: "https://arxiv.org/abs/2310.10688", repo: "https://github.com/google-research/timesfm" };
+    const _ttm_link = { paper: "https://arxiv.org/abs/2401.03955", repo: "https://github.com/ibm-granite/granite-tsfm" };
+    const _tirex_link = { paper: "https://arxiv.org/abs/2505.23719", repo: "https://github.com/NX-AI/tirex" };
+    const _patchtst_link = { paper: "https://arxiv.org/abs/2602.06909", repo: "https://github.com/ibm-granite/granite-tsfm" };
+
+    const LINKS = {
+      arima: { paper: "https://robjhyndman.com/papers/BoxJenkins.pdf", repo: "https://github.com/statsmodels/statsmodels" },
+      chronos_tiny: _chronos_link, chronos_mini: _chronos_link, chronos_small: _chronos_link, chronos_base: _chronos_link, chronos_large: _chronos_link,
+      chronos_bolt_tiny: _chronos_bolt_link, chronos_bolt_mini: _chronos_bolt_link, chronos_bolt_small: _chronos_bolt_link, chronos_bolt_base: _chronos_bolt_link,
+      chronos2: _chronos_bolt_link, chronos2_small: _chronos_bolt_link,
+      croston_classic: { paper: "https://robjhyndman.com/papers/croston.pdf", repo: "https://github.com/statsmodels/statsmodels" },
+      deepar: { paper: "https://arxiv.org/abs/1704.04110", repo: "https://github.com/Nixtla/neuralforecast" },
+      exponential_smoothing: { paper: "https://www.bauer.uh.edu/gardner/exponential-smoothing.pdf", repo: "https://github.com/statsmodels/statsmodels" },
+      granite_flowstate: { paper: "https://arxiv.org/abs/2508.05287", repo: "https://github.com/ibm-granite/granite-tsfm" },
+      itransformer: { paper: "https://arxiv.org/abs/2310.06625", repo: "https://github.com/thuml/iTransformer" },
+      kairos_10m: _kairos_link, kairos_23m: _kairos_link, kairos_50m: _kairos_link,
+      lafn: { paper: null, repo: "https://github.com/Smlcrm/chronarium" },
+      lagllama: { paper: "https://arxiv.org/abs/2310.08278", repo: "https://github.com/time-series-foundation-models/lag-llama" },
+      lstm: { paper: "https://www.bioinf.jku.at/publications/older/2604.pdf", repo: "https://github.com/Nixtla/neuralforecast" },
+      moirai_small: _moirai_link, moirai_base: _moirai_link, moirai_large: _moirai_link,
+      moirai_moe: { paper: "https://arxiv.org/abs/2410.10469", repo: "https://github.com/SalesforceAIResearch/uni2ts" },
+      moirai2: { paper: "https://arxiv.org/abs/2511.11698", repo: "https://github.com/SalesforceAIResearch/uni2ts" },
+      moment_small: _moment_link, moment_base: _moment_link, moment_large: _moment_link,
+      nbeats: { paper: "https://arxiv.org/abs/1905.10437", repo: "https://github.com/Nixtla/neuralforecast" },
+      nhits: { paper: "https://arxiv.org/abs/2201.12886", repo: "https://github.com/Nixtla/neuralforecast" },
+      patchtsmixer: { paper: "https://arxiv.org/abs/2306.09364", repo: "https://github.com/huggingface/transformers" },
+      patchtst_fm: _patchtst_link, patchtst_granite: _patchtst_link,
+      prophet: { paper: "https://facebook.github.io/prophet/static/prophet_paper_20170113.pdf", repo: "https://github.com/facebook/prophet" },
+      random_forest: { paper: "https://link.springer.com/article/10.1023/A:1010933404324", repo: "https://github.com/scikit-learn/scikit-learn" },
+      seasonal_naive: { paper: "https://otexts.com/fpp3/simple-methods.html", repo: "https://github.com/sktime/sktime" },
+      sundial: { paper: "https://arxiv.org/abs/2502.00816", repo: "https://github.com/thuml/Sundial" },
+      svr: { paper: "https://link.springer.com/article/10.1007/BF00994018", repo: "https://github.com/scikit-learn/scikit-learn" },
+      tabpfn: { paper: "https://arxiv.org/abs/2511.08667", repo: "https://github.com/PriorLabs/TabPFN" },
+      tabpfn_ts: { paper: "https://arxiv.org/abs/2501.02945", repo: "https://github.com/PriorLabs/tabpfn-time-series" },
+      tft: { paper: "https://arxiv.org/abs/1912.09363", repo: "https://github.com/Nixtla/neuralforecast" },
+      theta: { paper: "https://www.sciencedirect.com/science/article/abs/pii/S0169207000000662", repo: "https://github.com/sktime/sktime" },
+      time_moe_50m: _time_moe_link, time_moe_200m: _time_moe_link,
+      timesfm_200m: _timesfm_link, timesfm2: _timesfm_link, timesfm_500m: _timesfm_link,
+      timesnet: { paper: "https://arxiv.org/abs/2210.02186", repo: "https://github.com/thuml/TimesNet" },
+      tiny_time_mixer_r1: _ttm_link, tiny_time_mixer_r2: _ttm_link, tiny_time_mixer_r2_1: _ttm_link,
+      tirex: _tirex_link, tirex_1_1_gifteval: _tirex_link,
+      toto: { paper: "https://arxiv.org/abs/2505.14766", repo: "https://github.com/DataDog/toto" },
+      varmax: { paper: "https://support.sas.com/resources/papers/proceedings20/4306-2020.pdf", repo: "https://github.com/statsmodels/statsmodels" },
+      xgboost: { paper: "https://arxiv.org/abs/1603.02754", repo: "https://github.com/dmlc/xgboost" },
+    };
+
+    const DISPLAY_NAMES = {
+      arima: "ARIMA", croston_classic: "Croston", deepar: "DeepAR",
+      exponential_smoothing: "Exponential Smoothing", itransformer: "iTransformer",
+      lafn: "LAFN", lagllama: "Lag-Llama", lstm: "LSTM", nbeats: "N-BEATS", nhits: "N-HiTS",
+      patchtsmixer: "PatchTSMixer", prophet: "Prophet", random_forest: "Random Forest",
+      seasonal_naive: "Seasonal Naive", svr: "SVR", tft: "TFT", theta: "Theta",
+      timesnet: "TimesNet", varmax: "VARMAX", xgboost: "XGBoost",
+      chronos_tiny: "Chronos-Tiny", chronos_mini: "Chronos-Mini", chronos_small: "Chronos-Small",
+      chronos_base: "Chronos-Base", chronos_large: "Chronos-Large",
+      chronos_bolt_tiny: "Chronos-Bolt-Tiny", chronos_bolt_mini: "Chronos-Bolt-Mini",
+      chronos_bolt_small: "Chronos-Bolt-Small", chronos_bolt_base: "Chronos-Bolt-Base",
+      chronos2: "Chronos-2", chronos2_small: "Chronos-2-Small",
+      granite_flowstate: "Granite FlowState",
+      kairos_10m: "Kairos-10M", kairos_23m: "Kairos-23M", kairos_50m: "Kairos-50M",
+      moirai_small: "Moirai-Small", moirai_base: "Moirai-Base", moirai_large: "Moirai-Large",
+      moirai_moe: "Moirai-MoE", moirai2: "Moirai 2.0",
+      moment_small: "MOMENT-Small", moment_base: "MOMENT-Base", moment_large: "MOMENT-Large",
+      patchtst_fm: "PatchTST-FM", patchtst_granite: "PatchTST-Granite",
+      sundial: "Sundial", tabpfn: "TabPFN", tabpfn_ts: "TabPFN-TS",
+      time_moe_50m: "Time-MoE-50M", time_moe_200m: "Time-MoE-200M",
+      timesfm_200m: "TimesFM 200M", timesfm2: "TimesFM 2.5", timesfm_500m: "TimesFM 500M",
+      tiny_time_mixer_r1: "TTM R1", tiny_time_mixer_r2: "TTM R2", tiny_time_mixer_r2_1: "TTM R2.1",
+      tirex: "TiRex", tirex_1_1_gifteval: "TiRex 1.1",
+      toto: "TOTO",
+    };
+
+    const MODEL_PARAMS = {
+      arima: null, croston_classic: null, exponential_smoothing: null, prophet: null,
+      seasonal_naive: null, theta: null, varmax: null, random_forest: null, svr: null,
+      lstm: null, deepar: null, nbeats: null, nhits: null, tft: null, itransformer: null,
+      timesnet: null, patchtsmixer: null, xgboost: null,
+      chronos_tiny: 8e6, chronos_mini: 20e6, chronos_small: 46e6, chronos_base: 200e6, chronos_large: 710e6,
+      chronos_bolt_tiny: 9e6, chronos_bolt_mini: 21e6, chronos_bolt_small: 48e6, chronos_bolt_base: 205e6,
+      chronos2: 120e6, chronos2_small: 40e6,
+      granite_flowstate: 9.1e6,
+      kairos_10m: 10e6, kairos_23m: 23e6, kairos_50m: 50e6,
+      moirai_small: 14e6, moirai_base: 91e6, moirai_large: 311e6, moirai_moe: 86e6, moirai2: 12e6,
+      moment_small: 40e6, moment_base: 125e6, moment_large: 385e6,
+      patchtst_fm: 260e6, patchtst_granite: 40e6,
+      sundial: 128e6, tabpfn: 1e6, tabpfn_ts: 1e6,
+      time_moe_50m: 50e6, time_moe_200m: 200e6,
+      timesfm_200m: 200e6, timesfm2: 200e6, timesfm_500m: 500e6,
+      tiny_time_mixer_r1: 1e6, tiny_time_mixer_r2: 1.7e6, tiny_time_mixer_r2_1: 1.7e6,
+      tirex: 300e6, tirex_1_1_gifteval: 300e6,
+      toto: 151e6, lagllama: 10e6, lafn: null,
+    };
+
+    function formatParams(p) {
+      if (p == null) return "—";
+      const m = p / 1e6;
+      return String(Number(m >= 1 ? m.toFixed(1) : m.toFixed(2)));
+    }
+    function formatBytes(b) {
+      if (b == null) return "—";
+      const mb = b / 1e6;
+      return String(Number(mb >= 1 ? mb.toFixed(1) : mb.toFixed(2)));
+    }
+
+    function modelIconLinks(r) {
+      const links = LINKS[r.model] || {};
+      const repoIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>';
+      const paperIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>';
+      const repoBtn = links.repo ? '<a href="' + links.repo + '" target="_blank" rel="noopener noreferrer" class="model-card-btn" title="Repository">' + repoIcon + '</a>' : '<span class="model-card-btn" title="No repo">' + repoIcon + '</span>';
+      const paperBtn = links.paper ? '<a href="' + links.paper + '" target="_blank" rel="noopener noreferrer" class="model-card-btn" title="Paper">' + paperIcon + '</a>' : '<span class="model-card-btn" title="No paper">' + paperIcon + '</span>';
+      return '<div class="model-card-links">' + repoBtn + paperBtn + '</div>';
+    }
+    function modelName(r) {
+      return '<span class="model-card-name">' + (DISPLAY_NAMES[r.model] || r.model) + '</span>';
+    }
+
+    const _chronos_props = { modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "Yes" };
+    const _chronos_bolt_props = { modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" };
+    const _chronos2_props = { modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Native Multivariate", covariates: "Past + Future", autoregressive: "No" };
+    const _moirai_props = { modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Native Multivariate", covariates: "Past + Future", autoregressive: "Yes" };
+    const _kairos_props = { modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "Yes" };
+    const _moment_props = { modelType: "foundation", year: 2024, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" };
+    const _time_moe_props = { modelType: "foundation", year: 2024, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "Yes" };
+    const _ttm_props = { modelType: "foundation", year: 2024, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "No" };
+    const _tirex_props = { modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "Yes" };
+    const _patchtst_props = { modelType: "foundation", year: 2023, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" };
+
+    const data = [
+      // Statistical
+      { model: "arima", modelType: "statistical", year: 1970, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "Yes" },
+      { model: "croston_classic", modelType: "statistical", year: 1972, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "Yes" },
+      { model: "exponential_smoothing", modelType: "statistical", year: 1957, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "Yes" },
+      { model: "prophet", modelType: "statistical", year: 2018, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "Yes" },
+      { model: "seasonal_naive", modelType: "statistical", year: 1970, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "Yes" },
+      { model: "theta", modelType: "statistical", year: 2000, outputType: "deterministic", uniMulti: "Native Multivariate", covariates: "None", autoregressive: "Yes" },
+      { model: "varmax", modelType: "statistical", year: 1980, outputType: "deterministic", uniMulti: "Native Multivariate", covariates: "Past only", autoregressive: "Yes" },
+      // ML
+      { model: "deepar", modelType: "ml", year: 2019, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Future only", autoregressive: "Yes" },
+      { model: "itransformer", modelType: "ml", year: 2024, outputType: "deterministic", uniMulti: "Native Multivariate", covariates: "None", autoregressive: "No" },
+      { model: "lstm", modelType: "ml", year: 1997, outputType: "deterministic", uniMulti: "Native Multivariate", covariates: "None", autoregressive: "Yes" },
+      { model: "nbeats", modelType: "ml", year: 2020, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "No" },
+      { model: "nhits", modelType: "ml", year: 2023, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "No" },
+      { model: "patchtsmixer", modelType: "ml", year: 2023, outputType: "deterministic", uniMulti: "Native Multivariate", covariates: "None", autoregressive: "No" },
+      { model: "random_forest", modelType: "ml", year: 2001, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "No" },
+      { model: "svr", modelType: "ml", year: 1995, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "No" },
+      { model: "tft", modelType: "ml", year: 2021, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "No" },
+      { model: "timesnet", modelType: "ml", year: 2023, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Future only", autoregressive: "No" },
+      { model: "xgboost", modelType: "ml", year: 2016, outputType: "deterministic", uniMulti: "Native Multivariate", covariates: "None", autoregressive: "No" },
+      // Foundation — Chronos family
+      { model: "chronos_tiny", ..._chronos_props },
+      { model: "chronos_mini", ..._chronos_props },
+      { model: "chronos_small", ..._chronos_props },
+      { model: "chronos_base", ..._chronos_props },
+      { model: "chronos_large", ..._chronos_props },
+      { model: "chronos_bolt_tiny", ..._chronos_bolt_props },
+      { model: "chronos_bolt_mini", ..._chronos_bolt_props },
+      { model: "chronos_bolt_small", ..._chronos_bolt_props },
+      { model: "chronos_bolt_base", ..._chronos_bolt_props },
+      { model: "chronos2", ..._chronos2_props },
+      { model: "chronos2_small", ..._chronos2_props },
+      // Foundation — Moirai family
+      { model: "moirai_small", ..._moirai_props },
+      { model: "moirai_base", ..._moirai_props },
+      { model: "moirai_large", ..._moirai_props },
+      { model: "moirai_moe", modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Native Multivariate", covariates: "Past + Future", autoregressive: "Yes" },
+      { model: "moirai2", modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Native Multivariate", covariates: "Past + Future", autoregressive: "Yes" },
+      // Foundation — Kairos family
+      { model: "kairos_10m", ..._kairos_props },
+      { model: "kairos_23m", ..._kairos_props },
+      { model: "kairos_50m", ..._kairos_props },
+      // Foundation — MOMENT family
+      { model: "moment_small", ..._moment_props },
+      { model: "moment_base", ..._moment_props },
+      { model: "moment_large", ..._moment_props },
+      // Foundation — Time-MoE family
+      { model: "time_moe_50m", ..._time_moe_props },
+      { model: "time_moe_200m", ..._time_moe_props },
+      // Foundation — TimesFM family
+      { model: "timesfm_200m", modelType: "foundation", year: 2024, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "Yes" },
+      { model: "timesfm2", modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" },
+      { model: "timesfm_500m", modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" },
+      // Foundation — TTM family
+      { model: "tiny_time_mixer_r1", ..._ttm_props },
+      { model: "tiny_time_mixer_r2", ..._ttm_props },
+      { model: "tiny_time_mixer_r2_1", ..._ttm_props },
+      // Foundation — TiRex family
+      { model: "tirex", ..._tirex_props },
+      { model: "tirex_1_1_gifteval", ..._tirex_props },
+      // Foundation — PatchTST family
+      { model: "patchtst_fm", ..._patchtst_props },
+      { model: "patchtst_granite", ..._patchtst_props },
+      // Foundation — others
+      { model: "granite_flowstate", modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" },
+      { model: "lagllama", modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "None", autoregressive: "Yes" },
+      { model: "lafn", modelType: "foundation", year: 2024, outputType: "hybrid", uniMulti: "Native Multivariate", covariates: "None", autoregressive: "No" },
+      { model: "sundial", modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "Yes" },
+      { model: "tabpfn", modelType: "foundation", year: 2023, outputType: "deterministic", uniMulti: "Channel Independent", covariates: "Past only", autoregressive: "No" },
+      { model: "tabpfn_ts", modelType: "foundation", year: 2025, outputType: "stochastic", uniMulti: "Channel Independent", covariates: "Past + Future", autoregressive: "No" },
+      { model: "toto", modelType: "foundation", year: 2024, outputType: "stochastic", uniMulti: "Native Multivariate", covariates: "Past + Future", autoregressive: "Yes" },
+    ];
+
+    const covKey = (c) => {
+      if (c.includes("Past + Future")) return "past_future";
+      if (c.includes("Future only")) return "future";
+      if (c.includes("Past only")) return "past";
+      return "none";
+    };
+
+    const uniMultiKey = (u) => {
+      if (u === "Native Multivariate") return "native_multivariate";
+      if (u === "Channel Independent") return "channel_independent";
+      return u;
+    };
+
+    const typeBadgeClass = {
+      statistical: "bg-blue-100 text-blue-800",
+      ml: "bg-emerald-100 text-emerald-800",
+      foundation: "bg-rose-100 text-rose-800",
+    };
+
+    const LABELS = {
+      type: { statistical: "Statistical", ml: "ML", foundation: "Foundation" },
+      output: { deterministic: "Deterministic", stochastic: "Stochastic", hybrid: "Hybrid" },
+      unimulti: { native_multivariate: "Native Multivariate", channel_independent: "Channel Independent" },
+      covariates: { past_future: "Past + Future", future: "Future only", past: "Past only", none: "No covariates" },
+      ar: { yes: "Autoregressive", no: "Non-autoregressive" },
+    };
+
+    const COL_FILTER_IDS = { "col-type": "type", "col-output": "output", "col-year": "year", "col-unimulti": "unimulti", "col-covariates": "covariates", "col-ar": "ar" };
+
+    function getSelectedValues(colFilterId) {
+      const panel = document.querySelector(`#${colFilterId} .col-filter-panel`);
+      if (!panel) return [];
+      return [...panel.querySelectorAll('input:checked')].map(cb => cb.dataset.value);
+    }
+
+    function updateFunnelStates() {
+      document.querySelectorAll('.col-filter').forEach(cf => {
+        const colId = cf.id;
+        const btn = cf.querySelector('.th-funnel-btn');
+        if (!btn) return;
+        let hasFilter = false;
+        if (colId === "col-model") {
+          hasFilter = !!document.getElementById("search")?.value?.trim();
+        } else if (colId === "col-year") {
+          hasFilter = !!document.getElementById("search-year")?.value?.trim();
+        } else {
+          hasFilter = getSelectedValues(colId).length > 0;
+        }
+        btn.classList.toggle('has-filter', hasFilter);
+      });
+    }
+
+    function render(rows) {
+      const tbody = document.getElementById("tbody");
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="px-6 py-12 text-center text-slate-500">No models match your filters.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const params = MODEL_PARAMS[r.model];
+        const sizeBytes = params != null ? params * 2 : null;
+        return `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="px-4 py-4 text-center">${modelIconLinks(r)}</td>
+          <td class="px-6 py-4">${modelName(r)}</td>
+          <td class="px-6 py-4"><span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${typeBadgeClass[r.modelType]}">${r.modelType}</span></td>
+          <td class="px-6 py-4 text-slate-600">${r.year || "—"}</td>
+          <td class="px-6 py-4 text-slate-600">${r.outputType}</td>
+          <td class="px-6 py-4 text-slate-600">${r.uniMulti}</td>
+          <td class="px-6 py-4 text-slate-600">${r.covariates}</td>
+          <td class="px-6 py-4"><span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${r.autoregressive === "Yes" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}">${r.autoregressive}</span></td>
+          <td class="px-6 py-4 text-slate-600 text-right tabular-nums">${formatParams(params)}</td>
+          <td class="px-6 py-4 text-slate-600 text-right tabular-nums">${formatBytes(sizeBytes)}</td>
+        </tr>
+      `}).join("");
+    }
+
+    function filterAndSort() {
+      const q = document.getElementById("search").value.toLowerCase();
+      const yearQ = document.getElementById("search-year").value.trim();
+      const typeVals = getSelectedValues("col-type");
+      const outputVals = getSelectedValues("col-output");
+      const unimultiVals = getSelectedValues("col-unimulti");
+      const covVals = getSelectedValues("col-covariates");
+      const arVals = getSelectedValues("col-ar");
+
+      let rows = data.filter(r => {
+        if (q && !r.model.toLowerCase().includes(q) && !(DISPLAY_NAMES[r.model] || r.model).toLowerCase().includes(q)) return false;
+        if (yearQ && !String(r.year || "").includes(yearQ)) return false;
+        if (typeVals.length && !typeVals.includes(r.modelType)) return false;
+        if (outputVals.length && !outputVals.includes(r.outputType)) return false;
+        if (unimultiVals.length && !unimultiVals.includes(uniMultiKey(r.uniMulti))) return false;
+        if (covVals.length && !covVals.includes(covKey(r.covariates))) return false;
+        if (arVals.length && !arVals.includes(r.autoregressive.toLowerCase())) return false;
+        return true;
+      });
+
+      const col = filterAndSort._sortCol || "model";
+      const dir = filterAndSort._sortDir || 1;
+
+      rows.sort((a, b) => {
+        let va = a[col], vb = b[col];
+        if (col === "year") { va = va || 0; vb = vb || 0; return dir * (va - vb); }
+        if (col === "params" || col === "sizeBytes") {
+          va = col === "params" ? (MODEL_PARAMS[a.model] ?? -1) : ((MODEL_PARAMS[a.model] ?? -1) * 2);
+          vb = col === "params" ? (MODEL_PARAMS[b.model] ?? -1) : ((MODEL_PARAMS[b.model] ?? -1) * 2);
+          return dir * (va - vb);
+        }
+        return dir * String(va).localeCompare(String(vb));
+      });
+
+      document.querySelectorAll("th .th-sort-label").forEach(lbl => {
+        lbl.classList.remove("sorted-asc", "sorted-desc");
+        const th = lbl.closest("th");
+        if (th?.dataset.col === col) lbl.classList.add(dir === 1 ? "sorted-asc" : "sorted-desc");
+      });
+
+      render(rows);
+      updateFunnelStates();
+    }
+
+    document.querySelectorAll(".col-filter").forEach(cf => {
+      const btn = cf.querySelector(".th-funnel-btn");
+      const panel = cf.querySelector(".col-filter-panel");
+      if (!btn || !panel) return;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.querySelectorAll(".col-filter").forEach(c => c.classList.remove("open"));
+        cf.classList.toggle("open");
+        btn.setAttribute("aria-expanded", cf.classList.contains("open"));
+      });
+      panel.addEventListener("click", (e) => e.stopPropagation());
+      panel.querySelectorAll("input").forEach(cb => {
+        if (cb.type === "checkbox") cb.addEventListener("change", () => filterAndSort());
+      });
+      const searchInput = panel.querySelector('input[type="text"]');
+      if (searchInput) searchInput.addEventListener("input", filterAndSort);
+    });
+
+    document.addEventListener("click", () => {
+      document.querySelectorAll(".col-filter").forEach(c => c.classList.remove("open"));
+      document.querySelectorAll(".th-funnel-btn").forEach(b => b.setAttribute("aria-expanded", "false"));
+    });
+
+    document.querySelectorAll("th[data-col] .th-sort-label").forEach(lbl => {
+      lbl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const th = lbl.closest("th");
+        const col = th.dataset.col;
+        const isAsc = lbl.classList.contains("sorted-asc");
+        filterAndSort._sortCol = col;
+        filterAndSort._sortDir = isAsc ? -1 : 1;
+        filterAndSort();
+      });
+    });
+
+    filterAndSort();
+  </script>
+</body>
+</html>

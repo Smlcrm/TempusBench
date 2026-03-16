@@ -1,0 +1,4 @@
+model_type: "stochastic"
+python_version: "3.12"
+device: "cpu"
+hf_model_name: "ibm-granite/granite-timeseries-flowstate-r1"
