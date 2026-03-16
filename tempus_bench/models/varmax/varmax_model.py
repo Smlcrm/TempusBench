@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel as PydanticBaseModel, Field
 from statsmodels.tsa.statespace.varmax import VARMAX
+from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
@@ -34,6 +35,7 @@ class VarmaxHyperparams(PydanticBaseModel):
 class VarmaxModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         super().__init__(params, settings, VarmaxHyperparams)
+        self._is_univariate = False  # Track if using ARIMA fallback
 
     @validate_inputs
     def train(
@@ -53,12 +55,15 @@ class VarmaxModel(BaseModel):
         - Captures cross-dependencies between multiple targets
         - Applies differencing if needed to achieve stationarity
         - Uses Maximum Likelihood Estimation for parameter fitting
+        - Falls back to ARIMA (d=0) for univariate time series
 
         Args:
             y_context: Past target values (time series) - used for training (can be DataFrame for multivariate)
             y_target: Future target values (optional, for extended training)
             timestamps_context: Timestamps for y_context (optional)
             timestamps_target: Timestamps for y_target (optional)
+            x_context: Optional exogenous variables for context
+            x_target: Optional exogenous variables for target (unused in training)
             **kwargs: Additional keyword arguments
 
         Returns:
@@ -73,10 +78,32 @@ class VarmaxModel(BaseModel):
             exog = x_context.squeeze()
 
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
-        if not self.is_fitted:
-            model = VARMAX(endog=y_context, exog=exog, order=(p, q), trend=trend)
 
-            self._model = model.fit()
+        if not self.is_fitted:
+            num_targets = y_context.shape[1]
+
+            # Check if univariate (only 1 target variable)
+            print("num targets",num_targets)
+            if num_targets == 1:
+                print("Using ARIMA!")
+                # Use ARIMA with d=0 for univariate case (ARMAX)
+                self._is_univariate = True
+                endog = y_context.squeeze()
+
+                # ARIMA with d=0, no seasonality (s=1 means no seasonal component)
+                model = ARIMA(
+                    endog=endog,
+                    order=(p, 0, q),  # d=0 for ARMAX
+                    exog=exog,
+                )
+                self._model = model.fit()
+            else:
+                # Use VARMAX for multivariate case
+                self._is_univariate = False
+                model = VARMAX(endog=y_context, exog=exog, order=(p, q), trend=trend)
+                self._model = model.fit()
+
+            self.is_fitted = True
 
         return self
 
@@ -98,11 +125,14 @@ class VarmaxModel(BaseModel):
         - Predicts all targets simultaneously using their interdependencies
         - Handles both in-sample and out-of-sample forecasting
         - Reverses differencing to get predictions in original scale
+        - For univariate case, uses ARIMA (d=0) with exogenous variables
 
         Args:
             y_context: Past target values for prediction context
             timestamps_context: Timestamps for context data
             timestamps_target: Timestamps for target data
+            x_context: Optional exogenous variables for context (unused in prediction)
+            x_target: Optional exogenous variables for target horizon
             **kwargs: Additional keyword arguments
 
         Returns:
@@ -113,8 +143,26 @@ class VarmaxModel(BaseModel):
             raise ValueError("Model not fitted. Call train first.")
 
         forecast_steps = timestamps_target.shape[0]
-        forecasts = self._model.forecast(steps=forecast_steps)
-        return np.asarray(forecasts)  # (forecast_steps, num_targets)
+
+        # Prepare exogenous variables for prediction if provided
+        exog = None
+        if x_target is not None:
+            exog = x_target.squeeze()
+
+        if self._is_univariate:
+            # ARIMA forecast with exogenous variables
+            forecasts = self._model.forecast(steps=forecast_steps, exog=exog)
+            # Reshape to (forecast_steps, 1) for consistency
+            forecasts = np.asarray(forecasts).reshape(-1, 1)
+        else:
+            # VARMAX forecast
+            if exog is not None:
+                forecasts = self._model.forecast(steps=forecast_steps, exog=exog)
+            else:
+                forecasts = self._model.forecast(steps=forecast_steps)
+            forecasts = np.asarray(forecasts)
+
+        return forecasts  # (forecast_steps, num_targets)
 
     def _convert_to_datetimeindex(self, timestamps):
         # Convert timestamps to datetime if they're not already
