@@ -1,0 +1,11 @@
+task:
+  task_name: cyclical
+  context_window: 2048
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: madrid_cyclical_multivariate.csv
+
+# number of variates : 14
+# number of time-steps : 181753

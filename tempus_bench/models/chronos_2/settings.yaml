@@ -1,0 +1,6 @@
+model_type: "stochastic"
+python_version: "3.12"
+device: "cpu"
+hf_model_name: "amazon/chronos-2"
+context_length: 2048
+

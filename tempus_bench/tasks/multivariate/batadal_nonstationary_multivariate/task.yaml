@@ -1,0 +1,11 @@
+task:
+  task_name: nonstationary
+  context_window: 512
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: batadal_nonstationary_multivariate.csv
+
+# number of variates : 44
+# number of time-steps : 1741

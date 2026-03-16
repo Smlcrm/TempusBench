@@ -1,0 +1,11 @@
+task:
+  task_name: months
+  context_window: 64
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: inventories_months_univariate.csv
+
+# number of variates : 1
+# number of time-steps : 402

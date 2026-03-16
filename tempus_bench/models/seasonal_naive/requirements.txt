@@ -1,0 +1,16 @@
+joblib==1.5.1
+numpy==2.2.6
+packaging==25.0
+pandas==2.3.1
+patsy==1.0.1
+python-dateutil==2.9.0.post0
+pytz==2025.2
+PyYAML==6.0.2
+scikit-base==0.12.4
+scikit-learn==1.7.1
+scipy==1.15.3
+six==1.17.0
+sktime==0.38.4
+statsmodels==0.14.5
+threadpoolctl==3.6.0
+tzdata==2025.2
