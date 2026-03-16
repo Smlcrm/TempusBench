@@ -108,42 +108,64 @@ class TotoModel(BaseModel):
         # y_context shape: (num_steps, num_variates)
         # timestamps_context shape: (num_steps,)
         # timestamps_target shape: (forecast_horizon,)
+        # x_context shape: (num_steps, num_covariates) if provided
+        # x_target shape: (forecast_horizon, num_covariates) if provided
         num_steps, num_variates = y_context.shape
         forecast_horizon = len(timestamps_target)
-        
+
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
         time_diff = self.freq_to_seconds(freq)
 
-        # Convert to tensors and transpose to (num_variates, num_steps)
-        # Then add batch dimension to get (1, num_variates, num_steps)
+        # Build series: [target | covariates]. Exogenous MUST be at the end.
         y_context_tensor = torch.tensor(y_context.T, dtype=torch.float)  # (num_variates, num_steps)
-        y_context_tensor = y_context_tensor.unsqueeze(0)  # (1, num_variates, num_steps)
-        
-        timestamps_context_tensor = torch.tensor(timestamps_context, dtype=torch.float)  # (num_steps,)
-        # Expand timestamps to match series shape: (1, num_variates, num_steps)
-        timestamps_context_tensor = timestamps_context_tensor.unsqueeze(0).unsqueeze(0)  # (1, 1, num_steps)
-        timestamps_context_tensor = timestamps_context_tensor.expand(1, num_variates, -1)  # (1, num_variates, num_steps)
+        future_exogenous = None
+        num_exogenous = 0
 
-        # Create a MaskedTimeseries object
-        # All tensors need shape: (batch=1, variates, seq_len)
+        # TOTO supports past-only, future-only, or both (optional, independent)
+        if x_context is not None:
+            x_context_tensor = torch.tensor(x_context.T, dtype=torch.float)
+            series = torch.cat([y_context_tensor, x_context_tensor], dim=0)
+            num_exogenous = x_context.shape[1]
+        else:
+            series = y_context_tensor
+            num_exogenous = 0
+
+        if x_target is not None:
+            x_target_trimmed = x_target[:forecast_horizon]
+            future_exogenous = torch.tensor(
+                x_target_trimmed.T, dtype=torch.float
+            ).unsqueeze(0)
+        else:
+            future_exogenous = None
+
+        series = series.unsqueeze(0)  # (1, num_variates [+ num_covariates], num_steps)
+        num_channels = series.shape[1]
+
+        timestamps_context_tensor = torch.tensor(timestamps_context, dtype=torch.float)
+        timestamps_context_tensor = timestamps_context_tensor.unsqueeze(0).unsqueeze(0)
+        timestamps_context_tensor = timestamps_context_tensor.expand(1, num_channels, -1)
+
         inputs = MaskedTimeseries(
-            series=y_context_tensor,  # (1, num_variates, num_steps)
-            padding_mask=torch.full_like(y_context_tensor, True, dtype=torch.bool),  # (1, num_variates, num_steps)
-            id_mask=torch.zeros_like(y_context_tensor[:, :, :1], dtype=torch.float),  # (1, num_variates, 1) - broadcastable
-            timestamp_seconds=timestamps_context_tensor,  # (1, num_variates, num_steps)
-            time_interval_seconds=torch.full((1, num_variates), time_diff, dtype=torch.float),  # (1, num_variates)
+            series=series,
+            padding_mask=torch.full_like(series, True, dtype=torch.bool),
+            id_mask=torch.zeros_like(series[:, :, :1], dtype=torch.float),
+            timestamp_seconds=timestamps_context_tensor,
+            time_interval_seconds=torch.full((1, num_channels), time_diff, dtype=torch.float),
+            num_exogenous_variables=num_exogenous,
         )
+        inputs = inputs.to(self.device)
+        if future_exogenous is not None:
+            future_exogenous = future_exogenous.to(self.device)
 
-        # Generate forecasts
         forecast = self._model.forecast(
             inputs,
             prediction_length=forecast_horizon,
-            num_samples=num_samples,  # Use configured number of samples
-            samples_per_batch=num_samples,  # Control memory usage during inference
+            num_samples=num_samples,
+            samples_per_batch=num_samples,
+            future_exogenous_variables=future_exogenous,
         )
 
-        # forecast.samples shape: (batch=1, variate, future_time_steps, samples)
-        # We need: (samples, future_time_steps, variate)
+        # forecast.samples already excludes exogenous (only target variates)
         forecast_samples = forecast.samples  # (1, num_variates, forecast_horizon, num_samples)
         forecast_samples = forecast_samples.squeeze(0)  # (num_variates, forecast_horizon, num_samples)
         # Transpose to (num_samples, forecast_horizon, num_variates)
@@ -241,6 +263,7 @@ class TotoModel(BaseModel):
             "mon": "mon",
             "month": "mon",
             "months": "mon",
+            "me": "mon",  # pandas 2.0 month-end alias (1ME)
             # years (calendar-average)
             "y": "y",
             "yr": "y",

@@ -156,8 +156,15 @@ class HyperparameterTuner:
         y_pred = []
         timestamps_pred = []
         # Try each hyperparameter combination
-        for params in tqdm(self._generate_hyperparameter_grid(), desc="Hyperparameter Combinations"):
-            #print(params)
+        _grid_list = list(self._generate_hyperparameter_grid())
+        is_foundation_single_run = len(_grid_list) == 1 and _grid_list[0] == {}
+        if is_foundation_single_run:
+            LogManager.get_logger().info(
+                "HyperparameterTuner",
+                f"Running {self.model_name} (foundation model, no tuning). "
+                "First run may take several minutes to load/download model weights.",
+            )
+        for params in tqdm(_grid_list, desc="Hyperparameter Combinations"):
             try:
                 # Execute model with these hyperparameters
                 windows_eval_outputs = model_executor.execute_model(
@@ -173,7 +180,6 @@ class HyperparameterTuner:
                     f"Error executing model {self.model_name} with params {params}: {e}",
                 )
                 continue
-            #print("windows_eval_outputs", windows_eval_outputs)
             for window_idx, eval_outputs in enumerate(windows_eval_outputs):
                 #print("eval outpus", eval_outputs)
                 immutable_params = tuple(sorted(params.items()))
@@ -183,6 +189,7 @@ class HyperparameterTuner:
                 y_true.append(eval_outputs.pop("y_true"))
                 y_pred.append(eval_outputs.pop("y_pred"))
                 timestamps_pred.append(eval_outputs.pop("timestamps_pred"))
+                eval_outputs.pop("forecast_validation", None)  # exclude from metric aggregation
 
                 if evaluation_metrics is None:
                     evaluation_metrics = list(eval_outputs.keys())

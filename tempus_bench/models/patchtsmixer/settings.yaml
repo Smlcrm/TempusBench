@@ -1,0 +1,8 @@
+model_type: "deterministic"
+python_version: "3.12"
+device: "cpu"
+context_length: 512
+patch_length: 8
+stride: 8
+num_epochs: 50
+learning_rate: 0.001

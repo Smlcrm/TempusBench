@@ -1,2 +1,4 @@
 model_type: "deterministic"
 python_version: "3.12"
+# HuggingFace model path for sktime TinyTimeMixerForecaster (R1 default)
+hf_model_name: "ibm/TTM"

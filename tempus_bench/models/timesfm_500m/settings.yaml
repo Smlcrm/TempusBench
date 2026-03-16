@@ -1,0 +1,5 @@
+model_type: "stochastic"
+python_version: "3.11"
+device: "cpu"
+# TimesFM 2.0 500M (timesfm library, not transformers); max context 2048
+context_len: 2048

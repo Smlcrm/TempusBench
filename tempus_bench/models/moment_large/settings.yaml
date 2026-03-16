@@ -1,4 +1,5 @@
 model_type: "deterministic"
+hf_model_name: "AutonLab/MOMENT-1-large"
 device: cpu
 freeze_embedder: true
 freeze_encoder: true

@@ -1,0 +1,4 @@
+git+https://github.com/ibm-granite/granite-tsfm.git@patchtst-fm
+torch>=2.0.0
+transformers>=4.36.0
+numpy>=1.21.0

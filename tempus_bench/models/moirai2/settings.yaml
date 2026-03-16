@@ -1,0 +1,7 @@
+model_type: "stochastic"
+python_version: "3.11"
+device: "cpu"
+size: "small"
+bsz: 1
+model_size: "small"
+# Moirai 2.0 currently only has small size on HuggingFace (Salesforce/moirai-2.0-R-small)

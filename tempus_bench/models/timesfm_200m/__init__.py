@@ -1,1 +1,1 @@
-from .timesfm_model import *
+from .timesfm_200m_model import *
