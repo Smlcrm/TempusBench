@@ -1,0 +1,5 @@
+model_type: "stochastic"
+python_version: "3.11"
+device: "cpu"
+model_size: "base"
+bsz: 1

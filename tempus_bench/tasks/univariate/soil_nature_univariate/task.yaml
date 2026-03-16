@@ -1,0 +1,11 @@
+task:
+  task_name: nature
+  context_window: 128
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: soil_nature_univariate.csv
+
+# number of variates : 1
+# number of time-steps : 679

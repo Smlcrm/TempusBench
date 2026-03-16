@@ -1,0 +1,191 @@
+"""
+SVR model implementation.
+"""
+
+import os
+import pickle
+
+from typing import Any, Dict, Literal, Optional
+
+import numpy as np
+import pandas as pd
+from pydantic import BaseModel as PydanticBaseModel, Field
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+
+from tempus_bench.models.base_model import BaseModel, validate_inputs
+
+
+class SvrHyperparams(PydanticBaseModel):
+    # Highly Influential Hyperparameters
+    kernel: Literal["linear", "poly", "rbf", "sigmoid"] = Field(
+        ..., description="SVR kernel type"
+    )
+    C: float = Field(..., gt=0, description="Regularization parameter")
+    # Fixed Hyperparameters - Optional for User to override
+    epsilon: float = Field(
+        default=0.1, ge=0, description="Epsilon parameter for epsilon-SVR"
+    )
+    gamma: Literal["scale", "auto"] = Field(
+        default="scale",
+        description="Kernel coefficient for 'rbf', 'poly' and 'sigmoid'",
+    )
+
+
+class SvrModel(BaseModel):
+    def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
+        """
+        Initialize Support Vector Regression (SVR) model with model-specific parameters.
+        Uses direct multi-output strategy via sklearn's MultiOutputRegressor.
+        """
+        super().__init__(params, settings, SvrHyperparams)
+        self._scaler = StandardScaler()  # SVR is sensitive to feature scaling
+
+    @validate_inputs
+    def train(
+        self,
+        y_context: np.ndarray,
+        y_target: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict,
+    ) -> "SvrModel":
+        """
+        Train the SVR model for direct multi-output forecasting using MultiOutputRegressor.
+        """
+        # Calculate forecast_horizon from y_target if not provided in kwargs
+        forecast_horizon = int(kwargs.get("forecast_horizon", y_target.shape[0]))
+        lookback_window = int(self.lookback_window)
+
+        if not self.is_fitted:
+            self._build_model()
+
+        # Combine context and target for full training series if y_target is provided
+        # Handle (num_steps, num_targets) format
+        y_series = np.concatenate([y_context, y_target], axis=0)
+
+        X, y = self._create_features_targets(
+            y_series, forecast_horizon=forecast_horizon, lookback_window=lookback_window
+        )
+
+        # Scale features (SVR is sensitive to feature scaling)
+        self._scaler.fit(X)
+        X_scaled = self._scaler.transform(X)
+        self._model.fit(X_scaled, y)
+        self.is_fitted = True
+
+        return self
+
+    @validate_inputs
+    def predict(
+        self,
+        y_context: np.ndarray,
+        timestamps_context: np.ndarray,
+        timestamps_target: np.ndarray,
+        **kwargs: dict,
+    ):
+        """
+        Autoregressive rolling prediction for MultiOutputRegressor SVR.
+        Predicts the entire length of y_target by repeatedly using its own predictions as context.
+        """
+        # Calculate forecast_horizon from timestamps_target if not provided in kwargs
+        forecast_horizon = int(
+            kwargs.get("forecast_horizon", timestamps_target.shape[0])
+        )
+
+        # Reference params, settings, device, python_version
+        lookback_window = int(self.lookback_window)
+
+        if not self.is_fitted:
+            raise ValueError("Model is not trained yet. Call train() first.")
+
+        if y_context.shape[0] < lookback_window:
+            raise ValueError(
+                f"y_context too short: {y_context.shape[0]} < lookback_window {lookback_window}"
+            )
+
+        total_steps = len(timestamps_target)
+        num_targets = y_context.shape[1]  # num_targets is second dimension
+
+        preds = []
+        context = y_context.copy()
+
+        steps_done = 0
+
+        while steps_done < total_steps:
+            # Use last lookback_window timesteps
+            current_window = context[-lookback_window:, :]
+
+            # Flatten for prediction
+            y_flat = np.expand_dims(current_window.flatten(), axis=0)
+            # Scale features before prediction (SVR is sensitive to feature scaling)
+            y_flat_scaled = self._scaler.transform(y_flat)
+            pred = self._model.predict(y_flat_scaled)
+
+            # MultiOutputRegressor returns shape (1, forecast_horizon * num_targets)
+            # Flatten to 1D, then reshape to (forecast_horizon, num_targets)
+            pred = pred.flatten()
+            pred = np.reshape(pred, (forecast_horizon, num_targets))
+
+            # Calculate how many steps we actually need for this iteration
+            steps_needed = min(forecast_horizon, total_steps - steps_done)
+            pred_steps = pred[:steps_needed, :]  # Only take what we need
+
+            preds.append(pred_steps)
+
+            # Concatenate along time axis (axis=0)
+            context = np.concatenate([context, pred_steps], axis=0)
+            steps_done += steps_needed
+
+        # Concatenate all predictions along time axis
+        preds = np.concatenate(preds, axis=0)
+
+        # Return (total_steps, num_targets) - should be exact now
+        # Note: Do not inverse-transform targets with feature scaler; predictions are in original target scale
+        return preds
+
+    def _build_model(self):
+        """
+        Build the SVR model instance from the configuration using MultiOutputRegressor for direct multi-output forecasting.
+        """
+        # Build base SVR from params fields relevant to estimator
+        base_svr = SVR(
+            kernel=self.kernel, C=self.C, epsilon=self.epsilon, gamma=self.gamma
+        )
+        self._model = MultiOutputRegressor(base_svr)
+        self.is_fitted = False
+
+    def _create_features_targets(
+        self, y_series: np.ndarray, forecast_horizon: int, lookback_window: int
+    ):
+        """
+        Create features and multi-step targets for direct multi-output forecasting.
+        Each sample uses the previous lookback_window values as features and the next forecast_horizon values as targets.
+        Handles (num_series, timesteps) format.
+        """
+        X, y = [], []
+
+        num_steps, num_targets = y_series.shape
+
+        # Validate data length
+        min_required_length = lookback_window + forecast_horizon
+        if num_steps < min_required_length:
+            raise ValueError(
+                f"Not enough data for SVR. Have {num_steps} observations, need at least {min_required_length}"
+            )
+
+        for i in range(num_steps - lookback_window - forecast_horizon + 1):
+            # Extract lookback window for all features
+            curr_X = y_series[i : i + lookback_window, :].flatten()
+            X.append(curr_X)
+
+            # Extract forecast horizon for all features
+            curr_y = y_series[
+                i + lookback_window : i + lookback_window + forecast_horizon, :
+            ].flatten()
+            y.append(curr_y)
+
+        X, y = np.array(X), np.array(y)
+
+        return X, y

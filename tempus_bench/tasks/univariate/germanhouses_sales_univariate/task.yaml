@@ -1,0 +1,11 @@
+task:
+  task_name: sales
+  context_window: 32
+  forecast_horizon: 32
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: germanhouses_sales_univariate.csv
+
+# number of variates : 1
+# number of time-steps : 221

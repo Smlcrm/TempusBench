@@ -1,0 +1,8 @@
+model_type: "hybrid"
+python_version: "3.11.10"
+device: "cpu"
+bucket_name: "chronarium_artifacts"
+model_name: "2025_11_01_14:28:04lafn_mse_2.619_nll_10.816/"
+model_version: 1
+project: "sim-inference"
+credentials_path: "tempus_bench/models/lafn/gcp_credentials.json"
