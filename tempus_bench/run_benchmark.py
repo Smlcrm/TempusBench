@@ -76,8 +76,8 @@ class BenchmarkRunner:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        # self.temp_task_datasets_dir.cleanup()
-        shutil.rmtree(self.temp_task_datasets_dir)
+        if self.temp_task_datasets_dir.exists():
+            shutil.rmtree(self.temp_task_datasets_dir)
         self.logger.close()
 
     def run(self):

@@ -1,0 +1,6 @@
+model_type: "stochastic"
+python_version: "3.11"
+device: "cpu"
+hf_model_name: "thuml/sundial-base-128m"
+lookback_length: 256
+forecast_length: 50

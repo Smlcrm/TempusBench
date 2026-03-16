@@ -1,0 +1,5 @@
+model_type: "stochastic"
+python_version: "3.11"
+device: "cpu"
+hf_model_name: "NX-AI/TiRex-1.1-gifteval"
+backend: "torch"

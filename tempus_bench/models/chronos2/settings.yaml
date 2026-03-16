@@ -1,0 +1,6 @@
+model_type: "stochastic"
+python_version: "3.12"
+device: "cpu"
+# Chronos-2 model (requires chronos-forecasting>=2.0)
+hf_model_name: "amazon/chronos-2"
+context_length: 8192

@@ -75,17 +75,20 @@ class CondaEnvManager:
             text=True,
         )
 
+        # Check if environment exists and is healthy (i.e., 'conda run ... python --version'
+        # and 'import tempus_bench' both succeed, and no reinstall requested)
         if (
             check_result.returncode == 0
             and "Python" in check_result.stdout
             and not reinstall
         ):
+            # Parse the Python version from the output so that self.python_version reflects the real version in env
             for line in check_result.stdout.split("\n"):
                 if "Python" in line:
                     self.python_version = line.strip().split("Python")[-1].strip()
                     break
-            self._env_created = True
-            self._installed = True
+            # Mark that the environment was not created in this session
+            self._env_created = False  # Env existed; we did not create it
         else:
             # Environment doesn't exist, not healthy, or reinstall requested
             self.create_env()
@@ -203,7 +206,11 @@ class CondaEnvManager:
         self._installed = True
 
     def run(
-        self, script: str | None = None, args: str = "", command: str | None = None
+        self,
+        script: str | None = None,
+        args: str = "",
+        command: str | None = None,
+        verbose: bool = False,
     ):
         """
         Run a Python script or command inside the conda environment.
@@ -218,6 +225,8 @@ class CondaEnvManager:
                 split by whitespace. Defaults to empty string.
             command (Optional[str]): Full command string to run. Mutually exclusive
                 with script.
+            verbose (bool): If True, stream stdout/stderr to the console in real time.
+                Defaults to False.
 
         Returns:
             subprocess.CompletedProcess: Result object with stdout, stderr, and
@@ -233,14 +242,41 @@ class CondaEnvManager:
             raise ValueError("Must specify either 'script' or 'command' parameter")
 
         if command:
-            # Run arbitrary command in conda environment
-            result = subprocess.run(
-                f"conda run -n {self.env_name} {command}",
-                shell=True,
-                executable="/bin/bash",
-                capture_output=True,
-                text=True,
-            )
+            # Run arbitrary command in conda environment (cwd=project root so temp_task_datasets is found)
+            cwd = str(get_project_root())
+            if verbose:
+                cmd_str = f"conda run -n {self.env_name} {command}"
+                proc = subprocess.Popen(
+                    cmd_str,
+                    shell=True,
+                    executable="/bin/bash",
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    cwd=cwd,
+                )
+                stdout_lines = []
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    print(line, flush=True)
+                    stdout_lines.append(line + "\n")
+                proc.wait()
+                result = subprocess.CompletedProcess(
+                    args=cmd_str,
+                    returncode=proc.returncode,
+                    stdout="".join(stdout_lines),
+                    stderr="",
+                )
+            else:
+                result = subprocess.run(
+                    f"conda run -n {self.env_name} {command}",
+                    shell=True,
+                    executable="/bin/bash",
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                )
         else:
             # Run Python script with args
             # script is guaranteed to be not None here due to validation above

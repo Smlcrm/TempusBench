@@ -1,0 +1,4 @@
+model_type: "deterministic"
+python_version: "3.12"
+# granite-timeseries-ttm-r2.1 not on HF; use r2 as fallback
+hf_model_name: "ibm-granite/granite-timeseries-ttm-r2"

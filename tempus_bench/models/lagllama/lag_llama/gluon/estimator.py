@@ -152,7 +152,7 @@ class LagLlamaEstimator(PyTorchLightningEstimator):
         validation_sampler: Optional[InstanceSampler] = None,
         time_feat: bool = False,
         dropout: float = 0.0,
-        lags_seq: list = ["Q", "M", "W", "D", "H", "T", "S"],
+        lags_seq: list = ["QE", "ME", "W", "D", "h", "min", "s"],
         data_id_to_name_map: dict = {},
         use_cosine_annealing_lr: bool = False,
         cosine_annealing_lr_args: dict = {},
@@ -175,9 +175,13 @@ class LagLlamaEstimator(PyTorchLightningEstimator):
 
         lag_indices = []
         for freq in lags_seq:
-            lag_indices.extend(
-                get_lags_for_frequency(freq_str=freq, num_default_lags=1)
-            )
+            try:
+                lag_indices.extend(
+                    get_lags_for_frequency(freq_str=freq, num_default_lags=1)
+                )
+            except ValueError:
+                # Skip freqs rejected by GluonTS (e.g. Q->QE, M->ME, H->h pandas deprecations)
+                pass
 
         if len(lag_indices):
             self.lags_seq = sorted(set(lag_indices))
@@ -266,7 +270,7 @@ class LagLlamaEstimator(PyTorchLightningEstimator):
                         start_field=FieldName.START,
                         target_field=FieldName.TARGET,
                         output_field=FieldName.FEAT_TIME,
-                        time_features=time_features_from_frequency_str("S"),
+                        time_features=time_features_from_frequency_str("s"),
                         pred_length=self.prediction_length,
                     ),
                     AddObservedValuesIndicator(

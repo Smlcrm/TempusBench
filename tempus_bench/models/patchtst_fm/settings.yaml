@@ -1,0 +1,5 @@
+model_type: "stochastic"
+python_version: "3.12"
+device: "cpu"
+# IBM PatchTST-FM pretrained foundation model (~260M params, zero-shot)
+hf_model_name: "ibm-research/patchtst-fm-r1"

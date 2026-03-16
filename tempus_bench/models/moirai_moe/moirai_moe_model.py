@@ -56,6 +56,8 @@ class MoiraiMoeModel(BaseModel):
         if not self.is_fitted:
             pdt = y_target.shape[0]
             ctx = y_context.shape[0]
+            feat_dim = x_target.shape[1] if x_target is not None else 0
+            past_feat_dim = x_context.shape[1] if x_context is not None else 0
             self._model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
                     pretrained_model_name_or_path=f"Salesforce/moirai-moe-1.0-R-{self.model_size}"
@@ -65,8 +67,8 @@ class MoiraiMoeModel(BaseModel):
                 patch_size=pdt + ctx,
                 num_samples=kwargs["num_samples"],
                 target_dim=y_context.shape[1],
-                feat_dynamic_real_dim=len(x_context),
-                past_feat_dynamic_real_dim=len(x_target),
+                feat_dynamic_real_dim=feat_dim,
+                past_feat_dynamic_real_dim=past_feat_dim,
             )
         self.is_fitted = True
         return self
@@ -114,16 +116,45 @@ class MoiraiMoeModel(BaseModel):
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
 
-        past_feat_dynamic_real = torch.tensor(x_context,dtype=torch.float32).unsqueeze(0)
-
-        feat_dynamic_real = torch.tensor(x_target,dtype=torch.float32).unsqueeze(0)
+        past_feat_dynamic_real = None
+        past_observed_feat_dynamic_real = None
+        feat_dynamic_real = None
+        observed_feat_dynamic_real = None
+        forecast_horizon = timestamps_target.shape[0]
+        # Moirai-MoE: past-only, both, or future-only. Future-only zero-pads past.
+        # observed_feat_dynamic_real must be provided if feat_dynamic_real is provided (uni2ts API).
+        if x_context is not None:
+            past_feat_dynamic_real = torch.tensor(
+                x_context, dtype=torch.float32
+            ).unsqueeze(0)
+            past_observed_feat_dynamic_real = torch.ones_like(
+                past_feat_dynamic_real, dtype=torch.bool
+            )
+        if x_target is not None:
+            x_future = x_target[:forecast_horizon]
+            if x_context is not None:
+                feat_arr = np.concatenate([x_context, x_future], axis=0)
+            else:
+                ctx = y_context.shape[0]
+                feat_arr = np.concatenate(
+                    [np.zeros((ctx, x_future.shape[1]), dtype=np.float32), x_future],
+                    axis=0,
+                )
+            feat_dynamic_real = torch.tensor(
+                feat_arr, dtype=torch.float32
+            ).unsqueeze(0)
+            observed_feat_dynamic_real = torch.ones_like(
+                feat_dynamic_real, dtype=torch.bool
+            )
 
         forecast = self._model(
             past_target=past_target,
             past_observed_target=past_observed_target,
             past_is_pad=past_is_pad,
             past_feat_dynamic_real=past_feat_dynamic_real,
-            feat_dynamic_real=feat_dynamic_real
+            past_observed_feat_dynamic_real=past_observed_feat_dynamic_real,
+            feat_dynamic_real=feat_dynamic_real,
+            observed_feat_dynamic_real=observed_feat_dynamic_real,
         )
 
         # forecast shape: (num_targets, num_samples, prediction_length)
