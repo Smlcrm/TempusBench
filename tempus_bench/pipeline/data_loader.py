@@ -125,7 +125,7 @@ class DataLoader:
         self.dataset = Dataset(
             timestamps=timestamps.tolist(),
             target=target.tolist(),
-            covariates=None,
+            covariate=None,
             metadata={
                 "dataset_path": str(self.dataset_path),
                 "time_start": time_start,
@@ -169,17 +169,15 @@ class DataLoader:
             values = json.loads(row["values"])
             target_data.append(values)
 
-        # Transpose to (num_steps, num_targets)
-        target_array = np.array(target_data).T
+        # target_data: list of [var1_series, var2_series, var3_series] - each series has num_steps values
+        # Preprocessor expects [[var1_series], [var2_series], ...] (list of variates, each variate = full time series)
+        target_raw_str = str(target_data)
 
-        # Parse all covariate variables
+        # Parse all covariate variables (same format for preprocessor)
         covariate_data = []
         for _, row in covariate_rows.iterrows():
             values = json.loads(row["values"])
             covariate_data.append(values)
-
-        # Transpose to (num_steps, num_covariates)
-        covariate_array = np.array(covariate_data).T
 
         # Apply preprocessing (normalization, handling missing values)
         normalize = self.task_config.dataset.normalize
@@ -187,18 +185,15 @@ class DataLoader:
 
         preprocessor = Preprocessor(self.task_config, self.evaluation_config)
 
-        # Process target data
-        print("target array shape",target_array.shape)
-        print("covariate array shape", covariate_array.shape)
-        target_raw_str = str(target_array.tolist())  # Convert to string format expected by preprocessor
+        # Process target data - preprocessor expects list of variates (each variate = full time series)
         #print("time_start, time_freq, target_raw_str, normalize, handle_missing",time_start, time_freq, target_raw_str, normalize, handle_missing)
         timestamps, time_start, time_freq, target, scaler = preprocessor.clean(
             time_start, time_freq, target_raw_str, normalize, handle_missing
         )
 
-        # Process covariate data if present
-        if covariate_array is not None:
-            covariate_raw_str = str(covariate_array.tolist())
+        # Process covariate data if present - preprocessor expects list of variates (each = full time series)
+        if covariate_data:
+            covariate_raw_str = str(covariate_data)
             _, _, _, covariate, _ = preprocessor.clean(
                 time_start, time_freq, covariate_raw_str, normalize=False, handle_missing=handle_missing
             )
@@ -210,8 +205,6 @@ class DataLoader:
         assert target.ndim == 2  # (num_steps, num_targets)
         assert timestamps.ndim == 1  # (num_steps,)
         assert covariate.ndim == 2  # (num_steps, num_covariates)
-
-        print("target shape, timestamps shape, covariate shape", target.shape, timestamps.shape, covariate.shape)
 
         # Construct the Dataset with covariates
         self.dataset = Dataset(

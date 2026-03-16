@@ -81,7 +81,8 @@ class MaskedTimeseries(NamedTuple):
     # Note: "*batch" indicates the batch dimension is optional.
     series: Float[torch.Tensor, "*batch variates series_len"]  # noqa: F722
     """
-    The time series data.
+    The time series data. When using exogenous variables, they MUST be placed at the
+    END of the variates dimension (last num_exogenous_variables channels).
     """
 
     padding_mask: Bool[torch.Tensor, "*batch variates series_len"]  # noqa: F722
@@ -110,6 +111,13 @@ class MaskedTimeseries(NamedTuple):
     The time frequency of each variate in seconds
     """
 
+    num_exogenous_variables: int = 0
+    """
+    Number of exogenous variates (covariates) in the series. These are the last
+    num_exogenous_variables channels. During autoregressive decoding, their future
+    values are injected from future_exogenous_variables instead of being predicted.
+    """
+
     def to(self, device: torch.device) -> "MaskedTimeseries":
         return MaskedTimeseries(
             series=self.series.to(device),
@@ -117,6 +125,7 @@ class MaskedTimeseries(NamedTuple):
             id_mask=self.id_mask.to(device),
             timestamp_seconds=self.timestamp_seconds.to(device),
             time_interval_seconds=self.time_interval_seconds.to(device),
+            num_exogenous_variables=self.num_exogenous_variables,
         )
 
 

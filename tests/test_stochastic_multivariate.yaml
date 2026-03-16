@@ -8,9 +8,9 @@ evaluation:
   max_windows: 5
 
 model:
-  chronos: {}
+  chronos_tiny: {}
   # deepar: {}
   # lagllama: {}
-  # moirai: {}
+  # moirai_base: {}
   # moirai_moe: {}
   # toto: {}

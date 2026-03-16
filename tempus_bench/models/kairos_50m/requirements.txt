@@ -1,0 +1,6 @@
+kairos @ git+https://github.com/foundation-model-research/Kairos
+torch>=2.6.0
+einops>=0.8.0
+jaxtyping>=0.3.0
+transformers>=4.56.0
+numpy>=1.21.0

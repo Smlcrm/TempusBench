@@ -1,0 +1,18 @@
+# Covariate test config for foundation models
+# Run with: benchmark using this config to verify covariate support
+# Uses a small covariate dataset for quick validation
+
+evaluation:
+  task_path: 'covariate/gdp_years_covariate'
+  tuning_loss: mae
+  max_windows: 2
+  max_num_variates: 4
+  num_samples: 10
+  num_quantiles: 5
+  point_forecast_statistic: mean
+
+model:
+  # Foundation models with covariate support (x_context only for extend-input)
+  chronos_tiny: {}
+  tabpfn: {}
+  # Add more as needed for manual testing

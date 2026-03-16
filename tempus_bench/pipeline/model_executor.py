@@ -12,6 +12,7 @@ The module can also be invoked directly from the command line:
 import argparse
 import json
 import os
+import sys
 import importlib.util
 import tempfile
 import pickle
@@ -23,6 +24,37 @@ from typing import Any, Dict, Optional
 
 from tempus_bench.utils.envs import CondaEnvManager
 from tempus_bench.utils.paths import get_project_root, get_models_dir
+
+# Models that support past covariates only (x_context); must not receive x_target
+PAST_ONLY_COVARIATE_MODELS = frozenset({
+    "chronos_tiny", "chronos_mini", "chronos_small", "chronos_base", "chronos_large",
+    "chronos_bolt_tiny", "chronos_bolt_mini", "chronos_bolt_small", "chronos_bolt_base",
+    "kairos_10m", "kairos_23m", "kairos_50m",
+    "moment_small", "moment_base", "moment_large", "time_moe_50m", "time_moe_200m",
+    "patchtst_fm", "patchtst_granite", "sundial", "timesfm2", "timesfm_500m", "tabpfn",
+    # moirai2 uses past_feat_dynamic_real only (feat_dynamic_real has known issues); ignore future covs
+    "moirai2",
+    # Lag-Llama: targets + covariates concatenated as past_target channels
+    "lagllama",
+    # TiRex: past covariates via channel concatenation
+    "tirex", "tirex_1_1_gifteval",
+    # Granite FlowState: iteration over targets + covariates (discard covariate predictions)
+    "granite_flowstate",
+})
+
+# Models that support no covariates; pass x_context=None, x_target=None when dataset has covariates
+NO_COVARIATE_MODELS = frozenset({"lafn"})
+
+# Model names whose class names don't follow default PascalCase derivation (e.g. nbeats -> NBEATSModel)
+MODEL_CLASS_NAME_OVERRIDES = {
+    "nbeats": "NBEATSModel",
+    "nhits": "NHITSModel",
+    "itransformer": "ITransformerModel",
+    "timesnet": "TimesNetModel",
+    "tft": "TFTModel",
+    "deepar": "DeepARModel",
+}
+from tempus_bench.utils.utils import validate_forecast_sanity
 from tempus_bench.pipeline.data_types import Dataset
 
 
@@ -107,9 +139,19 @@ class ModelExecutor:
             )
             job_config_path = os.path.join(temp_dir, "job_config.json")
 
+            # Add absolute path to task dataset so subprocess finds it regardless of cwd
+            task_name = self.job_config["task_config"]["task_name"]
+            task_dataset_path = str(
+                Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
+            )
+            job_config_to_write = {
+                **self.job_config,
+                "task_dataset_path": task_dataset_path,
+            }
+
             # Write job config dict to JSON file
             with open(job_config_path, "w") as f:
-                json.dump(self.job_config, f)
+                json.dump(job_config_to_write, f)
 
             # Build CLI command
             hyperparameters_json = json.dumps(hyperparameters)
@@ -125,8 +167,22 @@ class ModelExecutor:
                 f"--job-config-path {job_config_path} "
             )
 
-            result = conda_env.run(command=command)
-
+            verbose = self.job_config.get("evaluation_setting", {}).get("verbose", False)
+            result = None
+            for attempt in range(2):
+                try:
+                    result = conda_env.run(command=command, verbose=verbose)
+                    break
+                except RuntimeError as e:
+                    err_text = str(e)
+                    if attempt == 0 and (
+                        "ModuleNotFoundError" in err_text or "ImportError" in err_text
+                    ):
+                        conda_env.install(final_requirements_path)
+                        continue
+                    raise
+            if result is None:
+                raise RuntimeError("Model execution failed after install retry")
             lines = result.stdout.strip().split("\n")
             outputs_line = None
             for line in lines:
@@ -299,7 +355,7 @@ def main():
         job_config = json.load(f)
 
     task_name = args.task_name
-    temp_task_dataset_path = (
+    temp_task_dataset_path = job_config.get("task_dataset_path") or str(
         Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
     )
 
@@ -332,9 +388,10 @@ def main():
     model_file = f"{model_name}_model"
     module_path = str(model_dir / f"{model_file}.py")
 
-    # Generate class name (PascalCase + Model suffix)
-    class_name = (
-        "".join(word.capitalize() for word in args.model_name.split("_")) + "Model"
+    # Generate class name (PascalCase + Model suffix); use override for special cases
+    class_name = MODEL_CLASS_NAME_OVERRIDES.get(
+        args.model_name,
+        "".join(word.capitalize() for word in args.model_name.split("_")) + "Model",
     )
 
     spec = importlib.util.spec_from_file_location(model_file, module_path)
@@ -352,6 +409,25 @@ def main():
         timestamps = np.asarray(dataset.timestamps)
         target = np.asarray(dataset.target)
         freq = dataset.metadata["time_freq"]  # type: ignore
+        if freq:
+            freq = str(freq)
+            # Models that need pandas 2.0 freq (M->ME, Q->QE, A->YE): neuralforecast
+            NEEDS_PANDAS2_FREQ = frozenset({"deepar", "itransformer", "timesnet"})
+            # Models that need legacy M (gluonts Period, toto freq_to_seconds): don't map
+            NEEDS_LEGACY_FREQ = frozenset({"lagllama", "toto"})
+            if model_name in NEEDS_PANDAS2_FREQ:
+                freq = re.sub(r"(\d*)M$", r"\1ME", freq)
+                freq = re.sub(r"(\d*)Q$", r"\1QE", freq)
+                freq = re.sub(r"(\d*)A$", r"\1YE", freq)
+            elif model_name in NEEDS_LEGACY_FREQ:
+                # Keep M, Q, A; only map Q->QE, A->YE for lagllama (gluonts) compatibility
+                if model_name == "lagllama":
+                    freq = {"Q": "QE", "A": "YE", "AS": "YS"}.get(freq, freq)
+            else:
+                # Default: apply pandas 2.0 mapping for compatibility
+                freq = re.sub(r"(\d*)M$", r"\1ME", freq)
+                freq = re.sub(r"(\d*)Q$", r"\1QE", freq)
+                freq = re.sub(r"(\d*)A$", r"\1YE", freq)
 
         # Extract split indices
         cstart, cend = dataset_splits["context"].start, dataset_splits["context"].end
@@ -368,20 +444,16 @@ def main():
         x_context_predict = None
         x_target_predict = None
 
-        if dataset.covariate is not None:
+        if dataset.covariate is not None and model_name not in NO_COVARIATE_MODELS:
             covariate = np.asarray(dataset.covariate)
             x_context_train = covariate[cstart:cend]
-            x_target_train = covariate[tstart:tend]
+            x_target_train = covariate[tstart:tend] if model_name not in PAST_ONLY_COVARIATE_MODELS else None
 
+            # For predict: past covs = context+train period, future covs = validation period
+            # Chronos-2 expects past_covariates (history_length,) and future_covariates (prediction_length,)
             x_context_predict = covariate[cstart:tend]
-            x_target_predict = covariate[vstart:vend]
-            print("model executor - covariates length:", len(covariate))
-            print("x_context_train length",len(x_context_train))
-            print("x_target_train length",len(x_target_train))
-            print("x_context_predict length",len(x_context_predict))
-            print("x_target_predict length" ,len(x_target_predict))
+            x_target_predict = covariate[vstart:vend] if model_name not in PAST_ONLY_COVARIATE_MODELS else None
 
-        print("before train")
         trained_model = model.train(
             x_context=x_context_train,
             x_target=x_target_train,
@@ -394,17 +466,49 @@ def main():
             num_samples=job_config["evaluation_config"]["num_samples"],
         )
 
-        print("before test")
         # Generate predictions
         results = trained_model.predict(
             x_context=x_context_predict,
-            x_target=x_target_predict, 
+            x_target=x_target_predict,
             y_context=target[cstart:tend],
             timestamps_context=timestamps[cstart:tend],
             timestamps_target=timestamps[vstart:vend],
             freq=freq,
             num_samples=job_config["evaluation_config"]["num_samples"],
         )
+
+        # Covariate sensitivity check (first window only, when covariates present)
+        if (
+            dataset.covariate is not None
+            and window_idx == 0
+            and hasattr(trained_model, "predict")
+        ):
+            try:
+                pred_no_cov = trained_model.predict(
+                    x_context=x_context_predict,
+                    x_target=x_target_predict,
+                    y_context=target[cstart:tend],
+                    timestamps_context=timestamps[cstart:tend],
+                    timestamps_target=timestamps[vstart:vend],
+                    freq=freq,
+                    num_samples=job_config["evaluation_config"]["num_samples"],
+                    use_covariates=False,
+                )
+                max_diff = float(np.abs(np.asarray(results) - np.asarray(pred_no_cov)).max())
+                if max_diff < 1e-6:
+                    print(
+                        "[Covariate check] WARNING: Predictions identical with/without covariates "
+                        f"(max_diff={max_diff:.2e}). Covariates may not be used.",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"[Covariate check] OK: Predictions differ with vs without covariates (max_diff={max_diff:.4f})",
+                        file=sys.stderr,
+                    )
+            except TypeError:
+                # Model doesn't support use_covariates kwarg (e.g. non-Chronos2)
+                pass
 
         # Compute evaluation metrics
         eval_metrics = trained_model.compute_metrics(
@@ -415,6 +519,19 @@ def main():
             ],
             num_quantiles=job_config["evaluation_config"]["num_quantiles"],
         )
+
+        # Forecast sanity validation
+        y_true_window = target[vstart:vend]
+        validation = validate_forecast_sanity(
+            y_true=y_true_window,
+            y_pred=results,
+            point_forecast_statistic=job_config["evaluation_config"][
+                "point_forecast_statistic"
+            ],
+        )
+        if not validation["ok"]:
+            for w in validation["warnings"]:
+                print(f"[Forecast validation] window {window_idx}: {w}", file=sys.stderr)
 
         if job_config["model_setting"]["model_type"] == "hybrid":
             results = results[0].tolist()
@@ -427,6 +544,11 @@ def main():
             "y_pred": results,
             "y_true": target[vstart:vend].tolist(),
             "timestamps_pred": timestamps[vstart:vend].tolist(),
+            "forecast_validation": {
+                "ok": validation["ok"],
+                "warnings": validation["warnings"],
+                "stats": validation["stats"],
+            },
         }
 
         outputs.append(output)

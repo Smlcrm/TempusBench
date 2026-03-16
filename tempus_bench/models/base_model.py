@@ -209,15 +209,71 @@ class BaseModel(ABC):
             "parameters": self.get_params(),
         }
 
+def validate_covariate_support(
+    x_context: Optional[np.ndarray],
+    x_target: Optional[np.ndarray],
+    supports_past_only: bool,
+    supports_future_only: bool,
+    supports_both: bool,
+    model_name: str,
+) -> None:
+    """
+    Raise ValueError when covariates are provided in an unsupported configuration.
+
+    Args:
+        x_context: Past covariate data (None if not provided).
+        x_target: Future covariate data (None if not provided).
+        supports_past_only: Model can use x_context alone.
+        supports_future_only: Model can use x_target alone.
+        supports_both: Model can use x_context and x_target together.
+        model_name: Model name for error messages.
+
+    Raises:
+        ValueError: When an unsupported covariate combination is passed.
+    """
+    has_past = x_context is not None
+    has_future = x_target is not None
+
+    if not has_past and not has_future:
+        return
+
+    if has_past and not has_future:
+        if not supports_past_only:
+            raise ValueError(
+                f"{model_name} does not support past covariates (x_context) only. "
+                "Do not pass x_context without x_target."
+            )
+        return
+
+    if has_future and not has_past:
+        if not supports_future_only:
+            raise ValueError(
+                f"{model_name} does not support future covariates (x_target) only. "
+                "Do not pass x_target without x_context."
+            )
+        return
+
+    if has_past and has_future:
+        if not supports_both:
+            raise ValueError(
+                f"{model_name} does not support both past and future covariates "
+                "(x_context and x_target) together. "
+                "Use x_context only, or do not pass covariates."
+            )
+
+
 def validate_inputs(func):
     """
     Decorator to validate input shapes for train/predict methods.
 
-    Validates:
+    Shape convention (all models, foundation and non-foundation):
     - y_context, y_target: 2D arrays (num_steps, num_targets) with num_targets >= 1
     - timestamps_context, timestamps_target: 1D arrays (num_steps,)
     - x_context, x_target: Optional 2D arrays (num_steps, num_covariates)
     - Matching dimensions between related parameters
+
+    Models must convert to their library's internal format (e.g. HF PatchTSMixer
+    expects (batch, seq_len, channels); MOMENT expects (batch, channels, seq_len)).
     """
 
     @wraps(func)

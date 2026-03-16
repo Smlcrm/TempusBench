@@ -67,19 +67,18 @@ model:
   #   learning_rate: [0.05, 0.01, 0.001]
 
     
-  moment: {}
-  timesfm: {}
-  tiny_time_mixer: {}
+  moment_large: {}
+  timesfm_200m: {}
+  tiny_time_mixer_r1: {}
 
   # Stochastic models
-  chronos: {}
+  chronos_tiny: {}
   
-  moirai: {}
+  moirai_base: {}
   moirai_moe: {}
   
   lagllama: {}
   toto: {}
   tabpfn: {}
-  
 
   lafn: {}

@@ -14,6 +14,14 @@ This project provides a unified benchmarking framework for evaluating the perfor
 - **Hyperparameter Tuning**: Automated optimization of model parameters
 - **Isolated Execution**: Each model runs in its own conda environment to avoid dependency conflicts
 
+## Documentation
+
+See the [docs/](docs/README.md) folder for detailed documentation:
+
+- **Models**: [TempusBench model catalog](docs/models/tempusbench_models.md), [StatsForecast](docs/models/statsforecast_models.md) and [Chronax](docs/models/chronax_models.md) references, [model comparison](docs/models/model_comparison.md)
+- **Covariates**: [Foundation model covariate support](docs/covariates/foundation_models_covariate_support.md), [testing guide](docs/covariates/covariate_testing_guide.md)
+- **Development**: [Config coverage](docs/development/CONFIG_COVERAGE_SUMMARY.md), [TODO](docs/TODO.md)
+
 ## Project Structure
 
 ```
