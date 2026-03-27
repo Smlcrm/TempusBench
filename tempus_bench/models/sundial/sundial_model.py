@@ -18,17 +18,31 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_
 
 
 def _patch_dynamic_cache_for_sundial():
-    """Add seen_tokens/get_max_length aliases to DynamicCache for Sundial model compatibility."""
+    """Polyfill DynamicCache attrs removed in transformers >=4.48 for Sundial's trust_remote_code."""
     from transformers.cache_utils import DynamicCache
 
     if not hasattr(DynamicCache, "seen_tokens"):
         DynamicCache.seen_tokens = property(lambda self: self.get_seq_length())
-    if not hasattr(DynamicCache, "get_max_length"):
-        def get_max_length(self):
-            shape = self.get_max_cache_shape()
-            return shape if shape > 0 else 2**30
 
-        DynamicCache.get_max_length = get_max_length
+    if not hasattr(DynamicCache, "get_max_length"):
+        def _get_max_length(self):
+            if hasattr(self, "get_max_cache_shape"):
+                shape = self.get_max_cache_shape()
+                if shape is not None and shape > 0:
+                    return shape
+            return None
+
+        DynamicCache.get_max_length = _get_max_length
+
+    if not hasattr(DynamicCache, "get_usable_length"):
+        def _get_usable_length(self, new_seq_length, layer_idx=0):
+            max_length = self.get_max_length()
+            previous_seq_length = self.get_seq_length(layer_idx)
+            if max_length is not None and previous_seq_length + new_seq_length > max_length:
+                return max_length - new_seq_length
+            return previous_seq_length
+
+        DynamicCache.get_usable_length = _get_usable_length
 
 
 class SundialHyperparams(PydanticBaseModel):

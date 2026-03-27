@@ -1,2 +1,12 @@
-model_type: "deterministic"
+model_type: deterministic
 python_version: "3.12"
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: false
+foundation: false
+default_hyperparameter_grid:
+  p: [1, 2]
+  d: [1]
+  q: [1, 2]
+  s: [2]

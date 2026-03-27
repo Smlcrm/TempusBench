@@ -46,36 +46,27 @@ class VarmaxModel(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "VarmaxModel":
-        """
-        Train the Multivariate VARMAX model on given data.
+        """Train the VARMAX model. Requires multivariate (>=2 targets); univariate raises."""
+        if y_context.ndim < 2 or y_context.shape[1] < 2:
+            raise ValueError(
+                "VARMAX requires at least 2 target variates; "
+                f"got y_context.shape={y_context.shape}. Use ARIMA for univariate."
+            )
 
-        TECHNIQUE: Vector Autoregression (VAR) for Multiple Time Series
-        - Captures cross-dependencies between multiple targets
-        - Applies differencing if needed to achieve stationarity
-        - Uses Maximum Likelihood Estimation for parameter fitting
-
-        Args:
-            y_context: Past target values (time series) - used for training (can be DataFrame for multivariate)
-            y_target: Future target values (optional, for extended training)
-            timestamps_context: Timestamps for y_context (optional)
-            timestamps_target: Timestamps for y_target (optional)
-            **kwargs: Additional keyword arguments
-
-        Returns:
-            self: The fitted model instance
-        """
         p = self.p
         q = self.q
         trend = self.trend
 
+        self._has_exog = x_context is not None
         exog = None
         if x_context is not None:
-            exog = x_context.squeeze()
+            exog = np.asarray(x_context)
+            if exog.ndim == 1:
+                exog = exog.reshape(-1, 1)
 
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
         if not self.is_fitted:
             model = VARMAX(endog=y_context, exog=exog, order=(p, q), trend=trend)
-
             self._model = model.fit()
 
         return self
@@ -90,30 +81,19 @@ class VarmaxModel(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
-        """
-        Make predictions using the trained Multivariate ARIMA model.
-
-        TECHNIQUE: VAR Forecasting for Multiple Time Series
-        - Uses fitted VAR model to predict multiple steps ahead
-        - Predicts all targets simultaneously using their interdependencies
-        - Handles both in-sample and out-of-sample forecasting
-        - Reverses differencing to get predictions in original scale
-
-        Args:
-            y_context: Past target values for prediction context
-            timestamps_context: Timestamps for context data
-            timestamps_target: Timestamps for target data
-            **kwargs: Additional keyword arguments
-
-        Returns:
-            np.ndarray: Model predictions with shape (forecast_steps, num_targets)
-        """
-
+        """Forecast using the fitted VARMAX model."""
         if self._model is None:
             raise ValueError("Model not fitted. Call train first.")
 
         forecast_steps = timestamps_target.shape[0]
-        forecasts = self._model.forecast(steps=forecast_steps)
+
+        exog_oos = None
+        if self._has_exog and x_target is not None:
+            exog_oos = np.asarray(x_target[:forecast_steps])
+            if exog_oos.ndim == 1:
+                exog_oos = exog_oos.reshape(-1, 1)
+
+        forecasts = self._model.forecast(steps=forecast_steps, exog=exog_oos)
         return np.asarray(forecasts)  # (forecast_steps, num_targets)
 
     def _convert_to_datetimeindex(self, timestamps):

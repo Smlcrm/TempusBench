@@ -1,9 +1,14 @@
-model_type: "stochastic"
+model_type: stochastic
 python_version: "3.11"
-device: "cpu"
-size: "base"
+device: cpu
+hf_model_name: Salesforce/moirai-1.1-R-base
+size: base
 bsz: 1
-model_size: "base"
-# ctx: None # context length
-psz: "auto" # patch size
-bsz: 1 # batch size
+model_size: base
+psz: auto
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

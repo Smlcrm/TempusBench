@@ -1,5 +1,11 @@
-model_type: "deterministic"
-python_version: "3.12"
-device: "cpu"
-hf_model_name: "Maple728/TimeMoE-50M"
+model_type: deterministic
+python_version: '3.12'
+device: cpu
+hf_model_name: Maple728/TimeMoE-50M
 context_length: 4096
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

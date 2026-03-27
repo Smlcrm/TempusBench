@@ -130,9 +130,9 @@ class ChronosModel(BaseModel):
             )
 
         y_context = torch.tensor(y_context.T)
-        # Generate forecasts
+        # Generate forecasts (ChronosPipeline.predict uses 'inputs' as first positional arg)
         forecasts = self._model.predict(
-            context=y_context, prediction_length=forecast_horizon
+            y_context, prediction_length=forecast_horizon
         )
         forecasts = np.asarray(forecasts)
 

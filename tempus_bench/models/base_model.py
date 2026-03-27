@@ -10,9 +10,11 @@ the required abstract methods.
 """
 
 import inspect
+import os
 
 from abc import ABC, abstractmethod
 from functools import wraps
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import numpy as np
@@ -173,6 +175,34 @@ class BaseModel(ABC):
         self.is_fitted = False  # Mark as unfitted if parameters change
         return self
 
+    @staticmethod
+    def resolve_weights_path(hf_id: str) -> str:
+        """Return a local FUSE path for ``hf_id`` if ``MODEL_WEIGHTS_PATH`` is set and
+        the directory exists, otherwise return the original HuggingFace identifier."""
+        root = os.environ.get("MODEL_WEIGHTS_PATH", "").strip()
+        if not root:
+            print(
+                "[tempusbench-weights] MODEL_WEIGHTS_PATH unset; "
+                f"using HuggingFace/repo id (may download from internet): {hf_id!r}",
+                flush=True,
+            )
+            return hf_id
+        local = Path(root) / hf_id
+        if local.is_dir() and any(local.iterdir()):
+            print(
+                "[tempusbench-weights] Using local weights (e.g. GCS FUSE bucket), "
+                f"not downloading from internet: root={root!r} hf_id={hf_id!r} -> {local!s}",
+                flush=True,
+            )
+            return str(local)
+        print(
+            "[tempusbench-weights] MODEL_WEIGHTS_PATH set but snapshot missing or empty; "
+            f"falling back to HuggingFace id (may use internet): root={root!r} hf_id={hf_id!r} "
+            f"expected_dir={local!s}",
+            flush=True,
+        )
+        return hf_id
+
     def set_attrs(self, **attrs: Dict[str, Any]):
         """
         Map validated settings onto the instance for ergonomic access.
@@ -191,6 +221,9 @@ class BaseModel(ABC):
                 f"Setting names clash with reserved or parameter keys: {clashing_keys}. "
                 f"Please rename these settings."
             )
+
+        if "hf_model_name" in attrs and attrs["hf_model_name"]:
+            attrs["hf_model_name"] = self.resolve_weights_path(attrs["hf_model_name"])
 
         self.settings = attrs
         for key, value in attrs.items():

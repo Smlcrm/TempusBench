@@ -64,7 +64,7 @@ class MoiraiModel(BaseModel):
             ctx = y_context.shape[0]
             self._model = MoiraiForecast(
                 module=MoiraiModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/moirai-1.1-R-{size}"
+                    pretrained_model_name_or_path=self.hf_model_name
                 ),
                 prediction_length=pdt,
                 context_length=ctx,
