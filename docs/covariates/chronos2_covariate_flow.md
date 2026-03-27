@@ -1,5 +1,14 @@
 # Chronos-2 Covariate Data Flow
 
+## Covariate CSV timestamp column
+
+Each row’s `timestamps` field is a JSON array of **strings** in **ISO 8601** form, for example:
+
+- `1980-01-01T00:00:00Z` (recommended), or
+- `2006-01-03` (date-only; interpreted as midnight UTC)
+
+Do not use bare integers (e.g. `1980` for a year) or locale-specific dates (`1/1/2012`). The loader rejects non-string elements.
+
 ## What the model receives
 
 For each rolling window, Chronos-2 receives:
