@@ -1,6 +1,6 @@
 # Covariate benchmark config
 # All models with covariate support (except lafn - requires external credentials)
-# Run with: python scripts/run_covariate_benchmarks.py
+# Run with: python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark_covariates.yaml
 
 evaluation:
   task_path: 'covariate/solar_100_covariate'

@@ -24,26 +24,14 @@ from typing import Any, Dict, Optional
 
 from tempus_bench.utils.envs import CondaEnvManager
 from tempus_bench.utils.paths import get_project_root, get_models_dir
+from tempus_bench.utils.model_settings import (
+    get_past_only_covariate_models,
+    get_no_covariate_models,
+)
 
-# Models that support past covariates only (x_context); must not receive x_target
-PAST_ONLY_COVARIATE_MODELS = frozenset({
-    "chronos_tiny", "chronos_mini", "chronos_small", "chronos_base", "chronos_large",
-    "chronos_bolt_tiny", "chronos_bolt_mini", "chronos_bolt_small", "chronos_bolt_base",
-    "kairos_10m", "kairos_23m", "kairos_50m",
-    "moment_small", "moment_base", "moment_large", "time_moe_50m", "time_moe_200m",
-    "patchtst_fm", "patchtst_granite", "sundial", "timesfm2", "timesfm_500m", "tabpfn",
-    # moirai2 uses past_feat_dynamic_real only (feat_dynamic_real has known issues); ignore future covs
-    "moirai2",
-    # Lag-Llama: targets + covariates concatenated as past_target channels
-    "lagllama",
-    # TiRex: past covariates via channel concatenation
-    "tirex", "tirex_1_1_gifteval",
-    # Granite FlowState: iteration over targets + covariates (discard covariate predictions)
-    "granite_flowstate",
-})
-
-# Models that support no covariates; pass x_context=None, x_target=None when dataset has covariates
-NO_COVARIATE_MODELS = frozenset({"lafn"})
+# Derived from each model's settings.yaml ``capabilities.covariates``.
+PAST_ONLY_COVARIATE_MODELS = get_past_only_covariate_models()
+NO_COVARIATE_MODELS = get_no_covariate_models()
 
 # Model names whose class names don't follow default PascalCase derivation (e.g. nbeats -> NBEATSModel)
 MODEL_CLASS_NAME_OVERRIDES = {
@@ -56,6 +44,42 @@ MODEL_CLASS_NAME_OVERRIDES = {
 }
 from tempus_bench.utils.utils import validate_forecast_sanity
 from tempus_bench.pipeline.data_types import Dataset
+
+
+def _scaler_from_dataset_metadata(metadata: Optional[Dict[str, Any]]):
+    """Reconstruct StandardScaler from DataLoader metadata (pickle-safe)."""
+    if not metadata or "target_scaler_mean" not in metadata:
+        return None
+    try:
+        from sklearn.preprocessing import StandardScaler
+    except ImportError as e:
+        raise RuntimeError(
+            "scikit-learn is required to inverse-transform normalized targets for export"
+        ) from e
+    s = StandardScaler()
+    s.mean_ = np.asarray(metadata["target_scaler_mean"], dtype=np.float64)
+    s.scale_ = np.asarray(metadata["target_scaler_scale"], dtype=np.float64)
+    s.var_ = s.scale_ ** 2
+    s.n_features_in_ = int(s.mean_.shape[0])
+    s.feature_names_in_ = None
+    return s
+
+
+def _inverse_target_scale(y: np.ndarray, scaler) -> np.ndarray:
+    """Inverse StandardScaler per column (same as training targets)."""
+    if scaler is None:
+        return np.asarray(y, dtype=np.float64)
+    a = np.asarray(y, dtype=np.float64)
+    if a.ndim == 1:
+        return scaler.inverse_transform(a.reshape(-1, 1)).ravel()
+    if a.ndim == 2:
+        return scaler.inverse_transform(a)
+    if a.ndim == 3:
+        s0, s1, s2 = a.shape
+        flat = a.reshape(-1, s2)
+        inv = scaler.inverse_transform(flat)
+        return inv.reshape(s0, s1, s2)
+    return a
 
 
 class ModelExecutor:
@@ -141,9 +165,13 @@ class ModelExecutor:
 
             # Add absolute path to task dataset so subprocess finds it regardless of cwd
             task_name = self.job_config["task_config"]["task_name"]
-            task_dataset_path = str(
-                Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
-            )
+            tdir = self.job_config.get("task_datasets_dir")
+            if tdir:
+                task_dataset_path = str(Path(tdir) / f"{task_name}.pkl")
+            else:
+                task_dataset_path = str(
+                    Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
+                )
             job_config_to_write = {
                 **self.job_config,
                 "task_dataset_path": task_dataset_path,
@@ -355,9 +383,15 @@ def main():
         job_config = json.load(f)
 
     task_name = args.task_name
-    temp_task_dataset_path = job_config.get("task_dataset_path") or str(
-        Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
-    )
+    temp_task_dataset_path = job_config.get("task_dataset_path")
+    if not temp_task_dataset_path:
+        tdir = job_config.get("task_datasets_dir")
+        if tdir:
+            temp_task_dataset_path = str(Path(tdir) / f"{task_name}.pkl")
+        else:
+            temp_task_dataset_path = str(
+                Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
+            )
 
     with open(temp_task_dataset_path, "rb") as f:
         dataset = pickle.load(f)
@@ -419,15 +453,19 @@ def main():
                 freq = re.sub(r"(\d*)M$", r"\1ME", freq)
                 freq = re.sub(r"(\d*)Q$", r"\1QE", freq)
                 freq = re.sub(r"(\d*)A$", r"\1YE", freq)
+                freq = re.sub(r"(\d*)Y$", r"\1YE", freq)
             elif model_name in NEEDS_LEGACY_FREQ:
                 # Keep M, Q, A; only map Q->QE, A->YE for lagllama (gluonts) compatibility
                 if model_name == "lagllama":
-                    freq = {"Q": "QE", "A": "YE", "AS": "YS"}.get(freq, freq)
+                    freq = {"Q": "QE", "A": "YE", "Y": "YE", "AS": "YS"}.get(
+                        freq, freq
+                    )
             else:
                 # Default: apply pandas 2.0 mapping for compatibility
                 freq = re.sub(r"(\d*)M$", r"\1ME", freq)
                 freq = re.sub(r"(\d*)Q$", r"\1QE", freq)
                 freq = re.sub(r"(\d*)A$", r"\1YE", freq)
+                freq = re.sub(r"(\d*)Y$", r"\1YE", freq)
 
         # Extract split indices
         cstart, cend = dataset_splits["context"].start, dataset_splits["context"].end
@@ -454,17 +492,23 @@ def main():
             x_context_predict = covariate[cstart:tend]
             x_target_predict = covariate[vstart:vend] if model_name not in PAST_ONLY_COVARIATE_MODELS else None
 
-        trained_model = model.train(
-            x_context=x_context_train,
-            x_target=x_target_train,
-            y_context=target[cstart:cend],
-            y_target=target[tstart:tend],
-            timestamps_context=timestamps[cstart:cend],
-            timestamps_target=timestamps[tstart:tend],
-            freq=freq,
-            tuning_loss=job_config["evaluation_config"]["tuning_loss"],
-            num_samples=job_config["evaluation_config"]["num_samples"],
-        )
+        train_call_kwargs: dict = {
+            "x_context": x_context_train,
+            "x_target": x_target_train,
+            "y_context": target[cstart:cend],
+            "y_target": target[tstart:tend],
+            "timestamps_context": timestamps[cstart:cend],
+            "timestamps_target": timestamps[tstart:tend],
+            "freq": freq,
+            "tuning_loss": job_config["evaluation_config"]["tuning_loss"],
+            "num_samples": job_config["evaluation_config"]["num_samples"],
+        }
+        # Moirai models must size prediction_length for the validation horizon; train span alone
+        # can disagree with uni2ts patching and yield y_pred shorter than y_true (no BQ rows).
+        if model_name in ("moirai_moe", "moirai2"):
+            train_call_kwargs["validate_horizon"] = int(vend - vstart)
+
+        trained_model = model.train(**train_call_kwargs)
 
         # Generate predictions
         results = trained_model.predict(
@@ -533,17 +577,37 @@ def main():
             for w in validation["warnings"]:
                 print(f"[Forecast validation] window {window_idx}: {w}", file=sys.stderr)
 
-        if job_config["model_setting"]["model_type"] == "hybrid":
-            results = results[0].tolist()
-        else:
-            results = results.tolist()
+        # Metrics above use normalized y_true / y_pred. Export denormalized series for
+        # BigQuery + UI alignment with raw task CSV (inverse StandardScaler when present).
+        md = dataset.metadata if isinstance(dataset.metadata, dict) else {}
+        tc = job_config.get("task_config") or {}
+        ds_cfg = tc.get("dataset") or {}
+        normalize = bool(ds_cfg.get("normalize", False))
+        scaler = _scaler_from_dataset_metadata(md)
+        if normalize and scaler is None:
+            raise RuntimeError(
+                "task dataset.normalize is true but the pickled Dataset metadata is missing "
+                "target_scaler_mean / target_scaler_scale; rebuild task datasets with the "
+                "current tempus_bench DataLoader."
+            )
 
-        # Include predictions in output for plotting
+        if job_config["model_setting"]["model_type"] == "hybrid":
+            pt = _inverse_target_scale(np.asarray(results[0]), scaler)
+            results_out = pt.tolist()
+        else:
+            results_out = _inverse_target_scale(np.asarray(results), scaler).tolist()
+
+        y_true_out = _inverse_target_scale(target[vstart:vend], scaler).tolist()
+        ctx_out = _inverse_target_scale(target[cstart:tend], scaler).tolist()
+
+        # Include predictions and context in output (for plotting and downstream export)
         output = {
             **eval_metrics,
-            "y_pred": results,
-            "y_true": target[vstart:vend].tolist(),
+            "y_pred": results_out,
+            "y_true": y_true_out,
             "timestamps_pred": timestamps[vstart:vend].tolist(),
+            "context_values": ctx_out,
+            "context_timestamps": timestamps[cstart:tend].tolist(),
             "forecast_validation": {
                 "ok": validation["ok"],
                 "warnings": validation["warnings"],
@@ -553,8 +617,8 @@ def main():
 
         outputs.append(output)
 
-    # Output results as JSON
-    print(json.dumps(outputs))
+    # Output results as JSON (metrics may include datetimes / numpy scalars)
+    print(json.dumps(outputs, default=str))
 
 
 if __name__ == "__main__":

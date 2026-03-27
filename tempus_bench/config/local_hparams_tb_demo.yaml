@@ -1,0 +1,30 @@
+# Quick HParams + TensorBoard demo: 3 tasks × 2 models × 3 hyperparameter combos each.
+# Statistical models only (no covariate tasks — seasonal_naive / theta are covariate:none).
+#
+# From repository root:
+#   python -m tempus_bench.run_benchmark --config tempus_bench/config/local_hparams_tb_demo.yaml
+#
+# TensorBoard:
+#   tensorboard --logdir runs/<run_id>/tensorboard
+# Open **HParams**: compare runs under `hparams_sessions/`; filter/sort by `model`, `task`, `window`, `sp`, …
+# Open **Scalars** / **Custom Scalars** on the root run for forecast curves.
+
+evaluation:
+  task_paths:
+    - univariate/chickenpox_dense_univariate
+    - multivariate/baggage_100_multivariate
+    - univariate/coinbase_days_univariate
+  tuning_loss: mae
+  max_windows: 1
+  max_num_variates: 4
+  num_samples: 5
+  num_quantiles: 3
+  point_forecast_statistic: mean
+
+model:
+  seasonal_naive:
+    sp: [7, 12, 24]
+  theta:
+    sp: [7, 12, 24]
+    theta_method: ["least_squares"]
+    use_reduced_rank: [false]

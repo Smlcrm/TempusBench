@@ -6,6 +6,7 @@ to ensure they comply with the expected schema before execution. The ConfigManag
 validation of benchmark configurations, model settings, task configurations, and system settings.
 """
 
+import os
 import yaml
 
 from pathlib import Path
@@ -23,6 +24,12 @@ from .configs import (
     convert_pydantic_errors,
 )
 from .log_manager import LogManager
+from .model_settings import (
+    assert_model_supports_task_family,
+    merge_benchmark_params_with_default_grid,
+    parse_capabilities_from_settings,
+    task_path_to_family,
+)
 from .paths import (
     get_project_root,
     get_models_dir,
@@ -85,7 +92,7 @@ class ConfigManager:
             - self.run_path: Path to run directory (created with timestamp).
             - self.logs_path: Path to logs directory within run_path.
             - self.logger: Logger instance with TensorBoard support.
-            - self.tf_logger: Alias to logger instance (for backward compatibility).
+            - self.tf_logger: Alias to logger instance.
             - self.evaluation_config: Evaluation configuration.
             - self.evaluation_setting: System settings (logging format, tensorboard, etc.).
             - self.model_configs: Model hyperparameters for each model.
@@ -107,7 +114,10 @@ class ConfigManager:
 
         self.models_evaluated = config_data["model"].keys()
 
-        self.task_path = config_data["evaluation"]["task_path"]
+        eval_eval = config_data["evaluation"]
+        self.task_path = eval_eval.get("task_path") or (
+            eval_eval.get("task_paths", [None])[0] if eval_eval.get("task_paths") else None
+        )
 
         self.evaluation_config = EvaluationConfig(**config_data["evaluation"])
         self.evaluation_setting = EvaluationSetting(**evaluation_setting)
@@ -140,6 +150,7 @@ class ConfigManager:
         self.model_settings = self.init_model_setting()
 
         self.task_configs = self.init_tasks()
+        self._validate_model_task_compatibility()
 
     def init_tasks(self) -> Dict[str, TaskConfig]:
         """
@@ -156,22 +167,26 @@ class ConfigManager:
         """
 
         task_configs = {}
-        tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
+        eval_config = self.evaluation_config
+        if eval_config.task_paths:
+            tasks = {}
+            for p in eval_config.task_paths:
+                tasks.update(find_task_directories(p))
+        else:
+            tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
 
         for task_path in tasks.values():
-
-            task_config_path = Path(task_path) / "task.yaml"
+            task_path_obj = Path(task_path)
+            task_config_path = task_path_obj / "task.yaml"
 
             with open(task_config_path, "r") as f:
                 tasks_data = list(yaml.safe_load_all(f))
 
             for task_data in tasks_data:
-
-                dataset_file = task_data["task"]["dataset"]["file_name"]
-
-                dataset_name = Path(dataset_file).stem
-
-                task_name = f"{dataset_name}_{task_data['task'].pop('task_name')}"
+                # Use folder name as task_name (e.g. madrid_cyclical_multivariate)
+                # so external sinks and display names match the naming convention
+                task_name = task_path_obj.name
+                task_data["task"].pop("task_name", None)  # discard; folder name is canonical
                 dataset_config = DatasetConfig(**task_data["task"].pop("dataset"))
 
                 task_configs[task_name] = TaskConfig(
@@ -196,9 +211,18 @@ class ConfigManager:
         """
         model_hparams = {}
         for model_name in self.models_evaluated:
-            if models_config[model_name] != {}:
+            params = models_config.get(model_name)
+            if params is None:
+                params = {}
+            if not isinstance(params, dict):
+                raise ValidationError(
+                    f"Benchmark model block for {model_name!r} must be a mapping, "
+                    f"got {type(params).__name__}."
+                )
+            merged = merge_benchmark_params_with_default_grid(model_name, params)
+            if merged:
                 model_hparams[model_name] = ModelConfig(
-                    model_name=model_name, **models_config[model_name]
+                    model_name=model_name, **merged
                 )
             else:
                 model_hparams[model_name] = ModelConfig(model_name=model_name)
@@ -234,10 +258,38 @@ class ConfigManager:
             model_name = model_setting_path.parent.name
             if model_name not in self.models_evaluated:
                 continue
-            else:
-                model_setting[model_name] = self._load_config(model_setting_path)
+            settings = self._load_config(model_setting_path)
+            try:
+                parse_capabilities_from_settings(settings, model_name=model_name)
+            except ValueError as e:
+                raise ValidationError(str(e)) from e
+            model_setting[model_name] = settings
+
+        missing = set(self.models_evaluated) - set(model_setting.keys())
+        if missing:
+            raise ValidationError(
+                f"Missing or invalid settings.yaml for models: {sorted(missing)}"
+            )
 
         return model_setting
+
+    def _validate_model_task_compatibility(self) -> None:
+        """Ensure each evaluated model supports every task family in this benchmark config."""
+        for model_name in self.models_evaluated:
+            cap = parse_capabilities_from_settings(
+                self.model_settings[model_name],
+                model_name=model_name,
+            )
+            for task_name, tc in self.task_configs.items():
+                family = task_path_to_family(tc.task_path)
+                try:
+                    assert_model_supports_task_family(
+                        cap, model_name=model_name, family=family
+                    )
+                except ValueError as e:
+                    raise ValidationError(
+                        f"Task {task_name!r} ({family}) vs model {model_name!r}: {e}"
+                    ) from e
 
     def generate_run_configs(self):
         """
@@ -253,7 +305,7 @@ class ConfigManager:
 
         Yields:
             Tuple[JobConfig, int]: A tuple of (JobConfig, task_idx) where JobConfig is the
-                aggregated configuration and task_idx is always 0 (for backward compatibility).
+                aggregated configuration and task_idx is always 0.
         """
         for task_config in self.task_configs.values():
             for model_name in self.models_evaluated:
