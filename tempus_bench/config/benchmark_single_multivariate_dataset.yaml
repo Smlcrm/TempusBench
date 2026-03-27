@@ -11,8 +11,8 @@ evaluation:
   point_forecast_statistic: mean
 
 model:
-  
-  seasonal_naive: 
+
+  seasonal_naive:
     sp: [12, 24]
 
   # Deterministic Models
@@ -33,7 +33,6 @@ model:
 
   lstm:
     learning_rate: [0.01, 0.001, 0.0001]
-    
 
   prophet:
     seasonality_mode: [additive]
@@ -44,12 +43,6 @@ model:
     n_estimators: [10]
     max_depth: [2]
 
-  
-  svr:
-    kernel: [rbf]
-    C: [1.0]
-    epsilon: [0.1]
-    gamma: [scale]
 
   theta:
     sp: [12]
@@ -59,24 +52,24 @@ model:
   varmax:
     p: [1, 2]
     q: [1, 2]
-    trend: [c, t]  
+    trend: [c, t]
 
   # xgboost:
   #   n_estimators: [200]
   #   max_depth: [4]
   #   learning_rate: [0.05, 0.01, 0.001]
 
-    
+
   moment_large: {}
   timesfm_200m: {}
   tiny_time_mixer_r1: {}
 
   # Stochastic models
   chronos_tiny: {}
-  
+
   moirai_base: {}
   moirai_moe: {}
-  
+
   lagllama: {}
   toto: {}
   tabpfn: {}

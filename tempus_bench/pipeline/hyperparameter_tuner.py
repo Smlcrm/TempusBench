@@ -7,14 +7,20 @@ windows. It evaluates each hyperparameter combination and selects the best perfo
 parameters based on the specified tuning loss metric.
 """
 
+import copy
 import csv
 import importlib.util
+import math
+import numbers
+import os
+import sys
 
 from itertools import product
 from pathlib import Path
-from typing import List, Tuple
-from tqdm.auto import tqdm
+from typing import Callable, List, Tuple
+
 import numpy as np
+from tqdm import tqdm
 
 from tempus_bench.utils.utils import compute_point_forecast
 
@@ -25,6 +31,72 @@ from ..utils.paths import get_task_path
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
 from .metric_registry import MetricRegistry
+
+
+def _finite_scalar_metric_for_bq(v: object) -> float | None:
+    """Pick scalar finite floats for BigQuery ``error_metrics`` (NumPy / 0-d tensor-safe)."""
+    if v is None or isinstance(v, (str, bytes, dict, list, tuple, set)):
+        return None
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, np.bool_):
+        return None
+    try:
+        if isinstance(v, np.ndarray):
+            if v.size != 1:
+                return None
+            x = float(v.reshape(-1)[0])
+        elif isinstance(v, np.generic):
+            x = float(v)
+        elif isinstance(v, numbers.Real):
+            x = float(v)
+        else:
+            # PyTorch / JAX-style 0-d scalars often expose .item(); recurse to native float.
+            item_fn = getattr(v, "item", None)
+            if callable(item_fn):
+                try:
+                    extracted = item_fn()
+                except Exception:
+                    return None
+                if extracted is v:
+                    return None
+                return _finite_scalar_metric_for_bq(extracted)
+            return None
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if math.isfinite(x):
+        return x
+    return None
+
+
+def _metrics_dict_for_bq(eval_outputs: dict) -> dict[str, float]:
+    """Convert ``eval_outputs`` metric values to finite floats for BigQuery ``error_metrics``.
+
+    ``compute_metrics`` almost always returns NumPy scalars (and sometimes 0-d torch tensors).
+    The old ``isinstance(v, (int, float))`` filter dropped those, leaving an empty map so
+    ``append_tempus_window`` often had nothing to buffer (successful runs with no
+    ``tempus_benchmarks`` rows). Applies to stochastic and deterministic foundation models alike.
+    """
+    out: dict[str, float] = {}
+    for k, v in eval_outputs.items():
+        f = _finite_scalar_metric_for_bq(v)
+        if f is not None:
+            out[str(k)] = f
+    return out
+
+
+def _task_id_for_results_sink(task_config) -> str:
+    """
+    Task key for external sinks (e.g. BigQuery ``task_id`` / Firestore execution_plan).
+
+    Uses the path segment after a ``tasks`` directory (e.g. ``univariate/foo``) so it
+    matches ``execution_plan[].tasks[]`` strings; falls back to folder name.
+    """
+    parts = Path(task_config.task_path).parts
+    for i, seg in enumerate(parts):
+        if seg.lower() == "tasks" and i + 1 < len(parts):
+            return "/".join(parts[i + 1 :])
+    return task_config.task_name
 
 
 class HyperparameterTuner:
@@ -50,15 +122,25 @@ class HyperparameterTuner:
         data_loader (DataLoader): Data loader instance for accessing dataset windows.
     """
 
-    def __init__(self, job_config: JobConfig):
+    def __init__(
+        self,
+        job_config: JobConfig,
+        job_id: str | None = None,
+        results_callback: Callable[..., None] | None = None,
+    ):
         """
         Initialize tuner with job configuration.
 
         Args:
             job_config: Fully validated `JobConfig` produced by `ConfigManager.generate_run_configs`.
                 Provides benchmark settings, task metadata, and model hyperparameter grid.
+            job_id: Optional run identifier for result sinks (passed to ``results_callback``).
+            results_callback: Optional callback(job_id, model, task, window_idx, metrics, forecast_data?)
+                for per-window metrics/forecasts (optional persistence layer).
         """
         self.job_config = job_config
+        self.job_id = job_id
+        self.results_callback = results_callback
         self.evaluation_config = job_config.evaluation_config
         self.evaluation_setting = job_config.evaluation_setting
         self.model_config = job_config.model_config
@@ -164,7 +246,19 @@ class HyperparameterTuner:
                 f"Running {self.model_name} (foundation model, no tuning). "
                 "First run may take several minutes to load/download model weights.",
             )
-        for params in tqdm(_grid_list, desc="Hyperparameter Combinations"):
+        # tqdm: (1) std `tqdm` only — `tqdm.auto` can pick the notebook backend, which may
+        # ignore `file=` and still write to stderr. (2) On Batch/COS, stdout is not a TTY;
+        # disable the bar entirely so no bytes hit stderr (Batch task logs label stderr as ERROR).
+        # Set TEMPUSBENCH_FORCE_TQDM=1 to show the bar in non-interactive runs.
+        _force_tqdm = os.environ.get("TEMPUSBENCH_FORCE_TQDM", "").strip() == "1"
+        _show_hp_bar = _force_tqdm or sys.stdout.isatty()
+        for params in tqdm(
+            _grid_list,
+            desc="Hyperparameter Combinations",
+            file=sys.stdout,
+            mininterval=1.0,
+            disable=not _show_hp_bar,
+        ):
             try:
                 # Execute model with these hyperparameters
                 windows_eval_outputs = model_executor.execute_model(
@@ -189,20 +283,59 @@ class HyperparameterTuner:
                 y_true.append(eval_outputs.pop("y_true"))
                 y_pred.append(eval_outputs.pop("y_pred"))
                 timestamps_pred.append(eval_outputs.pop("timestamps_pred"))
+                context_values = eval_outputs.pop("context_values", None)
+                context_timestamps = eval_outputs.pop("context_timestamps", None)
                 eval_outputs.pop("forecast_validation", None)  # exclude from metric aggregation
+
+                # Optional per-window results sink (metrics + forecast series)
+                if self.results_callback and self.job_id:
+                    metrics_for_bq = _metrics_dict_for_bq(eval_outputs)
+                    y_pred_arr = np.array(y_pred[window_idx])
+                    point_pred = compute_point_forecast(
+                        y_pred_arr,
+                        self.job_config.evaluation_config.point_forecast_statistic,
+                    )
+                    # BigQuery stores denormalized predictions/quantiles only; actuals come from task CSV in the app.
+                    forecast_data = {
+                        "y_pred": point_pred,
+                        "timestamps_pred": timestamps_pred[window_idx],
+                    }
+                    if context_values is not None and context_timestamps is not None:
+                        forecast_data["context_values"] = context_values
+                        forecast_data["context_timestamps"] = context_timestamps
+                    # p10, p50, p90 for stochastic models (y_pred is 3D: samples x steps x targets)
+                    if self.model_setting.get("model_type") == "stochastic" and y_pred_arr.ndim == 3:
+                        forecast_data["p10"] = np.percentile(y_pred_arr, 10, axis=0)
+                        forecast_data["p50"] = np.percentile(y_pred_arr, 50, axis=0)
+                        forecast_data["p90"] = np.percentile(y_pred_arr, 90, axis=0)
+                    self.results_callback(
+                        self.job_id,
+                        self.model_name,
+                        _task_id_for_results_sink(self.task_config),
+                        window_idx,
+                        metrics_for_bq,
+                        forecast_data=forecast_data,
+                    )
 
                 if evaluation_metrics is None:
                     evaluation_metrics = list(eval_outputs.keys())
 
                 eval_metrics[immutable_params] = eval_outputs
 
-                # Log hyperparameters and metrics to TensorBoard
-                LogManager.get_logger().log_hparams(params, eval_outputs)
+                # Log hyperparameters and metrics to TensorBoard (HParams: one sub-run per trial)
+                LogManager.get_logger().log_hparams(
+                    params,
+                    eval_outputs,
+                    model_name=self.model_name,
+                    task_name=self.task_config.task_name,
+                    window_idx=window_idx,
+                )
 
                 # Find the hyperparams with lowest tuning_loss for this window
                 best_params = min(tuning_losses, key=lambda k: tuning_losses[k])
                 optimal_hyperparameters.append(best_params)
-                evaluations.append(eval_metrics)
+                # Snapshot per window (eval_metrics is reused; shallow copy would alias inner dicts)
+                evaluations.append(copy.deepcopy(eval_metrics))
 
                 self.visualizer.plot_forecast_window(
                     y_pred=compute_point_forecast(
@@ -212,7 +345,8 @@ class HyperparameterTuner:
                     y_true=np.array(y_true[window_idx]),
                     timestamps_pred=np.array(timestamps_pred[window_idx]),
                     model_name=self.model_name,
-                    hyperparameters=dict(best_params),
+                    task_name=self.task_config.task_name,
+                    hyperparameters=dict(params),
                     window_idx=window_idx,
                 )
 
@@ -228,15 +362,24 @@ class HyperparameterTuner:
             )
             return {}, {}
 
-        # Aggregate test loss over all windows, for each metric
+        # Aggregate test loss over windows, for each metric.
+        # With 2+ windows: use hyperparams chosen on window j to score metrics on window j+1.
+        # With 1 window: there is no next-window holdout — report that window's metrics directly.
         test_loss = {metric: [] for metric in evaluation_metrics}  # type: ignore
-        for window_j in range(num_windows - 1):
-            best_params_prev = optimal_hyperparameters[window_j]
-            for metric in evaluation_metrics:  # type: ignore
-                if best_params_prev in evaluations[window_j + 1]:
-                    test_loss[metric].append(
-                        evaluations[window_j + 1][best_params_prev][metric]
-                    )
+        if num_windows >= 2:
+            for window_j in range(num_windows - 1):
+                best_params_prev = optimal_hyperparameters[window_j]
+                for metric in evaluation_metrics:  # type: ignore
+                    if best_params_prev in evaluations[window_j + 1]:
+                        test_loss[metric].append(
+                            evaluations[window_j + 1][best_params_prev][metric]
+                        )
+        elif num_windows == 1:
+            bp = optimal_hyperparameters[0]
+            ev0 = evaluations[0]
+            if bp in ev0:
+                for metric in evaluation_metrics:  # type: ignore
+                    test_loss[metric].append(float(ev0[bp][metric]))
 
         avg_test_loss = {
             metric: (
