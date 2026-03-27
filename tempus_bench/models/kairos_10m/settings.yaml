@@ -1,5 +1,11 @@
-model_type: "stochastic"
-python_version: "3.11"
-device: "cpu"
-hf_model_name: "mldi-lab/Kairos_10m"
+model_type: stochastic
+python_version: '3.11'
+device: cpu
+hf_model_name: mldi-lab/Kairos_10m
 context_length: 2048
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

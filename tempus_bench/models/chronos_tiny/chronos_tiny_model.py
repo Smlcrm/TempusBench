@@ -9,7 +9,7 @@ The model supports multiple sizes (tiny, mini, small, base, large) and can be co
 with different context lengths and sampling strategies.
 """
 
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -84,14 +84,27 @@ class ChronosTinyModel(BaseModel):
         )
         hf_model_name = self.hf_model_name
 
-        # For foundation models, we don't need to load the model here
-        # It will be loaded fresh for each prediction (like it was in the working version)
-        # Load the Chronos model fresh for each prediction (like the working version)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Align with settings.yaml `device` and Amazon's HF examples (cuda + bfloat16 for GPU).
+        requested = str(getattr(self, "device", "cpu") or "cpu").strip().lower()
+        if requested == "cuda":
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    "Model settings request device=cuda but torch.cuda.is_available() is false. "
+                    "Chronos-T5 Large (710M) inference is documented on GPU "
+                    "(https://huggingface.co/amazon/chronos-t5-large); use a CUDA-enabled worker "
+                    "image and a Google Batch GPU machine type, or set device: cpu."
+                )
+            device_map = "cuda"
+        elif requested == "cpu":
+            device_map = "cpu"
+        else:
+            raise ValueError(
+                f"Unsupported Chronos device {requested!r}; expected 'cpu' or 'cuda'."
+            )
 
         self._model = BaseChronosPipeline.from_pretrained(
             hf_model_name,
-            device_map="auto",
+            device_map=device_map,
             torch_dtype=torch.bfloat16,
         )
 
@@ -150,7 +163,7 @@ class ChronosTinyModel(BaseModel):
 
         context_tensor = torch.tensor(y_input.T)
         forecasts = self._model.predict(
-            context=context_tensor, prediction_length=forecast_horizon
+            context_tensor, prediction_length=forecast_horizon
         )
         forecasts = np.asarray(forecasts)
 

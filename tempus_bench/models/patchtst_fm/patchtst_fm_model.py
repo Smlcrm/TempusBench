@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
 
@@ -22,7 +22,15 @@ except ImportError as e:
 
 
 class PatchtstFmHyperparams(PydanticBaseModel):
-    pass
+    """Stochastic output shape (pretrained weights fixed; no training grid)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stochastic_samples: int = Field(
+        default=100,
+        ge=1,
+        description="How many quantiles to subsample into pseudo-samples at predict time.",
+    )
 
 
 class PatchtstFmModel(BaseModel):
@@ -89,7 +97,7 @@ class PatchtstFmModel(BaseModel):
         )
         forecast_horizon = timestamps_target.shape[0]
         num_targets = y_context.shape[1]
-        num_samples = kwargs.get("num_samples", 100)
+        num_samples = int(kwargs.get("num_samples", self.stochastic_samples))
 
         # Extend input with x_context (past covariates only) for non-native support
         if x_context is not None:

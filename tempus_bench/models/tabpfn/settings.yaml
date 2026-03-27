@@ -1,5 +1,11 @@
-model_type: "deterministic"
-python_version: "3.12"
-device: "cpu"
+model_type: deterministic
+python_version: '3.11'
+device: cpu
 allow_large_cpu_dataset: false
 max_sequence_length: 1000
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

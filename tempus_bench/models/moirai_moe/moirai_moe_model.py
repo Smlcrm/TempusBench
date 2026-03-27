@@ -54,13 +54,16 @@ class MoiraiMoeModel(BaseModel):
         # Prepare MoiraiForecast model with target_dim equal to num_targets
 
         if not self.is_fitted:
-            pdt = y_target.shape[0]
+            train_span = int(y_target.shape[0])
+            val_h_raw = kwargs.get("validate_horizon")
+            val_h = int(val_h_raw) if val_h_raw is not None else train_span
+            pdt = max(train_span, val_h)
             ctx = y_context.shape[0]
             feat_dim = x_target.shape[1] if x_target is not None else 0
             past_feat_dim = x_context.shape[1] if x_context is not None else 0
             self._model = MoiraiMoEForecast(
                 module=MoiraiMoEModule.from_pretrained(
-                    pretrained_model_name_or_path=f"Salesforce/moirai-moe-1.0-R-{self.model_size}"
+                    pretrained_model_name_or_path=self.hf_model_name
                 ),
                 prediction_length=pdt,
                 context_length=ctx,
@@ -157,15 +160,31 @@ class MoiraiMoeModel(BaseModel):
             observed_feat_dynamic_real=observed_feat_dynamic_real,
         )
 
-        # forecast shape: (num_targets, num_samples, prediction_length)
-        # Convert to numpy array
-        forecast = np.squeeze(np.asarray(forecast), axis=0)
+        # uni2ts MoiraiMoE forward outputs (batch, num_targets, num_samples, prediction_length)
+        # or (num_targets, num_samples, prediction_length) after dropping batch.
+        # MetricRegistry stochastic path expects (num_samples, prediction_length, num_targets).
+        forecast = np.asarray(forecast)
+        if forecast.ndim >= 1 and forecast.shape[0] == 1:
+            forecast = np.squeeze(forecast, axis=0)
 
-        # Transpose from (num_targets, num_samples, prediction_length) to (num_samples, prediction_length, num_targets)
-        # Then the base class will handle point forecasts if needed
-
-        # If univariate, ensure shape is (num_samples, prediction_length, 1)
-        if forecast.ndim == 2:
+        forecast_horizon = int(timestamps_target.shape[0])
+        if forecast.ndim == 3 and forecast.shape[0] == num_targets:
+            forecast = np.transpose(forecast, (1, 2, 0))
+        elif forecast.ndim == 2:
             forecast = np.expand_dims(forecast, axis=-1)
+
+        if forecast.ndim != 3:
+            raise ValueError(
+                f"moirai_moe: expected forecast ndim 3 after layout fix, got shape {forecast.shape}"
+            )
+
+        pred_len = int(forecast.shape[1])
+        if pred_len > forecast_horizon:
+            forecast = forecast[:, :forecast_horizon, :]
+        elif pred_len < forecast_horizon:
+            raise ValueError(
+                "moirai_moe: forecast length "
+                f"{pred_len} shorter than required horizon {forecast_horizon}"
+            )
 
         return forecast

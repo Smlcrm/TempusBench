@@ -1,3 +1,13 @@
-model_type: "deterministic"
-python_version: "3.12"
+model_type: deterministic
+python_version: '3.12'
 lookback_window: 32
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  kernel: [rbf]
+  C: [1.0]
+  epsilon: [0.1]
+  gamma: [scale]

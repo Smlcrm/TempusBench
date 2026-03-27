@@ -4,3 +4,10 @@ device: cpu
 beta_1: 0.9
 beta_2: 0.999
 epsilon: 1e-7
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  learning_rate: [0.01, 0.001, 0.0001]
