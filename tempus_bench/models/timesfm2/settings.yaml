@@ -1,7 +1,11 @@
-model_type: "stochastic"
-python_version: "3.11"
-device: "cpu"
-# TimesFM 2.5 (transformers); 16k context, quantile forecasts
-hf_model_name: "google/timesfm-2.5-200m-transformers"
-# Max context length (model supports up to 16k)
+model_type: stochastic
+python_version: '3.11'
+device: cpu
+hf_model_name: google/timesfm-2.5-200m-transformers
 context_length: 16384
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

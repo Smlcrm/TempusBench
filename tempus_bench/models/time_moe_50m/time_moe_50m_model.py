@@ -16,6 +16,49 @@ from transformers import AutoModelForCausalLM
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
 
 
+def _patch_dynamic_cache_for_time_moe():
+    """Polyfill DynamicCache attrs removed in transformers >=4.44 for Time-MoE's trust_remote_code."""
+    from transformers.cache_utils import DynamicCache
+
+    if not hasattr(DynamicCache, "seen_tokens"):
+        DynamicCache.seen_tokens = property(lambda self: self.get_seq_length())
+
+    if not hasattr(DynamicCache, "get_max_length"):
+        def _get_max_length(self):
+            if hasattr(self, "get_max_cache_shape"):
+                shape = self.get_max_cache_shape()
+                if shape is not None and shape > 0:
+                    return shape
+            return None
+
+        DynamicCache.get_max_length = _get_max_length
+
+    if not hasattr(DynamicCache, "get_usable_length"):
+        def _get_usable_length(self, new_seq_length, layer_idx=0):
+            max_length = self.get_max_length()
+            previous_seq_length = self.get_seq_length(layer_idx)
+            if max_length is not None and previous_seq_length + new_seq_length > max_length:
+                return max_length - new_seq_length
+            return previous_seq_length
+
+        DynamicCache.get_usable_length = _get_usable_length
+
+
+def _patch_model_generation_for_time_moe(model):
+    """Polyfill _extract_past_from_model_output removed in transformers >=4.44.
+
+    Time-MoE's cached ts_generation_mixin.py calls this in _update_model_kwargs_for_generation.
+    The method simply pulls 'past_key_values' from model outputs.
+    """
+    if hasattr(model, "_extract_past_from_model_output"):
+        return
+    def _extract_past_from_model_output(self, outputs, standardize_cache_format=False):
+        past_key_values = getattr(outputs, "past_key_values", None)
+        return past_key_values
+    import types
+    model._extract_past_from_model_output = types.MethodType(_extract_past_from_model_output, model)
+
+
 class TimeMoe50mHyperparams(PydanticBaseModel):
     pass
 
@@ -43,11 +86,13 @@ class TimeMoe50mModel(BaseModel):
             supports_both=False,
             model_name="Time-MoE",
         )
+        _patch_dynamic_cache_for_time_moe()
         self._model = AutoModelForCausalLM.from_pretrained(
             self.hf_model_name,
             device_map=self.device,
             trust_remote_code=True,
         )
+        _patch_model_generation_for_time_moe(self._model)
         self._model.eval()
         self.is_fitted = True
         return self

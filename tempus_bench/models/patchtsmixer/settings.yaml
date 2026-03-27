@@ -1,8 +1,15 @@
-model_type: "deterministic"
-python_version: "3.12"
-device: "cpu"
-context_length: 512
-patch_length: 8
-stride: 8
-num_epochs: 50
-learning_rate: 0.001
+model_type: deterministic
+python_version: '3.12'
+device: cpu
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  # Reduced search space vs 24+ combos (shorter fine-tune, smaller contexts).
+  context_length: [128, 256]
+  patch_length: [8]
+  stride: [8]
+  num_epochs: [25]
+  learning_rate: [0.001]

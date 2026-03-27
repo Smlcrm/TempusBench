@@ -36,12 +36,15 @@ from gluonts.dataset.pandas import PandasDataset
 from gluonts.evaluation import make_evaluation_predictions
 from pydantic import BaseModel as PydanticBaseModel, Field
 import torch
+from tempus_bench.compat.lightning_pytree import apply_lightning_pytree_leafspec_patch
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
 
 # Add the lagllama directory to the Python path for absolute imports
 lagllama_dir = os.path.dirname(os.path.abspath(__file__))
 if lagllama_dir not in sys.path:
     sys.path.insert(0, lagllama_dir)
+
+apply_lightning_pytree_leafspec_patch()
 
 from lag_llama.gluon.estimator import LagLlamaEstimator
 

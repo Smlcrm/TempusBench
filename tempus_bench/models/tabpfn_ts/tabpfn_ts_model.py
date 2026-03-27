@@ -76,7 +76,10 @@ class TabpfnTsModel(BaseModel):
         forecast_horizon = len(timestamps_target)
         num_variates = y_context.shape[1]
 
-        pipeline = TabPFNTSPipeline(tabpfn_mode=TabPFNMode.LOCAL)
+        pipeline = TabPFNTSPipeline(
+            tabpfn_mode=TabPFNMode.LOCAL,
+            ignore_pretraining_limits=True,
+        )
 
         all_samples = []
         for v in range(num_variates):

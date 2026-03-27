@@ -1,6 +1,7 @@
-model_type: "deterministic"
-python_version: '3.11'
-device: 'cpu'
+model_type: deterministic
+python_version: "3.11"
+device: cpu
+hf_model_name: google/timesfm-1.0-200m-pytorch
 input_patch_len: 32
 horizon_len: 128
 num_layers: 20
@@ -8,5 +9,11 @@ model_dims: 1280
 output_patch_len: 128
 use_positional_embedding: true
 context_len: 128
-version: "jax"
-huggingface_repo_id: "google/timesfm-1.0-200m-pytorch"
+version: jax
+huggingface_repo_id: google/timesfm-1.0-200m-pytorch
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

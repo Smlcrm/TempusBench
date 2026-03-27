@@ -1,6 +1,13 @@
-model_type: "deterministic"
-python_version: "3.12"
-device: "cpu"
-input_size: 512
-max_steps: 100
-hidden_size: 64
+model_type: deterministic
+python_version: '3.12'
+# Batch: highmem_16_128 + cpu-job. NeuralForecast Lightning uses CPU when device is cpu.
+device: cpu
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  # Short lookback + fixed 25 Lightning steps (task forecast horizons are ≤128 per TaskConfig, unrelated to max_steps).
+  input_size: [128, 256]
+  max_steps: [25]

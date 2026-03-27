@@ -1,7 +1,14 @@
-model_type: "stochastic"
+model_type: stochastic
 python_version: "3.11"
-device: "cpu"
-size: "large"
+device: cpu
+hf_model_name: Salesforce/moirai-1.1-R-large
+size: large
 bsz: 1
-model_size: "large"
-psz: "auto"
+model_size: large
+psz: auto
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

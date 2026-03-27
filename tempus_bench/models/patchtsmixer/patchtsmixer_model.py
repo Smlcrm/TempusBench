@@ -11,7 +11,7 @@ Covariates: not supported.
 Autoregressive: no (direct multi-step).
 
 Trained from scratch on context data via sliding-window optimization
-(same pattern as PatchTST in TempusBench).
+(same pattern as PatchTST in Tempus Bench).
 
 Paper: "TSMixer: Lightweight MLP-Mixer Model for Multivariate Time Series
         Forecasting" (arXiv:2306.09364, KDD 2023)
@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import torch
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
@@ -34,7 +34,15 @@ except ImportError as e:
 
 
 class PatchtsmixerHyperparams(PydanticBaseModel):
-    pass
+    """Architecture + short fine-tune schedule (defaults match former static settings.yaml)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    context_length: int = Field(default=256, ge=1, description="HF config context_length (capped in train).")
+    patch_length: int = Field(default=8, ge=1)
+    stride: int = Field(default=8, ge=1)
+    num_epochs: int = Field(default=25, ge=1, description="Sliding-window fine-tune epochs on context.")
+    learning_rate: float = Field(default=0.001, gt=0, description="Adam learning rate for fine-tuning.")
 
 
 class PatchtsmixerModel(BaseModel):

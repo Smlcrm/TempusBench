@@ -58,7 +58,10 @@ class Moirai2Model(BaseModel):
     ) -> "Moirai2Model":
         """Initialize Moirai 2.0 (no training required for foundation models)."""
         if not self.is_fitted:
-            pdt = y_target.shape[0]
+            train_span = int(y_target.shape[0])
+            val_h_raw = kwargs.get("validate_horizon")
+            val_h = int(val_h_raw) if val_h_raw is not None else train_span
+            pdt = max(train_span, val_h)
             ctx_train = y_context.shape[0] + y_target.shape[0]
             # Moirai2 uses hparams.context_length for token counts; predict receives
             # y_context = context+train (full history). Use that length so observed_mask
@@ -71,7 +74,7 @@ class Moirai2Model(BaseModel):
                 )
 
             module = Moirai2Module.from_pretrained(
-                pretrained_model_name_or_path=f"Salesforce/moirai-2.0-R-{self.model_size}"
+                pretrained_model_name_or_path=self.hf_model_name
             )
             patch_size = getattr(module, "patch_size", 16)
             # Moirai2 requires context_length and prediction_length divisible by patch_size
