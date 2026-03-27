@@ -15,18 +15,7 @@ import yaml
 from pathlib import Path
 
 from tempus_bench.utils.paths import get_models_dir
-
-
-# Models that support past covariates only (x_context); reject x_target
-PAST_ONLY_MODELS = frozenset({
-    "chronos_tiny", "chronos_mini", "chronos_small", "chronos_base", "chronos_large",
-    "chronos_bolt_tiny", "chronos_bolt_mini", "chronos_bolt_small", "chronos_bolt_base",
-    "granite_flowstate", "kairos_10m", "kairos_23m", "kairos_50m",
-    "moment_small", "moment_base", "moment_large", "time_moe_50m", "time_moe_200m",
-    "patchtst_fm", "patchtst_granite", "sundial", "timesfm2", "timesfm_500m", "tabpfn",
-    "lagllama",
-    "tirex", "tirex_1_1_gifteval",
-})
+from tempus_bench.utils.model_settings import is_past_only_covariates
 
 # Models skipped due to external/package issues (not covariate-related)
 COVARIATE_TEST_SKIP = {
@@ -191,7 +180,7 @@ def test_foundation_model_accepts_covariates(model_name):
 
     # Train with covariates (x_context only for past-only models; both for full-support)
     x_ctx = data["x_context"]
-    x_tgt = None if model_name in PAST_ONLY_MODELS else data["x_target"]
+    x_tgt = None if is_past_only_covariates(model_name) else data["x_target"]
     try:
         model.train(
             y_context=data["y_context"],
