@@ -1,7 +1,7 @@
 task:
   task_name: months
   context_window: 64
-  forecast_horizon: 64
+  forecast_horizon: 30
   dataset:
     handle_missing: interpolate
     normalize: true
