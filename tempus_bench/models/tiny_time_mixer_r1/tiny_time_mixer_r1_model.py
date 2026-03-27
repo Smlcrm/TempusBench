@@ -7,6 +7,49 @@ from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
+_TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = False
+
+
+def _patch_transformers_tiny_time_mixer_tied_weights() -> None:
+    """Avoid ``from_pretrained`` failure when ``mark_tied_weights_as_initialized`` looks up
+    tied keys that are not registered ``nn.Parameter`` leaves (IBM / Granite TTM + recent
+    ``transformers``). Batch logs: AttributeError in ``Module.__getattr__`` from
+    ``get_parameter`` inside ``mark_tied_weights_as_initialized`` (line ~4613).
+    """
+    global _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE
+    if _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE:
+        return
+    from transformers.modeling_utils import PreTrainedModel
+
+    if not hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
+        # Newer ``transformers`` removed this hook; TTM loading no longer hits that path.
+        _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = True
+        return
+
+    def _mark_tied_weights_safe(self, loading_info):
+        for tied_param in list(self.all_tied_weights_keys.keys()):
+            try:
+                param = self.get_parameter(tied_param)
+            except AttributeError:
+                continue
+            param._is_hf_initialized = True
+        if self.is_remote_code():
+            def _has_hf_init_flag(key: str) -> bool:
+                try:
+                    obj = self.get_parameter_or_buffer(key)
+                except AttributeError:
+                    return False
+                return bool(getattr(obj, "_is_hf_initialized", False))
+
+            loading_info.missing_keys = {
+                key
+                for key in loading_info.missing_keys
+                if key in self.all_tied_weights_keys or not _has_hf_init_flag(key)
+            }
+
+    PreTrainedModel.mark_tied_weights_as_initialized = _mark_tied_weights_safe
+    _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = True
+
 
 class TinyTimeMixerR1Hyperparams(PydanticBaseModel):
     pass
@@ -67,6 +110,7 @@ class TinyTimeMixerR1Model(BaseModel):
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
         df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
         fh = list(range(1, forecast_horizon + 1))
+        _patch_transformers_tiny_time_mixer_tied_weights()
         model_path = getattr(self, "hf_model_name", None) or getattr(
             self, "model_path", "ibm/TTM"
         )

@@ -48,7 +48,7 @@ class TotoModel(BaseModel):
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = self.CUBLAS_WORKSPACE_CONFIG
         torch.use_deterministic_algorithms(self.use_deterministic_algorithms)
         torch.device(self.device)
-        toto = Toto.from_pretrained(self.model_name)
+        toto = Toto.from_pretrained(self.hf_model_name)
         toto.to(self.device)
         # JIT compilation for faster inference
         toto.compile()

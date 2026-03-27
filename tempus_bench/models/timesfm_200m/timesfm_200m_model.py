@@ -117,9 +117,9 @@ class Timesfm200mModel(BaseModel):
                 context_len=self.context_len,
             ),
             checkpoint=timesfm.TimesFmCheckpoint(
-                path=None,
+                path=self.hf_model_name if os.path.isdir(self.hf_model_name) else None,
                 version=self.version,
-                huggingface_repo_id=self.huggingface_repo_id,
+                huggingface_repo_id=None if os.path.isdir(self.hf_model_name) else self.hf_model_name,
                 local_dir=os.path.abspath(
                     os.path.join(os.path.dirname(__file__), "checkpoints")
                 ),

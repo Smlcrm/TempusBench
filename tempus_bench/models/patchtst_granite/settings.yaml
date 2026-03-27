@@ -1,4 +1,10 @@
-model_type: "stochastic"
-python_version: "3.12"
-device: "cpu"
-hf_model_name: "ibm-granite/granite-timeseries-patchtst"
+model_type: stochastic
+python_version: '3.12'
+device: cpu
+hf_model_name: ibm-granite/granite-timeseries-patchtst
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

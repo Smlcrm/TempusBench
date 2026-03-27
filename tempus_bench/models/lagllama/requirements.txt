@@ -1,8 +1,7 @@
-gluonts[torch]>=0.14.0
+gluonts[torch]>=0.14.0,<0.16.0
 torch>=2.0.0
 numpy>=1.23.0
 pandas>=2.0.0
 scipy>=1.0.0
 huggingface_hub>=0.20.0
-tensorflow>=2.11.0,<2.16.0
 orjson>=3.0.0

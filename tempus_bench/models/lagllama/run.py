@@ -26,6 +26,10 @@ from hashlib import sha1
 import lightning
 import torch
 import wandb
+
+from tempus_bench.compat.lightning_pytree import apply_lightning_pytree_leafspec_patch
+
+apply_lightning_pytree_leafspec_patch()
 from gluonts.evaluation import Evaluator, make_evaluation_predictions
 from gluonts.evaluation._base import aggregate_valid
 from gluonts.transform import ExpectedNumInstanceSampler

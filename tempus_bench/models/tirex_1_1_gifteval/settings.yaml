@@ -1,5 +1,11 @@
-model_type: "stochastic"
-python_version: "3.11"
-device: "cpu"
-hf_model_name: "NX-AI/TiRex-1.1-gifteval"
-backend: "torch"
+model_type: stochastic
+python_version: '3.11'
+device: cpu
+hf_model_name: NX-AI/TiRex-1.1-gifteval
+backend: torch
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

@@ -5,6 +5,7 @@ import pandas as pd
 from pydantic import BaseModel as PydanticBaseModel
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.neuralforecast_lightning_device import resolve_neuralforecast_trainer_kwargs
 
 try:
     from neuralforecast import NeuralForecast
@@ -62,11 +63,17 @@ class ITransformerModel(BaseModel):
 
         train_df = pd.concat(frames, ignore_index=True)
 
+        trainer_kw = resolve_neuralforecast_trainer_kwargs(getattr(self, "device", None))
+        val_check_steps = max(1, self.max_steps)
+        batch_size = int(getattr(self, "batch_size", 64))
         model = iTransformer(
             h=forecast_horizon,
             input_size=input_size,
             n_series=num_targets,
             max_steps=self.max_steps,
+            batch_size=batch_size,
+            val_check_steps=val_check_steps,
+            **trainer_kw,
         )
 
         self._nf = NeuralForecast(models=[model], freq=freq)

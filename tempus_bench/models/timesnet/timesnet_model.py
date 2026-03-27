@@ -2,9 +2,10 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.neuralforecast_lightning_device import resolve_neuralforecast_trainer_kwargs
 
 try:
     from neuralforecast import NeuralForecast
@@ -16,7 +17,21 @@ except ImportError as e:
 
 
 class TimesNetHyperparams(PydanticBaseModel):
-    pass
+    """Tunable training knobs; aligned with TFT / shorter GPU Batch runs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_size: int = Field(default=128, ge=1, description="NeuralForecast input_size (lookback).")
+    max_steps: int = Field(
+        default=25,
+        ge=1,
+        description="Lightning optimization steps per fit (not forecast horizon; tasks cap h at 128).",
+    )
+    batch_size: int = Field(
+        default=64,
+        ge=1,
+        description="Minibatch size (series per step); larger improves GPU throughput until memory-bound.",
+    )
 
 
 class TimesNetModel(BaseModel):
@@ -71,18 +86,26 @@ class TimesNetModel(BaseModel):
 
         train_df = pd.concat(frames, ignore_index=True)
 
+        trainer_kw = resolve_neuralforecast_trainer_kwargs(getattr(self, "device", None))
+        val_check_steps = max(1, self.max_steps)
         if has_covariates:
             model = TimesNet(
                 h=forecast_horizon,
                 input_size=input_size,
                 max_steps=self.max_steps,
+                batch_size=self.batch_size,
+                val_check_steps=val_check_steps,
                 futr_exog_list=cov_names,
+                **trainer_kw,
             )
         else:
             model = TimesNet(
                 h=forecast_horizon,
                 input_size=input_size,
                 max_steps=self.max_steps,
+                batch_size=self.batch_size,
+                val_check_steps=val_check_steps,
+                **trainer_kw,
             )
 
         self._nf = NeuralForecast(models=[model], freq=freq)
