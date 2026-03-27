@@ -1,19 +1,17 @@
 # Foundation Models: Covariate Support Reference
 
-This document describes covariate support for all foundation models in TempusBench: what type of support each model has, which model parameters are used, and how `x_context` and `x_target` are translated into model-specific inputs.
+This document describes covariate support for all foundation models in Tempus Bench: what type of support each model has, which model parameters are used, and how `x_context` and `x_target` are translated into model-specific inputs.
 
-**Pipeline configuration:** `PAST_ONLY_COVARIATE_MODELS` and `NO_COVARIATE_MODELS` in `tempus_bench/pipeline/model_executor.py` control which models receive covariates. Unit tests in `tests/unit/test_covariate_support.py` verify covariate acceptance and rejection behavior.
+**Pipeline configuration:** Covariate wiring is declared per model in `tempus_bench/models/<name>/settings.yaml` under `capabilities.covariates` (see [models_capabilities.md](../models_capabilities.md)). `tempus_bench/utils/model_settings.py` loads and validates that file (capabilities block and covariate-mode helpers). Unit tests in `tests/unit/test_covariate_support.py` verify covariate acceptance and rejection behavior.
 
 ## Input Conventions
 
-TempusBench uses a unified covariate interface:
-
+Tempus Bench uses a unified covariate interface:
 
 | Parameter   | Shape                                 | Description                                               |
 | ----------- | ------------------------------------- | --------------------------------------------------------- |
 | `x_context` | `(num_steps_context, num_covariates)` | Past covariate values aligned with the context window     |
 | `x_target`  | `(num_steps_target, num_covariates)`  | Future covariate values aligned with the forecast horizon |
-
 
 The pipeline passes these based on model category:
 
@@ -25,13 +23,13 @@ The pipeline passes these based on model category:
 
 ## Translation Strategy Types
 
-TempusBench uses three standardized translation strategies:
+Tempus Bench uses three standardized translation strategies:
 
-| Strategy | Description |
-| -------- | ----------- |
-| **Channel concatenation** | Covariates appended as extra channels to the target series. Input shape `(n_channels, context_length)` with `n_channels = num_targets + num_covariates`. Model forecasts all channels; only target-channel outputs are kept. |
-| **Native** | Model has a built-in covariate API. Covariates passed via dedicated parameters (e.g. `past_covariates`, `feat_dynamic_real`, sktime `X`), not as fake targets. |
-| **Iteration over variates** | Model is univariate. Targets and covariates stacked; one univariate call per variate. Only first `num_targets` forecasts kept; covariate forecasts discarded. |
+| Strategy                    | Description                                                                                                                                                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Channel concatenation**   | Covariates appended as extra channels to the target series. Input shape `(n_channels, context_length)` with `n_channels = num_targets + num_covariates`. Model forecasts all channels; only target-channel outputs are kept. |
+| **Native**                  | Model has a built-in covariate API. Covariates passed via dedicated parameters (e.g. `past_covariates`, `feat_dynamic_real`, sktime `X`), not as fake targets.                                                               |
+| **Iteration over variates** | Model is univariate. Targets and covariates stacked; one univariate call per variate. Only first `num_targets` forecasts kept; covariate forecasts discarded.                                                                |
 
 ---
 
@@ -366,35 +364,30 @@ These models use both `x_context` and `x_target`.
 
 These models are in `NO_COVARIATE_MODELS`. The pipeline passes `x_context=None`, `x_target=None` when the dataset has covariates.
 
-
-| Model             | Reason                                    |
-| ----------------- | ----------------------------------------- |
-| LAFN              | No covariate API                          |
-
+| Model | Reason           |
+| ----- | ---------------- |
+| LAFN  | No covariate API |
 
 ---
 
 ## Summary Table
 
-
-| Model                             | Support             | Translation Strategy       | Model Parameters                       |
-| --------------------------------- | ------------------- | -------------------------- | -------------------------------------- |
-| Chronos, Chronos-Bolt             | Past-only           | Channel concatenation      | `context` = targets + covariates       |
-| Kairos                            | Past-only           | Channel concatenation      | `past_target` per channel              |
-| MOMENT                            | Past-only           | Channel concatenation      | `n_channels`, `x_enc`                  |
-| Time-MoE                          | Past-only           | Channel concatenation      | `generate()` over channels             |
-| PatchTST-FM, Granite              | Past-only           | Channel concatenation      | `inputs_list`                          |
-| Sundial                           | Past-only           | Channel concatenation      | `generate()` per channel               |
-| TimesFM 2.5                       | Past-only           | Channel concatenation      | `past_values`                          |
-| TimesFM 500M                      | Past-only           | Channel concatenation      | `forecast(inputs)`; discard covariate channels |
-| TabPFN                            | Past-only           | Native                     | `X_hist`, `X_future` with covariates   |
-| Moirai 2.0                        | Past-only           | Native                     | `past_feat_dynamic_real`               |
-| TiRex, TiRex 1.1 GIFT-Eval       | Past-only           | Channel concatenation      | `context` = targets + covariates       |
-| Chronos-2                         | Both                | Native                     | `past_covariates`, `future_covariates` |
-| TimesFM 200M                      | Both                | Native                     | `forecast_with_covariates`, `dynamic_numerical_covariates` |
-| Tiny Time Mixer                   | Both                | Native                     | sktime `X_fit`, `X_pred`               |
-| Lag-Llama                         | Past-only           | Iteration over variates    | One call per variate; discard covariate preds |
-| Granite FlowState                 | Past-only           | Iteration over variates    | One call per variate; discard covariate preds |
-| LAFN                              | None                | N/A                        | N/A                                    |
-
-
+| Model                      | Support   | Translation Strategy    | Model Parameters                                           |
+| -------------------------- | --------- | ----------------------- | ---------------------------------------------------------- |
+| Chronos, Chronos-Bolt      | Past-only | Channel concatenation   | `context` = targets + covariates                           |
+| Kairos                     | Past-only | Channel concatenation   | `past_target` per channel                                  |
+| MOMENT                     | Past-only | Channel concatenation   | `n_channels`, `x_enc`                                      |
+| Time-MoE                   | Past-only | Channel concatenation   | `generate()` over channels                                 |
+| PatchTST-FM, Granite       | Past-only | Channel concatenation   | `inputs_list`                                              |
+| Sundial                    | Past-only | Channel concatenation   | `generate()` per channel                                   |
+| TimesFM 2.5                | Past-only | Channel concatenation   | `past_values`                                              |
+| TimesFM 500M               | Past-only | Channel concatenation   | `forecast(inputs)`; discard covariate channels             |
+| TabPFN                     | Past-only | Native                  | `X_hist`, `X_future` with covariates                       |
+| Moirai 2.0                 | Past-only | Native                  | `past_feat_dynamic_real`                                   |
+| TiRex, TiRex 1.1 GIFT-Eval | Past-only | Channel concatenation   | `context` = targets + covariates                           |
+| Chronos-2                  | Both      | Native                  | `past_covariates`, `future_covariates`                     |
+| TimesFM 200M               | Both      | Native                  | `forecast_with_covariates`, `dynamic_numerical_covariates` |
+| Tiny Time Mixer            | Both      | Native                  | sktime `X_fit`, `X_pred`                                   |
+| Lag-Llama                  | Past-only | Iteration over variates | One call per variate; discard covariate preds              |
+| Granite FlowState          | Past-only | Iteration over variates | One call per variate; discard covariate preds              |
+| LAFN                       | None      | N/A                     | N/A                                                        |
