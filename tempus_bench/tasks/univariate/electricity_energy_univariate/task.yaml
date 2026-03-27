@@ -1,7 +1,7 @@
 task:
   task_name: energy
   context_window: 128
-  forecast_horizon: 64
+  forecast_horizon: 39
   dataset:
     handle_missing: interpolate
     normalize: true

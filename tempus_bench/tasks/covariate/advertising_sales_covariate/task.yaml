@@ -1,11 +1,13 @@
 task:
   task_name: sales
-  context_window: 2048
-  forecast_horizon: 64
+  context_window: 45
+  forecast_horizon: 16
   dataset:
     handle_missing: interpolate
     normalize: true
     file_name: advertising_sales_covariate.csv
 
-# number of covariates : 1
-# number of time-steps : 6435
+# Panel split into 45 store-level series (143 steps each). Boundaries inferred where
+# the weekly calendar repeats the first timestamp (stacked store blocks).
+# 45 targets (weekly_sales_store_<id>), 225 covariate rows (5 series × 45 stores).
+# Rolling benchmark: need context + 11*fh <= 143 for 10 windows (stride=fh); here 96 + 44 = 140.

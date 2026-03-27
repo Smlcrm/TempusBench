@@ -2,6 +2,8 @@
 
 This directory contains a comprehensive collection of time series tasks for benchmarking forecasting models. The tasks are organized into two main categories: univariate and multivariate time series.
 
+**Dataset CSV schema:** each task CSV uses columns `variable_name`, `timestamps`, `values`, and `variable_type` (`target` or `covariate`). The `timestamps` and `values` cells hold JSON arrays; timestamps are ISO 8601 strings in UTC with a `Z` suffix. The `DataLoader` accepts only this format.
+
 ## Task Categories
 
 ### Univariate Time Series (25 tasks)
@@ -15,15 +17,15 @@ Univariate time series contain a single target variable over time, making them i
 **Financial & Economics:**
 - `coinbase_days_univariate/` - Daily Bitcoin prices from Coinbase (2020-2025)
 - `coinbase_economics_univariate/` - Economic indicators related to cryptocurrency
-- `german_quaterly_univariate/` - German quarterly economic data
-- `germanhouses_sales_univariate/` - German house sales data
-- `federalfuns_weeks_univariate/` - Weekly federal funding data
+- `german_quarterly_univariate/` - German quarterly economic data
+- `german_houses_sales_univariate/` - German house sales data
+- `federal_funds_weeks_univariate/` - Weekly federal funding data
 
 **Energy & Environment:**
 - `electricity_energy_univariate/` - Monthly electricity energy consumption (1978-2023)
-- `pconsumption_years_univariate/` - Annual power consumption data
+- `power_consumption_years_univariate/` - Annual power consumption data
 - `delhi_climate_univariate/` - Climate data from Delhi
-- `forestfires_continuous_univariate/` - Continuous forest fire occurrence data
+- `forest_fires_continuous_univariate/` - Continuous forest fire occurrence data
 - `soil_nature_univariate/` - Soil quality measurements over time
 
 **Transportation & Infrastructure:**
@@ -32,18 +34,18 @@ Univariate time series contain a single target variable over time, making them i
 
 **Technology & Software:**
 - `software_nonstationary_univariate/` - Non-stationary software metrics
-- `swjobpostings_software_univariate/` - Software job posting trends
-- `wtraffic_web_univariate/` - Web traffic data
+- `sw_job_postings_software_univariate/` - Software job posting trends
+- `web_traffic_univariate/` - Web traffic data
 
 **Business & Retail:**
 - `retail_categorical_univariate/` - Retail sales with categorical patterns
 - `inventories_months_univariate/` - Monthly inventory levels
-- `invetories_manufacturing_univariate/` - Manufacturing inventory data
+- `inventories_manufacturing_univariate/` - Manufacturing inventory data
 
 **Synthetic Datasets:**
 - `synthetic_additive2_univariate/` - Additive synthetic time series
 - `synthetic_cyclic_univariate/` - Cyclical synthetic patterns
-- `synthetic_multiplticative_univariate/` - Multiplicative synthetic data
+- `synthetic_multiplicative_univariate/` - Multiplicative synthetic data
 - `synthetic_nonstationary_univariate/` - Non-stationary synthetic series
 
 **Special Cases:**
@@ -53,13 +55,13 @@ Univariate time series contain a single target variable over time, making them i
 Multivariate time series contain multiple related variables, allowing models to leverage cross-variable dependencies for improved forecasting.
 
 **Financial Markets:**
-- `goldindia_continuous_multivariate/` - Indian gold market data (price, volume, OHLC)
-- `goldindia_dense_multivariate/` - Dense gold market observations
-- `goldindia_economics_multivariate/` - Gold market with economic indicators
-- `goldindia_real_multivariate/` - Real gold market data
-- `indiagold_days_multivariate/` - Daily Indian gold prices
-- `ltstock_longest_multivariate/` - Long-term stock data
-- `ltstock_minutes_multivariate/` - High-frequency stock data (minute-level)
+- `gold_india_continuous_multivariate/` - Indian gold market data (price, volume, OHLC)
+- `gold_india_dense_multivariate/` - Dense gold market observations
+- `gold_india_economics_multivariate/` - Gold market with economic indicators
+- `gold_india_real_multivariate/` - Real gold market data
+- `india_gold_days_multivariate/` - Daily Indian gold prices
+- `lt_stock_longest_multivariate/` - Long-term stock data
+- `lt_stock_minutes_multivariate/` - High-frequency stock data (minute-level)
 
 **Transportation & Logistics:**
 - `baggage_100_multivariate/` - Airline baggage data (100 variables)
@@ -78,10 +80,10 @@ Multivariate time series contain multiple related variables, allowing models to 
 - `soil_nature_multivariate/` - Natural soil measurements
 
 **Healthcare & Public Health:**
-- `nyccovid_healthcare_multivariate/` - NYC COVID-19 healthcare data
+- `nyc_covid_healthcare_multivariate/` - NYC COVID-19 healthcare data
 
 **Energy & Utilities:**
-- `splitsmart_energy_multivariate/` - Smart energy grid data
+- `split_smart_energy_multivariate/` - Smart energy grid data
 - `utah_manufacturing_multivariate/` - Utah manufacturing energy consumption
 
 ## Dataset Characteristics
