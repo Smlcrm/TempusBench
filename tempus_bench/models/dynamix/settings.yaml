@@ -1,0 +1,5 @@
+model_type: "deterministic"
+python_version: '3.11'
+batch_size: 1
+lookback_length: 32
+#forecast_length: 50
