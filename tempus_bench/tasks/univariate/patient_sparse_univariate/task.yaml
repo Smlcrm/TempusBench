@@ -1,7 +1,7 @@
 task:
   task_name: sparse
-  context_window: 2048
-  forecast_horizon: 64
+  context_window: 12
+  forecast_horizon: 4
   dataset:
     handle_missing: interpolate
     normalize: true
