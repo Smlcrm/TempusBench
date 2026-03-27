@@ -1,6 +1,8 @@
-# Time Series Forecasting Benchmarking Pipeline
+# Time Series Forecasting Benchmarking Pipeline (`tempus_bench`)
 
 A comprehensive framework for benchmarking time series forecasting models, including both traditional statistical models and modern foundation models.
+
+This repository is the **`tempus_bench`** Python package and its assets (tasks, models, tests, docs). **Cloud/UI, worker, GCP deploy scripts, and Dockerfiles** live in a separate private repo (for example **`inference-tempusbench-cloud`** under your org); clone that repo and place this library at **`tempusbench_open/`** next to `tempusbench_cloud/` and `deployment/` to match its documented layout.
 
 ## Overview
 
@@ -16,13 +18,11 @@ This project provides a unified benchmarking framework for evaluating the perfor
 
 ## Documentation
 
-See the [docs/](docs/README.md) folder for detailed documentation:
-
-- **Models**: [TempusBench model catalog](docs/models/tempusbench_models.md), [StatsForecast](docs/models/statsforecast_models.md) and [Chronax](docs/models/chronax_models.md) references, [model comparison](docs/models/model_comparison.md)
-- **Covariates**: [Foundation model covariate support](docs/covariates/foundation_models_covariate_support.md), [testing guide](docs/covariates/covariate_testing_guide.md)
-- **Development**: [Config coverage](docs/development/CONFIG_COVERAGE_SUMMARY.md), [TODO](docs/TODO.md)
+- [docs/README.md](docs/README.md) — models, covariates, development notes
 
 ## Project Structure
+
+Package root is this directory; Python code lives under `tempus_bench/`:
 
 ```
 tempus_bench/
@@ -45,12 +45,12 @@ tempus_bench/
 ├── metrics/                   # Evaluation metrics
 │   ├── __init__.py
 │   ├── crps.py                # Continuous Ranked Probability Score
+│   ├── quantile_score.py
 │   ├── weighted_interval_score.py
 │   ├── mae.py
 │   ├── mape.py
 │   ├── mase.py
-│   ├── rmse.py
-│   └── evaluation.py
+│   └── rmse.py
 ├── models/                    # Model implementations
 │   ├── __init__.py
 │   ├── base_model.py          # Base class for all models
@@ -120,11 +120,11 @@ class MyModel(BaseModel):
     def train(self, y_context, y_target, **kwargs):
         # Training implementation
         pass
-    
+
     def predict(self, y_context, **kwargs):
         # Prediction implementation
         pass
-    
+
     def compute_metrics(self, y_true, y_pred):
         # Metrics computation
         pass
@@ -133,6 +133,7 @@ class MyModel(BaseModel):
 ### 3. Comprehensive Data Handling
 
 The pipeline automatically handles:
+
 - **Multiple task formats** (CSV with metadata)
 - **Flexible windowing** (context, train, validate splits)
 - **Automatic frequency detection** from data
@@ -158,7 +159,7 @@ task_config = TaskConfig(
 
 evaluation_config = EvaluationConfig(
     task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
-    max_windows=10,
+    max_windows=5,
     max_num_variates=None
 )
 
@@ -171,9 +172,10 @@ steps = [
     ('train', 25),
     ('validate', 25)
 ]
-window_iter = data_loader.generate_dataset_split(
+window_iter = data_loader.dataset.generate_dataset_split(
     steps=steps,
-    stride=1
+    stride=1,
+    max_windows=evaluation_config.max_windows,
 )
 
 # Iterate over windows
@@ -184,6 +186,7 @@ for window_idx, window_splits in window_iter:
 ### 4. Flexible Configuration
 
 Configuration files support:
+
 - **Model-specific parameters** (hyperparameter grids)
 - **Task configuration** (context window, forecast horizon)
 - **Evaluation settings** (metrics, loss functions)
@@ -191,7 +194,7 @@ Configuration files support:
 
 ```yaml
 # benchmark.yaml
-task_path: '*'  # Use all tasks
+task_path: "*" # Use all tasks
 
 evaluation:
   tuning_loss: mae
@@ -206,13 +209,13 @@ model:
     d: [1]
     q: [1, 2]
     s: [2]
-  
+
   xgboost:
     lookback_window: [30]
     n_estimators: [200]
     max_depth: [4]
     learning_rate: [0.05]
-  
+
   # Foundation models (no hyperparameters needed)
   chronos: {}
   lagllama: {}
@@ -230,17 +233,22 @@ model:
 
 ### Setup
 
-1. **Clone the repository**:
+1. **Clone the repository** and `cd` into the repo root (this directory):
+
    ```bash
    git clone <repository-url>
-   cd benchmark
+   cd <repo>
    ```
 
-2. **Install dependencies**:
+2. **Install the package**:
+
    ```bash
-   # Run the installation script
-   source install.sh
+   pip install -r requirements.txt
    ```
+
+   That editable-installs this tree and pulls runtime deps from `pyproject.toml` (including TensorFlow and TensorBoard), plus pytest and linters from `requirements.txt`. For runtime only: `pip install -e .`. For dev extras from `pyproject.toml` only: `pip install -e ".[dev]"`.
+
+   You can also run **`./install.sh`**, which installs this package in editable mode from the repo root.
 
 3. **Verify installation**:
    ```bash
@@ -269,6 +277,28 @@ python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark.yaml
 # 5. Store results in runs/ directory
 ```
 
+### TensorBoard forecast series (grouped by model)
+
+Event files are written under **`runs/<run_id>/tensorboard/`** (not under a repo-root `tensorboard/` folder). **Actual vs predicted** are logged as **Scalars** only (no PNGs or image summaries):
+
+- **Tag path (model, task, forecast origin, hyperparam trial, variate):**  
+  `forecast/<model>/<task>/o<nanoseconds>/h<12-hex-or-default>/v<variate>/{actual|predicted}`  
+  **Model** is first so the Scalars sidebar nests under each model. The `o…` segment is the **first validation timestamp** (start of the forecast horizon), as zero-padded pandas-int64-nanoseconds, so ordering by tag matches calendar order. A missing or invalid forecast-start time **raises** (no rolling-index fallback). The `h…` segment is a stable hash of the **hyperparameter dict** for that curve; it is `default` when params are empty (typical foundation runs). **Without** `h…`, multiple grid points that share the same forecast start would write to the same tags and TensorBoard would merge runs into one jagged line.
+- **Step:** forecast **horizon index** within that window (`0 … H-1`). The chart x-axis is the position in the forecast, not the rolling-window id.
+
+**Same plot for actual + predicted (recommended):** open the **Custom Scalars** tab. The run includes a layout summary (`custom_scalars__config__`) built like TensorBoard’s official demo: **one category per model** when hyperparameters are empty (foundation-style), or **one category per (model · hyperparam summary)** when tuning, and **one multiline chart per (task, forecast origin, variate)** inside that category. Two tag entries per chart so **actual** and **predicted** render as **two lines on one axes**. Reference: [tensorboard/plugins/custom_scalar/custom_scalar_demo.py](https://github.com/tensorflow/tensorboard/blob/master/tensorboard/plugins/custom_scalar/custom_scalar_demo.py) (see the `wave trig functions` chart with `cosine` + `sine`). The layout is written with `tf.summary.experimental.write_raw_pb` at step `0`, same as that demo. If you still see **empty** charts titled with an old `w0` style, point TensorBoard at a **fresh** `runs/<run_id>/tensorboard` tree or remove stale event files—those panels are from an older layout whose tags no longer exist.
+
+In the plain **Scalars** tab, each tag is still a separate series in the sidebar; overlay there is limited unless you manually compare selections. For hierarchical browsing only, expand `forecast/<your_model>/` and pick task / window / variate tags.
+
+### TensorBoard HParams (hyperparameter × metrics table)
+
+When you sweep hyperparameters (lists in the benchmark `model:` section), each **(model, task, window, param combo)** is logged for the **HParams** dashboard using TensorBoard’s recommended pattern:
+
+1. **`hparams_config`** is written **once** on the root `tensorboard/` writer (declares columns such as `model`, `task`, `window`, `sp`, `theta_method`, `use_reduced_rank`, plus validation **metrics** from the metric registry).
+2. Each trial is a **separate sub-run** under **`tensorboard/hparams_sessions/<trial_id>/`**, with **`hp.hparams`**, metric scalars whose **tags match** those metrics (e.g. `mae`, `rmse`), and **`session_end`** so trials appear as distinct rows in the HParams table without overwriting each other.
+
+Point TensorBoard at `runs/<run_id>/tensorboard`, open the **HParams** tab, and select the runs under `hparams_sessions` (or “all”); filter and sort by **`model`** and **`task`** to compare hyperparameter choices. Example config: `tempus_bench/config/local_hparams_tb_demo.yaml`.
+
 ### Python API Usage
 
 ```python
@@ -281,7 +311,7 @@ runner.run()
 
 # The system handles:
 # - Hyperparameter optimization
-# - Rolling window evaluation  
+# - Rolling window evaluation
 # - Multiple model execution
 # - Result storage
 ```
@@ -321,16 +351,7 @@ results = executor.execute_model(
 
 ### Scripts and Automation
 
-```bash
-# Run all benchmarks for all models
-bash scripts/bash/run_all_benchmarks.sh
-
-# Clean up conda environments
-bash scripts/bash/cleanup_conda_envs.sh
-
-# Each model runs in isolation in its own conda environment
-# This prevents dependency conflicts between different models
-```
+Use `python -m tempus_bench.run_benchmark` with the YAML configs under `tempus_bench/config/`, or wrap that command in your own automation. Optional batch shell scripts are not part of the core package API.
 
 ### Adding New Models
 
@@ -342,6 +363,7 @@ bash scripts/bash/cleanup_conda_envs.sh
    - **Hybrid**: Both point forecasts and samples
 
 2. **Create model directory**:
+
    ```
    tempus_bench/models/my_model/
    ├── my_model_model.py
@@ -350,34 +372,36 @@ bash scripts/bash/cleanup_conda_envs.sh
    ```
 
 3. **Create settings.yaml**:
+
    ```yaml
    # settings.yaml
-   model_type: deterministic  # or 'stochastic' or 'hybrid'
-   python_version: "3.11.13"  # Must be Python 3.0 or later (3.x series)
+   model_type: deterministic # or 'stochastic' or 'hybrid'
+   python_version: "3.11.13" # Must be Python 3.0 or later (3.x series)
    ```
-   
+
    **Note**: The `python_version` specified in `settings.yaml` must be Python 3.0 or later. The framework requires all models to be compatible with Python 3.x series.
 
 4. **Implement model class**:
+
    ```python
    from tempus_bench.models.base_model import BaseModel
-   
+
    class MyModelModel(BaseModel):
        def __init__(self, params, settings):
            super().__init__(params, settings)
            # Store model-specific params
            self.params = params
-       
+
        def train(self, y_context, y_target, timestamps_context, timestamps_target, freq, **kwargs):
            # Training implementation
            # Must return self for method chaining
            return self
-       
+
        def predict(self, y_context, timestamps_context, timestamps_target, freq, **kwargs):
            # Prediction implementation
            # Return numpy array of predictions
            return predictions
-       
+
        def compute_metrics(self, y_true, y_pred):
            # Compute evaluation metrics
            return {'mae': mae, 'rmse': rmse}
@@ -417,26 +441,30 @@ The model will be automatically discovered and available for benchmarking!
 The framework supports various evaluation metrics:
 
 - **Point Forecast Metrics**: MAE, RMSE, MAPE, SMAPE
-- **Probabilistic Metrics**: CRPS, Interval Score
+- **Probabilistic Metrics**: CRPS, quantile score (QS), weighted interval score (WIS)
 - **Custom Metrics**: Easy to add new evaluation functions
 
 ### Performance Aggregation
 
 The framework includes aggregators to summarize model performance across multiple tasks:
 
-- **Win Rate**: Computes the average win rate for each model, representing the probability that a model achieves lower error than another randomly chosen model on a randomly chosen task.
+- **Win Rate**: For a **single** metric pivot (models × tasks), computes the win rate as the fraction of pairwise comparisons (against other models, on tasks where both have scores) where the model’s error is lower (ties count as 0.5). To summarize multiple metrics with **equal weight per metric**—so dense metrics like MAE do not dominate—use the mean of per-metric win rates:
+
   ```python
-  from tempus_bench.aggregators import WinRate
-  
-  # Pivot table with models as rows, tasks as columns, scores as values
+  from tempus_bench.aggregators import WinRate, average_win_rate_across_metrics
+
+  # One pivot per metric: models as rows, tasks as columns, scores as values
   win_rate = WinRate(pivot_table)
-  win_rates = win_rate()  # Returns Series with win rates for each model
+  win_rates = win_rate()  # Series per model for that metric only
+
+  combined = average_win_rate_across_metrics(pivot_tables)  # mean across metrics
   ```
 
 - **Skill Score**: Computes skill score for each model compared to a baseline model (default: `seasonal_naive`), quantifying how much a model reduces forecasting error compared to the baseline.
+
   ```python
   from tempus_bench.aggregators import SkillScore
-  
+
   # Compute skill score compared to baseline
   skill_score = SkillScore(pivot_table, baseline_model="seasonal_naive")
   skill_scores = skill_score()  # Returns Series with skill scores for each model
@@ -454,16 +482,13 @@ Both aggregators handle missing values (NaN) gracefully and can be extended by i
 
 ## Testing
 
-```bash
-# Run all tests
-pytest
+Run these from the **repository root**.
 
-# Run specific test categories
+```bash
+pytest
 pytest tests/unit/
 pytest tests/integration/
 pytest tests/e2e/
-
-# Run with coverage
 pytest --cov=tempus_bench
 ```
 
@@ -487,8 +512,9 @@ If you use this framework in your research, please cite:
 ## Support
 
 For questions and support:
+
 - Create an issue on GitHub
-- Check the documentation in `configs/CONFIG_DOCUMENTATION.md`
+- See [docs/README.md](docs/README.md)
 - Review the test examples for usage patterns
 
 ## Roadmap
