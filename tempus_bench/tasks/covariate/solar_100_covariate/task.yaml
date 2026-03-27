@@ -1,7 +1,7 @@
 task:
   task_name: sales
   context_window: 32
-  forecast_horizon: 8
+  forecast_horizon: 6
   dataset:
     handle_missing: interpolate
     normalize: true

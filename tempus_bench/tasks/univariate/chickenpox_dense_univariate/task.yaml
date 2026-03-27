@@ -1,7 +1,7 @@
 task:
   task_name: dense
   context_window: 128
-  forecast_horizon: 64
+  forecast_horizon: 35
   dataset:
     handle_missing: interpolate
     normalize: true

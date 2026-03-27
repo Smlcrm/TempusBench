@@ -1,7 +1,7 @@
 task:
   task_name: healthcare
   context_window: 64
-  forecast_horizon: 64
+  forecast_horizon: 33
   dataset:
     handle_missing: interpolate
     normalize: true
