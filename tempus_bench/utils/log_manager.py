@@ -167,6 +167,23 @@ class LogManager:
             )
         return LogManager.log_manager
 
+    @classmethod
+    def reset_singleton(cls) -> None:
+        """Close and clear the singleton so a new run can open different log files.
+
+        Long-lived worker processes (e.g. multiple benchmark plan steps) must call this
+        after each :class:`~tempus_bench.run_benchmark.BenchmarkRunner` exits; otherwise
+        later runs would keep using the first run's handlers and paths.
+        """
+        inst = cls.log_manager
+        if inst is None:
+            return
+        try:
+            inst.close()
+        except Exception:
+            pass
+        cls.log_manager = None
+
     def __new__(cls, *args, **kwargs):
         """
         Override __new__ to implement singleton pattern.
