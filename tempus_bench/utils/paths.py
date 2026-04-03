@@ -178,6 +178,16 @@ def get_runs_dir() -> Path:
     return runs_dir
 
 
+def get_logs_path() -> Path:
+    """
+    Get the absolute path to the project logs directory (may not exist yet).
+
+    Returns:
+        Path: Absolute path to ``<project_root>/logs``
+    """
+    return get_project_root() / "logs"
+
+
 def find_task_directories(task_path_pattern: str) -> dict[str, str]:
     """
     Find task directories based on a task path pattern.

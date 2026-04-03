@@ -123,7 +123,14 @@ class ConfigManager:
         self.evaluation_setting = EvaluationSetting(**evaluation_setting)
 
         run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.runs_path = get_project_root() / "runs"
+        # Cloud worker: set TEMPUSBENCH_RUNS_DIR to a writable directory (e.g. GCS fuse)
+        # so OSS ``runs/run_<ts>/logs/Tempus Bench.log`` is stored under that prefix.
+        runs_dir_override = (os.environ.get("TEMPUSBENCH_RUNS_DIR") or "").strip()
+        if runs_dir_override:
+            self.runs_path = Path(runs_dir_override)
+            self.runs_path.mkdir(parents=True, exist_ok=True)
+        else:
+            self.runs_path = get_project_root() / "runs"
         self.run_path = self.runs_path / f"run_{run_timestamp}"
         self.logs_path = self.run_path / "logs"
 
