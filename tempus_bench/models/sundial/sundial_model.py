@@ -11,7 +11,9 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import torch
+from packaging.version import Version
 from pydantic import BaseModel as PydanticBaseModel
+import transformers
 from transformers import AutoModelForCausalLM
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
@@ -45,6 +47,34 @@ def _patch_dynamic_cache_for_sundial():
         DynamicCache.get_usable_length = _get_usable_length
 
 
+def _needs_sundial_generation_compat() -> bool:
+    return Version(transformers.__version__) >= Version("4.48.0")
+
+
+def _sundial_use_patch_attention_mask() -> bool:
+    """Patch-length ``attention_mask`` fixes position_ids on transformers 4.48–4.x but breaks KV-cache updates on 5.x."""
+    v = Version(transformers.__version__)
+    return Version("4.48.0") <= v < Version("5.0.0")
+
+
+def _patch_generation_mixin_for_sundial(model: Any) -> None:
+    """Patch GenerationMixin API drift for Sundial remote code on newer transformers."""
+    cls = model.__class__
+    if hasattr(cls, "_extract_past_from_model_output"):
+        return
+
+    def _extract_past_from_model_output(self, outputs, standardize_cache_format: bool = False):
+        if hasattr(outputs, "past_key_values"):
+            return outputs.past_key_values
+        if hasattr(outputs, "mems"):
+            return outputs.mems
+        if hasattr(outputs, "past_buckets_states"):
+            return outputs.past_buckets_states
+        return None
+
+    cls._extract_past_from_model_output = _extract_past_from_model_output
+
+
 class SundialHyperparams(PydanticBaseModel):
     pass
 
@@ -76,6 +106,8 @@ class SundialModel(BaseModel):
         self._model = AutoModelForCausalLM.from_pretrained(
             self.hf_model_name, trust_remote_code=True
         )
+        if _needs_sundial_generation_compat():
+            _patch_generation_mixin_for_sundial(self._model)
         self._model.eval()
         self.is_fitted = True
         return self
@@ -130,8 +162,33 @@ class SundialModel(BaseModel):
             seqs = torch.tensor(normed, dtype=torch.float32).unsqueeze(0)
 
             with torch.no_grad():
+                generate_kwargs = {
+                    "max_new_tokens": forecast_horizon,
+                    "num_samples": num_samples,
+                }
+                if _needs_sundial_generation_compat():
+                    # SundialPatchEmbedding left-pads to a multiple of ``input_token_len``.
+                    # Right-pad the raw series to the same multiple so
+                    # ``input_ids.shape[1] // input_token_len`` matches the patch count from
+                    # the embedding (avoids position_ids / mask shape errors on transformers
+                    # ≥4.48). Use a patch-length ``attention_mask`` (not raw timesteps).
+                    patch_size = int(
+                        getattr(self._model.config, "input_token_len", 16)
+                    )
+                    L = int(seqs.shape[1])
+                    pad = (patch_size - (L % patch_size)) % patch_size
+                    if pad:
+                        pad_val = float(seqs[0, -1].item())
+                        seqs = torch.nn.functional.pad(
+                            seqs, (0, pad), mode="constant", value=pad_val
+                        )
+                    if _sundial_use_patch_attention_mask():
+                        token_len = max(1, seqs.shape[1] // patch_size)
+                        generate_kwargs["attention_mask"] = torch.ones(
+                            (1, token_len), dtype=torch.long, device=seqs.device
+                        )
                 output = self._model.generate(
-                    seqs, max_new_tokens=forecast_horizon, num_samples=num_samples
+                    seqs, **generate_kwargs
                 )
 
             # output: (1, num_samples, context_length + forecast_horizon)

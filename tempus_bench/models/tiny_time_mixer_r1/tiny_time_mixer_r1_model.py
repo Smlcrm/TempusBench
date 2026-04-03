@@ -3,9 +3,13 @@ import pandas as pd
 
 from typing import Any, Dict, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
+from sktime.forecasting.base import ForecastingHorizon
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.utils.sktime_datetime_freq import (
+    infer_pandas_freq_offset_for_datetime_index,
+)
 
 _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = False
 
@@ -26,8 +30,24 @@ def _patch_transformers_tiny_time_mixer_tied_weights() -> None:
         _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = True
         return
 
+    def _tied_weights_key_map(model: Any) -> dict:
+        """``PreTrainedModel`` sets ``all_tied_weights_keys`` in ``__init__``; remote-code
+        models (e.g. Granite TTM) may only define class-level ``_tied_weights_keys``."""
+        expanded = getattr(model, "all_tied_weights_keys", None)
+        if isinstance(expanded, dict):
+            return expanded
+        legacy = getattr(model, "_tied_weights_keys", None)
+        if isinstance(legacy, dict):
+            return legacy
+        return {}
+
     def _mark_tied_weights_safe(self, loading_info):
-        for tied_param in list(self.all_tied_weights_keys.keys()):
+        tied = _tied_weights_key_map(self)
+        # Remote-code TTM may omit instance ``all_tied_weights_keys``; ``transformers``
+        # still reads it in ``_move_missing_keys_from_meta_to_device`` after this hook.
+        if not hasattr(self, "all_tied_weights_keys"):
+            self.all_tied_weights_keys = dict(tied)
+        for tied_param in list(tied.keys()):
             try:
                 param = self.get_parameter(tied_param)
             except AttributeError:
@@ -44,7 +64,7 @@ def _patch_transformers_tiny_time_mixer_tied_weights() -> None:
             loading_info.missing_keys = {
                 key
                 for key in loading_info.missing_keys
-                if key in self.all_tied_weights_keys or not _has_hf_init_flag(key)
+                if key in tied or not _has_hf_init_flag(key)
             }
 
     PreTrainedModel.mark_tied_weights_as_initialized = _mark_tied_weights_safe
@@ -108,8 +128,15 @@ class TinyTimeMixerR1Model(BaseModel):
         forecast_horizon = timestamps_target.shape[0]
         columns = list(range(num_targets))
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
+        if not isinstance(timestamps_context, pd.DatetimeIndex):
+            timestamps_context = pd.DatetimeIndex(timestamps_context)
         df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
-        fh = list(range(1, forecast_horizon + 1))
+        freq_offset = infer_pandas_freq_offset_for_datetime_index(df.index)
+        fh = ForecastingHorizon(
+            np.arange(1, forecast_horizon + 1, dtype=np.int64),
+            is_relative=True,
+            freq=freq_offset,
+        )
         _patch_transformers_tiny_time_mixer_tied_weights()
         model_path = getattr(self, "hf_model_name", None) or getattr(
             self, "model_path", "ibm/TTM"

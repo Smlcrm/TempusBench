@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel as PydanticBaseModel
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.timesfm_local_checkpoint import local_timesfm_checkpoint_file
 
 
 class Timesfm500mHyperparams(PydanticBaseModel):
@@ -123,6 +124,13 @@ class Timesfm500mModel(BaseModel):
     def _build_model(self):
         device = getattr(self, "device", "cpu")
         context_len = int(getattr(self, "context_len", 2048))
+        hf_or_dir = self.hf_model_name
+        if os.path.isdir(hf_or_dir):
+            ckpt_path = local_timesfm_checkpoint_file(hf_or_dir)
+            hf_repo_id = None
+        else:
+            ckpt_path = None
+            hf_repo_id = hf_or_dir
         self._model = timesfm.TimesFm(
             hparams=timesfm.TimesFmHparams(
                 backend=device,
@@ -136,9 +144,9 @@ class Timesfm500mModel(BaseModel):
                 context_len=context_len,
             ),
             checkpoint=timesfm.TimesFmCheckpoint(
-                path=self.hf_model_name if os.path.isdir(self.hf_model_name) else None,
+                path=ckpt_path,
                 version="pytorch",
-                huggingface_repo_id=None if os.path.isdir(self.hf_model_name) else self.hf_model_name,
+                huggingface_repo_id=hf_repo_id,
                 local_dir=os.path.abspath(
                     os.path.join(os.path.dirname(__file__), "checkpoints")
                 ),

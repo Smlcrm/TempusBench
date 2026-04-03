@@ -38,6 +38,7 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 import torch
 from tempus_bench.compat.lightning_pytree import apply_lightning_pytree_leafspec_patch
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
+from tempus_bench.utils.lagllama_freq import normalize_freq_for_lagllama
 
 # Add the lagllama directory to the Python path for absolute imports
 lagllama_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,19 +49,25 @@ apply_lightning_pytree_leafspec_patch()
 
 from lag_llama.gluon.estimator import LagLlamaEstimator
 
-# Pandas 2.0+ deprecated freq strings: map legacy -> new
-_FREQ_LEGACY_TO_NEW = {
-    "Q": "QE",
-    "M": "ME",
-    "H": "h",
-    "T": "min",
-    "S": "s",
-}
+
+def _lagllama_checkpoint_file(snapshot_dir: str) -> str:
+    """Pick a Lightning ``.ckpt`` under an HF snapshot / FUSE directory."""
+    if not os.path.isdir(snapshot_dir):
+        raise FileNotFoundError(f"Lag-Llama weights directory does not exist: {snapshot_dir!r}")
+    ckpts = [os.path.join(snapshot_dir, f) for f in os.listdir(snapshot_dir) if f.endswith(".ckpt")]
+    if not ckpts:
+        raise FileNotFoundError(
+            f"No .ckpt files under Lag-Llama weights directory {snapshot_dir!r}"
+        )
+    preferred = [p for p in ckpts if "pretrained" in os.path.basename(p).lower()]
+    if preferred:
+        return preferred[0]
+    return sorted(ckpts)[0]
 
 
 def _normalize_freq(freq: str) -> str:
-    """Normalize deprecated pandas freq strings to avoid FutureWarnings."""
-    return _FREQ_LEGACY_TO_NEW.get(freq, freq)
+    """Delegate to :func:`normalize_freq_for_lagllama` (defined in ``freq_utils`` for testability)."""
+    return normalize_freq_for_lagllama(freq)
 
 
 class LagllamaHyperparams(PydanticBaseModel):
@@ -103,6 +110,11 @@ class LagllamaModel(BaseModel):
         context_length = self.context_length
         batch_size = self.batch_size
 
+        ckpt_path = None
+        hf_or_dir = getattr(self, "hf_model_name", None)
+        if hf_or_dir and os.path.isdir(hf_or_dir):
+            ckpt_path = _lagllama_checkpoint_file(hf_or_dir)
+
         estimator = LagLlamaEstimator(
             prediction_length=forecast_horizon,
             context_length=context_length,
@@ -110,6 +122,7 @@ class LagllamaModel(BaseModel):
             batch_size=batch_size,
             num_parallel_samples=num_samples,
             device=torch.device(self.device),
+            ckpt_path=ckpt_path,
         )
 
         transformation = estimator.create_transformation()

@@ -107,19 +107,22 @@ class MoiraiBaseModel(BaseModel):
         """
 
         num_targets = y_context.shape[1]
+        past_len = int(self._model.past_length)
 
-        ctx = y_context.shape[0]
-        # Create mask with the padded size (ctx, num_targets)
-        observed_mask = np.ones((ctx, num_targets), dtype=bool)
+        # Align with uni2ts ``past_length``: for ``patch_size=="auto"`` this is
+        # context_length + prediction_length; for a fixed patch it is context_length only.
+        # The benchmark often passes y of length (context + train); take the last past_len rows.
+        y_past = y_context[-past_len:]
+        observed_mask = np.ones((y_past.shape[0], num_targets), dtype=bool)
 
-        # Prepare past_target tensor: shape (1, ctx, num_targets)
-        past_target = torch.tensor(y_context, dtype=torch.float32).unsqueeze(0)
+        # Prepare past_target tensor: shape (1, past_len, num_targets)
+        past_target = torch.tensor(y_past, dtype=torch.float32).unsqueeze(0)
 
-        # past_observed_target: True where value is observed, False where padded (1, ctx, num_targets)
+        # past_observed_target: True where value is observed, False where padded (1, past_len, num_targets)
         past_observed_target = torch.tensor(observed_mask, dtype=torch.bool).unsqueeze(
             0
         )
-        # past_is_pad: True where ANY variate at a timestep is padded, False otherwise (1, ctx)
+        # past_is_pad: True where ANY variate at a timestep is padded, False otherwise (1, past_len)
         past_is_pad = (
             (~torch.tensor(observed_mask, dtype=torch.bool)).any(dim=-1).unsqueeze(0)
         )
@@ -132,8 +135,9 @@ class MoiraiBaseModel(BaseModel):
         # Moirai: past-only, both, or future-only. observed_feat_dynamic_real must be
         # provided if feat_dynamic_real is provided (uni2ts API).
         if x_context is not None:
+            x_past = x_context[-past_len:]
             past_feat_dynamic_real = torch.tensor(
-                x_context, dtype=torch.float32
+                x_past, dtype=torch.float32
             ).unsqueeze(0)
             past_observed_feat_dynamic_real = torch.ones_like(
                 past_feat_dynamic_real, dtype=torch.bool
@@ -141,11 +145,14 @@ class MoiraiBaseModel(BaseModel):
         if x_target is not None:
             x_future = x_target[:forecast_horizon]
             if x_context is not None:
-                feat_arr = np.concatenate([x_context, x_future], axis=0)
+                x_hist = x_context[-past_len:]
+                feat_arr = np.concatenate([x_hist, x_future], axis=0)
             else:
-                ctx = y_context.shape[0]
                 feat_arr = np.concatenate(
-                    [np.zeros((ctx, x_future.shape[1]), dtype=np.float32), x_future],
+                    [
+                        np.zeros((past_len, x_future.shape[1]), dtype=np.float32),
+                        x_future,
+                    ],
                     axis=0,
                 )
             feat_dynamic_real = torch.tensor(
