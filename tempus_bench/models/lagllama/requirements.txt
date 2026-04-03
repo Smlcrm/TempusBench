@@ -1,4 +1,5 @@
-gluonts[torch]>=0.14.0,<0.16.0
+# 0.15+ removed gluonts.torch.modules.loss (used by lag_llama/gluon/estimator.py)
+gluonts[torch]>=0.14.0,<0.15.0
 torch>=2.0.0
 numpy>=1.23.0
 pandas>=2.0.0

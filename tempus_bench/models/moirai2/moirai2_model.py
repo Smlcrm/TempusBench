@@ -112,7 +112,12 @@ class Moirai2Model(BaseModel):
         num_targets = y_context.shape[1]
         ctx = y_context.shape[0]
         forecast_horizon = timestamps_target.shape[0]
-        num_samples = kwargs.get("num_samples")
+        num_samples_raw = kwargs.get("num_samples")
+        if num_samples_raw is None:
+            raise ValueError("num_samples is required for Moirai2Model.predict")
+        num_samples = int(num_samples_raw)
+        if num_samples < 1:
+            raise ValueError("num_samples must be >= 1")
 
         # Use the model's stored context_length (set during train), not a recomputed value.
         # predict() receives y_context = target[cstart:tend] which includes context+train steps,
@@ -174,12 +179,18 @@ class Moirai2Model(BaseModel):
                 past_observed_feat_dynamic_real=past_observed_feat_dynamic_real,
             )
 
-        # pred: (batch, num_quantiles, prediction_length, num_targets)
-        pred = pred.cpu().numpy().squeeze(0)
-        if pred.ndim == 2:
-            pred = pred[np.newaxis, ...]
+        # Forward returns (batch, num_quantiles, prediction_length) for univariate
+        # or (batch, num_quantiles, prediction_length, num_targets) multivariate.
+        pred = pred.cpu().numpy()
+        if pred.ndim >= 1 and pred.shape[0] == 1:
+            pred = pred.squeeze(0)
         # Truncate to requested forecast_horizon (model may predict pdt_aligned)
-        pred = pred[:, :forecast_horizon, :]
+        if pred.ndim == 2:
+            # (num_quantiles, prediction_length)
+            pred = pred[:, :forecast_horizon]
+            pred = pred[..., np.newaxis]
+        else:
+            pred = pred[:, :forecast_horizon, :]
         # pred: (num_quantiles, forecast_horizon, num_targets)
         n_quantiles = pred.shape[0]
 
