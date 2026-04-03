@@ -1,32 +1,27 @@
 import os
 import re
-
+import sys
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
+
+# Vendored Datadog ``toto`` package lives in this directory as ``toto/``. Its modules use
+# ``from toto....`` absolute imports. Those must resolve to the vendored tree, not
+# ``tempus_bench.models.toto`` (this file's package), so the wrapper dir must precede
+# normal imports of vendored code.
+_TOTO_WRAPPER_DIR = Path(__file__).resolve().parent
+if str(_TOTO_WRAPPER_DIR) not in sys.path:
+    sys.path.insert(0, str(_TOTO_WRAPPER_DIR))
 
 import numpy as np
 import pandas as pd
 import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel
+from toto.data.util.dataset import MaskedTimeseries
+from toto.inference.forecaster import TotoForecaster
+from toto.model.toto import Toto
 
-# Import from toto package using absolute imports from the tempus_bench.models.toto package
-# Since toto_model.py is in tempus_bench.models.toto and toto/ is a subpackage,
-# we can import it as a relative subpackage
-try:
-    from .toto.data.util.dataset import MaskedTimeseries
-    from .toto.inference.forecaster import TotoForecaster
-    from .toto.model.toto import Toto
-except ImportError:
-    # Fallback: if relative imports fail, try absolute imports by adding parent to path
-    import sys
-    from pathlib import Path
-    _toto_model_dir = Path(__file__).parent
-    if str(_toto_model_dir) not in sys.path:
-        sys.path.insert(0, str(_toto_model_dir))
-    from toto.data.util.dataset import MaskedTimeseries
-    from toto.inference.forecaster import TotoForecaster
-    from toto.model.toto import Toto
+from tempus_bench.models.base_model import BaseModel
 
 
 class TotoHyperparams(PydanticBaseModel):
@@ -50,8 +45,16 @@ class TotoModel(BaseModel):
         torch.device(self.device)
         toto = Toto.from_pretrained(self.hf_model_name)
         toto.to(self.device)
-        # JIT compilation for faster inference
-        toto.compile()
+        try:
+            toto.compile()
+        except Exception as exc:
+            import warnings
+
+            warnings.warn(
+                f"Toto torch.compile() skipped (inference still works): {exc}",
+                UserWarning,
+                stacklevel=1,
+            )
         self._model = TotoForecaster(toto.model)
 
     def train(
@@ -161,7 +164,9 @@ class TotoModel(BaseModel):
             inputs,
             prediction_length=forecast_horizon,
             num_samples=num_samples,
-            samples_per_batch=num_samples,
+            # Keep generation micro-batches fixed; coupling this to num_samples
+            # can create attention-mask shape mismatches in Toto internals.
+            samples_per_batch=1,
             future_exogenous_variables=future_exogenous,
         )
 

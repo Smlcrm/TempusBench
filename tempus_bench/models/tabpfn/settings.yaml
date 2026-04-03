@@ -3,6 +3,8 @@ python_version: '3.11'
 device: cpu
 allow_large_cpu_dataset: false
 max_sequence_length: 1000
+# Synthetic id for MODEL_WEIGHTS_PATH/<id>/… layout (TabPFN .ckpt inside).
+hf_model_name: tabpfn/tabpfn-v2.5-regressor
 capabilities:
   covariates: past_only
   univariate: true

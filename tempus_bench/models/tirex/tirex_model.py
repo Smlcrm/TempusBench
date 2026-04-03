@@ -8,6 +8,7 @@ compatibility with the stochastic evaluation pipeline.
 Requires tirex-ts>=1.4.0.
 """
 
+import os
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -18,9 +19,11 @@ from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_
 
 try:
     from tirex import load_model, ForecastModel
+    from tirex.base import xlstm_available
 except ImportError as e:
     load_model = None
     ForecastModel = None
+    xlstm_available = None
     _TIREX_IMPORT_ERROR = str(e)
 
 
@@ -41,6 +44,55 @@ class TiRexModel(BaseModel):
                 f"Original error: {_TIREX_IMPORT_ERROR}"
             )
 
+    def _resolve_tirex_checkpoint_path(self, path: str) -> str:
+        """Local dir uses ``model.ckpt``; ``tirex.load_model`` breaks on deep POSIX paths."""
+        if os.path.isdir(path):
+            ckpt = os.path.join(path, "model.ckpt")
+            if not os.path.isfile(ckpt):
+                raise FileNotFoundError(
+                    f"Expected TiRex checkpoint at {ckpt!r} (directory {path!r})"
+                )
+            return ckpt
+        return path
+
+    def _load_tirex_model(self) -> Any:
+        """Load from hub id (e.g. NX-AI/TiRex) or local checkpoint dir / file."""
+        path = self.hf_model_name
+        ckpt_path: str | None = None
+        if os.path.isdir(path):
+            ckpt_path = self._resolve_tirex_checkpoint_path(path)
+        elif os.path.isfile(path):
+            ckpt_path = path
+
+        if ckpt_path is not None:
+            from tirex.base import PretrainedModel
+
+            register_key = self.settings.get("tirex_register_name")
+            if not isinstance(register_key, str) or not register_key.strip():
+                register_key = "TiRex"
+            model_cls = PretrainedModel.REGISTRY.get(register_key)
+            if model_cls is None:
+                raise ValueError(
+                    f"Unknown tirex_register_name={register_key!r}; "
+                    f"valid keys include {sorted(PretrainedModel.REGISTRY)!r}"
+                )
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            backend = self.backend
+            if (
+                backend == "cuda"
+                and torch.cuda.is_available()
+                and callable(xlstm_available)
+                and not xlstm_available()
+            ):
+                backend = "torch"
+            return model_cls.from_pretrained(
+                ckpt_path,
+                backend=backend,
+                device=device,
+                compile=False,
+            )
+        return load_model(path, backend=self.backend)
+
     @validate_inputs
     def train(
         self,
@@ -59,7 +111,7 @@ class TiRexModel(BaseModel):
             supports_both=False,
             model_name="TiRex",
         )
-        self._model = load_model(self.hf_model_name, backend=self.backend)
+        self._model = self._load_tirex_model()
         self.is_fitted = True
         return self
 

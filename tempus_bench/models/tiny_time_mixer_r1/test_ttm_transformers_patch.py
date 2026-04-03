@@ -78,6 +78,40 @@ class TestTtmTransformersTiedWeightPatch(unittest.TestCase):
 
         self.assertIsNot(PreTrainedModel.mark_tied_weights_as_initialized, self._orig_mark)
 
+    def test_remote_code_only_tied_weights_keys_dict_backfills_all_tied(self) -> None:
+        """Remote-code TTM may expose only ``_tied_weights_keys`` (transformers 5.x)."""
+
+        class _LoadingInfo:
+            def __init__(self) -> None:
+                self.missing_keys: set[str] = set()
+
+        class _FakeRemoteTtm:
+            def __init__(self) -> None:
+                self._tied_weights_keys = {"a.weight": "b.weight"}
+                self._p = torch.nn.Parameter(torch.tensor([1.0]))
+
+            def get_parameter(self, name: str) -> torch.nn.Parameter:
+                if name == "a.weight":
+                    return self._p
+                raise AttributeError(name)
+
+            def is_remote_code(self) -> bool:
+                return True
+
+            def get_parameter_or_buffer(self, key: str) -> object:
+                o = type("_O", (), {})()
+                o._is_hf_initialized = True
+                return o
+
+        m = _FakeRemoteTtm()
+        info = _LoadingInfo()
+        from transformers.modeling_utils import PreTrainedModel
+
+        PreTrainedModel.mark_tied_weights_as_initialized(m, info)
+        self.assertIsInstance(m.all_tied_weights_keys, dict)
+        self.assertEqual(m.all_tied_weights_keys, m._tied_weights_keys)
+        self.assertTrue(getattr(m._p, "_is_hf_initialized", False))
+
     def test_remote_code_branch_tolerates_bad_buffer_lookup(self) -> None:
         class _LoadingInfo:
             def __init__(self) -> None:

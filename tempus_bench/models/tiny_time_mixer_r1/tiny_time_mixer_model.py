@@ -3,9 +3,13 @@ import pandas as pd
 
 from typing import Any, Dict, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
+from sktime.forecasting.base import ForecastingHorizon
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.utils.sktime_datetime_freq import (
+    infer_pandas_freq_offset_for_datetime_index,
+)
 
 
 class TinyTimeMixerHyperparams(PydanticBaseModel):
@@ -65,8 +69,15 @@ class TinyTimeMixerModel(BaseModel):
         forecast_horizon = timestamps_target.shape[0]
         columns = list(range(num_targets))
         timestamps_context = self._convert_to_datetimeindex(timestamps_context)
+        if not isinstance(timestamps_context, pd.DatetimeIndex):
+            timestamps_context = pd.DatetimeIndex(timestamps_context)
         df = pd.DataFrame(y_context, index=timestamps_context, columns=columns)
-        fh = list(range(1, forecast_horizon + 1))
+        freq_offset = infer_pandas_freq_offset_for_datetime_index(df.index)
+        fh = ForecastingHorizon(
+            np.arange(1, forecast_horizon + 1, dtype=np.int64),
+            is_relative=True,
+            freq=freq_offset,
+        )
         self._model = TinyTimeMixerForecaster()
         self._model.fit(df, fh=fh)
         forecast = self._model.predict()
