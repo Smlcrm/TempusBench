@@ -1,4 +1,4 @@
-# Cap major version for reproducibility; DynamicCache polyfills in sundial_model.py cover 4.48+ API drift.
-transformers>=4.40.0,<5.0.0
+# Tested with 4.48.x (patch attention mask). On 5.x the mask is omitted automatically; still cap <5 for trust_remote_code stability.
+transformers>=4.48.0,<5.0.0
 torch>=2.0.0
 numpy>=1.21.0

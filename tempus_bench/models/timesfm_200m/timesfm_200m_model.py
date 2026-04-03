@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel as PydanticBaseModel, Field
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.timesfm_local_checkpoint import local_timesfm_checkpoint_file
 
 
 class Timesfm200mHyperparams(PydanticBaseModel):
@@ -104,6 +105,13 @@ class Timesfm200mModel(BaseModel):
         return predictions
 
     def _build_model(self):
+        hf_or_dir = self.hf_model_name
+        if os.path.isdir(hf_or_dir):
+            ckpt_path = local_timesfm_checkpoint_file(hf_or_dir)
+            hf_repo_id = None
+        else:
+            ckpt_path = None
+            hf_repo_id = hf_or_dir
         self._model = timesfm.TimesFm(
             hparams=timesfm.TimesFmHparams(
                 backend=self.device,
@@ -117,9 +125,9 @@ class Timesfm200mModel(BaseModel):
                 context_len=self.context_len,
             ),
             checkpoint=timesfm.TimesFmCheckpoint(
-                path=self.hf_model_name if os.path.isdir(self.hf_model_name) else None,
+                path=ckpt_path,
                 version=self.version,
-                huggingface_repo_id=None if os.path.isdir(self.hf_model_name) else self.hf_model_name,
+                huggingface_repo_id=hf_repo_id,
                 local_dir=os.path.abspath(
                     os.path.join(os.path.dirname(__file__), "checkpoints")
                 ),

@@ -1,4 +1,6 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
+
+import os
 
 import numpy as np
 import pandas as pd
@@ -9,9 +11,31 @@ try:
 except ImportError as e:
     raise ImportError(
         "Failed to import TabPFNRegressor from tabpfn. "
-        "Please ensure tabpfn is installed in the conda environment. "
-        "Install with: pip install tabpfn==2.1.2"
+        "Install model deps from tempus_bench/models/tabpfn/requirements.txt "
+        "(e.g. pip install 'tabpfn>=2.1.0')."
     ) from e
+
+
+def _tabpfn_checkpoint_file(snapshot_dir: str) -> str:
+    """Resolve a TabPFN regressor checkpoint under a FUSE/HF snapshot directory."""
+    if not os.path.isdir(snapshot_dir):
+        raise FileNotFoundError(f"TabPFN weights directory does not exist: {snapshot_dir!r}")
+    preferred = "tabpfn-v2.5-regressor-v2.5_default.ckpt"
+    p = os.path.join(snapshot_dir, preferred)
+    if os.path.isfile(p):
+        return p
+    ckpts = [
+        os.path.join(snapshot_dir, f)
+        for f in sorted(os.listdir(snapshot_dir))
+        if f.endswith(".ckpt") or f.endswith(".pt")
+    ]
+    if not ckpts:
+        raise FileNotFoundError(
+            f"No .ckpt/.pt TabPFN weights under {snapshot_dir!r}; "
+            f"expected {preferred!r} or any .ckpt"
+        )
+    return ckpts[0]
+
 
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
 
@@ -35,13 +59,17 @@ class TabpfnModel(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "TabpfnModel":
-        validate_covariate_support(
-            x_context, x_target,
-            supports_past_only=True,
-            supports_future_only=False,
-            supports_both=False,
-            model_name="TabPFN",
-        )
+        # Train receives covariates aligned with y_context and y_target separately
+        # (contiguous history only; not forecast-horizon ``future`` covariates).
+        if x_context is None or x_target is None:
+            validate_covariate_support(
+                x_context,
+                x_target,
+                supports_past_only=True,
+                supports_future_only=False,
+                supports_both=False,
+                model_name="TabPFN",
+            )
         # Zero-shot TabPFN uses context during predict; mark as fitted
         self.is_fitted = True
         return self
@@ -56,8 +84,15 @@ class TabpfnModel(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs: dict
     ):
+        # ``predict`` only consumes ``x_context`` (history). Reject true future covariates.
+        if x_target is not None:
+            raise ValueError(
+                "TabPFN does not use x_target during prediction (past covariates only). "
+                "Pass the full past covariate block via x_context only."
+            )
         validate_covariate_support(
-            x_context, x_target,
+            x_context,
+            None,
             supports_past_only=True,
             supports_future_only=False,
             supports_both=False,
@@ -85,7 +120,14 @@ class TabpfnModel(BaseModel):
                 x_hist = x_hist.reshape(-1, 1)
             X_hist = np.concatenate([X_hist, x_hist], axis=1)
             last_cov = x_hist[-1:].astype(np.float32)  # (1, num_covariates)
-        regressor = TabPFNRegressor()
+        model_path: str | Literal["auto"] = "auto"
+        hf_or_dir = getattr(self, "hf_model_name", None)
+        if hf_or_dir:
+            if os.path.isfile(hf_or_dir):
+                model_path = hf_or_dir
+            elif os.path.isdir(hf_or_dir):
+                model_path = _tabpfn_checkpoint_file(hf_or_dir)
+        regressor = TabPFNRegressor(model_path=model_path)
         regressor.fit(X_hist, y_hist)
 
         # Roll out forecasts in chunks

@@ -1,5 +1,6 @@
 model_type: stochastic
 python_version: '3.12'
+hf_model_name: time-series-foundation-models/Lag-Llama
 device: cpu
 context_length: 2048
 batch_size: 1
