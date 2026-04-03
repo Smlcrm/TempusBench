@@ -99,7 +99,7 @@ class TestPathFunctions:
         assert actual == expected, "Task path mismatch"
         
         # Test with another task
-        task_name2 = "univariate/daily_gpu_price_univariate"
+        task_name2 = "univariate/delhi_climate_univariate"
         expected2 = get_tasks_dir() / task_name2
         actual2 = get_task_path(task_name2)
         
@@ -111,30 +111,29 @@ class TestPathFunctions:
         assert actual2 == expected2, "Task path 2 mismatch"
     
     def test_get_model_path(self):
-        """Test that get_model_path returns correct model-specific paths."""
+        """Models live flat under ``tempus_bench/models/<name>`` (model_type is legacy)."""
         model_type = "deterministic"
         model_name = "arima"
-        expected = get_models_dir() / model_type / model_name
+        expected = get_models_dir() / model_name
         actual = get_model_path(model_type, model_name)
-        
+
         print(f"\nModel Path:")
         print(f"  Type: {model_type}, Name: {model_name}")
         print(f"  Expected: {expected}")
         print(f"  Actual:   {actual}")
-        
+
         assert actual == expected, "Model path mismatch"
-        
-        # Test with stochastic model
+
         model_type2 = "stochastic"
-        model_name2 = "chronos"
-        expected2 = get_models_dir() / model_type2 / model_name2
+        model_name2 = "chronos_base"
+        expected2 = get_models_dir() / model_name2
         actual2 = get_model_path(model_type2, model_name2)
-        
+
         print(f"\nModel Path 2:")
         print(f"  Type: {model_type2}, Name: {model_name2}")
         print(f"  Expected: {expected2}")
         print(f"  Actual:   {actual2}")
-        
+
         assert actual2 == expected2, "Model path 2 mismatch"
     
     def test_path_consistency(self):
@@ -167,7 +166,7 @@ class TestPathFunctions:
             ("models_dir", get_models_dir()),
             ("runs_dir", get_runs_dir()),
             ("logs_path", get_logs_path()),
-            ("task_path", get_task_path("univariate/test_univariate")),
+            ("task_path", get_task_path("univariate/chickenpox_dense_univariate")),
             ("model_path", get_model_path("deterministic", "prophet")),
         ]
         
@@ -225,8 +224,8 @@ class TestPathFunctions:
         print(f"\n6. Example Task Paths:")
         examples = [
             "multivariate/baggage_100_multivariate",
-            "univariate/daily_gpu_price_univariate",
-            "multivariate/test_multivariate",
+            "univariate/delhi_climate_univariate",
+            "multivariate/madrid_count_multivariate",
         ]
         for example in examples:
             print(f"   Task '{example}': {get_task_path(example)}")
@@ -235,8 +234,8 @@ class TestPathFunctions:
         model_examples = [
             ("deterministic", "arima"),
             ("deterministic", "prophet"),
-            ("stochastic", "chronos"),
-            ("stochastic", "deepar"),
+            ("stochastic", "chronos_base"),
+            ("stochastic", "chronos_tiny"),
         ]
         for model_type, model_name in model_examples:
             print(f"   Model '{model_type}/{model_name}': {get_model_path(model_type, model_name)}")
