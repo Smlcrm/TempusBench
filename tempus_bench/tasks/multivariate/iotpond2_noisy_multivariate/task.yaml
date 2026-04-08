@@ -1,0 +1,11 @@
+task:
+  task_name: noisy
+  context_window: 2048
+  forecast_horizon: 128
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: iotpond2_noisy_multivariate.csv
+
+# number of variates : 9
+# number of time-steps : 172249

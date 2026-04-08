@@ -1,0 +1,11 @@
+task:
+  task_name: sales
+  context_window: 16
+  forecast_horizon: 4
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: walmart_sales_multivariate.csv
+
+# number of variates : 45
+# number of time-steps : 143

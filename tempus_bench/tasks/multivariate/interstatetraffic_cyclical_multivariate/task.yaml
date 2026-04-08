@@ -1,0 +1,11 @@
+task:
+  task_name: cyclical
+  context_window: 32
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: interstatetraffic_cyclical_multivariate.csv
+
+# number of variates : 3
+# number of time-steps : 174

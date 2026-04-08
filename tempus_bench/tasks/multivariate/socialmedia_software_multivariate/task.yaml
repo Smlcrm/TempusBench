@@ -1,0 +1,11 @@
+task:
+  task_name: software
+  context_window: 64
+  forecast_horizon: 12
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: socialmedia_software_multivariate.csv
+
+# number of variates : 22
+# number of time-steps : 178

@@ -1,0 +1,11 @@
+task:
+  task_name: daily
+  context_window: 64
+  forecast_horizon: 16
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: hcfdbank_daily_multivariate.csv
+
+# number of variates : 5
+# number of time-steps : 248

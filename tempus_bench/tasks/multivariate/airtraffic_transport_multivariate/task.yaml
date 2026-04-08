@@ -1,0 +1,11 @@
+task:
+  task_name: transport
+  context_window: 64
+  forecast_horizon: 16
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: airtraffic_transport_multivariate.csv
+
+# number of variates : 15
+# number of time-steps : 249

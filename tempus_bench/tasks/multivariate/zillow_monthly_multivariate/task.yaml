@@ -1,0 +1,11 @@
+task:
+  task_name: monthly
+  context_window: 32
+  forecast_horizon: 8
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: zillow_monthly_multivariate.csv
+
+# number of variates : 51
+# number of time-steps : 314

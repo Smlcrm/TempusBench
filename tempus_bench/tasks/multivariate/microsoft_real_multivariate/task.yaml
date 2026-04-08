@@ -1,0 +1,11 @@
+task:
+  task_name: real
+  context_window: 128
+  forecast_horizon: 32
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: microsoft_real_multivariate.csv
+
+# number of variates : 5
+# number of time-steps : 1511

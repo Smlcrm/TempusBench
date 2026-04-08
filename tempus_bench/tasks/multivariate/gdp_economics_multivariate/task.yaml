@@ -1,0 +1,11 @@
+task:
+  task_name: economics
+  context_window: 64
+  forecast_horizon: 12
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: gdp_economics_multivariate.csv
+
+# number of variates : 3
+# number of time-steps : 315

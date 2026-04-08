@@ -1,0 +1,11 @@
+task:
+  task_name: minute
+  context_window: 2048
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: adanient_minute_multivariate.csv
+
+# number of variates : 5
+# number of time-steps : 92674

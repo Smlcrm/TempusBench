@@ -1,0 +1,11 @@
+task:
+  task_name: hourly
+  context_window: 1012
+  forecast_horizon: 64
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: trafficpredictions_hourly_multivariate.csv
+
+# number of variates : 3
+# number of time-steps : 14592
