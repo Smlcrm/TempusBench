@@ -1,3 +1,4 @@
+import functools
 import numpy as np
 import pandas as pd
 
@@ -11,10 +12,33 @@ from tempus_bench.models.base_model import (
     validate_inputs,
     validate_covariate_support,
 )
+from tempus_bench.utils.sktime_datetime_freq import (
+    infer_pandas_freq_offset_for_datetime_index,
+)
 
-# IBM Granite TTM checkpoints on HuggingFace are trained with context lengths 512 / 1024 / 1536.
-# Longer benchmark windows must use the **tail** of history so sktime/TTM never sees excess length.
-TTM_MAX_CONTEXT_LENGTH: int = 1536
+
+def _load_ttm_context_length_from_pretrained(
+    model_path: str, revision: str,
+) -> int:
+    """Read ``context_length`` from Hugging Face config (sktime TTM requires an exact sequence length)."""
+    from sktime.libs.granite_ttm import TinyTimeMixerConfig
+
+    config = TinyTimeMixerConfig.from_pretrained(
+        model_path,
+        revision=revision,
+    )
+    return int(config.context_length)
+
+
+@functools.lru_cache(maxsize=16)
+def _get_ttm_context_length(model_path: str, revision: str) -> int:
+    ctx = _load_ttm_context_length_from_pretrained(model_path, revision)
+    if ctx <= 0:
+        raise ValueError(
+            f"TinyTimeMixer config at {model_path!r} (revision={revision!r}) "
+            f"has invalid context_length={ctx}"
+        )
+    return ctx
 
 
 def _truncate_ttm_aligned_history(
@@ -48,9 +72,7 @@ def _truncate_ttm_aligned_history(
     ts2 = ts[start:]
     x2 = None if x_context is None else np.asarray(x_context)[start:]
     return y2, ts2, x2
-from tempus_bench.utils.sktime_datetime_freq import (
-    infer_pandas_freq_offset_for_datetime_index,
-)
+
 
 _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = False
 
@@ -181,11 +203,16 @@ class TinyTimeMixerR1Model(BaseModel):
             supports_both=True,
             model_name="TinyTimeMixer",
         )
+        model_path = getattr(self, "hf_model_name", None) or getattr(
+            self, "model_path", "ibm/TTM"
+        )
+        revision = getattr(self, "revision", "main")
+        ttm_context_len = _get_ttm_context_length(model_path, revision)
         y_context, timestamps_context, x_context = _truncate_ttm_aligned_history(
             y_context,
             timestamps_context,
             x_context,
-            max_len=TTM_MAX_CONTEXT_LENGTH,
+            max_len=ttm_context_len,
         )
         num_targets = y_context.shape[1]
         forecast_horizon = timestamps_target.shape[0]
@@ -201,10 +228,6 @@ class TinyTimeMixerR1Model(BaseModel):
             freq=freq_offset,
         )
         _patch_transformers_tiny_time_mixer_tied_weights()
-        model_path = getattr(self, "hf_model_name", None) or getattr(
-            self, "model_path", "ibm/TTM"
-        )
-        revision = getattr(self, "revision", "main")
         self._model = TinyTimeMixerForecaster(
             model_path=model_path, revision=revision
         )
