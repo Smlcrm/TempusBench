@@ -299,7 +299,8 @@ def extra_train_predict_kwargs(package: str) -> dict[str, Any]:
     if package == "toto":
         ex["freq"] = "d"
     if package == "lagllama":
-        ex["freq"] = "h"
+        # Synthetic matrix timestamps use one UTC day per step (``day_ms_timestamps``).
+        ex["freq"] = "D"
     return ex
 
 
