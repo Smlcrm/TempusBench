@@ -8,6 +8,16 @@ import pytest
 from tempus_bench.models.theta.theta_model import ThetaModel
 
 
+def test_theta_hyperparams_survives_pydantic_pep563_regression() -> None:
+    """Worker conda env uses Pydantic 2.12+; Literal-based hyperparams failed model_validate there."""
+    for method in ("least_squares", "correlation_optimal"):
+        m = ThetaModel(
+            params={"sp": 4, "theta_method": method},
+            settings={"model_type": "deterministic"},
+        )
+        assert str(m.theta_method) == method
+
+
 @pytest.mark.parametrize("theta_method", ["least_squares", "correlation_optimal"])
 def test_univariate_single_step_context_joint_path(theta_method: str) -> None:
     context_len = 1
