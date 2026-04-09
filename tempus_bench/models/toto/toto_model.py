@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -22,6 +21,7 @@ from toto.inference.forecaster import TotoForecaster
 from toto.model.toto import Toto
 
 from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.toto import freq_seconds as _toto_freq_seconds
 
 
 class TotoHyperparams(PydanticBaseModel):
@@ -117,7 +117,7 @@ class TotoModel(BaseModel):
         forecast_horizon = len(timestamps_target)
 
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
-        time_diff = self.freq_to_seconds(freq)
+        time_diff = _toto_freq_seconds.freq_to_seconds(freq)
 
         # Build series: [target | covariates]. Exogenous MUST be at the end.
         y_context_tensor = torch.tensor(y_context.T, dtype=torch.float)  # (num_variates, num_steps)
@@ -182,130 +182,8 @@ class TotoModel(BaseModel):
         return forecast_samples
 
     def freq_to_seconds(self, freq: Union[str, float, int]) -> float:
-        """
-        Convert a frequency string with an increment to seconds.
-
-        Accepts forms like:
-        - '15m', '30min', '45sec', '2h', '1.5h'
-        - '4w', '12mth', '1y', '250ms', '10us', '100ns'
-        - pandas-style short forms are fine: '2H', '15MIN', '30S'
-        - week anchors like 'W-MON' are treated as a week
-        Returns:
-        float seconds
-        """
-        if isinstance(freq, (int, float)):
-            # Assume already seconds if a number is given
-            return float(freq)
-
-        if not isinstance(freq, str) or not freq.strip():
-            raise ValueError(f"Unsupported frequency: {freq!r}")
-
-        s = freq.strip().lower().replace("µs", "us")
-
-        # Handle pandas week anchors like 'w-mon', 'w-fri' → treat as 1 week
-        if s.startswith("w-"):
-            return 7 * 24 * 3600.0
-
-        # Extract numeric value + unit (e.g., '15m', '30min', '1.5h', '250ms')
-        m = re.fullmatch(r"\s*(?P<val>[+-]?\d*\.?\d+)\s*(?P<unit>[a-z\-]+)\s*", s)
-        if not m:
-            # Also allow pure units like 'h' (implied 1)
-            m = re.fullmatch(r"\s*(?P<unit>[a-z\-]+)\s*", s)
-            if m:
-                val = 1.0
-                unit = m.group("unit")
-            else:
-                raise ValueError(f"Could not parse frequency string: {freq!r}")
-        else:
-            val = float(m.group("val"))
-            unit = m.group("unit")
-
-        # Canonicalize common aliases
-        aliases = {
-            # sub-second
-            "ns": "ns",
-            "nanosecond": "ns",
-            "nanoseconds": "ns",
-            "us": "us",
-            "microsecond": "us",
-            "microseconds": "us",
-            "ms": "ms",
-            "millisecond": "ms",
-            "milliseconds": "ms",
-            # seconds
-            "s": "s",
-            "sec": "s",
-            "secs": "s",
-            "second": "s",
-            "seconds": "s",
-            # minutes
-            "m": "min",
-            "min": "min",
-            "mins": "min",
-            "t": "min",
-            "minute": "min",
-            "minutes": "min",
-            # hours
-            "h": "h",
-            "hr": "h",
-            "hrs": "h",
-            "hour": "h",
-            "hours": "h",
-            # days
-            "d": "d",
-            "day": "d",
-            "days": "d",
-            # weeks
-            "w": "w",
-            "wk": "w",
-            "wks": "w",
-            "week": "w",
-            "weeks": "w",
-            # months (calendar-average)
-            "mth": "mon",
-            "mths": "mon",
-            "mo": "mon",
-            "mon": "mon",
-            "month": "mon",
-            "months": "mon",
-            "me": "mon",  # pandas 2.0 month-end alias (1ME)
-            # years (calendar-average)
-            "y": "y",
-            "yr": "y",
-            "yrs": "y",
-            "year": "y",
-            "years": "y",
-            # explicit words sometimes seen
-            "minu": "min",
-            "mins.": "min",
-            "sec.": "s",
-        }
-
-        unit = aliases.get(unit, unit)  # fold alias
-
-        # Seconds per unit (months/years use astronomical averages)
-        SECS = {
-            "ns": 1e-9,
-            "us": 1e-6,
-            "ms": 1e-3,
-            "s": 1.0,
-            "min": 60.0,
-            "h": 3600.0,
-            "d": 86400.0,
-            "w": 7 * 86400.0,
-            # Averages: 365.25 days/year, 12 months/year → ~30.44 days/month
-            "mon": 365.25 / 12 * 86400.0,  # ≈ 2_629_746 seconds
-            "y": 365.25 * 86400.0,  # ≈ 31_557_600 seconds
-        }
-
-        # Also accept pandas-like unit spellings directly:
-        # 'sec', 'second', 'minutes', etc. handled via aliases above.
-        if unit not in SECS:
-            # Try a few pandas-like quirks: 'w-mon' already handled; 'qs', 'a' not supported as they’re not fixed.
-            # If someone passes 'w-mon', we caught it at the top. Anything else unknown → error.
-            raise ValueError(f"Unsupported or non-fixed frequency unit: {unit!r} from {freq!r}")
-
-        return float(val) * SECS[unit]
+        """Delegate to :func:`~tempus_bench.models.toto.freq_seconds.freq_to_seconds`."""
+        return _toto_freq_seconds.freq_to_seconds(freq)
 
     # def _sub_predict(self, input_series: torch.Tensor, time_interval_sec: int = 900) -> dict:
     #     """
