@@ -21,7 +21,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from typing import Any, Dict, Literal, Optional
+from enum import StrEnum
+from typing import Any, Dict, Optional
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sklearn.linear_model import LinearRegression
 from sktime.forecasting.theta import ThetaForecaster
@@ -29,10 +30,17 @@ from sktime.forecasting.theta import ThetaForecaster
 from tempus_bench.models.base_model import BaseModel, validate_inputs
 
 
+class ThetaEstimationMethod(StrEnum):
+    """StrEnum avoids Pydantic 2.12+ ""class not fully defined"" with Literal under PEP 563."""
+
+    least_squares = "least_squares"
+    correlation_optimal = "correlation_optimal"
+
+
 class ThetaHyperparams(PydanticBaseModel):
     # Highly Influential Hyperparameters
     sp: int = Field(..., ge=1, description="Seasonal period")
-    theta_method: Literal["least_squares", "correlation_optimal"] = Field(
+    theta_method: ThetaEstimationMethod = Field(
         ..., description="Method for theta estimation"
     )
     # Fixed Hyperparameters - Optional for User to override
