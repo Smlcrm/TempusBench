@@ -88,6 +88,10 @@ class ThetaModel(BaseModel):
         self.num_targets: int = 0
         # Per-channel constant fallback for independent multivariate (zero-variance series).
         self._independent_constant_last: list[float] = []
+        # Joint path: last detrended theta-line value when ThetaForecaster refuses to fit.
+        self._joint_constant_last: list[float] = []
+        # y_work has < 2 rows: skip drift + Θ-matrix (same as per-channel univariate Theta).
+        self._per_column_theta_only: bool = False
 
     def _estimate_drift(self, y_context: np.ndarray) -> np.ndarray:
         diff_data = np.diff(y_context, axis=0)
@@ -177,6 +181,8 @@ class ThetaModel(BaseModel):
 
         self._num_original_targets = int(y_context.shape[1])
         self._models = []
+        self._per_column_theta_only = False
+        self._joint_constant_last = []
 
         if x_stack is not None:
             x_stack = np.asarray(x_stack, dtype=float)
@@ -217,7 +223,29 @@ class ThetaModel(BaseModel):
             self.is_fitted = True
             return self
 
-        self.drift_vector = self._estimate_drift(y_work)
+        # Need ≥2 rows for diff-based drift and Θ estimation (joint path).
+        if y_work.shape[0] < 2:
+            self._per_column_theta_only = True
+            self.drift_vector = None
+            self.theta_matrix = None
+            self._independent_constant_last = []
+            for j in range(num_targets):
+                col = y_work[:, j]
+                fitted = self._fit_theta_forecaster_on_series(col, sp=sp)
+                if fitted is None:
+                    self._models.append(None)
+                    self._independent_constant_last.append(
+                        _last_finite_scalar_1d(np.asarray(col, dtype=float))
+                    )
+                else:
+                    self._models.append(fitted)
+                    self._independent_constant_last.append(float("nan"))
+            self.is_fitted = True
+            return self
+
+        self.drift_vector = np.nan_to_num(
+            self._estimate_drift(y_work), nan=0.0, posinf=0.0, neginf=0.0
+        )
         detrended_data = self._detrend_data(y_work, self.drift_vector)
 
         if theta_method == "correlation_optimal":
@@ -232,18 +260,18 @@ class ThetaModel(BaseModel):
             raise ValueError(f"Unknown theta_method: {theta_method!r}")
 
         theta_lines = self._create_theta_lines(detrended_data, self.theta_matrix)
+        self._joint_constant_last = []
         for i in range(num_targets):
             col = theta_lines[:, i]
-            series = pd.Series(col)
-            if series.isna().any():
-                series = series.interpolate(limit_direction="both")
-                series = series.fillna(0.0)
-            has_non_positive = (series <= 0).any()
-            insufficient_cycles = len(series) < 2 * sp
-            deseasonalize = (not has_non_positive) and (not insufficient_cycles)
-            theta_model = ThetaForecaster(sp=sp, deseasonalize=deseasonalize)
-            theta_model.fit(y=series)
-            self._models.append(theta_model)
+            fitted = self._fit_theta_forecaster_on_series(col, sp=sp)
+            if fitted is None:
+                self._models.append(None)
+                self._joint_constant_last.append(
+                    _last_finite_scalar_1d(np.asarray(col, dtype=float))
+                )
+            else:
+                self._models.append(fitted)
+                self._joint_constant_last.append(float("nan"))
 
         self.is_fitted = True
         return self
@@ -301,6 +329,28 @@ class ThetaModel(BaseModel):
                     out[:, j] = vals[:forecast_horizon]
             return out
 
+        if self._per_column_theta_only:
+            k = len(self._models)
+            out = np.zeros((forecast_horizon, k), dtype=float)
+            for j in range(k):
+                m = self._models[j]
+                if m is None:
+                    cval = self._independent_constant_last[j]
+                    out[:, j] = cval
+                else:
+                    pred = m.predict(fh=fh)
+                    vals = np.asarray(pred, dtype=float).ravel()
+                    if vals.size < forecast_horizon:
+                        tail = (
+                            float(vals[-1])
+                            if vals.size > 0
+                            else self._independent_constant_last[j]
+                        )
+                        pad = np.full(forecast_horizon - vals.size, tail, dtype=float)
+                        vals = np.concatenate([vals, pad])
+                    out[:, j] = vals[:forecast_horizon]
+            return out[:, : self._num_original_targets]
+
         if x_stack is not None:
             x_stack = np.asarray(x_stack, dtype=float)
             _validate_covariate_rows(
@@ -313,12 +363,28 @@ class ThetaModel(BaseModel):
         num_targets = y_w.shape[1]
         num_original_targets = self._num_original_targets or y_context.shape[1]
         all_predictions = np.zeros((forecast_horizon, num_targets), dtype=float)
+        future_times = np.arange(1, forecast_horizon + 1, dtype=float)
         for i in range(num_targets):
-            theta_forecast = self._models[i].predict(fh=fh)
-            future_times = np.arange(1, forecast_horizon + 1, dtype=float)
-            linear_trend = future_times * float(self.drift_vector[i])
-            all_predictions[:, i] = (
-                np.asarray(theta_forecast, dtype=float).ravel()[:forecast_horizon]
-                + linear_trend
+            drift_i = float(
+                np.nan_to_num(
+                    self.drift_vector[i], nan=0.0, posinf=0.0, neginf=0.0
+                )
             )
+            linear_trend = future_times * drift_i
+            mdl = self._models[i]
+            if mdl is None:
+                base = self._joint_constant_last[i]
+                all_predictions[:, i] = base + linear_trend
+                continue
+            theta_forecast = mdl.predict(fh=fh)
+            vals = np.asarray(theta_forecast, dtype=float).ravel()
+            if vals.size < forecast_horizon:
+                tail = (
+                    float(vals[-1])
+                    if vals.size > 0
+                    else self._joint_constant_last[i]
+                )
+                pad = np.full(forecast_horizon - vals.size, tail, dtype=float)
+                vals = np.concatenate([vals, pad])
+            all_predictions[:, i] = vals[:forecast_horizon] + linear_trend
         return all_predictions[:, :num_original_targets]
