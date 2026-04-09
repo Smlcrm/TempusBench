@@ -38,6 +38,8 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 import torch
 from tempus_bench.compat.lightning_pytree import apply_lightning_pytree_leafspec_patch
 from tempus_bench.models.base_model import BaseModel, validate_inputs, validate_covariate_support
+from tempus_bench.utils.lagllama_channel_fanout import variates_and_num_targets_for_predict
+from tempus_bench.utils.lagllama_device import resolve_lagllama_device_string
 from tempus_bench.utils.lagllama_freq import normalize_freq_for_lagllama
 
 # Add the lagllama directory to the Python path for absolute imports
@@ -91,6 +93,11 @@ class LagllamaModel(BaseModel):
         """
         # Initialize base model
         super().__init__(params, settings, LagllamaHyperparams)
+        self.device = resolve_lagllama_device_string(
+            str(getattr(self, "device", "cpu")),
+            worker_compute_tier=os.environ.get("WORKER_COMPUTE_TIER", ""),
+            cuda_available=torch.cuda.is_available(),
+        )
 
     def _create_predictor_for_horizon(
         self, forecast_horizon: int, num_samples: int = 10
@@ -304,13 +311,7 @@ class LagllamaModel(BaseModel):
         freq = _normalize_freq(str(kwargs["freq"]))
         num_samples = kwargs["num_samples"]
 
-        # Build variates: M targets + N covariates (one univariate call per variate)
-        if x_context is not None:
-            variates = np.concatenate([y_context, x_context], axis=1)
-        else:
-            variates = y_context if y_context.ndim == 2 else y_context[:, np.newaxis]
-
-        num_targets = y_context.shape[1] if y_context.ndim == 2 else 1
+        variates, num_targets = variates_and_num_targets_for_predict(y_context, x_context)
 
         preds = []
         for k in range(variates.shape[1]):
