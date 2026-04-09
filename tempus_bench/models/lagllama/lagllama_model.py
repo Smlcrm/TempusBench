@@ -323,6 +323,9 @@ class LagllamaModel(BaseModel):
                 num_samples=num_samples,
             )
             preds.append(pred)
+            _dev = torch.device(self.device)
+            if _dev.type == "cuda":
+                torch.cuda.empty_cache()
 
         # Use only first M outputs (target predictions); discard covariate predictions
         return np.concatenate(preds[:num_targets], axis=2)
