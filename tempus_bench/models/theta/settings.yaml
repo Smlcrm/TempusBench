@@ -1,7 +1,7 @@
 model_type: deterministic
 python_version: '3.12'
 capabilities:
-  covariates: none
+  covariates: past_only
   univariate: true
   multivariate: true
 foundation: false
