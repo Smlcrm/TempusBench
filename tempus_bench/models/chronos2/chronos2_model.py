@@ -15,7 +15,11 @@ import numpy as np
 import torch
 from pydantic import BaseModel as PydanticBaseModel
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import (
+    BaseModel,
+    validate_inputs,
+    validate_covariate_support,
+)
 
 try:
     from chronos import Chronos2Pipeline
@@ -59,6 +63,14 @@ class Chronos2Model(BaseModel):
         """
         Initialize Chronos-2 (no training required for foundation models).
         """
+        validate_covariate_support(
+            x_context,
+            x_target,
+            supports_past_only=True,
+            supports_future_only=False,
+            supports_both=True,
+            model_name="Chronos-2",
+        )
         device = "cuda" if torch.cuda.is_available() else "cpu"
         device_map = "auto" if device == "cuda" else None
 
@@ -88,10 +100,18 @@ class Chronos2Model(BaseModel):
         - future_covariates: dict of 1D arrays, length = prediction_length;
           keys must be subset of past_covariates
         """
+        use_covariates = kwargs.get("use_covariates", True)
+        validate_covariate_support(
+            x_context if use_covariates else None,
+            x_target if use_covariates else None,
+            supports_past_only=True,
+            supports_future_only=False,
+            supports_both=True,
+            model_name="Chronos-2",
+        )
         context_length = min(self.context_length, y_context.shape[0])
         forecast_horizon = timestamps_target.shape[0]
         num_samples = kwargs.get("num_samples", 100)
-        use_covariates = kwargs.get("use_covariates", True)
 
         # Trim or pad context
         if y_context.shape[0] >= context_length:

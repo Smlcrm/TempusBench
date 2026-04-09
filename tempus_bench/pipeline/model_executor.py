@@ -45,6 +45,73 @@ MODEL_CLASS_NAME_OVERRIDES = {
 from tempus_bench.utils.utils import validate_forecast_sanity
 from tempus_bench.pipeline.data_types import Dataset
 
+# Printed on its own line before ``json.dumps(outputs)`` so the parent can find the payload
+# even when libraries emit other ``[...]``-shaped lines earlier on stdout.
+_JSON_OUTPUT_SENTINEL = "__TEMPUSBENCH_MODEL_EXECUTOR_OUTPUT_JSON__"
+_LEGACY_JSON_OUTPUT_SENTINELS = ("__TEMPUSBENCH_MODEL_EXECUTOR_RESULTS__",)
+_JSON_OUTPUT_SENTINELS = (_JSON_OUTPUT_SENTINEL,) + _LEGACY_JSON_OUTPUT_SENTINELS
+
+
+def parse_subprocess_eval_stdout(stdout: str) -> list:
+    """Parse ``model_executor`` subprocess stdout into the per-window evaluation list.
+
+    Prefer the sentinel line (current protocol). Otherwise scan **from the end**: the
+    real ``json.dumps(outputs)`` line is almost always last, while stray ``[...]`` lines
+    from dependencies often appear earlier and used to be mistaken for the payload.
+    """
+    raw = (stdout or "").strip()
+    if not raw:
+        raise ValueError("Subprocess stdout is empty")
+    lines = raw.split("\n")
+    dec = json.JSONDecoder()
+
+    for sentinel in _JSON_OUTPUT_SENTINELS:
+        for i, line in enumerate(lines):
+            if line.strip() != sentinel:
+                continue
+            remainder = "\n".join(lines[i + 1 :]).strip()
+            if not remainder:
+                raise ValueError(
+                    f"After {sentinel!r}, expected JSON payload. Stdout tail: {raw[-500:]!r}"
+                )
+            try:
+                out, end = dec.raw_decode(remainder)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"After {sentinel!r}, JSON decode failed: {e}. "
+                    f"Payload prefix: {remainder[:240]!r}"
+                ) from e
+            trailing = remainder[end:].strip()
+            if trailing:
+                raise ValueError(
+                    f"After {sentinel!r}, trailing garbage after JSON: {trailing[:120]!r}"
+                )
+            if not isinstance(out, list):
+                raise ValueError(
+                    f"After {sentinel!r}, expected a JSON array, got {type(out).__name__}"
+                )
+            return out
+
+    for line in reversed(lines):
+        s = line.strip()
+        if not s or s == "[]":
+            continue
+        try:
+            out, end = dec.raw_decode(s)
+        except json.JSONDecodeError:
+            continue
+        if end < len(s):
+            continue
+        if isinstance(out, list) and len(out) > 0 and all(
+            isinstance(x, dict) for x in out
+        ):
+            return out
+
+    raise ValueError(
+        "No evaluation results found in subprocess stdout (no sentinel and no parseable "
+        f"non-empty JSON array of objects). Stdout tail: {raw[-500:]!r}"
+    )
+
 
 def _scaler_from_dataset_metadata(metadata: Optional[Dict[str, Any]]):
     """Reconstruct StandardScaler from DataLoader metadata (pickle-safe)."""
@@ -211,28 +278,7 @@ class ModelExecutor:
                     raise
             if result is None:
                 raise RuntimeError("Model execution failed after install retry")
-            lines = result.stdout.strip().split("\n")
-            outputs_line = None
-            for line in lines:
-                stripped = line.strip()
-                if stripped.startswith("[") and stripped.endswith("]"):
-                    outputs_line = stripped
-                    break
-
-            if outputs_line is None:
-                raise ValueError(
-                    f"No evaluation results found in stdout. "
-                    f"Expected a line starting with '[' and ending with ']'. "
-                    f"Stdout: {result.stdout[:500]}"
-                )
-            #print("OUTPUTS LINE", outputs_line)
-            try:
-                outputs = json.loads(outputs_line)
-            except json.JSONDecodeError as e:
-                raise ValueError(
-                    f"Error parsing evaluation results as JSON: {e}. "
-                    f"Line: {outputs_line[:200]}"
-                )
+            outputs = parse_subprocess_eval_stdout(result.stdout)
         return outputs
 
     def _get_model_requirements(self, model_name: str) -> str:
@@ -617,7 +663,9 @@ def main():
 
         outputs.append(output)
 
-    # Output results as JSON (metrics may include datetimes / numpy scalars)
+    # Output results as JSON (metrics may include datetimes / numpy scalars).
+    # Sentinel line lets the parent parse stdout even when deps print ``[]``-like noise.
+    print(_JSON_OUTPUT_SENTINEL)
     print(json.dumps(outputs, default=str))
 
 
