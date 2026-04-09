@@ -1,4 +1,7 @@
 import functools
+import inspect
+import re
+import textwrap
 import numpy as np
 import pandas as pd
 
@@ -75,6 +78,73 @@ def _truncate_ttm_aligned_history(
 
 
 _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = False
+_SKTIME_TTM_FH_PATCH_DONE = False
+
+# sktime TinyTimeMixerForecaster._predict: the non-MultiIndex branch builds
+# ``ForecastingHorizon(range(...))`` without ``freq`` while MultiIndex uses ``freq=self.fh``.
+# ``to_absolute`` then hits ``to_offset(fh.freq)`` with ``freq is None`` (Batch / cloud logs:
+# _fh.py ``_to_offset``). Patch the bound method source once per process.
+_TTM_PREDICT_ELSE_FH_PATTERN = re.compile(
+    r"(index = \(\s*\n)"
+    r"(\s*)ForecastingHorizon\(range\(1, pred\.shape\[1\] \+ 1\)\)\s*\n"
+    r"(\s*)\.to_absolute\(self\._cutoff\)\s*\n"
+    r"(\s*)\._values\s*\n"
+    r"(\s*\))",
+    re.MULTILINE,
+)
+
+
+def _fix_sktime_ttm_predict_source_for_tests(src: str) -> tuple[str, int]:
+    """Replace else-branch ForecastingHorizon to include ``freq=self.fh.freq``. For unit tests."""
+    out, n = _TTM_PREDICT_ELSE_FH_PATTERN.subn(
+        lambda m: (
+            f"{m.group(1)}"
+            f"{m.group(2)}ForecastingHorizon(range(1, pred.shape[1] + 1), freq=self.fh.freq)\n"
+            f"{m.group(3)}.to_absolute(self._cutoff)\n"
+            f"{m.group(4)}._values\n"
+            f"{m.group(5)}"
+        ),
+        src,
+        count=1,
+    )
+    return out, n
+
+
+def _patch_sktime_ttm_predict_forecasting_horizon_freq() -> None:
+    """Monkeypatch ``TinyTimeMixerForecaster._predict`` so the non-MultiIndex path passes ``fh.freq``."""
+    global _SKTIME_TTM_FH_PATCH_DONE
+    if _SKTIME_TTM_FH_PATCH_DONE:
+        return
+    import sktime.forecasting.ttm as ttm_mod
+    from sktime.forecasting.ttm import TinyTimeMixerForecaster
+
+    src = textwrap.dedent(
+        "".join(inspect.getsourcelines(TinyTimeMixerForecaster._predict)[0])
+    )
+    patched, n = _fix_sktime_ttm_predict_source_for_tests(src)
+    if n != 1:
+        if _TTM_PREDICT_ELSE_FH_PATTERN.search(src) is None:
+            # Else branch already uses freq (fixed upstream) or layout changed.
+            m_alt = re.search(
+                r"else:\s*\n\s*index = \(\s*\n\s*ForecastingHorizon\(range\(1, pred\.shape\[1\] \+ 1\), freq=self\.fh\.freq\)",
+                src,
+            )
+            if m_alt is not None:
+                _SKTIME_TTM_FH_PATCH_DONE = True
+                return
+        raise RuntimeError(
+            "TempusBench could not patch sktime TinyTimeMixerForecaster._predict "
+            "(non-MultiIndex ForecastingHorizon freq). Check sktime version."
+        )
+
+    local: dict[str, Any] = {}
+    exec(
+        compile(patched, "<TinyTimeMixerForecaster._predict tempusbench>", "exec"),
+        ttm_mod.__dict__,
+        local,
+    )
+    TinyTimeMixerForecaster._predict = local["_predict"]  # type: ignore[assignment]
+    _SKTIME_TTM_FH_PATCH_DONE = True
 
 
 def _patch_transformers_tiny_time_mixer_tied_weights() -> None:
@@ -228,6 +298,7 @@ class TinyTimeMixerR1Model(BaseModel):
             freq=freq_offset,
         )
         _patch_transformers_tiny_time_mixer_tied_weights()
+        _patch_sktime_ttm_predict_forecasting_horizon_freq()
         self._model = TinyTimeMixerForecaster(
             model_path=model_path, revision=revision
         )
