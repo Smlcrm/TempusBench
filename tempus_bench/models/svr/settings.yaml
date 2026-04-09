@@ -2,7 +2,9 @@ model_type: deterministic
 python_version: '3.12'
 lookback_window: 32
 capabilities:
-  covariates: none
+  # Past covariates are passed on covariate tasks for benchmark compatibility; the SVR
+  # implementation forecasts from the target series only (same as other channel-wise ML baselines).
+  covariates: past_only
   univariate: true
   multivariate: true
 foundation: false
