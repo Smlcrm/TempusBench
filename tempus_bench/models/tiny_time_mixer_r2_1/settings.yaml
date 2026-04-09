@@ -1,6 +1,6 @@
 model_type: deterministic
 python_version: '3.12'
-hf_model_name: ibm-granite/granite-timeseries-ttm-r2
+hf_model_name: ibm-granite/granite-timeseries-ttm-r2.1
 capabilities:
   covariates: past_future
   univariate: true

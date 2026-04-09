@@ -6,7 +6,48 @@ from pydantic import BaseModel as PydanticBaseModel, Field
 from sktime.forecasting.base import ForecastingHorizon
 from sktime.forecasting.ttm import TinyTimeMixerForecaster
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import (
+    BaseModel,
+    validate_inputs,
+    validate_covariate_support,
+)
+
+# IBM Granite TTM checkpoints on HuggingFace are trained with context lengths 512 / 1024 / 1536.
+# Longer benchmark windows must use the **tail** of history so sktime/TTM never sees excess length.
+TTM_MAX_CONTEXT_LENGTH: int = 1536
+
+
+def _truncate_ttm_aligned_history(
+    y_context: np.ndarray,
+    timestamps_context: np.ndarray,
+    x_context: Optional[np.ndarray],
+    *,
+    max_len: int,
+) -> tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
+    """Keep only the last ``max_len`` rows of ``y`` / timestamps / past covariates (aligned)."""
+    n_rows = int(y_context.shape[0])
+    ts = np.asarray(timestamps_context)
+    if ts.ndim != 1:
+        raise ValueError(
+            f"timestamps_context must be 1D, got shape {ts.shape}"
+        )
+    if ts.shape[0] != n_rows:
+        raise ValueError(
+            f"timestamps_context length ({ts.shape[0]}) must match y_context rows ({n_rows})"
+        )
+    if x_context is not None:
+        xc = np.asarray(x_context)
+        if xc.shape[0] != n_rows:
+            raise ValueError(
+                f"x_context rows ({xc.shape[0]}) must match y_context rows ({n_rows})"
+            )
+    if n_rows <= max_len:
+        return y_context, timestamps_context, x_context
+    start = n_rows - max_len
+    y2 = y_context[start:]
+    ts2 = ts[start:]
+    x2 = None if x_context is None else np.asarray(x_context)[start:]
+    return y2, ts2, x2
 from tempus_bench.utils.sktime_datetime_freq import (
     infer_pandas_freq_offset_for_datetime_index,
 )
@@ -111,6 +152,14 @@ class TinyTimeMixerR1Model(BaseModel):
         Returns:
             self: The fitted model instance
         """
+        validate_covariate_support(
+            x_context,
+            x_target,
+            supports_past_only=True,
+            supports_future_only=True,
+            supports_both=True,
+            model_name="TinyTimeMixer",
+        )
         self.is_fitted = True
         return self
 
@@ -124,6 +173,20 @@ class TinyTimeMixerR1Model(BaseModel):
         x_target: Optional[np.ndarray] = None,
         **kwargs,
     ):
+        validate_covariate_support(
+            x_context,
+            x_target,
+            supports_past_only=True,
+            supports_future_only=True,
+            supports_both=True,
+            model_name="TinyTimeMixer",
+        )
+        y_context, timestamps_context, x_context = _truncate_ttm_aligned_history(
+            y_context,
+            timestamps_context,
+            x_context,
+            max_len=TTM_MAX_CONTEXT_LENGTH,
+        )
         num_targets = y_context.shape[1]
         forecast_horizon = timestamps_target.shape[0]
         columns = list(range(num_targets))
