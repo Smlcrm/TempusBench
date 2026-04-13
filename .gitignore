@@ -70,5 +70,9 @@ temp/
 *.tmp
 *.temp
 
+# Local or generated trees whose top segment is temp_* (e.g. temp_task_datasets).
+# Uses temp_ + glob so tempus_bench/ is not ignored.
+temp_*
+
 .cursor/
 .venv*
