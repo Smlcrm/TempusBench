@@ -83,8 +83,11 @@ def parse_subprocess_eval_stdout(stdout: str) -> list:
                 ) from e
             trailing = remainder[end:].strip()
             if trailing:
-                raise ValueError(
-                    f"After {sentinel!r}, trailing garbage after JSON: {trailing[:120]!r}"
+                print(
+                    f"[model_executor] warning: ignoring trailing output after JSON "
+                    f"(likely library warnings on stdout): {trailing[:200]!r}",
+                    file=sys.stderr,
+                    flush=True,
                 )
             if not isinstance(out, list):
                 raise ValueError(
@@ -537,6 +540,13 @@ def main():
             # Chronos-2 expects past_covariates (history_length,) and future_covariates (prediction_length,)
             x_context_predict = covariate[cstart:tend]
             x_target_predict = covariate[vstart:vend] if model_name not in PAST_ONLY_COVARIATE_MODELS else None
+
+        # VARMAX stacks covariates as extra endogenous columns and fits on context ∪ train targets.
+        # Past-only models usually omit x_target_train; VARMAX still needs those rows to stack with y_target.
+        if model_name == "varmax" and dataset.covariate is not None:
+            c = np.asarray(dataset.covariate)
+            x_context_train = c[cstart:cend]
+            x_target_train = c[tstart:tend]
 
         train_call_kwargs: dict = {
             "x_context": x_context_train,

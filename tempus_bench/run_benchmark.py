@@ -20,9 +20,8 @@ import os
 import pickle
 import tempfile
 import traceback
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional, Tuple
 
 # Telemetry: log uncaught Python exceptions to /tmp for the cloud worker (job_execution.run) to capture
 def _telemetry_excepthook(exc_type, exc_value, exc_tb):
@@ -47,6 +46,51 @@ from tempus_bench.pipeline.hyperparameter_tuner import HyperparameterTuner
 _import_stage("DataLoader")
 from tempus_bench.pipeline.data_loader import DataLoader
 _import_stage("imports_done")
+
+
+def _job_id_from_env_strict() -> Optional[str]:
+    """Trimmed ``JOB_ID`` only — no ``RUN_ID`` or other aliases."""
+    raw = (os.environ.get("JOB_ID") or "").strip()
+    return raw if raw else None
+
+
+def _gcp_project_from_env_strict() -> Optional[str]:
+    """Trimmed ``GCP_PROJECT`` only — no ``GOOGLE_CLOUD_PROJECT`` or other aliases."""
+    raw = (os.environ.get("GCP_PROJECT") or "").strip()
+    return raw if raw else None
+
+
+def _resolve_job_id_and_results_callback(
+    results_callback: Optional[Callable[..., Any]],
+) -> Tuple[Optional[str], Optional[Callable[..., Any]]]:
+    """Resolve ``JOB_ID`` and whether per-window export may run (strict env names only).
+
+    Uses ``JOB_ID`` and ``GCP_PROJECT`` only — no ``RUN_ID`` / ``GOOGLE_CLOUD_PROJECT``
+    aliases. If any required variable is missing while a callback was supplied, logs and
+    returns ``(job_id, None)`` so the benchmark run still completes without crashing.
+    """
+    job_id = _job_id_from_env_strict()
+    if results_callback is None:
+        return job_id, None
+    if not job_id:
+        print(
+            "[BenchmarkRunner] results_callback ignored: JOB_ID not set",
+            flush=True,
+        )
+        return job_id, None
+    if not _gcp_project_from_env_strict():
+        print(
+            "[BenchmarkRunner] results_callback ignored: GCP_PROJECT not set",
+            flush=True,
+        )
+        return job_id, None
+    if os.environ.get("BQ_BUFFER_RESULTS") != "1":
+        print(
+            "[BenchmarkRunner] BQ_BUFFER_RESULTS is not '1'; per-window BigQuery export disabled",
+            flush=True,
+        )
+        return job_id, None
+    return job_id, results_callback
 
 
 class BenchmarkRunner:
@@ -126,30 +170,16 @@ class BenchmarkRunner:
     def run(self):
         """Execute the end-to-end benchmarking pipeline."""
 
-        job_id = os.environ.get("JOB_ID")
-        gcp_project = os.environ.get("GCP_PROJECT")
-        results_callback = self.results_callback
-        if results_callback is not None:
-            if not job_id:
-                print(
-                    "[BenchmarkRunner] results_callback ignored: JOB_ID not set",
-                    flush=True,
-                )
-                results_callback = None
-            elif not gcp_project:
-                print(
-                    "[BenchmarkRunner] results_callback ignored: GCP_PROJECT not set",
-                    flush=True,
-                )
-                results_callback = None
-            elif os.environ.get("BQ_BUFFER_RESULTS") != "1":
-                print(
-                    "[BenchmarkRunner] BQ_BUFFER_RESULTS not set; streaming per-window",
-                    flush=True,
-                )
-        else:
+        requested_callback = self.results_callback
+        job_id, results_callback = _resolve_job_id_and_results_callback(requested_callback)
+        if requested_callback is None:
             print(
                 "[BenchmarkRunner] No results_callback; per-window export disabled.",
+                flush=True,
+            )
+        elif results_callback is None:
+            print(
+                "[BenchmarkRunner] Per-window export not active (see messages above if any).",
                 flush=True,
             )
 

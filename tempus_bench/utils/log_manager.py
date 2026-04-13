@@ -99,12 +99,19 @@ def _forecast_custom_category_display_title(
 
 # Defer TensorFlow import to avoid macOS mutex crash (TF 2.20+ on ARM).
 # When TEMPUSBENCH_DISABLE_TENSORBOARD=1, skip TF entirely and use no-op writer.
-_DISABLE_TB = os.environ.get("TEMPUSBENCH_DISABLE_TENSORBOARD", "").strip() in ("1", "true", "yes")
+# Important: read the env at *call* time, not at log_manager import time, so tests/runners
+# can set TEMPUSBENCH_DISABLE_TENSORBOARD after other modules imported LogManager.
+def _tensorboard_disabled() -> bool:
+    return os.environ.get("TEMPUSBENCH_DISABLE_TENSORBOARD", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def _get_tf():
     """Lazy import TensorFlow (avoids mutex crash when disabled)."""
-    if _DISABLE_TB:
+    if _tensorboard_disabled():
         return None
     os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
     os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
@@ -115,7 +122,7 @@ def _get_tf():
 
 def _get_hp():
     """Lazy import TensorBoard hparams plugin."""
-    if _DISABLE_TB:
+    if _tensorboard_disabled():
         return None
     from tensorboard.plugins.hparams import api as hp
     return hp
@@ -315,7 +322,7 @@ class LogManager:
         Returns:
             bool: True if TensorBoard logging is enabled, False otherwise.
         """
-        return self.tensorboard_logging and not _DISABLE_TB
+        return self.tensorboard_logging and not _tensorboard_disabled()
 
     # ==================== Context Manager Methods ====================
 

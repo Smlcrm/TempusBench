@@ -55,3 +55,41 @@ def test_parse_accepts_legacy_results_sentinel_alias() -> None:
     payload = [{"ok": True}]
     stdout = f"__TEMPUSBENCH_MODEL_EXECUTOR_RESULTS__\n{json.dumps(payload)}\n"
     assert parse_subprocess_eval_stdout(stdout) == payload
+
+
+def test_parse_tolerates_trailing_gluonts_warning() -> None:
+    """gluonts writes UserWarning to stdout after JSON (toto model)."""
+    payload = [{"mae": 0.5, "y_pred": [1.0, 2.0]}]
+    gluonts_noise = (
+        "/opt/conda/envs/benchmark.toto/lib/python3.11/site-packages/"
+        "gluonts/json.py:102: UserWarning: Using `json`-module for js"
+    )
+    stdout = f"{_JSON_OUTPUT_SENTINEL}\n{json.dumps(payload)}\n{gluonts_noise}"
+    assert parse_subprocess_eval_stdout(stdout) == payload
+
+
+def test_parse_tolerates_trailing_absl_warning() -> None:
+    """absl/grpc writes WARNING to stdout after JSON (lstm, sundial models)."""
+    payload = [{"mse": 0.3, "y_pred": [1.0]}]
+    absl_noise = (
+        "WARNING: All log messages before absl::InitializeLog() "
+        "is called are written to STDERR\n"
+        "I0000 00:00:1775760657.833709  68"
+    )
+    stdout = f"{_JSON_OUTPUT_SENTINEL}\n{json.dumps(payload)}\n{absl_noise}"
+    assert parse_subprocess_eval_stdout(stdout) == payload
+
+
+def test_parse_tolerates_trailing_whitespace_only() -> None:
+    """Trailing whitespace/newlines after JSON should not interfere."""
+    payload = [{"mae": 0.1}]
+    stdout = f"{_JSON_OUTPUT_SENTINEL}\n{json.dumps(payload)}\n\n   \n"
+    assert parse_subprocess_eval_stdout(stdout) == payload
+
+
+def test_parse_trailing_garbage_with_multiline_json() -> None:
+    """Trailing garbage after pretty-printed JSON should be tolerated."""
+    payload = [{"mae": 0.1}, {"mae": 0.2}]
+    pretty = json.dumps(payload, indent=2)
+    stdout = f"{_JSON_OUTPUT_SENTINEL}\n{pretty}\nSome library cleanup message"
+    assert parse_subprocess_eval_stdout(stdout) == payload
