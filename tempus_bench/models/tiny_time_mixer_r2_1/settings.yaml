@@ -1,6 +1,7 @@
 model_type: deterministic
 python_version: '3.12'
-hf_model_name: ibm-granite/granite-timeseries-ttm-r2.1
+# r2.1 lives as a branch on the r2 repo; use a synthetic path for local GCS FUSE layout.
+hf_model_name: ibm-granite/granite-timeseries-ttm-r2-r2.1
 capabilities:
   covariates: past_future
   univariate: true
