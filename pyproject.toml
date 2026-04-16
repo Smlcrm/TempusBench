@@ -16,11 +16,13 @@ dependencies = [
     "joblib>=1.5.1",
     "numpy>=2.3.2",
     "pandas>=2.3.2",
+    "polars>=1.0.0",
     "python-dateutil>=2.9.0",
     "pytz>=2025.2",
     "pyyaml>=6.0.2",
     "scikit-learn>=1.7.1",
     "scipy>=1.15.3",
+    "statsmodels>=0.14.0",
     "six>=1.17.0",
     "threadpoolctl>=3.6.0",
     "tzdata>=2025.2",
@@ -50,6 +52,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
+    "packaging>=23.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "black>=22.0.0",
@@ -66,3 +69,11 @@ include = ["tempus_bench*"]
 
 [tool.setuptools.package-data]
 "tempus_bench" = ["**/*.yaml", "**/*.json", "**/*.txt", "**/*.md"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: CPU-heavy / diffusion (e.g. Sundial); run explicitly or exclude with -m \"not slow\"",
+    "model_matrix: full per-model matrix; requires RUN_MODEL_MATRIX_TEST=1 for integration modules",
+    "needs_weights: requires MODEL_WEIGHTS_PATH and local hf snapshot",
+    "needs_conda: exercises conda subprocess / model executor; requires CONDA_MATRIX_TEST=1",
+]

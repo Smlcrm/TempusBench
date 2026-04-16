@@ -26,6 +26,10 @@ from hashlib import sha1
 import lightning
 import torch
 import wandb
+
+from tempus_bench.compat.lightning_pytree import apply_lightning_pytree_leafspec_patch
+
+apply_lightning_pytree_leafspec_patch()
 from gluonts.evaluation import Evaluator, make_evaluation_predictions
 from gluonts.evaluation._base import aggregate_valid
 from gluonts.transform import ExpectedNumInstanceSampler
@@ -581,7 +585,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_embd_per_head", type=int, default=64)
     parser.add_argument("--n_head", type=int, default=4)
     parser.add_argument("--dim_feedforward", type=int, default=256)
-    parser.add_argument("--lags_seq", type=str, nargs="+", default=["Q", "M", "W", "D", "H", "T", "S"])
+    parser.add_argument("--lags_seq", type=str, nargs="+", default=["QE", "ME", "W", "D", "h", "min", "s"])
 
     # Data normalization
     parser.add_argument(

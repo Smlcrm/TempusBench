@@ -66,6 +66,8 @@ class XgboostModel(BaseModel):
         """
         super().__init__(params, settings, XgboostHyperparams)
         self._build_model(params, settings)
+        # Original target channel count before optional covariate stacking (see covariate tests).
+        self._num_original_targets: int = 0
 
     def _create_multivariate_features(
         self, y_series: np.ndarray, **kwargs: dict
@@ -232,6 +234,8 @@ class XgboostModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "XgboostModel":
         """
@@ -261,6 +265,8 @@ class XgboostModel(BaseModel):
 
         # Reference params, settings, device, python_version
         lookback_window = self.lookback_window
+
+        self._num_original_targets = int(y_context.shape[1])
 
         # Use full target data if available and has more data than context
         if y_target is not None and y_target.shape[1] > y_context.shape[1]:
@@ -372,6 +378,8 @@ class XgboostModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
         """

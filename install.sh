@@ -14,9 +14,12 @@ conda activate tempus_bench
 
 # Install the package in development mode (dependencies from pyproject.toml)
 echo "📦 Installing package and dependencies..."
-pip install -e .
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+pip install -e "$REPO_ROOT"
 
 echo "✅ Installation complete!"
 echo ""
-echo "🎯 You can now run benchmarks with:"
-echo "   python tempus_bench/run_benchmark.py --config tempus_bench/config/benchmark.yaml"
+echo "📖 Library README: README.md"
+echo ""
+echo "🎯 Run benchmarks (from repo root):"
+echo "   python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark.yaml"

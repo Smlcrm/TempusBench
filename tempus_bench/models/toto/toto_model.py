@@ -1,32 +1,27 @@
 import os
-import re
-
+import sys
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
+
+# Vendored Datadog ``toto`` package lives in this directory as ``toto/``. Its modules use
+# ``from toto....`` absolute imports. Those must resolve to the vendored tree, not
+# ``tempus_bench.models.toto`` (this file's package), so the wrapper dir must precede
+# normal imports of vendored code.
+_TOTO_WRAPPER_DIR = Path(__file__).resolve().parent
+if str(_TOTO_WRAPPER_DIR) not in sys.path:
+    sys.path.insert(0, str(_TOTO_WRAPPER_DIR))
 
 import numpy as np
 import pandas as pd
 import torch
 from pydantic import BaseModel as PydanticBaseModel, Field
 
-from tempus_bench.models.base_model import BaseModel
+from toto.data.util.dataset import MaskedTimeseries
+from toto.inference.forecaster import TotoForecaster
+from toto.model.toto import Toto
 
-# Import from toto package using absolute imports from the tempus_bench.models.toto package
-# Since toto_model.py is in tempus_bench.models.toto and toto/ is a subpackage,
-# we can import it as a relative subpackage
-try:
-    from .toto.data.util.dataset import MaskedTimeseries
-    from .toto.inference.forecaster import TotoForecaster
-    from .toto.model.toto import Toto
-except ImportError:
-    # Fallback: if relative imports fail, try absolute imports by adding parent to path
-    import sys
-    from pathlib import Path
-    _toto_model_dir = Path(__file__).parent
-    if str(_toto_model_dir) not in sys.path:
-        sys.path.insert(0, str(_toto_model_dir))
-    from toto.data.util.dataset import MaskedTimeseries
-    from toto.inference.forecaster import TotoForecaster
-    from toto.model.toto import Toto
+from tempus_bench.models.base_model import BaseModel
+from tempus_bench.models.toto import freq_seconds as _toto_freq_seconds
 
 
 class TotoHyperparams(PydanticBaseModel):
@@ -48,10 +43,18 @@ class TotoModel(BaseModel):
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = self.CUBLAS_WORKSPACE_CONFIG
         torch.use_deterministic_algorithms(self.use_deterministic_algorithms)
         torch.device(self.device)
-        toto = Toto.from_pretrained(self.model_name)
+        toto = Toto.from_pretrained(self.hf_model_name)
         toto.to(self.device)
-        # JIT compilation for faster inference
-        toto.compile()
+        try:
+            toto.compile()
+        except Exception as exc:
+            import warnings
+
+            warnings.warn(
+                f"Toto torch.compile() skipped (inference still works): {exc}",
+                UserWarning,
+                stacklevel=1,
+            )
         self._model = TotoForecaster(toto.model)
 
     def train(
@@ -60,6 +63,8 @@ class TotoModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "TotoModel":
         """
@@ -83,6 +88,8 @@ class TotoModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
@@ -104,42 +111,66 @@ class TotoModel(BaseModel):
         # y_context shape: (num_steps, num_variates)
         # timestamps_context shape: (num_steps,)
         # timestamps_target shape: (forecast_horizon,)
+        # x_context shape: (num_steps, num_covariates) if provided
+        # x_target shape: (forecast_horizon, num_covariates) if provided
         num_steps, num_variates = y_context.shape
         forecast_horizon = len(timestamps_target)
-        
+
         timestamps_context = timestamps_context / 1e9  # Convert nanoseconds to seconds
-        time_diff = self.freq_to_seconds(freq)
+        time_diff = _toto_freq_seconds.freq_to_seconds(freq)
 
-        # Convert to tensors and transpose to (num_variates, num_steps)
-        # Then add batch dimension to get (1, num_variates, num_steps)
+        # Build series: [target | covariates]. Exogenous MUST be at the end.
         y_context_tensor = torch.tensor(y_context.T, dtype=torch.float)  # (num_variates, num_steps)
-        y_context_tensor = y_context_tensor.unsqueeze(0)  # (1, num_variates, num_steps)
-        
-        timestamps_context_tensor = torch.tensor(timestamps_context, dtype=torch.float)  # (num_steps,)
-        # Expand timestamps to match series shape: (1, num_variates, num_steps)
-        timestamps_context_tensor = timestamps_context_tensor.unsqueeze(0).unsqueeze(0)  # (1, 1, num_steps)
-        timestamps_context_tensor = timestamps_context_tensor.expand(1, num_variates, -1)  # (1, num_variates, num_steps)
+        future_exogenous = None
+        num_exogenous = 0
 
-        # Create a MaskedTimeseries object
-        # All tensors need shape: (batch=1, variates, seq_len)
+        # TOTO supports past-only, future-only, or both (optional, independent)
+        if x_context is not None:
+            x_context_tensor = torch.tensor(x_context.T, dtype=torch.float)
+            series = torch.cat([y_context_tensor, x_context_tensor], dim=0)
+            num_exogenous = x_context.shape[1]
+        else:
+            series = y_context_tensor
+            num_exogenous = 0
+
+        if x_target is not None:
+            x_target_trimmed = x_target[:forecast_horizon]
+            future_exogenous = torch.tensor(
+                x_target_trimmed.T, dtype=torch.float
+            ).unsqueeze(0)
+        else:
+            future_exogenous = None
+
+        series = series.unsqueeze(0)  # (1, num_variates [+ num_covariates], num_steps)
+        num_channels = series.shape[1]
+
+        timestamps_context_tensor = torch.tensor(timestamps_context, dtype=torch.float)
+        timestamps_context_tensor = timestamps_context_tensor.unsqueeze(0).unsqueeze(0)
+        timestamps_context_tensor = timestamps_context_tensor.expand(1, num_channels, -1)
+
         inputs = MaskedTimeseries(
-            series=y_context_tensor,  # (1, num_variates, num_steps)
-            padding_mask=torch.full_like(y_context_tensor, True, dtype=torch.bool),  # (1, num_variates, num_steps)
-            id_mask=torch.zeros_like(y_context_tensor[:, :, :1], dtype=torch.float),  # (1, num_variates, 1) - broadcastable
-            timestamp_seconds=timestamps_context_tensor,  # (1, num_variates, num_steps)
-            time_interval_seconds=torch.full((1, num_variates), time_diff, dtype=torch.float),  # (1, num_variates)
+            series=series,
+            padding_mask=torch.full_like(series, True, dtype=torch.bool),
+            id_mask=torch.zeros_like(series[:, :, :1], dtype=torch.float),
+            timestamp_seconds=timestamps_context_tensor,
+            time_interval_seconds=torch.full((1, num_channels), time_diff, dtype=torch.float),
+            num_exogenous_variables=num_exogenous,
         )
+        inputs = inputs.to(self.device)
+        if future_exogenous is not None:
+            future_exogenous = future_exogenous.to(self.device)
 
-        # Generate forecasts
         forecast = self._model.forecast(
             inputs,
             prediction_length=forecast_horizon,
-            num_samples=num_samples,  # Use configured number of samples
-            samples_per_batch=num_samples,  # Control memory usage during inference
+            num_samples=num_samples,
+            # Keep generation micro-batches fixed; coupling this to num_samples
+            # can create attention-mask shape mismatches in Toto internals.
+            samples_per_batch=1,
+            future_exogenous_variables=future_exogenous,
         )
 
-        # forecast.samples shape: (batch=1, variate, future_time_steps, samples)
-        # We need: (samples, future_time_steps, variate)
+        # forecast.samples already excludes exogenous (only target variates)
         forecast_samples = forecast.samples  # (1, num_variates, forecast_horizon, num_samples)
         forecast_samples = forecast_samples.squeeze(0)  # (num_variates, forecast_horizon, num_samples)
         # Transpose to (num_samples, forecast_horizon, num_variates)
@@ -151,129 +182,8 @@ class TotoModel(BaseModel):
         return forecast_samples
 
     def freq_to_seconds(self, freq: Union[str, float, int]) -> float:
-        """
-        Convert a frequency string with an increment to seconds.
-
-        Accepts forms like:
-        - '15m', '30min', '45sec', '2h', '1.5h'
-        - '4w', '12mth', '1y', '250ms', '10us', '100ns'
-        - pandas-style short forms are fine: '2H', '15MIN', '30S'
-        - week anchors like 'W-MON' are treated as a week
-        Returns:
-        float seconds
-        """
-        if isinstance(freq, (int, float)):
-            # Assume already seconds if a number is given
-            return float(freq)
-
-        if not isinstance(freq, str) or not freq.strip():
-            raise ValueError(f"Unsupported frequency: {freq!r}")
-
-        s = freq.strip().lower().replace("µs", "us")
-
-        # Handle pandas week anchors like 'w-mon', 'w-fri' → treat as 1 week
-        if s.startswith("w-"):
-            return 7 * 24 * 3600.0
-
-        # Extract numeric value + unit (e.g., '15m', '30min', '1.5h', '250ms')
-        m = re.fullmatch(r"\s*(?P<val>[+-]?\d*\.?\d+)\s*(?P<unit>[a-z\-]+)\s*", s)
-        if not m:
-            # Also allow pure units like 'h' (implied 1)
-            m = re.fullmatch(r"\s*(?P<unit>[a-z\-]+)\s*", s)
-            if m:
-                val = 1.0
-                unit = m.group("unit")
-            else:
-                raise ValueError(f"Could not parse frequency string: {freq!r}")
-        else:
-            val = float(m.group("val"))
-            unit = m.group("unit")
-
-        # Canonicalize common aliases
-        aliases = {
-            # sub-second
-            "ns": "ns",
-            "nanosecond": "ns",
-            "nanoseconds": "ns",
-            "us": "us",
-            "microsecond": "us",
-            "microseconds": "us",
-            "ms": "ms",
-            "millisecond": "ms",
-            "milliseconds": "ms",
-            # seconds
-            "s": "s",
-            "sec": "s",
-            "secs": "s",
-            "second": "s",
-            "seconds": "s",
-            # minutes
-            "m": "min",
-            "min": "min",
-            "mins": "min",
-            "t": "min",
-            "minute": "min",
-            "minutes": "min",
-            # hours
-            "h": "h",
-            "hr": "h",
-            "hrs": "h",
-            "hour": "h",
-            "hours": "h",
-            # days
-            "d": "d",
-            "day": "d",
-            "days": "d",
-            # weeks
-            "w": "w",
-            "wk": "w",
-            "wks": "w",
-            "week": "w",
-            "weeks": "w",
-            # months (calendar-average)
-            "mth": "mon",
-            "mths": "mon",
-            "mo": "mon",
-            "mon": "mon",
-            "month": "mon",
-            "months": "mon",
-            # years (calendar-average)
-            "y": "y",
-            "yr": "y",
-            "yrs": "y",
-            "year": "y",
-            "years": "y",
-            # explicit words sometimes seen
-            "minu": "min",
-            "mins.": "min",
-            "sec.": "s",
-        }
-
-        unit = aliases.get(unit, unit)  # fold alias
-
-        # Seconds per unit (months/years use astronomical averages)
-        SECS = {
-            "ns": 1e-9,
-            "us": 1e-6,
-            "ms": 1e-3,
-            "s": 1.0,
-            "min": 60.0,
-            "h": 3600.0,
-            "d": 86400.0,
-            "w": 7 * 86400.0,
-            # Averages: 365.25 days/year, 12 months/year → ~30.44 days/month
-            "mon": 365.25 / 12 * 86400.0,  # ≈ 2_629_746 seconds
-            "y": 365.25 * 86400.0,  # ≈ 31_557_600 seconds
-        }
-
-        # Also accept pandas-like unit spellings directly:
-        # 'sec', 'second', 'minutes', etc. handled via aliases above.
-        if unit not in SECS:
-            # Try a few pandas-like quirks: 'w-mon' already handled; 'qs', 'a' not supported as they’re not fixed.
-            # If someone passes 'w-mon', we caught it at the top. Anything else unknown → error.
-            raise ValueError(f"Unsupported or non-fixed frequency unit: {unit!r} from {freq!r}")
-
-        return float(val) * SECS[unit]
+        """Delegate to :func:`~tempus_bench.models.toto.freq_seconds.freq_to_seconds`."""
+        return _toto_freq_seconds.freq_to_seconds(freq)
 
     # def _sub_predict(self, input_series: torch.Tensor, time_interval_sec: int = 900) -> dict:
     #     """

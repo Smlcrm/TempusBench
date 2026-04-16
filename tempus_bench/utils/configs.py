@@ -8,7 +8,10 @@ validation, type checking, and documentation of the benchmarking pipeline.
 import yaml
 
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Final, List, Literal, Optional
+
+# Upper bound for ``evaluation.max_windows`` in YAML/programmatic configs (rolling-window count).
+MAX_EVALUATION_WINDOWS: Final[int] = 5
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
@@ -54,7 +57,8 @@ class EvaluationConfig(BaseModel):
     Attributes:
         tuning_loss (Optional[Literal["mae", "mase", "mape", "rmse"]]): Loss metric
             for hyperparameter tuning. Only deterministic metrics allowed.
-        max_windows (int): Maximum number of rolling windows to generate for evaluation.
+        max_windows (int): Maximum number of rolling windows to generate for evaluation
+            (capped at MAX_EVALUATION_WINDOWS inclusive).
         max_num_variates (Optional[int]): Maximum number of variates to extract from
             dataset. None means all variates.
         num_samples (int): Number of samples to generate for stochastic metrics.
@@ -65,7 +69,21 @@ class EvaluationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    task_path: str = Field(..., description="Task path")
+    task_path: Optional[str] = Field(default=None, description="Single task path pattern")
+    task_paths: Optional[List[str]] = Field(
+        default=None,
+        description="List of task paths; when set, overrides task_path for multiple tasks",
+    )
+
+    @model_validator(mode="after")
+    def require_task_path_or_paths(self):
+        if not self.task_path and not self.task_paths:
+            raise ValueError("Either task_path or task_paths must be provided")
+        if self.task_path and self.task_paths:
+            raise ValueError("Provide task_path OR task_paths, not both")
+        if self.task_paths and len(self.task_paths) == 0:
+            raise ValueError("task_paths cannot be empty")
+        return self
 
     tuning_loss: Optional[Literal["mae", "mase", "mape", "rmse"]] = Field(
         default="mae",
@@ -73,9 +91,13 @@ class EvaluationConfig(BaseModel):
         "Only deterministic (point) metrics are allowed: mae, mase, mape, rmse.",
     )
     max_windows: int = Field(
-        default=10,
+        default=MAX_EVALUATION_WINDOWS,
         ge=1,
-        description="Maximum number of rolling windows to generate for evaluation",
+        le=MAX_EVALUATION_WINDOWS,
+        description=(
+            "Maximum number of rolling windows to generate for evaluation "
+            f"(must be between 1 and {MAX_EVALUATION_WINDOWS}, inclusive)"
+        ),
     )
     max_num_variates: Optional[int] = Field(
         default=None,
@@ -244,6 +266,7 @@ class JobConfig:
             device, conda environment).
         task_config (TaskConfig): Task-specific configuration including dataset settings.
         run_path (str): Path to run directory for outputs.
+        task_datasets_dir (Optional[str]): Dir for ``{task_name}.pkl`` (BenchmarkRunner temp dir).
         logger (LoggerManager): Logger instance for this job.
     """
 
@@ -255,6 +278,7 @@ class JobConfig:
         model_setting: Dict[str, Any],
         task_config: TaskConfig,
         run_path: str,
+        task_datasets_dir: Optional[str] = None,
     ):
         """
         Initialize job configuration with all components.
@@ -266,6 +290,7 @@ class JobConfig:
             model_setting (Dict[str, Any]): Model execution settings.
             task_config (TaskConfig): Task-specific configuration.
             run_path (str): Path to run directory for outputs.
+            task_datasets_dir: Directory for pickled task datasets; set by BenchmarkRunner.
         """
 
         self.evaluation_config = evaluation_config
@@ -274,6 +299,7 @@ class JobConfig:
         self.model_setting = model_setting
         self.task_config = task_config
         self.run_path = run_path
+        self.task_datasets_dir = task_datasets_dir
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -288,7 +314,7 @@ class JobConfig:
             Dict[str, Any]: Dictionary representation of the JobConfig suitable
                 for JSON serialization.
         """
-        return {
+        d: Dict[str, Any] = {
             "evaluation_config": self.evaluation_config.model_dump(),
             "evaluation_setting": self.evaluation_setting.model_dump(),
             "model_config": {
@@ -303,3 +329,6 @@ class JobConfig:
             "task_config": self.task_config.model_dump(),
             "run_path": self.run_path,
         }
+        if self.task_datasets_dir is not None:
+            d["task_datasets_dir"] = self.task_datasets_dir
+        return d

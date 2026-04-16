@@ -34,12 +34,14 @@ class Dataset:
     Container for time series dataset with all splits and metadata.
 
     This class holds the complete time series data including timestamps, target
-    values, optional scaler for normalization, and metadata.
+    values, optional covariates, and metadata.
 
     Attributes:
         timestamps (np.ndarray): Array of timestamps of shape (num_steps,).
         target (np.ndarray): 2D numpy array of target values with shape
             (num_steps, num_targets).
+        covariate (Optional[np.ndarray]): 2D numpy array of covariate values with shape
+            (num_steps, num_covariates). Set to None if no covariates are present.
         scaler (Optional[StandardScaler]): Scaler used for normalization
             (if any). Set to None if no normalization was applied.
         metadata (Optional[Dict[str, Any]]): Dictionary of metadata including
@@ -48,6 +50,7 @@ class Dataset:
 
     timestamps: List[float]  # Array of timestamps (same length as num_steps) or None
     target: List[List[float]]  # 2D np.ndarray of Target values
+    covariate: Optional[List[List[float]]] = None  # 2D array of Covariate values
     metadata: Optional[Dict[str, Any]] = None
 
     def generate_dataset_split(

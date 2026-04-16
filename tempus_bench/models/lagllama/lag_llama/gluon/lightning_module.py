@@ -370,14 +370,14 @@ class LagLlamaLightningModule(LightningModule):
         )  # distr_args is a tuple with two tensors of shape (bsz, context_length+pred_len-1)
         context_target = take_last(
             past_target, dim=-1, num=self.context_length - 1
-        )  # (bsz, context_length-1) # Basically removes the first value since it cannot be predicted
+        )  # (bsz, context_length-1)
         target = torch.cat(
             (context_target, future_target_reshaped),
             dim=1,
-        )  # (bsz, context_length-1+pred_len) # values that can be predicted
+        )  # (bsz, context_length-1+pred_len)
         context_observed = take_last(
             past_observed_values, dim=-1, num=self.context_length - 1
-        )  # same as context_target, but for observed_values tensor
+        )
         observed_values = torch.cat(
             (context_observed, future_observed_reshaped), dim=1
         )  # same as target but for observed_values tensor

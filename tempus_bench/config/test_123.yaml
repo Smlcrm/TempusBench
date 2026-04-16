@@ -1,0 +1,30 @@
+# Covariate benchmark config
+# All models with covariate support (except lafn - requires external credentials)
+# Run with: python -m tempus_bench.run_benchmark --config <this-or-related-yaml>
+
+evaluation:
+  task_path: "univariate/absent_binary_univariate"
+  tuning_loss: mae
+  max_windows: 4
+  max_num_variates: 4
+  num_samples: 10
+  num_quantiles: 5
+  point_forecast_statistic: mean
+
+model:
+  croston_classic:
+    alpha: [0.1]
+    gamma: [0.1]
+
+  exponential_smoothing:
+    trend: ["null", "add"]
+    seasonal: ["null"]
+    seasonal_periods: [4]
+
+  lstm:
+    learning_rate: [0.01, 0.001, 0.0001]
+
+  theta:
+    sp: [12]
+    theta_method: [correlation_optimal]
+    use_reduced_rank: [false]
