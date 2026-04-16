@@ -5,7 +5,7 @@ accelerate==1.13.0
 adagio==0.2.6
 aiobotocore==2.26.0
 aiohappyeyeballs==2.6.1
-aiohttp==3.13.3
+aiohttp==3.13.4
 aioitertools==0.13.0
 aiosignal==1.4.0
 alembic==1.18.4
