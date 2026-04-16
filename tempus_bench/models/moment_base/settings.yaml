@@ -1,0 +1,16 @@
+model_type: deterministic
+device: cpu
+freeze_embedder: true
+freeze_encoder: true
+freeze_head: true
+head_dropout: 0.1
+python_version: '3.11'
+weight_decay: 0
+context_window: 512
+hf_model_name: AutonLab/MOMENT-1-base
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

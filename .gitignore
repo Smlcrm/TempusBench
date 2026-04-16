@@ -1,8 +1,21 @@
-# Python
+# TempusBench (library) repository root
+
+.DS_Store
+Thumbs.db
+
+logs/
+*.log
+
+gcp_credentials.json
+*credentials*.json
+*.key
+*.pem
+*.p12
+
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+
 .Python
 build/
 develop-eggs/
@@ -20,60 +33,46 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.mypy_cache/
+.ruff_cache/
+
 venv/
 env/
 ENV/
 
-# IDE
 .idea/
 .vscode/
 *.code-workspace
 *.swp
 *.swo
 
-# Project specific
 outputs/
-*.log
 lightning_logs/
-
-# Training runs and results
 runs/
 results/
-logs/
 *.tfevents.*
+tensorboard*
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-coverage.xml
-
-# System files
-.DS_Store
-Thumbs.db
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.temp
-
-# Model checkpoints and large model files
 *.ckpt
 *.pth
 *.pt
 *.bin
 *.safetensors
 checkpoints/
-models/*/checkpoints/
 **/checkpoints/
 
-runs/*runs/
+tmp/
+temp/
+*.tmp
+*.temp
 
-# Credentials and secrets
-gcp_credentials.json
-*credentials*.json
-*.key
-*.pem
-*.p12
+# Local or generated trees whose top segment is temp_* (e.g. temp_task_datasets).
+# Uses temp_ + glob so tempus_bench/ is not ignored.
+temp_*
+
+.cursor/
+.venv*

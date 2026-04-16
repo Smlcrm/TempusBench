@@ -41,6 +41,7 @@ class SvrModel(BaseModel):
         """
         super().__init__(params, settings, SvrHyperparams)
         self._scaler = StandardScaler()  # SVR is sensitive to feature scaling
+        self._effective_lookback: int = int(self.lookback_window)
 
     @validate_inputs
     def train(
@@ -49,6 +50,8 @@ class SvrModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "SvrModel":
         """
@@ -65,8 +68,16 @@ class SvrModel(BaseModel):
         # Handle (num_steps, num_targets) format
         y_series = np.concatenate([y_context, y_target], axis=0)
 
+        self._effective_lookback = self._resolve_effective_lookback(
+            series_length=y_series.shape[0],
+            forecast_horizon=forecast_horizon,
+            configured_lookback=lookback_window,
+        )
+
         X, y = self._create_features_targets(
-            y_series, forecast_horizon=forecast_horizon, lookback_window=lookback_window
+            y_series,
+            forecast_horizon=forecast_horizon,
+            lookback_window=self._effective_lookback,
         )
 
         # Scale features (SVR is sensitive to feature scaling)
@@ -83,6 +94,8 @@ class SvrModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ):
         """
@@ -95,14 +108,14 @@ class SvrModel(BaseModel):
         )
 
         # Reference params, settings, device, python_version
-        lookback_window = int(self.lookback_window)
+        lookback_window = int(self._effective_lookback)
 
         if not self.is_fitted:
             raise ValueError("Model is not trained yet. Call train() first.")
 
         if y_context.shape[0] < lookback_window:
             raise ValueError(
-                f"y_context too short: {y_context.shape[0]} < lookback_window {lookback_window}"
+                f"y_context too short: {y_context.shape[0]} < effective lookback {lookback_window}"
             )
 
         total_steps = len(timestamps_target)
@@ -114,7 +127,7 @@ class SvrModel(BaseModel):
         steps_done = 0
 
         while steps_done < total_steps:
-            # Use last lookback_window timesteps
+            # Use last effective lookback timesteps (matches training feature width)
             current_window = context[-lookback_window:, :]
 
             # Flatten for prediction
@@ -155,6 +168,25 @@ class SvrModel(BaseModel):
         )
         self._model = MultiOutputRegressor(base_svr)
         self.is_fitted = False
+
+    @staticmethod
+    def _resolve_effective_lookback(
+        *,
+        series_length: int,
+        forecast_horizon: int,
+        configured_lookback: int,
+    ) -> int:
+        """
+        Cap lookback so that a short context+train segment (e.g. covariate GDP tasks,
+        small context_window tasks) still yields at least one supervised sample.
+        """
+        if series_length <= forecast_horizon:
+            raise ValueError(
+                "Not enough data for SVR: concatenated context+train length "
+                f"{series_length} must be greater than forecast_horizon {forecast_horizon}"
+            )
+        max_feasible = series_length - forecast_horizon
+        return max(1, min(int(configured_lookback), max_feasible))
 
     def _create_features_targets(
         self, y_series: np.ndarray, forecast_horizon: int, lookback_window: int

@@ -20,7 +20,7 @@ from typing import (
     Sequence,
 )
 
-from tempus_bench.models.base_model import BaseModel, PydanticBaseModel
+from tempus_bench.models.base_model import BaseModel, PydanticBaseModel, validate_covariate_support
 
 from chronarium import Chronarium
 from tempus_bench.models.lafn.lafn_inferer import DataProcessor
@@ -71,10 +71,18 @@ class LafnModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> "LafnModel":
         """Pre-trained model – no fine-tuning required."""
-
+        validate_covariate_support(
+            x_context, x_target,
+            supports_past_only=False,
+            supports_future_only=False,
+            supports_both=False,
+            model_name="LAFN",
+        )
         return self
 
     def predict(
@@ -82,8 +90,17 @@ class LafnModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs,
     ) -> np.ndarray:
+        validate_covariate_support(
+            x_context, x_target,
+            supports_past_only=False,
+            supports_future_only=False,
+            supports_both=False,
+            model_name="LAFN",
+        )
         self.model.eval()
 
         forecast_horizon = timestamps_target.shape[0]
@@ -108,4 +125,4 @@ class LafnModel(BaseModel):
 
         samples = np.asarray(samples)
 
-        return forecasts, samples
+        return samples

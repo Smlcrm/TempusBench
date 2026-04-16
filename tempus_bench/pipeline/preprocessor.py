@@ -50,6 +50,39 @@ class Preprocessor:
         self.evaluation_config = evaluation_config
         self.max_num_variates = self.evaluation_config.max_num_variates
 
+    @staticmethod
+    def _normalize_pandas_freq_string(freq: str) -> str:
+        """
+        Map GluonTS / legacy freq strings to pandas 2.2+ offset aliases.
+
+        Pandas removed bare ``Y`` (e.g. ``1Y``); use ``YE`` (year-end). ``YS`` / ``1YE``
+        are left unchanged.
+        """
+        freq_mapping = {
+            "M": "ME",
+            "Q": "QE",
+            "A": "YE",
+            "Y": "YE",
+            "H": "h",
+            "D": "d",
+            "T": "min",
+            "S": "s",
+        }
+        mapped_freq = freq_mapping.get(freq, freq)
+        # Month/quarter end: map bare M/Q and e.g. 1M -> ME, but keep MS/QS (month/quarter start).
+        mapped_freq = re.sub(r"M(?!E|S)", "ME", mapped_freq)
+        mapped_freq = re.sub(r"Q(?!E|S)", "QE", mapped_freq)
+        mapped_freq = re.sub(r"(\d+)Y(?![ES])", r"\1YE", mapped_freq)
+        # GluonTS-style H/D/T/S -> pandas 2.x (avoid replacing letters inside MS, QS, BMS, etc.).
+        mapped_freq = re.sub(r"(\d+)H$", r"\1h", mapped_freq)
+        mapped_freq = re.sub(r"^H$", "h", mapped_freq)
+        mapped_freq = re.sub(r"(\d+)D$", r"\1d", mapped_freq)
+        mapped_freq = re.sub(r"^D$", "d", mapped_freq)
+        mapped_freq = re.sub(r"(\d+)T$", r"\1min", mapped_freq)
+        mapped_freq = re.sub(r"^T$", "min", mapped_freq)
+        mapped_freq = re.sub(r"(\d+)S$", r"\1s", mapped_freq)
+        return mapped_freq
+
     def _parse_and_clean_target(self, target_raw: str) -> np.ndarray:
         """
         Parse and clean raw target string data, handling empty values.
@@ -85,6 +118,12 @@ class Preprocessor:
         # This ignores trailing commas instead of treating them as empty values
         target_cleaned_str = re.sub(r",\s*\]", "]", target_cleaned_str)
 
+        # ast.literal_eval rejects nan/inf (they are identifiers, not literals).
+        # Replace with None/1e500 so parsing succeeds; post-processing converts to np.nan.
+        target_cleaned_str = re.sub(r"\b-(?i:inf)\b", "-1e500", target_cleaned_str)
+        target_cleaned_str = re.sub(r"\b(?i:inf)\b", "1e500", target_cleaned_str)
+        target_cleaned_str = re.sub(r"\b(?i:nan)\b", "None", target_cleaned_str)
+
         LogManager.get_logger().debug(
             "Preprocessor._parse_and_clean_target",
             f"[DEBUG] Cleaned target string length: {len(target_cleaned_str)}",
@@ -96,12 +135,12 @@ class Preprocessor:
                 "Preprocessor._parse_and_clean_target",
                 f"[DEBUG] Successfully parsed target with ast.literal_eval",
             )
-        except SyntaxError as e:
+        except (SyntaxError, ValueError) as e:
             LogManager.get_logger().debug(
                 "Preprocessor._parse_and_clean_target",
                 f"[DEBUG] ast.literal_eval failed: {e}",
             )
-            # If still fails, try more aggressive cleaning
+            # If still fails, try more aggressive cleaning (e.g. empty quotes -> None)
             target_cleaned_str = target_cleaned_str.replace('""', "None").replace(
                 "''", "None"
             )
@@ -263,14 +302,9 @@ class Preprocessor:
         """
         # Input requirement: arr shape (num_steps, num_targets)
         num_steps = arr.shape[0]
-        # Generate timestamps for each step (length = num_steps)
-        # Map deprecated frequency strings to new ones
-        freq_mapping = {
-            "M": "ME",  # Monthly -> Month End
-            "Q": "QE",  # Quarterly -> Quarter End
-            "A": "YE",  # Annual -> Year End
-        }
-        mapped_freq = freq_mapping.get(freq, freq)
+        if isinstance(freq, str) and freq.strip().lower() == "unknown":
+            freq = "s"
+        mapped_freq = Preprocessor._normalize_pandas_freq_string(freq)
 
         # Convert start to pandas Timestamp if it's a string or numeric
         try:
@@ -291,6 +325,9 @@ class Preprocessor:
                 f"Invalid start time format: {start!r}. Cannot convert to pandas Timestamp. "
                 f"Original error: {e}"
             )
+
+        if pd.isna(start_ts):
+            start_ts = pd.Timestamp("2000-01-01 00:00:00")
 
         # Generate date range with error handling for overflow
         try:
@@ -322,6 +359,8 @@ class Preprocessor:
         data = np.array(arr, dtype=float)  # ensure float dtype and copy
 
         result = data.copy()
+        # Non-finite values (Inf, NaN) must not reach JSON / sklearn. Treat Inf like missing.
+        result[~np.isfinite(result)] = np.nan
 
         if handle_missing == "drop":
             # Remove rows (timesteps) with any NaN values
@@ -362,6 +401,8 @@ class Preprocessor:
                 col_filled = self._forward_fill_column(result[:, col_idx])
                 result[:, col_idx] = self._backward_fill_column(col_filled)
 
+        result = self._coerce_finite_per_column(result, handle_missing)
+
         # Validate output shape is (num_steps, num_targets)
         if result.ndim != 2:
             raise ValueError(
@@ -387,6 +428,38 @@ class Preprocessor:
             )
 
         return timestamps, result
+
+    def _coerce_finite_per_column(
+        self, result: np.ndarray, handle_missing: str
+    ) -> np.ndarray:
+        """
+        Guarantee finite floats per column after ``handle_missing`` strategies.
+
+        Mean/median leave all-NaN columns unchanged; forward/backward fill can leave
+        leading/trailing NaNs. This pass maps any remaining non-finite values to NaN,
+        then interpolates (and forward/backward fill) so JSON + StandardScaler never see
+        NaN/Inf (RFC 8259 JSON has no ``NaN`` token; browsers reject it).
+        """
+        out = np.asarray(result, dtype=np.float64, order="C")
+        num_columns = out.shape[1]
+        for col_idx in range(num_columns):
+            column = out[:, col_idx]
+            if np.isfinite(column).all():
+                continue
+            fixed = column.astype(np.float64, copy=True)
+            fixed[~np.isfinite(fixed)] = np.nan
+            fixed = self._interpolate_column(fixed)
+            if not np.isfinite(fixed).all():
+                fixed = self._forward_fill_column(fixed)
+                fixed = self._backward_fill_column(fixed)
+            if not np.isfinite(fixed).all():
+                raise ValueError(
+                    f"Preprocessor cannot eliminate non-finite values in column {col_idx} "
+                    f"after handle_missing={handle_missing!r}. "
+                    "Inspect the raw series for invalid numeric tokens."
+                )
+            out[:, col_idx] = fixed
+        return out
 
     def _interpolate_column(self, col_data: np.ndarray) -> np.ndarray:
         """
@@ -575,19 +648,23 @@ class Preprocessor:
         )
 
         # 3. Validate/fix time_start
-        try:
-            pd.Timestamp(time_start)
-        except (ValueError, TypeError):
-            time_start = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+        # GluonTS-style CSVs often use the literal "unknown" for synthetic / aperiodic series.
+        if isinstance(time_start, str) and time_start.strip().lower() == "unknown":
+            time_start = "2000-01-01 00:00:00"
+        else:
+            try:
+                _ts = pd.Timestamp(time_start)
+                if pd.isna(_ts):
+                    time_start = "2000-01-01 00:00:00"
+            except (ValueError, TypeError):
+                time_start = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 4. Validate freq strictly (must come from data, no defaults)
-        # Map deprecated frequency strings to new ones
-        freq_mapping = {
-            "M": "ME",  # Monthly -> Month End
-            "Q": "QE",  # Quarterly -> Quarter End
-            "A": "YE",  # Annual -> Year End
-        }
-        mapped_freq = freq_mapping.get(freq)
+        # 4. Validate freq (pandas offset). "unknown" in CSV → synthetic evenly-spaced index.
+        if freq is None or not isinstance(freq, str):
+            freq = "D"
+        if freq.strip().lower() == "unknown":
+            freq = "s"
+        mapped_freq = self._normalize_pandas_freq_string(freq)
 
         try:
             pd.date_range(start=time_start, periods=2, freq=mapped_freq)

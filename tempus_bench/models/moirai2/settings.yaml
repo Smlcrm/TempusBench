@@ -1,0 +1,13 @@
+model_type: stochastic
+python_version: "3.11"
+device: cpu
+hf_model_name: Salesforce/moirai-2.0-R-small
+size: small
+bsz: 1
+model_size: small
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

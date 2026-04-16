@@ -8,6 +8,7 @@ edge cases for max_num_variates, model parameter validation, and foundation mode
 import pytest
 from pydantic import ValidationError
 from tempus_bench.utils.configs import (
+    MAX_EVALUATION_WINDOWS,
     EvaluationConfig,
     ModelConfig,
     DatasetConfig,
@@ -22,38 +23,48 @@ class TestEvaluationConfig:
     def test_valid_config_with_tuning_loss(self):
         """Test valid evaluation configuration with tuning loss."""
         config = EvaluationConfig(
+            task_path="*",
             tuning_loss="mae",
-            max_windows=20,
+            max_windows=MAX_EVALUATION_WINDOWS,
             max_num_variates=10,
             num_samples=100,
             num_quantiles=10,
             point_forecast_statistic="mean",
         )
         assert config.tuning_loss == "mae"
-        assert config.max_windows == 20
+        assert config.max_windows == MAX_EVALUATION_WINDOWS
         assert config.max_num_variates == 10
 
     def test_valid_config_with_default_tuning_loss(self):
         """Test valid evaluation configuration with default tuning loss."""
-        config = EvaluationConfig(max_windows=20)
+        config = EvaluationConfig(task_path="*", max_windows=MAX_EVALUATION_WINDOWS)
         assert config.tuning_loss == "mae"  # default value
-        assert config.max_windows == 20
+        assert config.max_windows == MAX_EVALUATION_WINDOWS
+
+    def test_default_max_windows_equals_cap(self):
+        """Omitted max_windows uses MAX_EVALUATION_WINDOWS."""
+        config = EvaluationConfig(task_path="*")
+        assert config.max_windows == MAX_EVALUATION_WINDOWS
 
     def test_invalid_tuning_loss(self):
         """Test invalid tuning loss value."""
         with pytest.raises(ValidationError) as exc_info:
-            EvaluationConfig(tuning_loss="invalid_metric", max_windows=20)  # type: ignore
+            EvaluationConfig(
+                task_path="*", tuning_loss="invalid_metric", max_windows=MAX_EVALUATION_WINDOWS
+            )  # type: ignore
         assert "Input should be 'mae', 'mase', 'mape' or 'rmse'" in str(exc_info.value)
 
     def test_max_num_variates_none(self):
         """Test max_num_variates with None value (default, all variates)."""
-        config = EvaluationConfig(tuning_loss="mae", max_windows=20)
+        config = EvaluationConfig(task_path="*", tuning_loss="mae", max_windows=MAX_EVALUATION_WINDOWS)
         assert config.max_num_variates is None
 
     def test_max_num_variates_invalid_negative(self):
         """Test that negative max_num_variates raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            EvaluationConfig(tuning_loss="mae", max_windows=20, max_num_variates=-1)
+            EvaluationConfig(
+                task_path="*", tuning_loss="mae", max_windows=MAX_EVALUATION_WINDOWS, max_num_variates=-1
+            )
         # Pydantic will validate ge constraint
         assert (
             "greater than or equal to" in str(exc_info.value).lower()
@@ -63,7 +74,9 @@ class TestEvaluationConfig:
     def test_max_num_variates_zero(self):
         """Test that zero max_num_variates raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            EvaluationConfig(tuning_loss="mae", max_windows=20, max_num_variates=0)
+            EvaluationConfig(
+                task_path="*", tuning_loss="mae", max_windows=MAX_EVALUATION_WINDOWS, max_num_variates=0
+            )
         # Pydantic will validate ge constraint if there is one
         assert (
             "greater than or equal to" in str(exc_info.value).lower()
@@ -72,8 +85,36 @@ class TestEvaluationConfig:
 
     def test_max_num_variates_valid_int(self):
         """Test that valid int values are accepted."""
-        config = EvaluationConfig(tuning_loss="mae", max_windows=20, max_num_variates=5)
+        config = EvaluationConfig(
+            task_path="*", tuning_loss="mae", max_windows=MAX_EVALUATION_WINDOWS, max_num_variates=5
+        )
         assert config.max_num_variates == 5
+
+    def test_task_paths_multiple_tasks(self):
+        """Test evaluation config with task_paths for multiple tasks."""
+        config = EvaluationConfig(
+            task_paths=["univariate/solar", "univariate/chickenpox"],
+            tuning_loss="mae",
+            max_windows=MAX_EVALUATION_WINDOWS,
+            max_num_variates=10,
+            num_samples=100,
+            num_quantiles=10,
+            point_forecast_statistic="mean",
+        )
+        assert config.task_paths == ["univariate/solar", "univariate/chickenpox"]
+        assert config.task_path is None
+
+    def test_task_path_or_task_paths_required(self):
+        """Test that either task_path or task_paths must be provided."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationConfig(tuning_loss="mae", max_windows=MAX_EVALUATION_WINDOWS)
+        assert "task_path" in str(exc_info.value).lower()
+
+    def test_max_windows_above_cap_rejected(self):
+        """max_windows may not exceed MAX_EVALUATION_WINDOWS (config YAML and API)."""
+        with pytest.raises(ValidationError) as exc_info:
+            EvaluationConfig(task_path="*", max_windows=MAX_EVALUATION_WINDOWS + 1)
+        assert "max_windows" in str(exc_info.value).lower()
 
 
 class TestModelConfig:

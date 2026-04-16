@@ -1,0 +1,12 @@
+model_type: deterministic
+python_version: '3.12'
+device: cpu
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  # Same pattern as tft/timesnet; batch_size default 64 not in grid.
+  input_size: [128, 256]
+  max_steps: [25]

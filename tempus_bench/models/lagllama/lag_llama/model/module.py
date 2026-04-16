@@ -493,48 +493,42 @@ class LagLlamaModel(nn.Module):
             past_target, past_observed_values
         )  # Data is standardized (past_observed_values is passed as "weights" parameter) # (bsz, context_length+max(self.lags_seq)
 
-        # In the below code, instead of max(self.lags_seq), it was previously -self.context_length
+        max_lags = max(self.lags_seq)
         if future_target is not None:
             input = torch.cat(
                 (
-                    scaled_past_target[..., max(self.lags_seq) :],  # Just the context
-                    (future_target[..., :-1] - loc)
-                    / scale,  # Not sure about the -1 here. Maybe so since the last value isn't used in the model for prediction of any new values. also if the prediction length is 1, this doesn't really affect anything
+                    scaled_past_target[..., max_lags:],
+                    (future_target[..., :-1] - loc) / scale,
                 ),
                 dim=-1,
-            )  # Shape is (bsz, context_length+(pred_len-1))
-        else:
-            input = scaled_past_target[..., max(self.lags_seq) :]
-        if (past_time_feat is not None) and (future_time_feat is not None):
-            time_feat = (
-                torch.cat(
-                    (
-                        past_time_feat[..., max(self.lags_seq) :, :],
-                        future_time_feat[..., :-1, :],
-                    ),
-                    dim=1,
-                )
-                if future_time_feat is not None
-                else past_time_feat[..., max(self.lags_seq) :, :]
             )
+        else:
+            input = scaled_past_target[..., max_lags:]
+        if (past_time_feat is not None) and (future_time_feat is not None):
+            time_feat = torch.cat(
+                (
+                    past_time_feat[..., max_lags:, :],
+                    future_time_feat[..., :-1, :],
+                ),
+                dim=1,
+            )
+        else:
+            time_feat = None
 
-        prior_input = (
-            past_target[..., : max(self.lags_seq)] - loc
-        ) / scale  # This the history used to construct lags.  # bsz, max(self.lags_seq)
+        prior_input = (past_target[..., :max_lags] - loc) / scale
 
         lags = lagged_sequence_values(
             self.lags_seq, prior_input, input, dim=-1
-        )  # Lags are added as an extra dim. Shape is (bsz, context_length+(pred_len-1), len(self.lags_seq))
+        )
 
         static_feat = torch.cat(
             (loc.abs().log1p(), scale.log()), dim=-1
-        )  # (bsz, 2) (loc and scale are concatenated)
+        )
         expanded_static_feat = unsqueeze_expand(
             static_feat, dim=-2, size=lags.shape[-2]
-        )  # (bsz, context_length+(pred_len-1), 2)
-        # expanded_static_feat: (bsz, context_length+(pred_len-1), len(self.lags_seq) + 2); (bsz, 1); (bsz, 1)
+        )
 
-        if past_time_feat is not None:
+        if time_feat is not None:
             return (
                 torch.cat((lags, expanded_static_feat, time_feat), dim=-1),
                 loc,

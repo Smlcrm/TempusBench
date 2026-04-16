@@ -1,2 +1,11 @@
-model_type: "deterministic"
-python_version: "3.12"
+model_type: deterministic
+python_version: '3.12'
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  trend: ['null', add]
+  seasonal: ['null']
+  seasonal_periods: [4, 8, 16, 32]

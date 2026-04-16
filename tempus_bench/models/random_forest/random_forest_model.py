@@ -5,7 +5,7 @@ Random Forest model implementation for time series forecasting
 import numpy as np
 import pandas as pd
 
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 from pydantic import BaseModel as PydanticBaseModel, Field
 from sklearn.ensemble import RandomForestRegressor
 
@@ -44,6 +44,8 @@ class RandomForestModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "RandomForestModel":
         """
@@ -93,6 +95,8 @@ class RandomForestModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
