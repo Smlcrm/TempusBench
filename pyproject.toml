@@ -10,6 +10,7 @@ authors = [
     {name = "SMLCRM Team"}
 ]
 readme = "README.md"
+license = { text = "CC-BY-NC-ND-4.0" }
 requires-python = ">=3.9"
 dependencies = [
     # Core dependencies
