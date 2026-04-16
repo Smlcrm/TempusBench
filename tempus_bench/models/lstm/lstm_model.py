@@ -5,9 +5,13 @@ This model extends the univariate LSTM to handle multiple target variables simul
 Design choices (all Option A):
 - Single output layer that predicts forecast_horizon * n_targets values (flattened)
 - Concatenate all targets into a single input sequence (context_length, n_targets)
+- Optional past and future covariates are concatenated on the feature axis; only targets are predicted.
 - Sum/average losses across all targets
 - Predict all targets simultaneously in one forward pass
 - Keep same LSTM architecture, just change input/output dimensions
+
+context_length and prediction_window are clamped each fit so that rolling-window training
+works when task context_window + forecast_horizon is smaller than the hyperparameter defaults.
 """
 
 import math
@@ -15,13 +19,18 @@ import math
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import tensorflow as tf
 from pydantic import BaseModel as PydanticBaseModel, Field
 from tensorflow.keras.callbacks import EarlyStopping  # type: ignore
 from tensorflow.keras.layers import LSTM, Dense, Dropout  # type: ignore
 from tensorflow.keras.models import Sequential  # type: ignore
 from tensorflow.keras.optimizers import Adam  # type: ignore
 
-from tempus_bench.models.base_model import BaseModel, validate_inputs
+from tempus_bench.models.base_model import (
+    BaseModel,
+    validate_covariate_support,
+    validate_inputs,
+)
 
 
 class LstmHyperparams(PydanticBaseModel):
@@ -37,9 +46,78 @@ class LstmHyperparams(PydanticBaseModel):
     prediction_window: int = Field(default=8, ge=1, description="Prediction window")
 
 
+def _mape_denominator_floor_epsilon() -> float:
+    """Floor on |y_true| inside MAPE so sparse / normalized series do not explode."""
+    return 1e-6
+
+
 class LstmModel(BaseModel):
     def __init__(self, params: Dict[str, Any], settings: Dict[str, Any]):
         super().__init__(params, settings, LstmHyperparams)  # type: ignore
+        self._runtime_n_y: int = 0
+        self._runtime_n_cov: int = 0
+        self._runtime_context_length: int = 0
+        self._runtime_prediction_window: int = 0
+
+    @staticmethod
+    def _resolve_runtime_lengths(
+        *,
+        n_ctx: int,
+        n_tgt: int,
+        requested_ctx: int,
+        requested_pred: int,
+    ) -> Tuple[int, int]:
+        """
+        Choose context and label horizon so at least one sliding window fits in n_ctx + n_tgt,
+        while never using more past rows than n_ctx (matches inference: history is context slice only).
+        """
+        combined_len = int(n_ctx) + int(n_tgt)
+        if combined_len < 2:
+            raise ValueError(
+                "LSTM requires at least 2 total timesteps in y_context ∪ y_target "
+                f"(got n_ctx={n_ctx}, n_tgt={n_tgt})."
+            )
+        req_ctx = int(requested_ctx)
+        req_pred = int(requested_pred)
+        if req_ctx < 1 or req_pred < 1:
+            raise ValueError(
+                f"LSTM context_length and prediction_window must be >= 1 "
+                f"(got {req_ctx}, {req_pred})."
+            )
+
+        # Past rows available in-rolling-window training are only the context slice (n_ctx);
+        # labels may draw from the full concatenated series (context + target segment).
+        ctx_eff = min(req_ctx, n_ctx, combined_len - 1)
+        pred_eff = min(req_pred, combined_len - ctx_eff)
+
+        if ctx_eff < 1 or pred_eff < 1:
+            raise ValueError(
+                "LSTM cannot form training sequences for this window: "
+                f"n_ctx={n_ctx}, n_tgt={n_tgt}, requested context_length={req_ctx}, "
+                f"prediction_window={req_pred}."
+            )
+        return ctx_eff, pred_eff
+
+    def _resolve_compile_loss(self, tuning_loss: str):
+        t = tuning_loss.lower()
+        if t == "mape":
+
+            def safe_mape(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+                eps = _mape_denominator_floor_epsilon()
+                denom = tf.maximum(tf.abs(y_true), eps)
+                return tf.reduce_mean(tf.abs(y_true - y_pred) / denom)
+
+            return safe_mape
+
+        loss_map = {
+            "mae": "mean_absolute_error",
+            "mase": "mean_absolute_error",
+            "mape": "mean_absolute_percentage_error",
+            "rmse": "root_mean_squared_error",
+            "mse": "mean_squared_error",
+        }
+        name = loss_map.get(t, t)
+        return name
 
     @validate_inputs
     def train(
@@ -48,6 +126,8 @@ class LstmModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "LstmModel":
         """
@@ -60,51 +140,107 @@ class LstmModel(BaseModel):
             y_target: Future target values (for supervised labels)
             timestamps_context: Timestamps for context (unused here)
             timestamps_target: Timestamps for target (unused here)
-            **kwargs: Extra options (currently ignored)
+            x_context / x_target: Optional covariates aligned with y_context / y_target
+            **kwargs: Must include tuning_loss
 
         Returns:
             self: The fitted model instance
         """
+        has_xc = x_context is not None
+        has_xt = x_target is not None
+        if has_xc ^ has_xt:
+            raise ValueError(
+                "LstmModel requires both x_context and x_target when using covariates."
+            )
+        if has_xc and has_xt:
+            validate_covariate_support(
+                x_context,
+                x_target,
+                supports_past_only=False,
+                supports_future_only=False,
+                supports_both=True,
+                model_name="LstmModel",
+            )
 
-        _, num_targets = y_context.shape
+        n_y = int(y_context.shape[1])
 
         # Ensure input data is numeric (float32) - Keras requires numeric dtypes
-        # Convert to new arrays to avoid issues with read-only arrays or object dtypes
-        y_context = np.array(y_context, dtype=np.float32, copy=True)
-        y_target = np.array(y_target, dtype=np.float32, copy=True)
+        y_context = np.asarray(y_context, dtype=np.float32, copy=True)
+        y_target = np.asarray(y_target, dtype=np.float32, copy=True)
 
-        # Combine context and target to make training sequences
-        combined_data = np.concatenate([y_context, y_target], axis=0)
-        X_seq, y_seq = self._prepare_sequences(combined_data)
-
-        # Build model if not done yet
-        if "_model" not in self.__dict__:
-            if "tuning_loss" not in kwargs:
+        if has_xc and has_xt:
+            xc = np.asarray(x_context, dtype=np.float32, copy=True)
+            xt = np.asarray(x_target, dtype=np.float32, copy=True)
+            if xc.shape[0] != y_context.shape[0]:
                 raise ValueError(
-                    "tuning_loss must be provided in kwargs for LSTM model"
+                    f"x_context rows ({xc.shape[0]}) must match y_context ({y_context.shape[0]})."
                 )
-            self._build_model(input_shape=(self.context_length, num_targets), tuning_loss=kwargs["tuning_loss"])  # type: ignore
+            if xt.shape[0] != y_target.shape[0]:
+                raise ValueError(
+                    f"x_target rows ({xt.shape[0]}) must match y_target ({y_target.shape[0]})."
+                )
+            if xc.shape[1] != xt.shape[1]:
+                raise ValueError(
+                    f"x_context and x_target must have same num covariates "
+                    f"({xc.shape[1]} vs {xt.shape[1]})."
+                )
+            z_context = np.concatenate([y_context, xc], axis=1)
+            z_target = np.concatenate([y_target, xt], axis=1)
+            n_cov = int(xc.shape[1])
+        else:
+            z_context = y_context
+            z_target = y_target
+            n_cov = 0
 
-        # Setup early stopping
+        n_ctx: int = int(y_context.shape[0])
+        n_tgt: int = int(y_target.shape[0])
+        ctx_eff, pred_eff = self._resolve_runtime_lengths(
+            n_ctx=n_ctx,
+            n_tgt=n_tgt,
+            requested_ctx=int(self.context_length),  # type: ignore[arg-type]
+            requested_pred=int(self.prediction_window),  # type: ignore[arg-type]
+        )
+
+        self._runtime_n_y = n_y
+        self._runtime_n_cov = n_cov
+        self._runtime_context_length = ctx_eff
+        self._runtime_prediction_window = pred_eff
+
+        combined_data = np.concatenate([z_context, z_target], axis=0)
+        X_seq, y_seq = self._prepare_sequences(
+            combined_data, ctx_eff, pred_eff, n_y
+        )
+
+        if "tuning_loss" not in kwargs:
+            raise ValueError(
+                "tuning_loss must be provided in kwargs for LSTM model"
+            )
+        tuning_loss_kw = str(kwargs["tuning_loss"])
+        compile_loss = self._resolve_compile_loss(tuning_loss_kw)
+
+        if "_model" in self.__dict__:
+            delattr(self, "_model")
+        n_feats = int(combined_data.shape[1])
+        self._build_model(
+            input_shape=(ctx_eff, n_feats),
+            prediction_window=pred_eff,
+            n_y_targets=n_y,
+            compile_loss=compile_loss,
+        )
+
         early_stopping = EarlyStopping(
             monitor="loss", patience=3, restore_best_weights=True, verbose=1
         )
-
         validation_split = 0.1 if len(X_seq) > 10 else 0.0
 
-        # Ensure X_seq and y_seq are float32 and contiguous before passing to Keras
-        # Force conversion to float32 and check for any string/object dtypes
-        if X_seq.dtype.kind in ["O", "U", "S"]:  # Object, Unicode, or String types
-            # Convert to numeric first, handling any string values
+        if X_seq.dtype.kind in ["O", "U", "S"]:
             X_seq = np.array(X_seq, dtype=np.float64, copy=True)
         X_seq = np.ascontiguousarray(X_seq, dtype=np.float32)
 
-        if y_seq.dtype.kind in ["O", "U", "S"]:  # Object, Unicode, or String types
-            # Convert to numeric first, handling any string values
+        if y_seq.dtype.kind in ["O", "U", "S"]:
             y_seq = np.array(y_seq, dtype=np.float64, copy=True)
         y_seq = np.ascontiguousarray(y_seq, dtype=np.float32)
 
-        # Final check - ensure arrays are numeric
         if not np.issubdtype(X_seq.dtype, np.number) or not np.issubdtype(
             y_seq.dtype, np.number
         ):
@@ -112,17 +248,22 @@ class LstmModel(BaseModel):
                 f"Data must be numeric. Got X_seq dtype: {X_seq.dtype}, y_seq dtype: {y_seq.dtype}"
             )
 
-        # Final verification - ensure arrays are truly numeric float32
-        assert X_seq.dtype == np.float32, f"X_seq must be float32, got {X_seq.dtype}"
-        assert y_seq.dtype == np.float32, f"y_seq must be float32, got {y_seq.dtype}"
-        assert X_seq.flags["C_CONTIGUOUS"], "X_seq must be contiguous"
-        assert y_seq.flags["C_CONTIGUOUS"], "y_seq must be contiguous"
+        if X_seq.dtype != np.float32:
+            raise ValueError(f"X_seq must be float32, got {X_seq.dtype}")
+        if y_seq.dtype != np.float32:
+            raise ValueError(f"y_seq must be float32, got {y_seq.dtype}")
+        if not X_seq.flags["C_CONTIGUOUS"]:
+            raise ValueError("X_seq must be contiguous")
+        if not y_seq.flags["C_CONTIGUOUS"]:
+            raise ValueError("y_seq must be contiguous")
 
-        self._model.fit(
+        batch_fit = min(int(self.batch_size), max(1, len(X_seq)))  # type: ignore[arg-type]
+
+        self._model.fit(  # type: ignore[union-attr]
             X_seq,
             y_seq,
-            batch_size=int(self.batch_size),  # type: ignore - ensure int
-            epochs=int(self.epochs),  # type: ignore - ensure int
+            batch_size=batch_fit,
+            epochs=int(self.epochs),  # type: ignore[arg-type]
             verbose=1,
             callbacks=[early_stopping] if validation_split > 0 else [],
             validation_split=float(validation_split) if validation_split > 0 else None,
@@ -137,19 +278,22 @@ class LstmModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
         Make predictions with the trained Multivariate LSTM model.
 
         Predicts the required number of steps ahead for all targets using non-overlapping multi-step windows.
-        Does not use own predictions as further inputs (no autoregressive feedback).
+        Does not use own predictions as further inputs for target channels (y); known future covariates are used when provided.
 
         Args:
             y_context: Context/history values (n_steps, n_targets)
             timestamps_context: Timestamps for context (unused)
             timestamps_target: Timestamps for target (unused)
-            freq: Frequency string (unused)
+            x_context: Covariates aligned with y_context (required if model was trained with covariates)
+            x_target: Future covariates aligned with timestamps_target (required if trained with covariates)
 
         Returns:
             np.ndarray: Model predictions with shape (forecast_steps, n_targets)
@@ -157,17 +301,56 @@ class LstmModel(BaseModel):
         if not self.is_fitted or "_model" not in self.__dict__:
             raise ValueError("Model not fitted. Call train() first.")
 
-        # Ensure input data is numeric (float32) - Keras requires numeric dtypes
-        # Convert to new array to avoid issues with read-only arrays or object dtypes
-        y_context = np.array(y_context, dtype=np.float32, copy=True)
+        n_y = self._runtime_n_y
+        n_cov = self._runtime_n_cov
+        context_length = self._runtime_context_length
+        prediction_window = self._runtime_prediction_window
+        if n_y < 1 or context_length < 1 or prediction_window < 1:
+            raise ValueError(
+                "LSTM runtime layout missing; train() must run before predict()."
+            )
 
-        # Get forecast length from timestamps_target, not y_context shape
+        y_context = np.asarray(y_context, dtype=np.float32, copy=True)
         forecast_length = len(timestamps_target)
-        num_context_steps, num_targets = y_context.shape
-        context_length = self.context_length  # type: ignore
-        prediction_window = self.prediction_window  # type: ignore
+        num_context_steps: int = int(y_context.shape[0])
 
-        # Ensure we have enough context data
+        if n_cov > 0:
+            if x_context is None or x_target is None:
+                raise ValueError(
+                    "Trained with covariates; predict requires x_context and x_target."
+                )
+            xc = np.asarray(x_context, dtype=np.float32, copy=True)
+            xf = np.asarray(x_target, dtype=np.float32, copy=True)
+            if xc.shape[0] != num_context_steps:
+                raise ValueError(
+                    f"x_context rows ({xc.shape[0]}) must match y_context ({num_context_steps})."
+                )
+            if xc.shape[1] != n_cov:
+                raise ValueError(
+                    f"x_context has {xc.shape[1]} columns but model expects {n_cov} covariates."
+                )
+            if xf.shape[0] != forecast_length:
+                raise ValueError(
+                    f"x_target rows ({xf.shape[0]}) must match forecast horizon ({forecast_length})."
+                )
+            if xf.shape[1] != n_cov:
+                raise ValueError(
+                    f"x_target has {xf.shape[1]} columns but model expects {n_cov} covariates."
+                )
+            z_context = np.concatenate([y_context, xc], axis=1)
+        else:
+            if x_context is not None or x_target is not None:
+                raise ValueError(
+                    "Model trained without covariates; omit x_context and x_target."
+                )
+            z_context = y_context
+
+        if z_context.shape[1] != n_y + n_cov:
+            raise ValueError(
+                f"Feature width mismatch: z has {z_context.shape[1]} columns, "
+                f"expected {n_y + n_cov} (n_y={n_y}, n_cov={n_cov})."
+            )
+
         if num_context_steps < context_length:
             raise ValueError(
                 f"y_context must have at least {context_length} timesteps, "
@@ -175,164 +358,154 @@ class LstmModel(BaseModel):
             )
 
         num_windows = math.ceil(forecast_length / prediction_window)
-
-        all_predictions = []
-        current_sequence = y_context[-context_length:].reshape(
-            1, context_length, num_targets
+        all_predictions: list[np.ndarray] = []
+        current_sequence = z_context[-context_length:].reshape(
+            1, context_length, n_y + n_cov
         )
 
+        t_future = 0
         for window in range(num_windows):
-            preds = self._model.predict(current_sequence, verbose=0)
-            preds_reshaped = preds[0].reshape(prediction_window, num_targets)
-            all_predictions.extend(preds_reshaped)
+            preds = self._model.predict(current_sequence, verbose=0)  # type: ignore[union-attr]
+            preds_reshaped = preds[0].reshape(prediction_window, n_y)
+            all_predictions.append(preds_reshaped)
 
-            # Only update current_sequence if not last window
             if window < num_windows - 1:
-                n = min(prediction_window, context_length)
-                # Create the next sequence by rolling and appending new predictions
+                n_roll = min(prediction_window, context_length)
                 current_sequence = np.roll(current_sequence, -prediction_window, axis=1)
-                current_sequence[0, -n:, :] = preds_reshaped[:n, :]
+                for j in range(n_roll):
+                    row_j = context_length - n_roll + j
+                    current_sequence[0, row_j, :n_y] = preds_reshaped[j, :]
+                    if n_cov > 0:
+                        current_sequence[0, row_j, n_y:] = xf[t_future + j, :]
+                t_future += n_roll
 
-        result = np.asarray(all_predictions[:forecast_length], dtype=np.float32)
+        stacked = np.concatenate(all_predictions, axis=0)
+        result = np.asarray(stacked[:forecast_length], dtype=np.float32)
 
         if result.ndim == 1:
             result = np.expand_dims(result, axis=1)
 
         return result
 
-    def _build_model(self, input_shape: Tuple[int, int], tuning_loss: str) -> None:
+    def _build_model(
+        self,
+        *,
+        input_shape: Tuple[int, int],
+        prediction_window: int,
+        n_y_targets: int,
+        compile_loss: Any,
+    ) -> None:
         """
         Build the Multivariate LSTM model architecture.
 
         Args:
-            input_shape: Shape of input data (context_length, num_targets)
+            input_shape: (context_length, num_input_features) where features are targets ∪ covariates
+            prediction_window: Steps predicted per forward pass
+            n_y_targets: Number of target variates (output channels only)
         """
-
-        _, num_targets = input_shape
         self._model = Sequential()
 
-        # Add LSTM layers
-        for layer_idx in range(self.layers):  # type: ignore
-            return_sequences = layer_idx < self.layers - 1  # type: ignore
+        for layer_idx in range(int(self.layers)):  # type: ignore[arg-type]
+            return_sequences = layer_idx < int(self.layers) - 1  # type: ignore[arg-type]
             self._model.add(
                 LSTM(
-                    units=self.units,  # type: ignore
+                    units=int(self.units),  # type: ignore[arg-type]
                     return_sequences=return_sequences,
                     input_shape=input_shape if layer_idx == 0 else None,
                 ),
             )
-            if self.dropout > 0:  # type: ignore
-                self._model.add(Dropout(self.dropout))  # type: ignore
+            if float(self.dropout) > 0:  # type: ignore[arg-type]
+                self._model.add(Dropout(float(self.dropout)))  # type: ignore[arg-type]
 
-        # Add output layer - predicts prediction_window * num_targets values (flattened)
-        self._model.add(Dense(self.prediction_window * num_targets))  # type: ignore
-
-        # Map tuning_loss to Keras loss function names
-        loss_map = {
-            "mae": "mean_absolute_error",
-            "mase": "mean_absolute_error",  # MASE not directly available, use MAE
-            "mape": "mean_absolute_percentage_error",
-            "rmse": "root_mean_squared_error",
-            "mse": "mean_squared_error",
-        }
-
-        keras_loss = loss_map.get(tuning_loss.lower(), tuning_loss.lower())
-
-        # Compile model with optimized settings
-        # Ensure optimizer parameters are floats
-        self._model.compile(
-            optimizer=Adam(
-                learning_rate=float(self.learning_rate),  # type: ignore
-                beta_1=float(self.beta_1),  # type: ignore
-                beta_2=float(self.beta_2),  # type: ignore
-                epsilon=float(self.epsilon),  # type: ignore
-            ),
-            loss=keras_loss,
-            metrics=[keras_loss],  # Add metrics to track during training
+        self._model.add(
+            Dense(int(prediction_window) * int(n_y_targets))
         )
 
-    def _prepare_sequences(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        train_metrics: list[Any] = (
+            [] if callable(compile_loss) else [compile_loss]
+        )
+
+        self._model.compile(
+            optimizer=Adam(
+                learning_rate=float(self.learning_rate),  # type: ignore[arg-type]
+                beta_1=float(self.beta_1),  # type: ignore[arg-type]
+                beta_2=float(self.beta_2),  # type: ignore[arg-type]
+                epsilon=float(self.epsilon),  # type: ignore[arg-type]
+            ),
+            loss=compile_loss,
+            metrics=train_metrics,
+        )
+
+    def _prepare_sequences(
+        self,
+        Z: np.ndarray,
+        context_length: int,
+        prediction_window: int,
+        n_y_targets: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Prepare input sequences for Multivariate LSTM.
 
         Args:
-            X: Input features (2D array with shape (num_timesteps, num_targets))
+            Z: Per-timestep features (num_timesteps, n_y + n_covariates)
+            context_length: LSTM time steps per input window
+            prediction_window: Steps to predict ahead (labels = first n_y targets only)
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: Prepared sequences and targets
+            X_seq: (num_sequences, context_length, n_features)
+            y_seq: (num_sequences, prediction_window * n_y_targets)
         """
-        # Ensure X is numeric (float32) - Keras requires numeric dtypes
-        # Convert to new array to avoid issues with read-only arrays or object dtypes
-        X = np.array(X, dtype=np.float32, copy=True)
+        Z = np.asarray(Z, dtype=np.float32, copy=True)
 
-        # Ensure X is 2D: (num_timesteps, num_targets) for multivariate
-        if X.ndim == 1:
-            # If univariate input, reshape to (num_timesteps, 1)
-            X = X.reshape(-1, 1)
-        elif X.ndim > 2:
-            # If 3D or higher, flatten to 2D
-            X = X.reshape(X.shape[0], -1)
+        if Z.ndim == 1:
+            Z = Z.reshape(-1, 1)
+        elif Z.ndim > 2:
+            Z = Z.reshape(Z.shape[0], -1)
 
-        # Check if we have enough data
-        min_length = self.context_length + self.prediction_window  # type: ignore
-        if len(X) < min_length:
-            context_length_val = self.context_length  # type: ignore
-            prediction_window_val = self.prediction_window  # type: ignore
+        min_length = int(context_length) + int(prediction_window)
+        if len(Z) < min_length:
             raise ValueError(
                 f"Input data must have at least {min_length} timesteps, "
-                f"but got {len(X)}. Need context_length ({context_length_val}) + "
-                f"prediction_window ({prediction_window_val})"
+                f"but got {len(Z)}. Need context_length ({context_length}) + "
+                f"prediction_window ({prediction_window})"
             )
 
-        X_seq, y_seq = [], []
-        for i in range(len(X) - self.context_length - self.prediction_window + 1):  # type: ignore
-            curr_X = X[i : (i + self.context_length)]  # type: ignore
-            # Ensure curr_X maintains 2D shape (context_length, num_targets)
+        X_seq: list[np.ndarray] = []
+        y_seq: list[np.ndarray] = []
+        n_y = int(n_y_targets)
+        for i in range(len(Z) - context_length - prediction_window + 1):
+            curr_X = Z[i : (i + context_length)]
             if curr_X.ndim == 1:
                 curr_X = curr_X.reshape(-1, 1)
-
-            # Ensure curr_X is float32 before appending
-            curr_X = np.array(curr_X, dtype=np.float32, copy=True)
-
+            curr_X = np.asarray(curr_X, dtype=np.float32, copy=True)
             X_seq.append(curr_X)
-            # y_seq: flatten to 1D array of length prediction_window * num_targets
-            future_values = X[
-                i
-                + self.context_length : i  # type: ignore
-                + self.context_length  # type: ignore
-                + self.prediction_window  # type: ignore
+
+            future_block = Z[
+                i + context_length : i + context_length + prediction_window
             ]
-            future_values = future_values.flatten()
-            # Ensure future_values is float32 before appending
-            future_values = np.array(future_values, dtype=np.float32, copy=True)
-            y_seq.append(future_values)
-
-        # Convert to numpy arrays and ensure correct shapes and numeric dtype
-        # Keras requires numeric dtypes (float32), not string or object
-        # First, stack the arrays properly to avoid object dtype issues
-        try:
-            X_seq = np.stack(X_seq, axis=0).astype(np.float32)
-        except (ValueError, TypeError) as e:
-            # If stacking fails, try to convert each element individually
-            X_seq_clean = [np.array(x, dtype=np.float32) for x in X_seq]
-            X_seq = np.stack(X_seq_clean, axis=0)
+            future_y = future_block[:, :n_y].reshape(-1)
+            future_y = np.asarray(future_y, dtype=np.float32, copy=True)
+            y_seq.append(future_y)
 
         try:
-            y_seq = np.stack(y_seq, axis=0).astype(np.float32)
-        except (ValueError, TypeError) as e:
-            # If stacking fails, try to convert each element individually
-            y_seq_clean = [np.array(y, dtype=np.float32) for y in y_seq]
-            y_seq = np.stack(y_seq_clean, axis=0)
+            X_arr = np.stack(X_seq, axis=0).astype(np.float32)
+        except (ValueError, TypeError):
+            X_clean = [np.array(x, dtype=np.float32) for x in X_seq]
+            X_arr = np.stack(X_clean, axis=0)
 
-        # Ensure arrays are contiguous and float32
-        X_seq = np.ascontiguousarray(X_seq, dtype=np.float32)
-        y_seq = np.ascontiguousarray(y_seq, dtype=np.float32)
+        try:
+            y_arr = np.stack(y_seq, axis=0).astype(np.float32)
+        except (ValueError, TypeError):
+            y_clean = [np.array(y, dtype=np.float32) for y in y_seq]
+            y_arr = np.stack(y_clean, axis=0)
 
-        # Ensure X_seq is 3D: (num_sequences, context_length, num_targets)
-        if X_seq.ndim != 3:
+        X_arr = np.ascontiguousarray(X_arr, dtype=np.float32)
+        y_arr = np.ascontiguousarray(y_arr, dtype=np.float32)
+
+        if X_arr.ndim != 3:
             raise ValueError(
-                f"X_seq should be 3D (num_sequences, context_length, num_targets), "
-                f"but got shape {X_seq.shape}"
+                f"X_seq should be 3D (num_sequences, context_length, num_features), "
+                f"but got shape {X_arr.shape}"
             )
 
-        return X_seq, y_seq
+        return X_arr, y_arr

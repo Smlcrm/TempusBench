@@ -1,10 +1,8 @@
-gluonts[torch]<=0.14.4
-numpy>=1.23.5
+# 0.15+ removed gluonts.torch.modules.loss (used by lag_llama/gluon/estimator.py)
+gluonts[torch]>=0.14.0,<0.15.0
 torch>=2.0.0
-wandb
-scipy
-pandas
-huggingface_hub[cli]
-matplotlib
-tensorflow>=2.11,<2.16
-
+numpy>=1.23.0
+pandas>=2.0.0
+scipy>=1.0.0
+huggingface_hub>=0.20.0
+orjson>=3.0.0

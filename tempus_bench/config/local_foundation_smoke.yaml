@@ -1,0 +1,21 @@
+# Local smoke: one small foundation model × univariate, multivariate, covariate.
+# From repository root:
+#   python -m tempus_bench.run_benchmark --config tempus_bench/config/local_foundation_smoke.yaml
+#
+# Uses conda env benchmark.chronos_tiny (see tempus_bench/config/settings.yaml).
+
+evaluation:
+  task_paths:
+    - univariate/chickenpox_dense_univariate
+    - multivariate/baggage_100_multivariate
+    # gdp_years_covariate has only 48 rows vs context_window 2048 — no windows.
+    - covariate/solar_100_covariate
+  tuning_loss: mae
+  max_windows: 1
+  max_num_variates: 4
+  num_samples: 5
+  num_quantiles: 3
+  point_forecast_statistic: mean
+
+model:
+  chronos_tiny: {}

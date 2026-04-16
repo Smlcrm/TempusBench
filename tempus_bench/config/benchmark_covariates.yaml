@@ -1,0 +1,73 @@
+# Covariate benchmark config
+# All models with covariate support (except lafn - requires external credentials)
+# Run with: python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark_covariates.yaml
+
+evaluation:
+  task_path: 'covariate/solar_100_covariate'
+  tuning_loss: mae
+  max_windows: 2
+  max_num_variates: 4
+  num_samples: 10
+  num_quantiles: 5
+  point_forecast_statistic: mean
+
+model:
+  # Neural / ML models
+  nbeats: {}
+  nhits: {}
+
+  # Chronos family
+  chronos_tiny: {}
+  chronos_mini: {}
+  chronos_small: {}
+  chronos_base: {}
+  chronos_large: {}
+  chronos_bolt_tiny: {}
+  chronos_bolt_mini: {}
+  chronos_bolt_small: {}
+  chronos_bolt_base: {}
+  chronos2: {}
+  chronos2_small: {}
+
+  # TimesFM
+  timesfm2: {}
+  timesfm_200m: {}
+  timesfm_500m: {}
+
+  # Time-MoE
+  time_moe_50m: {}
+  time_moe_200m: {}
+
+  # Tiny Time Mixer
+  tiny_time_mixer_r1: {}
+  tiny_time_mixer_r2: {}
+  tiny_time_mixer_r2_1: {}
+
+  # MOMENT
+  moment_small: {}
+  moment_base: {}
+  moment_large: {}
+
+  # Moirai
+  moirai_small: {}
+  moirai_base: {}
+  moirai_large: {}
+  moirai_moe: {}
+  moirai2: {}
+
+  # PatchTST
+  patchtst_fm: {}
+  patchtst_granite: {}
+
+  # Other foundation models
+  granite_flowstate: {}
+  kairos_10m: {}
+  kairos_23m: {}
+  kairos_50m: {}
+  lagllama: {}
+  toto: {}
+  tabpfn: {}
+  tabpfn_ts: {}
+  tirex: {}
+  tirex_1_1_gifteval: {}
+  sundial: {}

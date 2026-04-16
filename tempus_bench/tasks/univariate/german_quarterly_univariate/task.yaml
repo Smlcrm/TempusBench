@@ -1,0 +1,11 @@
+task:
+  task_name: quarterly
+  context_window: 32
+  forecast_horizon: 17
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: german_quarterly_univariate.csv
+
+# number of variates : 1
+# number of time-steps : 221

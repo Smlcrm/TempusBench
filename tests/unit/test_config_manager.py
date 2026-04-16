@@ -29,10 +29,10 @@ from tempus_bench.utils.paths import get_available_models, find_task_directories
 def sample_benchmark_config():
     """Sample benchmark configuration."""
     return {
-        "task_path": "*",
         "evaluation": {
+            "task_path": "*",
             "tuning_loss": "mae",
-            "max_windows": 20,
+            "max_windows": 5,
             "max_num_variates": 10,
             "num_samples": 100,
             "num_quantiles": 10,
@@ -521,10 +521,10 @@ class TestManagerFullIntegration:
         # Setup benchmark config
         config_file = project_root / "benchmark.yaml"
         config_data = {
-            "task_path": "univariate/*",
             "evaluation": {
+                "task_path": "univariate/*",
                 "tuning_loss": "mae",
-                "max_windows": 20,
+                "max_windows": 5,
                 "max_num_variates": 10,
             },
             "model": {"arima": {"p": [1, 2]}},
@@ -589,8 +589,11 @@ class TestManagerExceptionHandling:
         config_file = tmp_path / "benchmark.yaml"
         # Create invalid config that will trigger ValidationError
         config_data = {
-            "task_path": "*",
-            "evaluation": {"tuning_loss": "mae", "max_windows": -1},  # Invalid
+            "evaluation": {
+                "task_path": "*",
+                "tuning_loss": "mae",
+                "max_windows": -1,
+            },  # Invalid
             "model": {"arima": {"p": [1, 2]}},
         }
         config_file.write_text(yaml.dump(config_data))

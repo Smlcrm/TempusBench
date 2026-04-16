@@ -1,7 +1,7 @@
 task:
   task_name: nature
-  context_window: 128
-  forecast_horizon: 64
+  context_window: 32
+  forecast_horizon: 8
   dataset:
     handle_missing: interpolate
     normalize: true

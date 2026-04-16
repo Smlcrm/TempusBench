@@ -1,0 +1,20 @@
+# Optional: local Docker experiments against this repo only (no cloud UI in-tree).
+.git
+.github
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov
+*.egg-info
+.eggs
+dist
+build
+.env
+.env.*
+tempus_bench/models/*/notebooks
+tempus_bench/models/*/*/notebooks
+*.ipynb
+tempus_bench/models/**/checkpoints/
+tempus_bench/models/**/.cache/

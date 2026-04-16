@@ -1,0 +1,11 @@
+task:
+  task_name: sales
+  context_window: 18
+  forecast_horizon: 5
+  dataset:
+    handle_missing: interpolate
+    normalize: true
+    file_name: gdp_noisy_covariate.csv
+
+# number of covariates : 1
+# number of time-steps : 48

@@ -1,0 +1,9 @@
+model_type: deterministic
+python_version: '3.12'
+hf_model_name: ibm/TTM
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

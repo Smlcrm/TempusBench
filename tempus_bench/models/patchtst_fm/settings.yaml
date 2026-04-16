@@ -1,0 +1,11 @@
+model_type: stochastic
+python_version: '3.12'
+device: cpu
+hf_model_name: ibm-research/patchtst-fm-r1
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: false
+default_hyperparameter_grid:
+  stochastic_samples: [50, 100, 200]

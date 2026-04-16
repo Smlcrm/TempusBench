@@ -9,7 +9,7 @@ The model supports both seasonal and non-seasonal ARIMA variants and can handle
 exogenous variables for enhanced forecasting performance.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 from pydantic import BaseModel as PydanticBaseModel, Field
@@ -54,6 +54,8 @@ class ArimaModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "ArimaModel":
         """
@@ -75,6 +77,10 @@ class ArimaModel(BaseModel):
 
         freq = kwargs["freq"]
 
+        exog = None
+
+        if x_context is not None:
+            exog = x_context.squeeze()
         endog = y_context.squeeze()
 
         if self.s > 1:
@@ -82,13 +88,13 @@ class ArimaModel(BaseModel):
                 endog=endog,
                 order=(self.p, self.d, self.q),
                 seasonal_order=(0, 0, 0, self.s),
-                exog=None,
+                exog=exog,
             )
         else:
             model = ARIMA(
                 endog=endog,
                 order=(self.p, self.d, self.q),
-                exog=None,
+                exog=exog,
             )
 
         fitted_model = model.fit()
@@ -102,6 +108,8 @@ class ArimaModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
@@ -111,6 +119,7 @@ class ArimaModel(BaseModel):
             y_context: Past target values (unused, present for interface consistency)
             timestamps_context: Context timestamps (unused)
             timestamps_target: Timestamps for the forecast horizon
+            x_target: Exogenous variables for the forecast horizon (if model was trained with exog)
             freq: Frequency string (must be provided in kwargs)
 
         Returns:
@@ -129,7 +138,12 @@ class ArimaModel(BaseModel):
             )
 
         forecast_steps = len(timestamps_target)
-        forecast = arima_model.forecast(steps=forecast_steps)
+
+        exog = None
+        if x_target is not None:
+            exog = x_target.squeeze()
+
+        forecast = arima_model.forecast(steps=forecast_steps, exog=exog)
         y_pred = np.asarray(forecast).reshape(-1, 1)
 
         return y_pred
@@ -141,6 +155,8 @@ class ArimaModel(BaseModel):
         y_target: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> "ArimaModel":
         """
@@ -156,6 +172,8 @@ class ArimaModel(BaseModel):
                 y_target=y_target[:, k : k + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
+                x_context=x_context,
+                x_target=x_target,
                 **kwargs,
             )
             self._models.append(fitted_model)
@@ -170,6 +188,8 @@ class ArimaModel(BaseModel):
         y_context: np.ndarray,
         timestamps_context: np.ndarray,
         timestamps_target: np.ndarray,
+        x_context: Optional[np.ndarray] = None,
+        x_target: Optional[np.ndarray] = None,
         **kwargs: dict,
     ) -> np.ndarray:
         """
@@ -179,6 +199,8 @@ class ArimaModel(BaseModel):
             y_context (np.ndarray): Context values, shape (num_steps, num_variates).
             timestamps_context (np.ndarray): Timestamps for context data.
             timestamps_target (np.ndarray): Timestamps for target/future data.
+            x_context (Optional[np.ndarray]): Optional covariate data for context.
+            x_target (Optional[np.ndarray]): Optional covariate data for prediction horizon.
             **kwargs: Should include 'freq' key.
 
         Returns:
@@ -197,6 +219,8 @@ class ArimaModel(BaseModel):
                 y_context=y_context[:, idx : idx + 1],
                 timestamps_context=timestamps_context,
                 timestamps_target=timestamps_target,
+                x_context=x_context,
+                x_target=x_target,
                 **kwargs,
             )
             preds.append(prediction)
