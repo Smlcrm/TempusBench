@@ -74,5 +74,8 @@ temp/
 # Uses temp_ + glob so tempus_bench/ is not ignored.
 temp_*
 
+# Explicit: large generated dataset tree (also matched by temp_*).
+temp_task_datasets/
+
 .cursor/
 .venv*
