@@ -1,0 +1,14 @@
+model_type: deterministic
+python_version: '3.11'
+device: cpu
+foundation: false
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+default_hyperparameter_grid:
+  season_length: [4, 7, 12]
+  error_type: ['A', 'M']
+  season_type: ['A', 'M']
+  damped: [true, false]
+  phi: [0.8, 0.9, 0.98]

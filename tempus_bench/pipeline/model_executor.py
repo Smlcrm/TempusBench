@@ -251,19 +251,27 @@ class ModelExecutor:
             with open(job_config_path, "w") as f:
                 json.dump(job_config_to_write, f)
 
-            # Build CLI command
-            hyperparameters_json = json.dumps(hyperparameters)
-
-            command = (
-                f"python -m tempus_bench.pipeline.model_executor "
-                f"--task-name {self.job_config['task_config']['task_name']} "
-                f"--model-name {model_name} "
-                f"--hyperparameters '{hyperparameters_json}' "
-                f"--context-steps {context_steps} "
-                f"--train-steps {train_steps} "
-                f"--validate-steps {validate_steps} "
-                f"--job-config-path {job_config_path} "
-            )
+            # Build CLI command as argv list to avoid shell quoting issues.
+            hyperparameters_json = json.dumps(hyperparameters, separators=(",", ":"))
+            command = [
+                "python",
+                "-m",
+                "tempus_bench.pipeline.model_executor",
+                "--task-name",
+                str(self.job_config["task_config"]["task_name"]),
+                "--model-name",
+                str(model_name),
+                "--hyperparameters",
+                hyperparameters_json,
+                "--context-steps",
+                str(context_steps),
+                "--train-steps",
+                str(train_steps),
+                "--validate-steps",
+                str(validate_steps),
+                "--job-config-path",
+                str(job_config_path),
+            ]
 
             verbose = self.job_config.get("evaluation_setting", {}).get("verbose", False)
             result = None

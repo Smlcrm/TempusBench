@@ -10,3 +10,9 @@ use_positional_embedding: true
 context_len: 128
 version: "jax"
 huggingface_repo_id: "google/timesfm-1.0-200m-pytorch"
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

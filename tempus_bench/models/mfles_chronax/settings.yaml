@@ -1,0 +1,11 @@
+model_type: deterministic
+python_version: '3.11'
+device: cpu
+foundation: false
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+default_hyperparameter_grid:
+  robust: [true, false, null]
+  verbose: [0, 1]

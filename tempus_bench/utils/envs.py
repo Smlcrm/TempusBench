@@ -15,6 +15,35 @@ from .paths import get_project_root
 
 
 class CondaEnvManager:
+    def _conda_cmd(self, *args: str) -> list[str]:
+        """Build a cross-platform command that invokes conda."""
+        if os.name == "nt":
+            cmd_exe = os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe")
+            return [cmd_exe, "/d", "/c", "conda", *args]
+        return ["conda", *args]
+
+    def _conda_env_health_check(self) -> subprocess.CompletedProcess:
+        """Check whether the conda env can run Python and import tempus_bench."""
+        result_version = subprocess.run(
+            self._conda_cmd("run", "-n", self.env_name, "python", "--version"),
+            capture_output=True,
+            text=True,
+        )
+        if result_version.returncode != 0:
+            return result_version
+        result_import = subprocess.run(
+            [
+                *self._conda_cmd("run", "-n", self.env_name, "python"),
+                "-c",
+                "import tempus_bench",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result_import.returncode != 0:
+            return result_import
+        return result_version
+
     """
     Manages conda environments for isolated model execution.
 
@@ -65,19 +94,13 @@ class CondaEnvManager:
         # If reinstall requested, remove env if it exists
         if reinstall:
             subprocess.run(
-                ["conda", "env", "remove", "-n", self.env_name, "-y"],
+                self._conda_cmd("env", "remove", "-n", self.env_name, "-y"),
                 capture_output=True,
                 text=True,
             )
 
         # Check if the conda environment already exists and has tempus_bench installed
-        check_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version && conda run  -n {self.env_name} python -c 'import tempus_bench'",
-            shell=True,
-            executable="/bin/bash",
-            capture_output=True,
-            text=True,
-        )
+        check_result = self._conda_env_health_check()
 
         # Check if environment exists and is healthy (i.e., 'conda run ... python --version'
         # and 'import tempus_bench' both succeed, and no reinstall requested)
@@ -105,14 +128,7 @@ class CondaEnvManager:
         """
         if not self._skip_conda:
             return
-        check_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version && "
-            f"conda run -n {self.env_name} python -c 'import tempus_bench'",
-            shell=True,
-            executable="/bin/bash",
-            capture_output=True,
-            text=True,
-        )
+        check_result = self._conda_env_health_check()
         if (
             check_result.returncode == 0
             and "Python" in (check_result.stdout or "")
@@ -121,7 +137,7 @@ class CondaEnvManager:
         # Env doesn't exist or is unhealthy; create and install
         if self._reinstall:
             subprocess.run(
-                ["conda", "env", "remove", "-n", self.env_name, "-y"],
+                self._conda_cmd("env", "remove", "-n", self.env_name, "-y"),
                 capture_output=True,
                 text=True,
             )
@@ -164,14 +180,9 @@ class CondaEnvManager:
         """
         # Create the conda environment - fail fast, no fallbacks
         result = subprocess.run(
-            [
-                "conda",
-                "create",
-                "-y",
-                "-n",
-                self.env_name,
-                f"python={self.python_version}",
-            ],
+            self._conda_cmd(
+                "create", "-y", "-n", self.env_name, f"python={self.python_version}"
+            ),
             capture_output=True,
             text=True,
         )
@@ -184,11 +195,7 @@ class CondaEnvManager:
         # Install tempus_bench package
         result = subprocess.run(
             [
-                "conda",
-                "run",
-                "-n",
-                self.env_name,
-                "pip",
+                *self._conda_cmd("run", "-n", self.env_name, "pip"),
                 "install",
                 "-e",
                 str(get_project_root()),
@@ -220,11 +227,7 @@ class CondaEnvManager:
 
         result = subprocess.run(
             [
-                "conda",
-                "run",
-                "-n",
-                self.env_name,
-                "pip",
+                *self._conda_cmd("run", "-n", self.env_name, "pip"),
                 "install",
                 "-r",
                 requirements_path,
@@ -244,7 +247,7 @@ class CondaEnvManager:
         self,
         script: str | None = None,
         args: str = "",
-        command: str | None = None,
+        command: str | list[str] | None = None,
         verbose: bool = False,
     ):
         """
@@ -258,8 +261,8 @@ class CondaEnvManager:
                 "-m tempus_bench.pipeline.model_executor"). Mutually exclusive with command.
             args (str): Arguments string to pass to `python script`. Arguments are
                 split by whitespace. Defaults to empty string.
-            command (Optional[str]): Full command string to run. Mutually exclusive
-                with script.
+            command (Optional[str | list[str]]): Full command to run. When a list is
+                provided, elements are passed as exact argv tokens (recommended).
             verbose (bool): If True, stream stdout/stderr to the console in real time.
                 Defaults to False.
 
@@ -283,12 +286,14 @@ class CondaEnvManager:
         # which lacks model deps. We do a lazy env ensure here.
         if self._skip_conda and command:
             self._ensure_env_lazy()
-            cmd_str = f"conda run -n {self.env_name} {command}"
+            cmd_list = self._conda_cmd("run", "-n", self.env_name)
+            if isinstance(command, str):
+                cmd_list.extend(command.split())
+            else:
+                cmd_list.extend(command)
             if verbose:
                 proc = subprocess.Popen(
-                    cmd_str,
-                    shell=True,
-                    executable="/bin/bash",
+                    cmd_list,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -302,16 +307,14 @@ class CondaEnvManager:
                     stdout_lines.append(line + "\n")
                 proc.wait()
                 result = subprocess.CompletedProcess(
-                    args=cmd_str,
+                    args=cmd_list,
                     returncode=proc.returncode,
                     stdout="".join(stdout_lines),
                     stderr="",
                 )
             else:
                 result = subprocess.run(
-                    cmd_str,
-                    shell=True,
-                    executable="/bin/bash",
+                    cmd_list,
                     capture_output=True,
                     text=True,
                     cwd=cwd,
@@ -327,12 +330,14 @@ class CondaEnvManager:
 
         if command:
             # Run arbitrary command in conda environment (cwd=project root; task pickles use absolute paths)
+            cmd_list = self._conda_cmd("run", "-n", self.env_name)
+            if isinstance(command, str):
+                cmd_list.extend(command.split())
+            else:
+                cmd_list.extend(command)
             if verbose:
-                cmd_str = f"conda run -n {self.env_name} {command}"
                 proc = subprocess.Popen(
-                    cmd_str,
-                    shell=True,
-                    executable="/bin/bash",
+                    cmd_list,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -346,16 +351,14 @@ class CondaEnvManager:
                     stdout_lines.append(line + "\n")
                 proc.wait()
                 result = subprocess.CompletedProcess(
-                    args=cmd_str,
+                    args=cmd_list,
                     returncode=proc.returncode,
                     stdout="".join(stdout_lines),
                     stderr="",
                 )
             else:
                 result = subprocess.run(
-                    f"conda run -n {self.env_name} {command}",
-                    shell=True,
-                    executable="/bin/bash",
+                    cmd_list,
                     capture_output=True,
                     text=True,
                     cwd=cwd,
@@ -367,7 +370,7 @@ class CondaEnvManager:
                 raise ValueError("script cannot be None when command is not provided")
 
             # Build command list: base command + script + split args
-            cmd_list = ["conda", "run", "-n", self.env_name, "python", script]
+            cmd_list = [*self._conda_cmd("run", "-n", self.env_name, "python"), script]
 
             if args:
                 # Split args string into separate list elements
@@ -407,7 +410,7 @@ class CondaEnvManager:
         if not self._env_created:
             return
         subprocess.run(
-            ["conda", "remove", "-y", "-n", self.env_name, "--all"], check=True
+            self._conda_cmd("remove", "-y", "-n", self.env_name, "--all"), check=True
         )
         self._env_created = False
         self._installed = False
