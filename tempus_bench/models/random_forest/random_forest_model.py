@@ -72,15 +72,20 @@ class RandomForestModel(BaseModel):
         # Calculate forecast_horizon from y_target if not provided in kwargs
         forecast_horizon = kwargs.get("forecast_horizon", y_target.shape[0])
 
-        # Concatenate along time axis (axis=0) for our (num_steps, num_targets) format
-        full_y_data = np.concatenate([y_context, y_target], axis=0)
+        # Zero out future y to prevent leakage (mirrors what predict() already does)
+        full_y_data = np.concatenate([y_context, np.zeros_like(y_target)], axis=0)
         full_timestamps = np.concatenate(
             [timestamps_context, timestamps_target], axis=0
         )
         full_timestamps = np.squeeze(full_timestamps)
 
+        # Build combined covariate series (past + future) if provided
+        x_series = None
+        if x_context is not None and x_target is not None:
+            x_series = np.concatenate([x_context, x_target], axis=0)
+
         X, y, effective_lookback = self._create_features(
-            full_y_data, full_timestamps, forecast_horizon=forecast_horizon, **kwargs
+            full_y_data, full_timestamps, x_series=x_series, forecast_horizon=forecast_horizon, **kwargs
         )
 
         # Store effective_lookback used during training for consistency in prediction
@@ -129,8 +134,12 @@ class RandomForestModel(BaseModel):
         dummy_future = np.zeros((forecast_horizon, num_targets))
         full_y_data = np.concatenate([y_context, dummy_future], axis=0)
 
+        x_series = None
+        if x_context is not None and x_target is not None:
+            x_series = np.concatenate([x_context, x_target], axis=0)
+
         feature_row, _, _ = self._create_features(
-            full_y_data, full_timestamps, forecast_horizon=forecast_horizon, **kwargs
+            full_y_data, full_timestamps, x_series=x_series, forecast_horizon=forecast_horizon, **kwargs
         )
 
         X_last = feature_row[-1:].reshape(1, -1)
@@ -165,7 +174,7 @@ class RandomForestModel(BaseModel):
         self.is_fitted = False
 
     def _create_features(
-        self, y_series: np.ndarray, timestamps: np.ndarray, **kwargs: dict
+        self, y_series: np.ndarray, timestamps: np.ndarray, x_series: Optional[np.ndarray] = None, **kwargs: dict
     ) -> Tuple[np.ndarray, np.ndarray, int]:
         """
         Create time series features for Random Forest with timestamp features.
@@ -212,8 +221,13 @@ class RandomForestModel(BaseModel):
             # Create lag features for all targets
             lag_features = y_series[i : i + effective_lookback].flatten()
 
-            # Create rolling statistics for each target
+            # Past x and future x first, then past y last
             sample_features = []
+            if x_series is not None:
+                past_x = x_series[i : i + effective_lookback].flatten()
+                future_x = x_series[i + effective_lookback : i + effective_lookback + forecast_horizon].flatten()
+                sample_features.extend(past_x)
+                sample_features.extend(future_x)
             sample_features.extend(lag_features)
 
             for target_idx in range(num_targets):
