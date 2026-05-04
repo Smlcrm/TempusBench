@@ -55,7 +55,8 @@ lightning_logs/
 runs/
 results/
 *.tfevents.*
-tensorboard*
+# TensorBoard outputs at repo root (e.g. plots written alongside logs); never commit
+tensorboard/
 
 *.ckpt
 *.pkl
