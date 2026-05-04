@@ -5,7 +5,7 @@ beta_1: 0.9
 beta_2: 0.999
 epsilon: 1e-7
 capabilities:
-  covariates: none
+  covariates: past_future
   univariate: true
   multivariate: true
 foundation: false
