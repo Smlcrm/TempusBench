@@ -126,24 +126,25 @@ class TestLstmModel:
         assert result is model
         assert model.is_fitted == True
     
-    def test_train_insufficient_data_raises_error(self):
-        """Test that training with insufficient data raises error."""
+    def test_train_succeeds_when_concat_shorter_than_default_window_sum(self):
+        """Runtime window clamp: n_ctx + n_tgt can be below hyperparam context_length + prediction_window."""
         model = LstmModel(self.params, self.settings)
-        
-        # Not enough data: only context_length samples (need context_length + prediction_window)
+        # Old implementation required len(context)+len(target) >= context_length + prediction_window (10+4=14).
+        # With 9 + 4 = 13 rows, effective context becomes 9 and prediction 4 — training must work.
         y_context = np.random.randn(model.context_length - 1, 1).astype(np.float32)
         y_target = np.random.randn(model.prediction_window, 1).astype(np.float32)
         timestamps_context = np.arange(len(y_context))
         timestamps_target = np.arange(len(y_context), len(y_context) + len(y_target))
-        
-        with pytest.raises(ValueError, match="Input data must have at least"):
-            model.train(
-                y_context=y_context,
-                y_target=y_target,
-                timestamps_context=timestamps_context,
-                timestamps_target=timestamps_target,
-                tuning_loss='mse'
-            )
+        model.train(
+            y_context=y_context,
+            y_target=y_target,
+            timestamps_context=timestamps_context,
+            timestamps_target=timestamps_target,
+            tuning_loss="mse",
+        )
+        assert model.is_fitted is True
+        assert model._runtime_context_length == model.context_length - 1
+        assert model._runtime_prediction_window == model.prediction_window
     
     def test_predict_univariate(self):
         """Test prediction with univariate data."""
@@ -339,4 +340,134 @@ class TestLstmModel:
         assert model.units == 64
         assert model.layers == 3
         assert model.is_fitted == False  # Should be reset when params change
+
+    def test_train_clamps_defaults_for_short_tasks(self):
+        """
+        Task context_window + forecast_horizon can be smaller than default 32+8
+        (e.g. solar_100, gdp_years, patient_sparse, power_consumption_years).
+        """
+        params = {**self.params, "context_length": 32, "prediction_window": 8}
+        model = LstmModel(params, self.settings)
+        # Defaults 32 / 8 from merged hyperparams, runtime clamps to available rows.
+        y_context = np.random.randn(12, 1).astype(np.float32)
+        y_target = np.random.randn(4, 1).astype(np.float32)
+        ts_c = np.arange(12)
+        ts_t = np.arange(12, 16)
+        model.train(
+            y_context=y_context,
+            y_target=y_target,
+            timestamps_context=ts_c,
+            timestamps_target=ts_t,
+            tuning_loss="mse",
+        )
+        assert model.is_fitted is True
+        assert model._runtime_context_length == 12
+        assert model._runtime_prediction_window == 4
+
+    def test_mape_tuning_with_near_zero_labels_finishes(self):
+        """MAPE-style loss must not produce NaNs when targets include zeros (sparse series)."""
+        model = LstmModel(self.params, self.settings)
+        y_context = np.linspace(0.0, 0.5, 20, dtype=np.float32).reshape(-1, 1)
+        y_target = np.zeros((8, 1), dtype=np.float32)
+        ts_c = np.arange(20)
+        ts_t = np.arange(20, 28)
+        model.train(
+            y_context=y_context,
+            y_target=y_target,
+            timestamps_context=ts_c,
+            timestamps_target=ts_t,
+            tuning_loss="mape",
+        )
+        preds = model.predict(
+            y_context=y_context[-model._runtime_context_length :],
+            timestamps_context=ts_c[-model._runtime_context_length :],
+            timestamps_target=np.arange(8),
+        )
+        assert preds.shape == (8, 1)
+        assert np.all(np.isfinite(preds))
+
+    def test_covariate_train_and_predict(self):
+        """Past + future covariates are concatenated; only targets are predicted."""
+        model = LstmModel(self.params, self.settings)
+        n_ctx, n_tgt = 18, 5
+        n_cov = 1
+        y_context = np.random.randn(n_ctx, 1).astype(np.float32)
+        y_target = np.random.randn(n_tgt, 1).astype(np.float32)
+        x_context = np.random.randn(n_ctx, n_cov).astype(np.float32)
+        x_target = np.random.randn(n_tgt, n_cov).astype(np.float32)
+        ts_c = np.arange(n_ctx)
+        ts_t = np.arange(n_ctx, n_ctx + n_tgt)
+        model.train(
+            y_context=y_context,
+            y_target=y_target,
+            timestamps_context=ts_c,
+            timestamps_target=ts_t,
+            x_context=x_context,
+            x_target=x_target,
+            tuning_loss="mse",
+        )
+        hist_y = np.concatenate([y_context, y_target], axis=0)
+        hist_x = np.concatenate([x_context, x_target], axis=0)
+        fut_h = 5
+        pred = model.predict(
+            y_context=hist_y,
+            timestamps_context=np.arange(len(hist_y)),
+            timestamps_target=np.arange(len(hist_y), len(hist_y) + fut_h),
+            x_context=hist_x,
+            x_target=np.random.randn(fut_h, n_cov).astype(np.float32),
+        )
+        assert pred.shape == (fut_h, 1)
+        assert np.all(np.isfinite(pred))
+
+    def test_train_raises_if_only_one_covariate_array(self):
+        model = LstmModel(self.params, self.settings)
+        with pytest.raises(ValueError, match="both x_context and x_target"):
+            model.train(
+                y_context=np.random.randn(10, 1).astype(np.float32),
+                y_target=np.random.randn(4, 1).astype(np.float32),
+                timestamps_context=np.arange(10),
+                timestamps_target=np.arange(10, 14),
+                x_context=np.random.randn(10, 1).astype(np.float32),
+                x_target=None,
+                tuning_loss="mse",
+            )
+
+    def test_predict_requires_covariates_after_covariate_train(self):
+        model = LstmModel(self.params, self.settings)
+        n_ctx, n_tgt = 10, 4
+        model.train(
+            y_context=np.random.randn(n_ctx, 1).astype(np.float32),
+            y_target=np.random.randn(n_tgt, 1).astype(np.float32),
+            timestamps_context=np.arange(n_ctx),
+            timestamps_target=np.arange(n_ctx, n_ctx + n_tgt),
+            x_context=np.random.randn(n_ctx, 2).astype(np.float32),
+            x_target=np.random.randn(n_tgt, 2).astype(np.float32),
+            tuning_loss="mse",
+        )
+        hist = np.random.randn(n_ctx + n_tgt, 1).astype(np.float32)
+        with pytest.raises(ValueError, match="requires x_context and x_target"):
+            model.predict(
+                y_context=hist,
+                timestamps_context=np.arange(len(hist)),
+                timestamps_target=np.arange(4),
+            )
+
+    def test_predict_rejects_covariates_when_trained_without(self):
+        model = LstmModel(self.params, self.settings)
+        model.train(
+            y_context=np.random.randn(20, 1).astype(np.float32),
+            y_target=np.random.randn(8, 1).astype(np.float32),
+            timestamps_context=np.arange(20),
+            timestamps_target=np.arange(20, 28),
+            tuning_loss="mse",
+        )
+        hist = np.random.randn(28, 1).astype(np.float32)
+        with pytest.raises(ValueError, match="trained without covariates"):
+            model.predict(
+                y_context=hist,
+                timestamps_context=np.arange(28),
+                timestamps_target=np.arange(3),
+                x_context=np.random.randn(28, 1).astype(np.float32),
+                x_target=np.random.randn(3, 1).astype(np.float32),
+            )
 
