@@ -158,20 +158,29 @@ class BaseModel(ABC):
         """
         return self.params
 
-    def set_params(self, **params: Dict[str, Any]) -> "BaseModel":
+    def set_params(self, **params: Any) -> "BaseModel":
         """
         Set model parameters.
 
         Args:
-            **params: Model parameters to set
+            **params: Model parameters to set (merged into current validated params)
 
         Returns:
             self: The model instance with updated parameters
         """
-        validated_params = self.params_class.model_validate(params)
+        if not params:
+            return self
+
+        if getattr(self, "params", None) is None:
+            validated_params = self.params_class.model_validate(params)
+        else:
+            merged: Dict[str, Any] = self.params.model_dump()
+            merged.update(params)
+            validated_params = self.params_class.model_validate(merged)
         self.params = validated_params  # Store validated params for get_params() and model_dump()
 
-        self.set_attrs(**validated_params.model_dump())
+        for key, value in validated_params.model_dump().items():
+            setattr(self, key, value)
         self.is_fitted = False  # Mark as unfitted if parameters change
         return self
 

@@ -79,6 +79,8 @@ def _truncate_ttm_aligned_history(
 
 _TINY_TIME_MIXER_TRANSFORMERS_TIED_PATCH_DONE = False
 _SKTIME_TTM_FH_PATCH_DONE = False
+_SKTIME_TTM_FIT_MISMATCHED_KEYS_PATCH_DONE = False
+_SKTIME_TTM_FREQ_TOKEN_PATCH_DONE = False
 
 # sktime TinyTimeMixerForecaster._predict: the non-MultiIndex branch builds
 # ``ForecastingHorizon(range(...))`` without ``freq`` while MultiIndex uses ``freq=self.fh``.
@@ -145,6 +147,111 @@ def _patch_sktime_ttm_predict_forecasting_horizon_freq() -> None:
     )
     TinyTimeMixerForecaster._predict = local["_predict"]  # type: ignore[assignment]
     _SKTIME_TTM_FH_PATCH_DONE = True
+
+
+def _patch_sktime_ttm_fit_mismatched_keys() -> None:
+    """Monkeypatch ``TinyTimeMixerForecaster._fit`` so the ``mismatched_keys``
+    iteration handles tuples returned by ``transformers.from_pretrained``.
+
+    ``_fit`` iterates ``info["mismatched_keys"]`` calling ``key.split(".")``
+    but transformers returns tuples ``(key_str, shape_model, shape_ckpt)`` —
+    causing ``AttributeError: 'tuple' object has no attribute 'split'``.
+
+    We wrap ``_fit`` to normalise ``mismatched_keys`` to plain strings *before*
+    the original code runs.
+    """
+    global _SKTIME_TTM_FIT_MISMATCHED_KEYS_PATCH_DONE
+    if _SKTIME_TTM_FIT_MISMATCHED_KEYS_PATCH_DONE:
+        return
+    from sktime.forecasting.ttm import TinyTimeMixerForecaster
+    import functools
+
+    _orig_fit = TinyTimeMixerForecaster._fit
+
+    @functools.wraps(_orig_fit)
+    def _fit_with_normalised_keys(self, y, X=None, fh=None):
+        _orig_from_pt = None
+        try:
+            _TinyTimeMixer = type(None)
+            try:
+                from sktime.libs.granite_ttm import TinyTimeMixerForPrediction
+                _TinyTimeMixer = TinyTimeMixerForPrediction
+            except ImportError:
+                from transformers import TinyTimeMixerForPrediction  # type: ignore[no-redef]
+                _TinyTimeMixer = TinyTimeMixerForPrediction
+
+            _orig_from_pt = _TinyTimeMixer.from_pretrained.__func__  # type: ignore[union-attr]
+
+            @classmethod  # type: ignore[misc]
+            @functools.wraps(_orig_from_pt)
+            def _fixed_from_pt(cls, *a, **kw):
+                result = _orig_from_pt(cls, *a, **kw)
+                if isinstance(result, tuple) and len(result) == 2:
+                    model, info = result
+                    if isinstance(info, dict) and "mismatched_keys" in info:
+                        info["mismatched_keys"] = [
+                            k[0] if isinstance(k, tuple) else k
+                            for k in info["mismatched_keys"]
+                        ]
+                    return model, info
+                return result
+
+            _TinyTimeMixer.from_pretrained = _fixed_from_pt  # type: ignore[assignment]
+        except Exception:
+            _orig_from_pt = None
+
+        try:
+            return _orig_fit(self, y, X=X, fh=fh)
+        finally:
+            if _orig_from_pt is not None:
+                _TinyTimeMixer.from_pretrained = classmethod(_orig_from_pt)  # type: ignore[assignment]
+
+    TinyTimeMixerForecaster._fit = _fit_with_normalised_keys
+    _SKTIME_TTM_FIT_MISMATCHED_KEYS_PATCH_DONE = True
+
+
+def _patch_sktime_ttm_freq_token_default() -> None:
+    """Monkeypatch the TTM encoder ``forward`` to supply a default ``freq_token``
+    when ``resolution_prefix_tuning`` is enabled but sktime doesn't pass one.
+
+    Without this patch the encoder raises
+    ``Exception("Expecting freq_token in forward")``.  We inject a zero tensor
+    (the first vocabulary entry) so the resolution-prefix pathway runs and all
+    weight shapes (``num_patches=9``) remain valid.
+    """
+    global _SKTIME_TTM_FREQ_TOKEN_PATCH_DONE
+    if _SKTIME_TTM_FREQ_TOKEN_PATCH_DONE:
+        return
+
+    try:
+        from sktime.libs.granite_ttm.modeling_tinytimemixer import (
+            TinyTimeMixerEncoder,
+        )
+    except ImportError:
+        _SKTIME_TTM_FREQ_TOKEN_PATCH_DONE = True
+        return
+
+    import functools
+    import torch
+
+    _orig_encoder_forward = TinyTimeMixerEncoder.forward
+
+    @functools.wraps(_orig_encoder_forward)
+    def _forward_with_default_freq(self, past_values, output_hidden_states=False,
+                                   return_dict=None, freq_token=None):
+        if freq_token is None and getattr(self, "resolution_prefix_tuning", False):
+            freq_token = torch.zeros(
+                past_values.shape[0], dtype=torch.long, device=past_values.device,
+            )
+        return _orig_encoder_forward(
+            self, past_values,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            freq_token=freq_token,
+        )
+
+    TinyTimeMixerEncoder.forward = _forward_with_default_freq
+    _SKTIME_TTM_FREQ_TOKEN_PATCH_DONE = True
 
 
 def _patch_transformers_tiny_time_mixer_tied_weights() -> None:
@@ -299,6 +406,8 @@ class TinyTimeMixerR1Model(BaseModel):
         )
         _patch_transformers_tiny_time_mixer_tied_weights()
         _patch_sktime_ttm_predict_forecasting_horizon_freq()
+        _patch_sktime_ttm_fit_mismatched_keys()
+        _patch_sktime_ttm_freq_token_default()
         self._model = TinyTimeMixerForecaster(
             model_path=model_path, revision=revision
         )
@@ -337,6 +446,10 @@ class TinyTimeMixerR1Model(BaseModel):
             )
 
         self._model.fit(df, X=X_fit, fh=fh)
+        # sktime may normalize the stored FH and lose .freq after fit(); re-inject
+        # to prevent TypeError in _predict → to_absolute → _to_offset.
+        if hasattr(self._model, "fh") and getattr(self._model.fh, "freq", None) is None:
+            self._model.fh.freq = freq_offset
         forecast = self._model.predict(X=X_pred)
         return np.asarray(forecast)  # (forecast_horizon, num_targets)
 

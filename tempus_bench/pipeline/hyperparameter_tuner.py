@@ -17,7 +17,7 @@ import sys
 
 from itertools import product
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 from tqdm import tqdm
@@ -217,6 +217,11 @@ class HyperparameterTuner:
         all_evals = {}
         best_hyperparameters = {}
 
+        # When the cloud worker sets job_id + results_callback, every evaluated window must
+        # reach the sink; clearing the callback mid-loop used to complete "successfully" with
+        # partial BQ data.
+        sink_enforced = bool(self.job_id and self.results_callback)
+
         # Initialize model executor
         model_executor = ModelExecutor(job_config=self.job_config.to_dict())
 
@@ -252,6 +257,7 @@ class HyperparameterTuner:
         # Set TEMPUSBENCH_FORCE_TQDM=1 to show the bar in non-interactive runs.
         _force_tqdm = os.environ.get("TEMPUSBENCH_FORCE_TQDM", "").strip() == "1"
         _show_hp_bar = _force_tqdm or sys.stdout.isatty()
+        last_trial_error: Optional[BaseException] = None
         for params in tqdm(
             _grid_list,
             desc="Hyperparameter Combinations",
@@ -269,12 +275,22 @@ class HyperparameterTuner:
                 )
 
             except Exception as e:
+                last_trial_error = e
                 LogManager.get_logger().error(
                     "HyperparameterTuner",
                     f"Error executing model {self.model_name} with params {params}: {e}",
                 )
                 continue
             for window_idx, eval_outputs in enumerate(windows_eval_outputs):
+                if (
+                    self.job_id
+                    and sink_enforced
+                    and self.results_callback is None
+                ):
+                    raise RuntimeError(
+                        "results_callback mismatch: job_id is set but results_callback was "
+                        "cleared or unset before every rolling window was exported to the sink"
+                    )
                 #print("eval outpus", eval_outputs)
                 immutable_params = tuple(sorted(params.items()))
                 # Set evaluation metrics list on first successful eval
@@ -351,15 +367,17 @@ class HyperparameterTuner:
                 )
 
         num_windows = len(optimal_hyperparameters)
-        # Handle case where no evaluations were successful
-        #print("eval metrics", evaluation_metrics)
-        #print("num windows", num_windows)
         if evaluation_metrics is None or num_windows == 0:
-            # Return empty/default results if no evaluations succeeded
-            LogManager.get_logger().warning(
-                "HyperparameterTuner",
-                f"No successful evaluations for model {self.model_name}. Returning empty results.",
-            )
+            parts = [
+                f"No successful evaluation windows for model {self.model_name} on task "
+                f"{self.task_config.task_name!r} (task_path={self.task_config.task_path!r}).",
+                "Hint: ModelExecutor may have returned an empty window list, the series may be "
+                "shorter than context+train+validate, max_windows may be too small for the "
+                "series length, or every hyperparameter trial failed.",
+            ]
+            if last_trial_error is not None:
+                parts.append(f"Last trial error: {last_trial_error}")
+            LogManager.get_logger().error("HyperparameterTuner", " ".join(parts))
             return {}, {}
 
         # Aggregate test loss over windows, for each metric.

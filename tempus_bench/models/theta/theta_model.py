@@ -49,6 +49,11 @@ class ThetaHyperparams(PydanticBaseModel):
     )
 
 
+# Pydantic v2.12+ with PEP 563 deferred annotations needs an explicit rebuild
+# after all referenced types (ThetaEstimationMethod) are fully defined.
+ThetaHyperparams.model_rebuild()
+
+
 def _resolve_exogenous(
     x_context: Optional[np.ndarray], kwargs: dict
 ) -> Optional[np.ndarray]:
