@@ -1,6 +1,12 @@
 model_type: "deterministic"
 python_version: '3.11'
 device: 'cpu'
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}
 input_patch_len: 32
 horizon_len: 128
 num_layers: 20

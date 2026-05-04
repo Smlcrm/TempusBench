@@ -7,3 +7,9 @@ head_dropout: 0.1
 python_version: '3.11'
 weight_decay: 0
 context_window: 512
+capabilities:
+  covariates: past_only
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}

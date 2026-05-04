@@ -7,3 +7,9 @@ model_size: "base"
 # ctx: None # context length
 psz: "auto" # patch size
 bsz: 1 # batch size
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+foundation: true
+default_hyperparameter_grid: {}
