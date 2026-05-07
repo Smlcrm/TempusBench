@@ -6,7 +6,7 @@ This directory contains a comprehensive collection of time series tasks for benc
 
 ## Task Categories
 
-### Univariate Time Series (25 tasks)
+### Univariate Time Series (24 tasks)
 Univariate time series contain a single target variable over time, making them ideal for testing models that predict one variable at a time.
 
 **Healthcare & Medical:**
@@ -25,7 +25,6 @@ Univariate time series contain a single target variable over time, making them i
 - `electricity_energy_univariate/` - Monthly electricity energy consumption (1978-2023)
 - `power_consumption_years_univariate/` - Annual power consumption data
 - `delhi_climate_univariate/` - Climate data from Delhi
-- `forest_fires_continuous_univariate/` - Continuous forest fire occurrence data
 - `soil_nature_univariate/` - Soil quality measurements over time
 
 **Transportation & Infrastructure:**
@@ -51,7 +50,7 @@ Univariate time series contain a single target variable over time, making them i
 **Special Cases:**
 - `absent_binary_univariate/` - Binary data with missing values
 
-### Multivariate Time Series (23 tasks)
+### Multivariate Time Series (22 tasks)
 Multivariate time series contain multiple related variables, allowing models to leverage cross-variable dependencies for improved forecasting.
 
 **Financial Markets:**
@@ -74,7 +73,6 @@ Multivariate time series contain multiple related variables, allowing models to 
 - `madrid_noisy_multivariate/` - Noisy Madrid transport measurements
 
 **Environmental & Air Quality:**
-- `batadal_nonstationary_multivariate/` - Non-stationary environmental data
 - `batadal_software_multivariate/` - Environmental software metrics
 - `soil_500_multivariate/` - Soil data with 500 variables
 - `soil_nature_multivariate/` - Natural soil measurements
