@@ -58,6 +58,7 @@ results/
 tensorboard*
 
 *.ckpt
+*.pkl
 *.pth
 *.pt
 *.bin
@@ -69,13 +70,6 @@ tmp/
 temp/
 *.tmp
 *.temp
-
-# Local or generated trees whose top segment is temp_* (e.g. temp_task_datasets).
-# Uses temp_ + glob so tempus_bench/ is not ignored.
-temp_*
-
-# Explicit: large generated dataset tree (also matched by temp_*).
-temp_task_datasets/
 
 .cursor/
 .venv*
