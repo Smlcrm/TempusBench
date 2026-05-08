@@ -58,6 +58,7 @@ results/
 tensorboard*
 
 *.ckpt
+*.pkl
 *.pth
 *.pt
 *.bin
