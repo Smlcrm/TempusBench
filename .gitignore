@@ -55,8 +55,7 @@ lightning_logs/
 runs/
 results/
 *.tfevents.*
-# TensorBoard outputs at repo root (e.g. plots written alongside logs); never commit
-tensorboard/
+tensorboard*
 
 *.ckpt
 *.pkl
@@ -71,13 +70,6 @@ tmp/
 temp/
 *.tmp
 *.temp
-
-# Local or generated trees whose top segment is temp_* (e.g. temp_task_datasets).
-# Uses temp_ + glob so tempus_bench/ is not ignored.
-temp_*
-
-# Explicit: large generated dataset tree (also matched by temp_*).
-temp_task_datasets/
 
 .cursor/
 .venv*
