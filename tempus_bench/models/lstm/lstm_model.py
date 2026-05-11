@@ -184,8 +184,8 @@ class LstmModel(BaseModel):
                     f"x_context and x_target must have same num covariates "
                     f"({xc.shape[1]} vs {xt.shape[1]})."
                 )
-            z_context = np.concatenate([y_context, xc], axis=1)
-            z_target = np.concatenate([y_target, xt], axis=1)
+            z_context = np.concatenate([xc, y_context], axis=1)
+            z_target = np.concatenate([xt, y_target], axis=1)
             n_cov = int(xc.shape[1])
         else:
             z_context = y_context
@@ -207,8 +207,12 @@ class LstmModel(BaseModel):
         self._runtime_prediction_window = pred_eff
 
         combined_data = np.concatenate([z_context, z_target], axis=0)
+        # Zero out the y columns in the target portion so the model cannot see future
+        # target values in its input window during training.
+        combined_data_X = combined_data.copy()
+        combined_data_X[n_ctx:, n_cov:] = 0.0
         X_seq, y_seq = self._prepare_sequences(
-            combined_data, ctx_eff, pred_eff, n_y
+            combined_data_X, combined_data, ctx_eff, pred_eff, n_y
         )
 
         if "tuning_loss" not in kwargs:
@@ -337,7 +341,7 @@ class LstmModel(BaseModel):
                 raise ValueError(
                     f"x_target has {xf.shape[1]} columns but model expects {n_cov} covariates."
                 )
-            z_context = np.concatenate([y_context, xc], axis=1)
+            z_context = np.concatenate([xc, y_context], axis=1)
         else:
             if x_context is not None or x_target is not None:
                 raise ValueError(
@@ -374,9 +378,9 @@ class LstmModel(BaseModel):
                 current_sequence = np.roll(current_sequence, -prediction_window, axis=1)
                 for j in range(n_roll):
                     row_j = context_length - n_roll + j
-                    current_sequence[0, row_j, :n_y] = preds_reshaped[j, :]
+                    current_sequence[0, row_j, n_cov:] = preds_reshaped[j, :]
                     if n_cov > 0:
-                        current_sequence[0, row_j, n_y:] = xf[t_future + j, :]
+                        current_sequence[0, row_j, :n_cov] = xf[t_future + j, :]
                 t_future += n_roll
 
         stacked = np.concatenate(all_predictions, axis=0)
@@ -438,7 +442,8 @@ class LstmModel(BaseModel):
 
     def _prepare_sequences(
         self,
-        Z: np.ndarray,
+        Z_X: np.ndarray,
+        Z_y: np.ndarray,
         context_length: int,
         prediction_window: int,
         n_y_targets: int,
@@ -447,7 +452,8 @@ class LstmModel(BaseModel):
         Prepare input sequences for Multivariate LSTM.
 
         Args:
-            Z: Per-timestep features (num_timesteps, n_y + n_covariates)
+            Z_X: Per-timestep features used for X inputs (future y zeroed out)
+            Z_y: Per-timestep features used for y labels (actual values)
             context_length: LSTM time steps per input window
             prediction_window: Steps to predict ahead (labels = first n_y targets only)
 
@@ -455,35 +461,41 @@ class LstmModel(BaseModel):
             X_seq: (num_sequences, context_length, n_features)
             y_seq: (num_sequences, prediction_window * n_y_targets)
         """
-        Z = np.asarray(Z, dtype=np.float32, copy=True)
+        Z_X = np.asarray(Z_X, dtype=np.float32, copy=True)
+        Z_y = np.asarray(Z_y, dtype=np.float32, copy=True)
 
-        if Z.ndim == 1:
-            Z = Z.reshape(-1, 1)
-        elif Z.ndim > 2:
-            Z = Z.reshape(Z.shape[0], -1)
+        if Z_X.ndim == 1:
+            Z_X = Z_X.reshape(-1, 1)
+        elif Z_X.ndim > 2:
+            Z_X = Z_X.reshape(Z_X.shape[0], -1)
+
+        if Z_y.ndim == 1:
+            Z_y = Z_y.reshape(-1, 1)
+        elif Z_y.ndim > 2:
+            Z_y = Z_y.reshape(Z_y.shape[0], -1)
 
         min_length = int(context_length) + int(prediction_window)
-        if len(Z) < min_length:
+        if len(Z_X) < min_length:
             raise ValueError(
                 f"Input data must have at least {min_length} timesteps, "
-                f"but got {len(Z)}. Need context_length ({context_length}) + "
+                f"but got {len(Z_X)}. Need context_length ({context_length}) + "
                 f"prediction_window ({prediction_window})"
             )
 
         X_seq: list[np.ndarray] = []
         y_seq: list[np.ndarray] = []
         n_y = int(n_y_targets)
-        for i in range(len(Z) - context_length - prediction_window + 1):
-            curr_X = Z[i : (i + context_length)]
+        for i in range(len(Z_X) - context_length - prediction_window + 1):
+            curr_X = Z_X[i : (i + context_length)]
             if curr_X.ndim == 1:
                 curr_X = curr_X.reshape(-1, 1)
             curr_X = np.asarray(curr_X, dtype=np.float32, copy=True)
             X_seq.append(curr_X)
 
-            future_block = Z[
+            future_block = Z_y[
                 i + context_length : i + context_length + prediction_window
             ]
-            future_y = future_block[:, :n_y].reshape(-1)
+            future_y = future_block[:, -n_y_targets:].reshape(-1)
             future_y = np.asarray(future_y, dtype=np.float32, copy=True)
             y_seq.append(future_y)
 

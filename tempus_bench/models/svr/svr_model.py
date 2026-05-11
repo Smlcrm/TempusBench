@@ -66,18 +66,27 @@ class SvrModel(BaseModel):
 
         # Combine context and target for full training series if y_target is provided
         # Handle (num_steps, num_targets) format
-        y_series = np.concatenate([y_context, y_target], axis=0)
+        y_actual = np.concatenate([y_context, y_target], axis=0)
+        # Zero out the target portion in the X-side series to prevent future y leakage
+        y_masked = np.concatenate([y_context, np.zeros_like(y_target)], axis=0)
+
+        # Build combined covariate series (past + future) if provided
+        x_series = None
+        if x_context is not None and x_target is not None:
+            x_series = np.concatenate([x_context, x_target], axis=0)
 
         self._effective_lookback = self._resolve_effective_lookback(
-            series_length=y_series.shape[0],
+            series_length=y_actual.shape[0],
             forecast_horizon=forecast_horizon,
             configured_lookback=lookback_window,
         )
 
         X, y = self._create_features_targets(
-            y_series,
+            y_masked,
+            y_actual,
             forecast_horizon=forecast_horizon,
             lookback_window=self._effective_lookback,
+            x_series=x_series,
         )
 
         # Scale features (SVR is sensitive to feature scaling)
@@ -121,6 +130,12 @@ class SvrModel(BaseModel):
         total_steps = len(timestamps_target)
         num_targets = y_context.shape[1]  # num_targets is second dimension
 
+        has_cov = x_context is not None and x_target is not None
+        if has_cov:
+            x_all = np.concatenate([x_context, x_target], axis=0)
+            # Start offset so that x_all[x_offset : x_offset+lookback] aligns with y_context[-lookback:]
+            x_offset = len(x_context) - lookback_window
+
         preds = []
         context = y_context.copy()
 
@@ -130,8 +145,15 @@ class SvrModel(BaseModel):
             # Use last effective lookback timesteps (matches training feature width)
             current_window = context[-lookback_window:, :]
 
-            # Flatten for prediction
-            y_flat = np.expand_dims(current_window.flatten(), axis=0)
+            # Build feature vector: past x + future x first, past y last
+            feature_parts = []
+            if has_cov:
+                past_x = x_all[x_offset : x_offset + lookback_window, :]
+                future_x = x_all[x_offset + lookback_window : x_offset + lookback_window + forecast_horizon, :]
+                feature_parts.append(past_x.flatten())
+                feature_parts.append(future_x.flatten())
+            feature_parts.append(current_window.flatten())
+            y_flat = np.expand_dims(np.concatenate(feature_parts), axis=0)
             # Scale features before prediction (SVR is sensitive to feature scaling)
             y_flat_scaled = self._scaler.transform(y_flat)
             pred = self._model.predict(y_flat_scaled)
@@ -149,6 +171,8 @@ class SvrModel(BaseModel):
 
             # Concatenate along time axis (axis=0)
             context = np.concatenate([context, pred_steps], axis=0)
+            if has_cov:
+                x_offset += steps_needed
             steps_done += steps_needed
 
         # Concatenate all predictions along time axis
@@ -189,16 +213,23 @@ class SvrModel(BaseModel):
         return max(1, min(int(configured_lookback), max_feasible))
 
     def _create_features_targets(
-        self, y_series: np.ndarray, forecast_horizon: int, lookback_window: int
+        self,
+        y_masked: np.ndarray,
+        y_actual: np.ndarray,
+        forecast_horizon: int,
+        lookback_window: int,
+        x_series: Optional[np.ndarray] = None,
     ):
         """
         Create features and multi-step targets for direct multi-output forecasting.
         Each sample uses the previous lookback_window values as features and the next forecast_horizon values as targets.
-        Handles (num_series, timesteps) format.
+
+        X is built from y_masked (future y zeroed out) plus past and future covariate values.
+        y is built from y_actual (true future target values).
         """
         X, y = [], []
 
-        num_steps, num_targets = y_series.shape
+        num_steps, num_targets = y_masked.shape
 
         # Validate data length
         min_required_length = lookback_window + forecast_horizon
@@ -208,12 +239,17 @@ class SvrModel(BaseModel):
             )
 
         for i in range(num_steps - lookback_window - forecast_horizon + 1):
-            # Extract lookback window for all features
-            curr_X = y_series[i : i + lookback_window, :].flatten()
-            X.append(curr_X)
+            # Past x and future x first, then past y last
+            feature_parts = []
+            if x_series is not None:
+                feature_parts.append(x_series[i : i + lookback_window, :].flatten())
+                feature_parts.append(x_series[i + lookback_window : i + lookback_window + forecast_horizon, :].flatten())
+            feature_parts.append(y_masked[i : i + lookback_window, :].flatten())
 
-            # Extract forecast horizon for all features
-            curr_y = y_series[
+            X.append(np.concatenate(feature_parts))
+
+            # Labels: actual future y values only
+            curr_y = y_actual[
                 i + lookback_window : i + lookback_window + forecast_horizon, :
             ].flatten()
             y.append(curr_y)
