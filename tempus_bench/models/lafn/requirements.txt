@@ -1,7 +1,6 @@
-flax>=0.10.0
-jax>=0.6.0
-jaxlib>=0.6.0
-numpy>=1.24.0
-matplotlib>=3.8.0
-tensorflow>=2.0.0
+flax>=0.12.5
+jax>=0.8.1
+jaxlib>=0.8.1
+numpy>=2.2
+polars>=1.0
 chronarium @ git+https://github.com/Smlcrm/chronarium.git@dev
