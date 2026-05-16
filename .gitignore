@@ -47,6 +47,7 @@ ENV/
 .idea/
 .vscode/
 *.code-workspace
+lafn/lafn.code-workspace
 *.swp
 *.swo
 
