@@ -142,23 +142,15 @@ The pipeline automatically handles:
 
 ```python
 from tempus_bench.pipeline.data_loader import DataLoader
-from tempus_bench.utils.configs import TaskConfig, EvaluationConfig, DatasetConfig
+from tempus_bench.utils.configs import EvaluationConfig
+from tempus_bench.utils.task_yaml_loader import load_task_config_from_task_dir
+from pathlib import Path
 
-# Create task and evaluation configurations
-task_config = TaskConfig(
-    name="chickenpox_dense_univariate",
-    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
-    forecast_horizon=25,
-    context_window=50,
-    dataset=DatasetConfig(
-        file_name="chickenpox_dense_univariate.csv",
-        normalize=True,
-        handle_missing="interpolate"
-    )
-)
+task_dir = Path("tempus_bench/tasks/univariate/univariate_climate_daily_mean_humidity_delhi")
+task_config = load_task_config_from_task_dir(task_dir)
 
 evaluation_config = EvaluationConfig(
-    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    task_path="univariate/univariate_climate_daily_mean_humidity_delhi",
     max_windows=5,
     max_num_variates=None
 )
@@ -343,7 +335,7 @@ results = executor.execute_model(
     context_steps=50,
     train_steps=25,
     validate_steps=25,
-    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    task_path="tempus_bench/tasks/univariate/univariate_climate_daily_mean_humidity_delhi",
     window_idx=0,
     config_path=job_config.config_path
 )

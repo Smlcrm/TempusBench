@@ -118,12 +118,14 @@ def get_task_path(task_name: str) -> Path:
     return task_path
 
 
-def get_dataset_path(task_name: str) -> Path:
+def get_dataset_path(task_name: str, *, file_name: str | None = None) -> Path:
     """
-    Get the absolute path to a specific dataset file.
+    Get the absolute path to a task dataset CSV.
 
     Args:
-        task_name: Name of the task (e.g., 'baggage_100_multivariate')
+        task_name: Relative task path (e.g. ``univariate/foo`` or ``multivariate/bar``).
+        file_name: CSV filename from task.yaml; when omitted, tries ``{basename}.csv``
+            then the sole ``*.csv`` in the task folder.
 
     Returns:
         Path: Absolute path to the dataset file
@@ -131,7 +133,19 @@ def get_dataset_path(task_name: str) -> Path:
     Raises:
         FileNotFoundError: If the dataset file doesn't exist
     """
-    dataset_path = Path(get_task_path(task_name)) / (task_name + ".csv")
+    task_dir = get_task_path(task_name)
+    if file_name:
+        dataset_path = task_dir / file_name
+    else:
+        primary = task_dir / f"{task_dir.name}.csv"
+        if primary.exists():
+            dataset_path = primary
+        else:
+            csv_files = sorted(task_dir.glob("*.csv"))
+            if len(csv_files) == 1:
+                dataset_path = csv_files[0]
+            else:
+                dataset_path = primary
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
     return dataset_path
@@ -190,50 +204,76 @@ def get_logs_path() -> Path:
 
 def find_task_directories(task_path_pattern: str) -> dict[str, str]:
     """
-    Find task directories based on a task path pattern.
+    Find task directories based on a task path pattern under tasks/.
 
-    This function searches for task directories that match the specified pattern.
-    Supported patterns include:
-    - "*": All task directories
-    - "univariate/*": All univariate task directories
-    - "multivariate/*": All multivariate task directories
-    - "specific_task": A specific task directory (e.g., "univariate/specific_task")
+    Logical multivariate covariate tasks use the ``__covariate`` suffix in the
+    returned dict key while pointing at the same on-disk multivariate folder.
 
-    Args:
-        task_path_pattern: Pattern to match task directories against
-
-    Returns:
-        Dict[str, str]: Mapping from task names to absolute directory paths that match the pattern.
-
-    Example:
-        >>> find_task_directories("univariate/*")
-        {'task1': '/path/to/tasks/univariate/task1', 'task2': '/path/to/tasks/univariate/task2'}
+    Supported patterns:
+    - ``*``: all univariate folders plus each multivariate folder twice
+      (joint + ``__covariate`` logical ids)
+    - ``univariate/*`` / ``multivariate/*``: all folders in that category
+      (multivariate emits joint + covariate logical ids)
+    - ``univariate/foo`` / ``multivariate/foo`` / ``multivariate/foo__covariate``
     """
-    tasks_dir = get_tasks_dir()
-    task_paths = {}
+    from tempus_bench.utils.task_yaml_loader import COVARIATE_TASK_SUFFIX
 
-    pattern = task_path_pattern
+    tasks_dir = get_tasks_dir()
+    task_paths: dict[str, str] = {}
+    pattern = task_path_pattern.strip()
+
+    def _register_folder(task_path: Path, *, include_covariate: bool) -> None:
+        if not task_path.is_dir():
+            return
+        task_paths[task_path.name] = str(task_path)
+        if include_covariate and task_path.parent.name == "multivariate":
+            task_paths[f"{task_path.name}{COVARIATE_TASK_SUFFIX}"] = str(task_path)
 
     if pattern == "*":
-        # Find all task directories
-        for subdir in tasks_dir.iterdir():
-            if subdir.is_dir():
-                for task_path in subdir.iterdir():
-                    if task_path.is_dir():
-                        task_paths[task_path.name] = str(task_path)
-    elif pattern.endswith("/*"):
-        # Find directories in specific subdirectory
+        for subdir_name in ("univariate", "multivariate"):
+            subdir_path = tasks_dir / subdir_name
+            if not subdir_path.is_dir():
+                continue
+            for task_path in subdir_path.iterdir():
+                _register_folder(
+                    task_path,
+                    include_covariate=subdir_name == "multivariate",
+                )
+        return task_paths
+
+    if pattern.endswith("/*"):
         subdir_name = pattern[:-2]
         subdir_path = tasks_dir / subdir_name
-        if subdir_path.exists():
+        if subdir_path.is_dir():
             for task_path in subdir_path.iterdir():
-                if task_path.is_dir():
-                    task_paths[task_path.name] = str(task_path)
+                _register_folder(
+                    task_path,
+                    include_covariate=subdir_name == "multivariate",
+                )
+        return task_paths
+
+    logical_name = pattern.split("/")[-1]
+    if "/" in pattern:
+        physical_pattern = pattern
+        if logical_name.endswith(COVARIATE_TASK_SUFFIX):
+            physical_pattern = pattern[: -len(COVARIATE_TASK_SUFFIX)]
+        task_path = tasks_dir / physical_pattern
     else:
-        # Specific task directory
         task_path = tasks_dir / pattern
-        if task_path.exists():
-            task_paths[task_path.name] = str(task_path)
+
+    if task_path.is_dir():
+        include_covariate = (
+            logical_name.endswith(COVARIATE_TASK_SUFFIX)
+            or (
+                task_path.parent.name == "multivariate"
+                and logical_name == task_path.name
+                and "/" not in pattern
+            )
+        )
+        if logical_name.endswith(COVARIATE_TASK_SUFFIX):
+            task_paths[logical_name] = str(task_path)
+        else:
+            _register_folder(task_path, include_covariate=include_covariate)
 
     return task_paths
 

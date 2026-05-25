@@ -175,12 +175,36 @@ class TestTaskConfig:
             task_path="/path/to/task",
             forecast_horizon=24,
             context_window=100,
-            dataset=DatasetConfig(file_name="test.csv"),
+            handle_missing="interpolate",
+            normalization_method="standard",
+            file_name="test.csv",
+            task_mode="univariate",
+            target_variable_names=["target"],
+            covariate_variable_names=[],
         )
         assert config.forecast_horizon == 24
         assert config.context_window == 100
         assert config.task_path == "/path/to/task"
         assert config.dataset.file_name == "test.csv"
+        assert config.is_normalize() is True
+
+    def test_covariate_mode_helpers(self):
+        config = TaskConfig(
+            task_name="mv__covariate",
+            task_path="/path/to/task",
+            forecast_horizon=8,
+            context_window=32,
+            handle_missing="interpolate",
+            normalization_method="standard",
+            file_name="task.csv",
+            task_mode="covariate",
+            target_variable_names=["y"],
+            covariate_variable_names=["x1", "x2"],
+            multivariate_target_variable_names=["y", "x1", "x2"],
+            covariate_target_variable_name="y",
+        )
+        assert config.effective_targets() == ["y"]
+        assert config.effective_covariates() == ["x1", "x2"]
 
     def test_invalid_forecast_horizon_too_large(self):
         """Test that forecast_horizon > 128 raises ValidationError."""
@@ -190,7 +214,11 @@ class TestTaskConfig:
                 task_path="/path/to/task",
                 forecast_horizon=200,
                 context_window=100,
-                dataset=DatasetConfig(file_name="test.csv"),
+                handle_missing="interpolate",
+                normalization_method="standard",
+                file_name="test.csv",
+                task_mode="univariate",
+                target_variable_names=["target"],
             )
         assert "128" in str(exc_info.value)
 
@@ -202,7 +230,11 @@ class TestTaskConfig:
                 task_path="/path/to/task",
                 forecast_horizon=0,
                 context_window=100,
-                dataset=DatasetConfig(file_name="test.csv"),
+                handle_missing="interpolate",
+                normalization_method="standard",
+                file_name="test.csv",
+                task_mode="univariate",
+                target_variable_names=["target"],
             )
 
     def test_invalid_context_window_zero(self):
@@ -213,7 +245,11 @@ class TestTaskConfig:
                 task_path="/path/to/task",
                 forecast_horizon=24,
                 context_window=0,
-                dataset=DatasetConfig(file_name="test.csv"),
+                handle_missing="interpolate",
+                normalization_method="standard",
+                file_name="test.csv",
+                task_mode="univariate",
+                target_variable_names=["target"],
             )
 
 

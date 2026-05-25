@@ -8,10 +8,26 @@ model runs in isolation to avoid dependency conflicts.
 
 import os
 import subprocess
+import sys
 
 from pathlib import Path
 
 from .paths import get_project_root
+
+
+def _shell_subprocess_kwargs() -> dict:
+    """Use bash on Unix; default shell (cmd/PowerShell) on Windows."""
+    if sys.platform == "win32":
+        return {"shell": True}
+    return {"shell": True, "executable": "/bin/bash"}
+
+
+def _conda_import_check_cmd(env_name: str) -> str:
+    """Shell one-liner verifying env python and tempus_bench import."""
+    return (
+        f"conda run -n {env_name} python --version && "
+        f'conda run -n {env_name} python -c "import tempus_bench"'
+    )
 
 
 class CondaEnvManager:
@@ -72,11 +88,10 @@ class CondaEnvManager:
 
         # Check if the conda environment already exists and has tempus_bench installed
         check_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version && conda run  -n {self.env_name} python -c 'import tempus_bench'",
-            shell=True,
-            executable="/bin/bash",
+            _conda_import_check_cmd(self.env_name),
             capture_output=True,
             text=True,
+            **_shell_subprocess_kwargs(),
         )
 
         # Check if environment exists and is healthy (i.e., 'conda run ... python --version'
@@ -106,12 +121,10 @@ class CondaEnvManager:
         if not self._skip_conda:
             return
         check_result = subprocess.run(
-            f"conda run -n {self.env_name} python --version && "
-            f"conda run -n {self.env_name} python -c 'import tempus_bench'",
-            shell=True,
-            executable="/bin/bash",
+            _conda_import_check_cmd(self.env_name),
             capture_output=True,
             text=True,
+            **_shell_subprocess_kwargs(),
         )
         if (
             check_result.returncode == 0
@@ -287,13 +300,12 @@ class CondaEnvManager:
             if verbose:
                 proc = subprocess.Popen(
                     cmd_str,
-                    shell=True,
-                    executable="/bin/bash",
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
                     cwd=cwd,
+                    **_shell_subprocess_kwargs(),
                 )
                 stdout_lines = []
                 for line in proc.stdout:
@@ -310,11 +322,10 @@ class CondaEnvManager:
             else:
                 result = subprocess.run(
                     cmd_str,
-                    shell=True,
-                    executable="/bin/bash",
                     capture_output=True,
                     text=True,
                     cwd=cwd,
+                    **_shell_subprocess_kwargs(),
                 )
             if verbose and result.stdout:
                 print(result.stdout, end="", flush=True)
@@ -331,13 +342,12 @@ class CondaEnvManager:
                 cmd_str = f"conda run -n {self.env_name} {command}"
                 proc = subprocess.Popen(
                     cmd_str,
-                    shell=True,
-                    executable="/bin/bash",
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
                     cwd=cwd,
+                    **_shell_subprocess_kwargs(),
                 )
                 stdout_lines = []
                 for line in proc.stdout:
@@ -354,11 +364,10 @@ class CondaEnvManager:
             else:
                 result = subprocess.run(
                     f"conda run -n {self.env_name} {command}",
-                    shell=True,
-                    executable="/bin/bash",
                     capture_output=True,
                     text=True,
                     cwd=cwd,
+                    **_shell_subprocess_kwargs(),
                 )
         else:
             # Run Python script with args

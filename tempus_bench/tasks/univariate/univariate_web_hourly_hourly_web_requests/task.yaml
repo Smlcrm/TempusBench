@@ -1,0 +1,13 @@
+task:
+  context_window: 1024
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: univariate_web_hourly_hourly_web_requests.csv
+  target_variable_names:
+  - hourly_web_requests_single_website
+  covariate_variable_names: []
+
+# number of targets : 1
+# number of covariates : 0
+# number of time-steps : 5689

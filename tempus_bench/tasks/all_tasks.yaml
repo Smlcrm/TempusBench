@@ -1,0 +1,1437 @@
+# TempusBench tasks — consolidated task configurations.
+# Mirrors each task folder's task.yaml. Regenerate with:
+#   python tempus_bench/scripts/generate_tasks_task_yaml.py
+# 
+# Shared defaults across tasks:
+#   handle_missing: interpolate — matches legacy tasks/ benchmark preprocessing.
+#   normalization_method: standard — replaces legacy dataset.normalize: true (StandardScaler).
+# 
+# Multivariate tasks support two evaluation modes from one CSV:
+#   multivariate_target_variable_names — all exported variates (joint multivariate forecasting).
+#   covariate_target_variable_name + covariate_variable_names — single-target forecasting with
+#     the remaining variates as covariates.
+# Univariate tasks use target_variable_names only (covariate_variable_names is []).
+tasks:
+
+  univariate_economics_weekly_federal_funds_effective_rate:
+    rel_path: univariate/univariate_economics_weekly_federal_funds_effective_rate
+    # Legacy reference: tempus_bench/tasks/univariate/federal_funds_weeks_univariate.
+    # context_window=1024, forecast_horizon=64 — kept from legacy; long weekly macro series (~3750 steps).
+    # Single target (federal_funds_effective_rate_us); no covariates — standard univariate benchmark.
+    task:
+      context_window: 1024
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_economics_weekly_federal_funds_effective_rate.csv
+      target_variable_names:
+      - federal_funds_effective_rate_us
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 3750
+
+  univariate_energy_monthly_electricity_price_kwh:
+    rel_path: univariate/univariate_energy_monthly_electricity_price_kwh
+    # Legacy reference: electricity_energy_univariate.
+    # context_window=128, forecast_horizon=39 — kept from legacy; monthly CPI electricity prices (~570 steps).
+    # Single target; no covariates.
+    task:
+      context_window: 128
+      forecast_horizon: 39
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_energy_monthly_electricity_price_kwh.csv
+      target_variable_names:
+      - electricity_price_kwh_us_city_avg
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 570
+
+  univariate_climate_daily_mean_humidity_delhi:
+    rel_path: univariate/univariate_climate_daily_mean_humidity_delhi
+    # Legacy reference: delhi_climate_univariate.
+    # context_window=512, forecast_horizon=64 — kept from legacy; daily Delhi humidity (~1462 steps).
+    # Single target (humidity only; other raw weather columns dropped in transform).
+    task:
+      context_window: 512
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_climate_daily_mean_humidity_delhi.csv
+      target_variable_names:
+      - mean_humidity_delhi_india
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 1462
+
+  univariate_software_daily_software_dev_postings_indeed:
+    rel_path: univariate/univariate_software_daily_software_dev_postings_indeed
+    # Legacy reference: sw_job_postings_software_univariate.
+    # context_window=512, forecast_horizon=64 — kept from legacy; daily Indeed job-posting index.
+    # Single target; no covariates.
+    task:
+      context_window: 512
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_software_daily_software_dev_postings_indeed.csv
+      target_variable_names:
+      - software_dev_postings_us_indeed
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 2282
+
+  univariate_web_hourly_hourly_web_requests:
+    rel_path: univariate/univariate_web_hourly_hourly_web_requests
+    # Legacy reference: web_traffic_univariate.
+    # context_window=1024, forecast_horizon=64 — kept from legacy; hourly web request counts on 30min grid.
+    # Single target; no covariates.
+    task:
+      context_window: 1024
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_web_hourly_hourly_web_requests.csv
+      target_variable_names:
+      - hourly_web_requests_single_website
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 5689
+
+  univariate_sales_quarterly_real_residential_property_prices:
+    rel_path: univariate/univariate_sales_quarterly_real_residential_property_prices
+    # Legacy reference: german_houses_sales_univariate (context/horizon); data is annual BIS Germany index.
+    # context_window=32, forecast_horizon=17 — legacy quarterly-style windows; only ~56 annual steps available.
+    # Single target; no covariates.
+    task:
+      context_window: 32
+      forecast_horizon: 17
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_sales_quarterly_real_residential_property_prices.csv
+      target_variable_names:
+      - real_residential_property_prices_quaterly_germany
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 56
+
+  univariate_nature_minutes_soil_moisture:
+    rel_path: univariate/univariate_nature_minutes_soil_moisture
+    # Legacy reference: soil_nature_univariate.
+    # context_window=32, forecast_horizon=8 — kept from legacy; 2-minute soil moisture grid (~7282 steps).
+    # Single target (soil_moisture only; spectral/env columns omitted).
+    task:
+      context_window: 32
+      forecast_horizon: 8
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_nature_minutes_soil_moisture.csv
+      target_variable_names:
+      - soil_moisture_env_monitoring_2_min
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 7282
+
+  univariate_healthcare_monthly_all_employees_health_care:
+    rel_path: univariate/univariate_healthcare_monthly_all_employees_health_care
+    # Legacy reference: employees_healthcare_univariate.
+    # context_window=64, forecast_horizon=33 — kept from legacy; monthly BLS health-care employment.
+    # Single target; no covariates.
+    task:
+      context_window: 64
+      forecast_horizon: 33
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_healthcare_monthly_all_employees_health_care.csv
+      target_variable_names:
+      - all_employees_health_care_us_bls
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 436
+
+  univariate_manufacturing_seconds_skab_pressure:
+    rel_path: univariate/univariate_manufacturing_seconds_skab_pressure
+    # Legacy reference: utah_manufacturing_multivariate (2048/64); SKAB 1s pressure-only slice.
+    # High context window suits 1-second industrial telemetry (~9961 steps after reindex).
+    # Single target (Pressure column only from anomaly-free SKAB file).
+    task:
+      context_window: 2048
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_manufacturing_seconds_skab_pressure.csv
+      target_variable_names:
+      - Skoltech Anomaly Benchmark (SKAB) - anomaly-free - Pressure
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 9961
+
+  univariate_transport_annually_air_passengers_carried:
+    rel_path: univariate/univariate_transport_annually_air_passengers_carried
+    # No direct legacy task; short annual World Bank series (~54 US-only steps after melt).
+    # context_window=32, forecast_horizon=8 — conservative windows so context+horizon fits series length.
+    # Single target; no covariates.
+    task:
+      context_window: 32
+      forecast_horizon: 8
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: univariate_transport_annually_air_passengers_carried.csv
+      target_variable_names:
+      - Air transport, passengers carried - United States
+      covariate_variable_names: []
+    # number of targets : 1
+    # number of covariates : 0
+    # number of time-steps : 54
+
+  multivariate_energy_minutes_splitsmart_ac_energy:
+    rel_path: multivariate/multivariate_energy_minutes_splitsmart_ac_energy
+    # multivariate_target_variable_names: all 8 AC telemetry columns (joint multivariate mode).
+    # covariate_target_variable_name=unit_consumption — primary energy outcome to forecast in covariate mode.
+    # covariate_variable_names: electrical + environmental sensors excluding unit_consumption.
+    task:
+      context_window: 2048
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_energy_minutes_splitsmart_ac_energy.csv
+      multivariate_target_variable_names:
+      - Current
+      - voltage
+      - Power_Factor
+      - Real_Power
+      - room_temp
+      - External_temp
+      - Humidity
+      - unit_consumption
+      covariate_target_variable_name: unit_consumption
+      covariate_variable_names:
+      - Current
+      - voltage
+      - Power_Factor
+      - Real_Power
+      - room_temp
+      - External_temp
+      - Humidity
+    # number of multivariate targets : 8
+    # covariate_target_variable_name : unit_consumption
+    # number of covariates : 7
+    # number of time-steps : 384440
+
+  multivariate_healthcare_daily_nyc_covid_counts:
+    rel_path: multivariate/multivariate_healthcare_daily_nyc_covid_counts
+    # multivariate_target_variable_names: all 53 NYC/borough COVID count series.
+    # covariate_target_variable_name=DEATH_COUNT — matches legacy nyc_covid_healthcare_covariate.
+    # covariate_variable_names: remaining case/hospitalization/borough series.
+    task:
+      context_window: 512
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_healthcare_daily_nyc_covid_counts.csv
+      multivariate_target_variable_names:
+      - CASE_COUNT
+      - PROBABLE_CASE_COUNT
+      - HOSPITALIZED_COUNT
+      - DEATH_COUNT
+      - CASE_COUNT_7DAY_AVG
+      - ALL_CASE_COUNT_7DAY_AVG
+      - HOSP_COUNT_7DAY_AVG
+      - DEATH_COUNT_7DAY_AVG
+      - BX_CASE_COUNT
+      - BX_PROBABLE_CASE_COUNT
+      - BX_HOSPITALIZED_COUNT
+      - BX_DEATH_COUNT
+      - BX_CASE_COUNT_7DAY_AVG
+      - BX_PROBABLE_CASE_COUNT_7DAY_AVG
+      - BX_ALL_CASE_COUNT_7DAY_AVG
+      - BX_HOSPITALIZED_COUNT_7DAY_AVG
+      - BX_DEATH_COUNT_7DAY_AVG
+      - BK_CASE_COUNT
+      - BK_PROBABLE_CASE_COUNT
+      - BK_HOSPITALIZED_COUNT
+      - BK_DEATH_COUNT
+      - BK_CASE_COUNT_7DAY_AVG
+      - BK_PROBABLE_CASE_COUNT_7DAY_AVG
+      - BK_ALL_CASE_COUNT_7DAY_AVG
+      - BK_HOSPITALIZED_COUNT_7DAY_AVG
+      - BK_DEATH_COUNT_7DAY_AVG
+      - MN_CASE_COUNT
+      - MN_PROBABLE_CASE_COUNT
+      - MN_HOSPITALIZED_COUNT
+      - MN_DEATH_COUNT
+      - MN_CASE_COUNT_7DAY_AVG
+      - MN_PROBABLE_CASE_COUNT_7DAY_AVG
+      - MN_ALL_CASE_COUNT_7DAY_AVG
+      - MN_HOSPITALIZED_COUNT_7DAY_AVG
+      - MN_DEATH_COUNT_7DAY_AVG
+      - QN_CASE_COUNT
+      - QN_PROBABLE_CASE_COUNT
+      - QN_HOSPITALIZED_COUNT
+      - QN_DEATH_COUNT
+      - QN_CASE_COUNT_7DAY_AVG
+      - QN_PROBABLE_CASE_COUNT_7DAY_AVG
+      - QN_ALL_CASE_COUNT_7DAY_AVG
+      - QN_HOSPITALIZED_COUNT_7DAY_AVG
+      - QN_DEATH_COUNT_7DAY_AVG
+      - SI_CASE_COUNT
+      - SI_PROBABLE_CASE_COUNT
+      - SI_HOSPITALIZED_COUNT
+      - SI_DEATH_COUNT
+      - SI_PROBABLE_CASE_COUNT_7DAY_AVG
+      - SI_CASE_COUNT_7DAY_AVG
+      - SI_ALL_CASE_COUNT_7DAY_AVG
+      - SI_HOSPITALIZED_COUNT_7DAY_AVG
+      - SI_DEATH_COUNT_7DAY_AVG
+      covariate_target_variable_name: DEATH_COUNT
+      covariate_variable_names:
+      - CASE_COUNT
+      - PROBABLE_CASE_COUNT
+      - HOSPITALIZED_COUNT
+      - CASE_COUNT_7DAY_AVG
+      - ALL_CASE_COUNT_7DAY_AVG
+      - HOSP_COUNT_7DAY_AVG
+      - DEATH_COUNT_7DAY_AVG
+      - BX_CASE_COUNT
+      - BX_PROBABLE_CASE_COUNT
+      - BX_HOSPITALIZED_COUNT
+      - BX_DEATH_COUNT
+      - BX_CASE_COUNT_7DAY_AVG
+      - BX_PROBABLE_CASE_COUNT_7DAY_AVG
+      - BX_ALL_CASE_COUNT_7DAY_AVG
+      - BX_HOSPITALIZED_COUNT_7DAY_AVG
+      - BX_DEATH_COUNT_7DAY_AVG
+      - BK_CASE_COUNT
+      - BK_PROBABLE_CASE_COUNT
+      - BK_HOSPITALIZED_COUNT
+      - BK_DEATH_COUNT
+      - BK_CASE_COUNT_7DAY_AVG
+      - BK_PROBABLE_CASE_COUNT_7DAY_AVG
+      - BK_ALL_CASE_COUNT_7DAY_AVG
+      - BK_HOSPITALIZED_COUNT_7DAY_AVG
+      - BK_DEATH_COUNT_7DAY_AVG
+      - MN_CASE_COUNT
+      - MN_PROBABLE_CASE_COUNT
+      - MN_HOSPITALIZED_COUNT
+      - MN_DEATH_COUNT
+      - MN_CASE_COUNT_7DAY_AVG
+      - MN_PROBABLE_CASE_COUNT_7DAY_AVG
+      - MN_ALL_CASE_COUNT_7DAY_AVG
+      - MN_HOSPITALIZED_COUNT_7DAY_AVG
+      - MN_DEATH_COUNT_7DAY_AVG
+      - QN_CASE_COUNT
+      - QN_PROBABLE_CASE_COUNT
+      - QN_HOSPITALIZED_COUNT
+      - QN_DEATH_COUNT
+      - QN_CASE_COUNT_7DAY_AVG
+      - QN_PROBABLE_CASE_COUNT_7DAY_AVG
+      - QN_ALL_CASE_COUNT_7DAY_AVG
+      - QN_HOSPITALIZED_COUNT_7DAY_AVG
+      - QN_DEATH_COUNT_7DAY_AVG
+      - SI_CASE_COUNT
+      - SI_PROBABLE_CASE_COUNT
+      - SI_HOSPITALIZED_COUNT
+      - SI_DEATH_COUNT
+      - SI_PROBABLE_CASE_COUNT_7DAY_AVG
+      - SI_CASE_COUNT_7DAY_AVG
+      - SI_ALL_CASE_COUNT_7DAY_AVG
+      - SI_HOSPITALIZED_COUNT_7DAY_AVG
+      - SI_DEATH_COUNT_7DAY_AVG
+    # number of multivariate targets : 53
+    # covariate_target_variable_name : DEATH_COUNT
+    # number of covariates : 52
+    # number of time-steps : 2054
+
+  multivariate_climate_hourly_madrid_air_pollution:
+    rel_path: multivariate/multivariate_climate_hourly_madrid_air_pollution
+    # multivariate_target_variable_names: all 14 Madrid pollutant concentrations.
+    # covariate_target_variable_name=PM25 — common fine-particulate health indicator.
+    # covariate_variable_names: other pollutant species as covariates.
+    task:
+      context_window: 2048
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_climate_hourly_madrid_air_pollution.csv
+      multivariate_target_variable_names:
+      - BEN
+      - CH4
+      - CO
+      - EBE
+      - NMHC
+      - 'NO'
+      - NO2
+      - NOx
+      - O3
+      - PM10
+      - PM25
+      - SO2
+      - TCH
+      - TOL
+      covariate_target_variable_name: PM25
+      covariate_variable_names:
+      - BEN
+      - CH4
+      - CO
+      - EBE
+      - NMHC
+      - 'NO'
+      - NO2
+      - NOx
+      - O3
+      - PM10
+      - SO2
+      - TCH
+      - TOL
+    # number of multivariate targets : 14
+    # covariate_target_variable_name : PM25
+    # number of covariates : 13
+    # number of time-steps : 186240
+
+  multivariate_transport_monthly_airline_baggage_complaints:
+    rel_path: multivariate/multivariate_transport_monthly_airline_baggage_complaints
+    # multivariate_target_variable_names: Baggage, Scheduled, Cancelled, Enplaned.
+    # covariate_target_variable_name=Baggage — customer-outcome series to forecast.
+    # covariate_variable_names: Scheduled, Cancelled, Enplaned operational drivers.
+    task:
+      context_window: 32
+      forecast_horizon: 8
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_transport_monthly_airline_baggage_complaints.csv
+      multivariate_target_variable_names:
+      - Baggage
+      - Scheduled
+      - Cancelled
+      - Enplaned
+      covariate_target_variable_name: Baggage
+      covariate_variable_names:
+      - Scheduled
+      - Cancelled
+      - Enplaned
+    # number of multivariate targets : 4
+    # covariate_target_variable_name : Baggage
+    # number of covariates : 3
+    # number of time-steps : 84
+
+  multivariate_sales_weekly_walmart_sales:
+    rel_path: multivariate/multivariate_sales_weekly_walmart_sales
+    # multivariate_target_variable_names: all 6 store-1 retail columns.
+    # covariate_target_variable_name=Weekly_Sales — revenue target (legacy retail covariate semantics).
+    # covariate_variable_names: Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment.
+    task:
+      context_window: 45
+      forecast_horizon: 16
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_sales_weekly_walmart_sales.csv
+      multivariate_target_variable_names:
+      - Weekly_Sales
+      - Holiday_Flag
+      - Temperature
+      - Fuel_Price
+      - CPI
+      - Unemployment
+      covariate_target_variable_name: Weekly_Sales
+      covariate_variable_names:
+      - Holiday_Flag
+      - Temperature
+      - Fuel_Price
+      - CPI
+      - Unemployment
+    # number of multivariate targets : 6
+    # covariate_target_variable_name : Weekly_Sales
+    # number of covariates : 5
+    # number of time-steps : 143
+
+  multivariate_software_hourly_cybertec_iiot_malware:
+    rel_path: multivariate/multivariate_software_hourly_cybertec_iiot_malware
+    # multivariate_target_variable_names: all 22 IIoT/network metrics.
+    # covariate_target_variable_name=Malicious Signatures — matches legacy cybersecurity_software_covariate.
+    # covariate_variable_names: remaining network/system features.
+    task:
+      context_window: 2048
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_software_hourly_cybertec_iiot_malware.csv
+      multivariate_target_variable_names:
+      - Packet Size
+      - Packet Length
+      - Inter-Arrival Time
+      - Flow Duration
+      - Total Packets
+      - Total Bytes
+      - Average Packet Size
+      - Packet Arrival Rate
+      - Payload Entropy
+      - Flow Entropy
+      - Baseline Deviation
+      - Packet Size Variance
+      - Malicious Signatures
+      - Embedded Commands
+      - Device Activity Patterns
+      - CPU Usage
+      - Memory Usage
+      - Network Interface Stats
+      - Duration Anomaly
+      - Known IoC
+      - C&C Communication
+      - Data Exfiltration
+      covariate_target_variable_name: Malicious Signatures
+      covariate_variable_names:
+      - Packet Size
+      - Packet Length
+      - Inter-Arrival Time
+      - Flow Duration
+      - Total Packets
+      - Total Bytes
+      - Average Packet Size
+      - Packet Arrival Rate
+      - Payload Entropy
+      - Flow Entropy
+      - Baseline Deviation
+      - Packet Size Variance
+      - Embedded Commands
+      - Device Activity Patterns
+      - CPU Usage
+      - Memory Usage
+      - Network Interface Stats
+      - Duration Anomaly
+      - Known IoC
+      - C&C Communication
+      - Data Exfiltration
+    # number of multivariate targets : 22
+    # covariate_target_variable_name : Malicious Signatures
+    # number of covariates : 21
+    # number of time-steps : 45289
+
+  multivariate_manufacturing_seconds_skab:
+    rel_path: multivariate/multivariate_manufacturing_seconds_skab
+    # multivariate_target_variable_names: all 8 SKAB sensors.
+    # covariate_target_variable_name=Pressure — aligns with univariate SKAB pressure task.
+    # covariate_variable_names: vibration, current, temperature, flow, voltage sensors.
+    task:
+      context_window: 2048
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_manufacturing_seconds_skab.csv
+      multivariate_target_variable_names:
+      - Accelerometer1RMS
+      - Accelerometer2RMS
+      - Current
+      - Pressure
+      - Temperature
+      - Thermocouple
+      - Voltage
+      - Volume Flow RateRMS
+      covariate_target_variable_name: Pressure
+      covariate_variable_names:
+      - Accelerometer1RMS
+      - Accelerometer2RMS
+      - Current
+      - Temperature
+      - Thermocouple
+      - Voltage
+      - Volume Flow RateRMS
+    # number of multivariate targets : 8
+    # covariate_target_variable_name : Pressure
+    # number of covariates : 7
+    # number of time-steps : 9961
+
+  multivariate_web_daily_wikipedia_web_traffic:
+    rel_path: multivariate/multivariate_web_daily_wikipedia_web_traffic
+    # multivariate_target_variable_names: all 145 zh.wikipedia page-view series.
+    # covariate_target_variable_name=Python_zh... — representative high-traffic tech article.
+    # covariate_variable_names: other page-view series as covariates.
+    task:
+      context_window: 128
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_web_daily_wikipedia_web_traffic.csv
+      multivariate_target_variable_names:
+      - 2NE1_zh.wikipedia.org_all-access_spider
+      - 2PM_zh.wikipedia.org_all-access_spider
+      - 3C_zh.wikipedia.org_all-access_spider
+      - 4minute_zh.wikipedia.org_all-access_spider
+      - 52_Hz_I_Love_You_zh.wikipedia.org_all-access_spider
+      - 5566_zh.wikipedia.org_all-access_spider
+      - 91Days_zh.wikipedia.org_all-access_spider
+      - A'N'D_zh.wikipedia.org_all-access_spider
+      - AKB48_zh.wikipedia.org_all-access_spider
+      - ASCII_zh.wikipedia.org_all-access_spider
+      - ASTRO_zh.wikipedia.org_all-access_spider
+      - Ahq_e-Sports_Club_zh.wikipedia.org_all-access_spider
+      - All_your_base_are_belong_to_us_zh.wikipedia.org_all-access_spider
+      - AlphaGo_zh.wikipedia.org_all-access_spider
+      - Android_zh.wikipedia.org_all-access_spider
+      - Angelababy_zh.wikipedia.org_all-access_spider
+      - Apink_zh.wikipedia.org_all-access_spider
+      - Apple_II_zh.wikipedia.org_all-access_spider
+      - As_One_zh.wikipedia.org_all-access_spider
+      - B-PROJECT_zh.wikipedia.org_all-access_spider
+      - B1A4_zh.wikipedia.org_all-access_spider
+      - BDSM_zh.wikipedia.org_all-access_spider
+      - BEAST_zh.wikipedia.org_all-access_spider
+      - BIGBANG_zh.wikipedia.org_all-access_spider
+      - BLACK_PINK_zh.wikipedia.org_all-access_spider
+      - BLEACH_zh.wikipedia.org_all-access_spider
+      - BTOB_zh.wikipedia.org_all-access_spider
+      - Beautiful_Mind_zh.wikipedia.org_all-access_spider
+      - Beyond_zh.wikipedia.org_all-access_spider
+      - Big_zh.wikipedia.org_all-access_spider
+      - Block_B_zh.wikipedia.org_all-access_spider
+      - CHAOS;CHILD_zh.wikipedia.org_all-access_spider
+      - CHAOS;HEAD_zh.wikipedia.org_all-access_spider
+      - CLC_zh.wikipedia.org_all-access_spider
+      - CNBLUE_zh.wikipedia.org_all-access_spider
+      - DIA_zh.wikipedia.org_all-access_spider
+      - Daigo_zh.wikipedia.org_all-access_spider
+      - Dear_My_Friends_zh.wikipedia.org_all-access_spider
+      - Doctors_zh.wikipedia.org_all-access_spider
+      - EGOIST_zh.wikipedia.org_all-access_spider
+      - EXID_zh.wikipedia.org_all-access_spider
+      - EXO_zh.wikipedia.org_all-access_spider
+      - Energy_zh.wikipedia.org_all-access_spider
+      - Eric_Nam_zh.wikipedia.org_all-access_spider
+      - FAIRY_TAIL_zh.wikipedia.org_all-access_spider
+      - FIESTAR_zh.wikipedia.org_all-access_spider
+      - FIRST_CLASS_zh.wikipedia.org_all-access_spider
+      - Facebook_zh.wikipedia.org_all-access_spider
+      - Fantastic_Duo_zh.wikipedia.org_all-access_spider
+      - Fate/Grand_Order_zh.wikipedia.org_all-access_spider
+      - Fate/Zero_zh.wikipedia.org_all-access_spider
+      - Fate/stay_night_zh.wikipedia.org_all-access_spider
+      - File:427FW_126.JPG_zh.wikipedia.org_all-access_spider
+      - File:Ap_F23_20110324114153669.jpg_zh.wikipedia.org_all-access_spider
+      - File:Christian-krohg-leiv-eriksson.jpg_zh.wikipedia.org_all-access_spider
+      - File:Sebastiaosalgado2006.jpg_zh.wikipedia.org_all-access_spider
+      - File:Zhongxiao_West_Road2.JPG_zh.wikipedia.org_all-access_spider
+      - G-Dragon_zh.wikipedia.org_all-access_spider
+      - G.NA_zh.wikipedia.org_all-access_spider
+      - GFRIEND_zh.wikipedia.org_all-access_spider
+      - GNZ48_zh.wikipedia.org_all-access_spider
+      - GOT7_zh.wikipedia.org_all-access_spider
+      - GUMMY_zh.wikipedia.org_all-access_spider
+      - Girl's_Day_zh.wikipedia.org_all-access_spider
+      - Goodbye_Mr._Black_zh.wikipedia.org_all-access_spider
+      - Google_zh.wikipedia.org_all-access_spider
+      - Gu9udan_zh.wikipedia.org_all-access_spider
+      - HDMI_zh.wikipedia.org_all-access_spider
+      - Hand_Shakers_zh.wikipedia.org_all-access_spider
+      - Hisasi_zh.wikipedia.org_all-access_spider
+      - Hit_The_Stage_zh.wikipedia.org_all-access_spider
+      - Hotel_King_zh.wikipedia.org_all-access_spider
+      - I'm_Home_zh.wikipedia.org_all-access_spider
+      - I.O.I_zh.wikipedia.org_all-access_spider
+      - IKON_zh.wikipedia.org_all-access_spider
+      - INFINITE_zh.wikipedia.org_all-access_spider
+      - IPhone_zh.wikipedia.org_all-access_spider
+      - Ingress_zh.wikipedia.org_all-access_spider
+      - Intel740_zh.wikipedia.org_all-access_spider
+      - Intel_80386_zh.wikipedia.org_all-access_spider
+      - Juksy_zh.wikipedia.org_all-access_spider
+      - K.A.R.D_zh.wikipedia.org_all-access_spider
+      - KNK_zh.wikipedia.org_all-access_spider
+      - KUROMUKURO_zh.wikipedia.org_all-access_spider
+      - Kara_zh.wikipedia.org_all-access_spider
+      - Kill_Me_Heal_Me_zh.wikipedia.org_all-access_spider
+      - Lady_Gaga_zh.wikipedia.org_all-access_spider
+      - Legal_high_zh.wikipedia.org_all-access_spider
+      - LoveLive!_zh.wikipedia.org_all-access_spider
+      - LoveLive!_Sunshine!!_zh.wikipedia.org_all-access_spider
+      - Lovelyz_zh.wikipedia.org_all-access_spider
+      - Lulu_zh.wikipedia.org_all-access_spider
+      - MADTOWN_zh.wikipedia.org_all-access_spider
+      - MAMAMOO_zh.wikipedia.org_all-access_spider
+      - MONSTA_X_zh.wikipedia.org_all-access_spider
+      - Madame_Antoine_zh.wikipedia.org_all-access_spider
+      - Mamamoo_zh.wikipedia.org_all-access_spider
+      - Mike_D._Angelo_zh.wikipedia.org_all-access_spider
+      - Miss_A_zh.wikipedia.org_all-access_spider
+      - Missing9_zh.wikipedia.org_all-access_spider
+      - Monstar_zh.wikipedia.org_all-access_spider
+      - Mrs._Cop_2_zh.wikipedia.org_all-access_spider
+      - NBA_zh.wikipedia.org_all-access_spider
+      - NCT_zh.wikipedia.org_all-access_spider
+      - NEW_GAME!_zh.wikipedia.org_all-access_spider
+      - Netflix_zh.wikipedia.org_all-access_spider
+      - Niantic_zh.wikipedia.org_all-access_spider
+      - ONE_OK_ROCK_zh.wikipedia.org_all-access_spider
+      - ONE_PIECE_zh.wikipedia.org_all-access_spider
+      - ONE_PIECE_FILM_GOLD_zh.wikipedia.org_all-access_spider
+      - Oh_My_Girl_zh.wikipedia.org_all-access_spider
+      - Oh_My_Venus_zh.wikipedia.org_all-access_spider
+      - PRODUCE_101_zh.wikipedia.org_all-access_spider
+      - Page_Turner_zh.wikipedia.org_all-access_spider
+      - Pen-Pineapple-Apple-Pen_zh.wikipedia.org_all-access_spider
+      - PewDiePie_zh.wikipedia.org_all-access_spider
+      - Popu_Lady_zh.wikipedia.org_all-access_spider
+      - Pristin_zh.wikipedia.org_all-access_spider
+      - Python_zh.wikipedia.org_all-access_spider
+      - Qualidea_Code_zh.wikipedia.org_all-access_spider
+      - RADWIMPS_zh.wikipedia.org_all-access_spider
+      - RAID_zh.wikipedia.org_all-access_spider
+      - RWBY_zh.wikipedia.org_all-access_spider
+      - Rain_zh.wikipedia.org_all-access_spider
+      - ReLIFE_zh.wikipedia.org_all-access_spider
+      - Red_Velvet_zh.wikipedia.org_all-access_spider
+      - Rewrite_zh.wikipedia.org_all-access_spider
+      - Running_Man_zh.wikipedia.org_all-access_spider
+      - S.H.E_zh.wikipedia.org_all-access_spider
+      - SF9_zh.wikipedia.org_all-access_spider
+      - SHINee_zh.wikipedia.org_all-access_spider
+      - SISTAR_zh.wikipedia.org_all-access_spider
+      - SIXTEEN_zh.wikipedia.org_all-access_spider
+      - SMAP_zh.wikipedia.org_all-access_spider
+      - SNH48_zh.wikipedia.org_all-access_spider
+      - SUPER_LOVERS_zh.wikipedia.org_all-access_spider
+      - Schwarzesmarken_zh.wikipedia.org_all-access_spider
+      - Secret_Love_zh.wikipedia.org_all-access_spider
+      - SpeXial_zh.wikipedia.org_all-access_spider
+      - Special:Search_zh.wikipedia.org_all-access_spider
+      - Super_Junior_zh.wikipedia.org_all-access_spider
+      - Supper_Moment_zh.wikipedia.org_all-access_spider
+      - T-ara_zh.wikipedia.org_all-access_spider
+      - T.O.P._zh.wikipedia.org_all-access_spider
+      - TANet_zh.wikipedia.org_all-access_spider
+      covariate_target_variable_name: Python_zh.wikipedia.org_all-access_spider
+      covariate_variable_names:
+      - 2NE1_zh.wikipedia.org_all-access_spider
+      - 2PM_zh.wikipedia.org_all-access_spider
+      - 3C_zh.wikipedia.org_all-access_spider
+      - 4minute_zh.wikipedia.org_all-access_spider
+      - 52_Hz_I_Love_You_zh.wikipedia.org_all-access_spider
+      - 5566_zh.wikipedia.org_all-access_spider
+      - 91Days_zh.wikipedia.org_all-access_spider
+      - A'N'D_zh.wikipedia.org_all-access_spider
+      - AKB48_zh.wikipedia.org_all-access_spider
+      - ASCII_zh.wikipedia.org_all-access_spider
+      - ASTRO_zh.wikipedia.org_all-access_spider
+      - Ahq_e-Sports_Club_zh.wikipedia.org_all-access_spider
+      - All_your_base_are_belong_to_us_zh.wikipedia.org_all-access_spider
+      - AlphaGo_zh.wikipedia.org_all-access_spider
+      - Android_zh.wikipedia.org_all-access_spider
+      - Angelababy_zh.wikipedia.org_all-access_spider
+      - Apink_zh.wikipedia.org_all-access_spider
+      - Apple_II_zh.wikipedia.org_all-access_spider
+      - As_One_zh.wikipedia.org_all-access_spider
+      - B-PROJECT_zh.wikipedia.org_all-access_spider
+      - B1A4_zh.wikipedia.org_all-access_spider
+      - BDSM_zh.wikipedia.org_all-access_spider
+      - BEAST_zh.wikipedia.org_all-access_spider
+      - BIGBANG_zh.wikipedia.org_all-access_spider
+      - BLACK_PINK_zh.wikipedia.org_all-access_spider
+      - BLEACH_zh.wikipedia.org_all-access_spider
+      - BTOB_zh.wikipedia.org_all-access_spider
+      - Beautiful_Mind_zh.wikipedia.org_all-access_spider
+      - Beyond_zh.wikipedia.org_all-access_spider
+      - Big_zh.wikipedia.org_all-access_spider
+      - Block_B_zh.wikipedia.org_all-access_spider
+      - CHAOS;CHILD_zh.wikipedia.org_all-access_spider
+      - CHAOS;HEAD_zh.wikipedia.org_all-access_spider
+      - CLC_zh.wikipedia.org_all-access_spider
+      - CNBLUE_zh.wikipedia.org_all-access_spider
+      - DIA_zh.wikipedia.org_all-access_spider
+      - Daigo_zh.wikipedia.org_all-access_spider
+      - Dear_My_Friends_zh.wikipedia.org_all-access_spider
+      - Doctors_zh.wikipedia.org_all-access_spider
+      - EGOIST_zh.wikipedia.org_all-access_spider
+      - EXID_zh.wikipedia.org_all-access_spider
+      - EXO_zh.wikipedia.org_all-access_spider
+      - Energy_zh.wikipedia.org_all-access_spider
+      - Eric_Nam_zh.wikipedia.org_all-access_spider
+      - FAIRY_TAIL_zh.wikipedia.org_all-access_spider
+      - FIESTAR_zh.wikipedia.org_all-access_spider
+      - FIRST_CLASS_zh.wikipedia.org_all-access_spider
+      - Facebook_zh.wikipedia.org_all-access_spider
+      - Fantastic_Duo_zh.wikipedia.org_all-access_spider
+      - Fate/Grand_Order_zh.wikipedia.org_all-access_spider
+      - Fate/Zero_zh.wikipedia.org_all-access_spider
+      - Fate/stay_night_zh.wikipedia.org_all-access_spider
+      - File:427FW_126.JPG_zh.wikipedia.org_all-access_spider
+      - File:Ap_F23_20110324114153669.jpg_zh.wikipedia.org_all-access_spider
+      - File:Christian-krohg-leiv-eriksson.jpg_zh.wikipedia.org_all-access_spider
+      - File:Sebastiaosalgado2006.jpg_zh.wikipedia.org_all-access_spider
+      - File:Zhongxiao_West_Road2.JPG_zh.wikipedia.org_all-access_spider
+      - G-Dragon_zh.wikipedia.org_all-access_spider
+      - G.NA_zh.wikipedia.org_all-access_spider
+      - GFRIEND_zh.wikipedia.org_all-access_spider
+      - GNZ48_zh.wikipedia.org_all-access_spider
+      - GOT7_zh.wikipedia.org_all-access_spider
+      - GUMMY_zh.wikipedia.org_all-access_spider
+      - Girl's_Day_zh.wikipedia.org_all-access_spider
+      - Goodbye_Mr._Black_zh.wikipedia.org_all-access_spider
+      - Google_zh.wikipedia.org_all-access_spider
+      - Gu9udan_zh.wikipedia.org_all-access_spider
+      - HDMI_zh.wikipedia.org_all-access_spider
+      - Hand_Shakers_zh.wikipedia.org_all-access_spider
+      - Hisasi_zh.wikipedia.org_all-access_spider
+      - Hit_The_Stage_zh.wikipedia.org_all-access_spider
+      - Hotel_King_zh.wikipedia.org_all-access_spider
+      - I'm_Home_zh.wikipedia.org_all-access_spider
+      - I.O.I_zh.wikipedia.org_all-access_spider
+      - IKON_zh.wikipedia.org_all-access_spider
+      - INFINITE_zh.wikipedia.org_all-access_spider
+      - IPhone_zh.wikipedia.org_all-access_spider
+      - Ingress_zh.wikipedia.org_all-access_spider
+      - Intel740_zh.wikipedia.org_all-access_spider
+      - Intel_80386_zh.wikipedia.org_all-access_spider
+      - Juksy_zh.wikipedia.org_all-access_spider
+      - K.A.R.D_zh.wikipedia.org_all-access_spider
+      - KNK_zh.wikipedia.org_all-access_spider
+      - KUROMUKURO_zh.wikipedia.org_all-access_spider
+      - Kara_zh.wikipedia.org_all-access_spider
+      - Kill_Me_Heal_Me_zh.wikipedia.org_all-access_spider
+      - Lady_Gaga_zh.wikipedia.org_all-access_spider
+      - Legal_high_zh.wikipedia.org_all-access_spider
+      - LoveLive!_zh.wikipedia.org_all-access_spider
+      - LoveLive!_Sunshine!!_zh.wikipedia.org_all-access_spider
+      - Lovelyz_zh.wikipedia.org_all-access_spider
+      - Lulu_zh.wikipedia.org_all-access_spider
+      - MADTOWN_zh.wikipedia.org_all-access_spider
+      - MAMAMOO_zh.wikipedia.org_all-access_spider
+      - MONSTA_X_zh.wikipedia.org_all-access_spider
+      - Madame_Antoine_zh.wikipedia.org_all-access_spider
+      - Mamamoo_zh.wikipedia.org_all-access_spider
+      - Mike_D._Angelo_zh.wikipedia.org_all-access_spider
+      - Miss_A_zh.wikipedia.org_all-access_spider
+      - Missing9_zh.wikipedia.org_all-access_spider
+      - Monstar_zh.wikipedia.org_all-access_spider
+      - Mrs._Cop_2_zh.wikipedia.org_all-access_spider
+      - NBA_zh.wikipedia.org_all-access_spider
+      - NCT_zh.wikipedia.org_all-access_spider
+      - NEW_GAME!_zh.wikipedia.org_all-access_spider
+      - Netflix_zh.wikipedia.org_all-access_spider
+      - Niantic_zh.wikipedia.org_all-access_spider
+      - ONE_OK_ROCK_zh.wikipedia.org_all-access_spider
+      - ONE_PIECE_zh.wikipedia.org_all-access_spider
+      - ONE_PIECE_FILM_GOLD_zh.wikipedia.org_all-access_spider
+      - Oh_My_Girl_zh.wikipedia.org_all-access_spider
+      - Oh_My_Venus_zh.wikipedia.org_all-access_spider
+      - PRODUCE_101_zh.wikipedia.org_all-access_spider
+      - Page_Turner_zh.wikipedia.org_all-access_spider
+      - Pen-Pineapple-Apple-Pen_zh.wikipedia.org_all-access_spider
+      - PewDiePie_zh.wikipedia.org_all-access_spider
+      - Popu_Lady_zh.wikipedia.org_all-access_spider
+      - Pristin_zh.wikipedia.org_all-access_spider
+      - Qualidea_Code_zh.wikipedia.org_all-access_spider
+      - RADWIMPS_zh.wikipedia.org_all-access_spider
+      - RAID_zh.wikipedia.org_all-access_spider
+      - RWBY_zh.wikipedia.org_all-access_spider
+      - Rain_zh.wikipedia.org_all-access_spider
+      - ReLIFE_zh.wikipedia.org_all-access_spider
+      - Red_Velvet_zh.wikipedia.org_all-access_spider
+      - Rewrite_zh.wikipedia.org_all-access_spider
+      - Running_Man_zh.wikipedia.org_all-access_spider
+      - S.H.E_zh.wikipedia.org_all-access_spider
+      - SF9_zh.wikipedia.org_all-access_spider
+      - SHINee_zh.wikipedia.org_all-access_spider
+      - SISTAR_zh.wikipedia.org_all-access_spider
+      - SIXTEEN_zh.wikipedia.org_all-access_spider
+      - SMAP_zh.wikipedia.org_all-access_spider
+      - SNH48_zh.wikipedia.org_all-access_spider
+      - SUPER_LOVERS_zh.wikipedia.org_all-access_spider
+      - Schwarzesmarken_zh.wikipedia.org_all-access_spider
+      - Secret_Love_zh.wikipedia.org_all-access_spider
+      - SpeXial_zh.wikipedia.org_all-access_spider
+      - Special:Search_zh.wikipedia.org_all-access_spider
+      - Super_Junior_zh.wikipedia.org_all-access_spider
+      - Supper_Moment_zh.wikipedia.org_all-access_spider
+      - T-ara_zh.wikipedia.org_all-access_spider
+      - T.O.P._zh.wikipedia.org_all-access_spider
+      - TANet_zh.wikipedia.org_all-access_spider
+    # number of multivariate targets : 145
+    # covariate_target_variable_name : Python_zh.wikipedia.org_all-access_spider
+    # number of covariates : 144
+    # number of time-steps : 550
+
+  multivariate_econ_quarterly_fred_qd:
+    rel_path: multivariate/multivariate_econ_quarterly_fred_qd
+    # multivariate_target_variable_names: all 245 FRED-QD macro series.
+    # covariate_target_variable_name=GDPC1 — real GDP, canonical macro anchor series.
+    # covariate_variable_names: remaining macro/labor/price/finance indicators.
+    task:
+      context_window: 128
+      forecast_horizon: 64
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_econ_quarterly_fred_qd.csv
+      multivariate_target_variable_names:
+      - GDPC1
+      - PCECC96
+      - PCDGx
+      - PCESVx
+      - PCNDx
+      - GPDIC1
+      - FPIx
+      - Y033RC1Q027SBEAx
+      - PNFIx
+      - PRFIx
+      - A014RE1Q156NBEA
+      - GCEC1
+      - A823RL1Q225SBEA
+      - FGRECPTx
+      - SLCEx
+      - EXPGSC1
+      - IMPGSC1
+      - DPIC96
+      - OUTNFB
+      - OUTBS
+      - OUTMS
+      - INDPRO
+      - IPFINAL
+      - IPCONGD
+      - IPMAT
+      - IPDMAT
+      - IPNMAT
+      - IPDCONGD
+      - IPB51110SQ
+      - IPNCONGD
+      - IPBUSEQ
+      - IPB51220SQ
+      - TCU
+      - CUMFNS
+      - PAYEMS
+      - USPRIV
+      - MANEMP
+      - SRVPRD
+      - USGOOD
+      - DMANEMP
+      - NDMANEMP
+      - USCONS
+      - USEHS
+      - USFIRE
+      - USINFO
+      - USPBS
+      - USLAH
+      - USSERV
+      - USMINE
+      - USTPU
+      - USGOVT
+      - USTRADE
+      - USWTRADE
+      - CES9091000001
+      - CES9092000001
+      - CES9093000001
+      - CE16OV
+      - CIVPART
+      - UNRATE
+      - UNRATESTx
+      - UNRATELTx
+      - LNS14000012
+      - LNS14000025
+      - LNS14000026
+      - UEMPLT5
+      - UEMP5TO14
+      - UEMP15T26
+      - UEMP27OV
+      - LNS13023621
+      - LNS13023557
+      - LNS13023705
+      - LNS13023569
+      - LNS12032194
+      - HOABS
+      - HOAMS
+      - HOANBS
+      - AWHMAN
+      - AWHNONAG
+      - AWOTMAN
+      - HWIx
+      - HOUST
+      - HOUST5F
+      - PERMIT
+      - HOUSTMW
+      - HOUSTNE
+      - HOUSTS
+      - HOUSTW
+      - CMRMTSPLx
+      - RSAFSx
+      - AMDMNOx
+      - ACOGNOx
+      - AMDMUOx
+      - ANDENOx
+      - INVCQRMTSPL
+      - PCECTPI
+      - PCEPILFE
+      - GDPCTPI
+      - GPDICTPI
+      - IPDBS
+      - DGDSRG3Q086SBEA
+      - DDURRG3Q086SBEA
+      - DSERRG3Q086SBEA
+      - DNDGRG3Q086SBEA
+      - DHCERG3Q086SBEA
+      - DMOTRG3Q086SBEA
+      - DFDHRG3Q086SBEA
+      - DREQRG3Q086SBEA
+      - DODGRG3Q086SBEA
+      - DFXARG3Q086SBEA
+      - DCLORG3Q086SBEA
+      - DGOERG3Q086SBEA
+      - DONGRG3Q086SBEA
+      - DHUTRG3Q086SBEA
+      - DHLCRG3Q086SBEA
+      - DTRSRG3Q086SBEA
+      - DRCARG3Q086SBEA
+      - DFSARG3Q086SBEA
+      - DIFSRG3Q086SBEA
+      - DOTSRG3Q086SBEA
+      - CPIAUCSL
+      - CPILFESL
+      - WPSFD49207
+      - PPIACO
+      - WPSFD49502
+      - WPSFD4111
+      - PPIIDC
+      - WPSID61
+      - WPU0531
+      - WPU0561
+      - OILPRICEx
+      - AHETPIx
+      - CES2000000008x
+      - CES3000000008x
+      - COMPRMS
+      - COMPRNFB
+      - RCPHBS
+      - OPHMFG
+      - OPHNFB
+      - OPHPBS
+      - ULCBS
+      - ULCMFG
+      - ULCNFB
+      - UNLPNBS
+      - FEDFUNDS
+      - TB3MS
+      - TB6MS
+      - GS1
+      - GS10
+      - MORTGAGE30US
+      - AAA
+      - BAA
+      - BAA10YM
+      - MORTG10YRx
+      - TB6M3Mx
+      - GS1TB3Mx
+      - GS10TB3Mx
+      - CPF3MTB3Mx
+      - BOGMBASEREALx
+      - M1REAL
+      - M2REAL
+      - BUSLOANSx
+      - CONSUMERx
+      - NONREVSLx
+      - REALLNx
+      - REVOLSLx
+      - TOTALSLx
+      - DRIWCIL
+      - TABSHNOx
+      - TLBSHNOx
+      - LIABPIx
+      - TNWBSHNOx
+      - NWPIx
+      - TARESAx
+      - HNOREMQ027Sx
+      - TFAABSHNOx
+      - VIXCLSx
+      - USSTHPI
+      - SPCS10RSA
+      - SPCS20RSA
+      - TWEXAFEGSMTHx
+      - EXUSEU
+      - EXSZUSx
+      - EXJPUSx
+      - EXUSUKx
+      - EXCAUSx
+      - UMCSENTx
+      - USEPUINDXM
+      - B020RE1Q156NBEA
+      - B021RE1Q156NBEA
+      - GFDEGDQ188S
+      - GFDEBTNx
+      - IPMANSICS
+      - IPB51222S
+      - IPFUELS
+      - UEMPMEAN
+      - CES0600000007
+      - TOTRESNS
+      - NONBORRES
+      - GS5
+      - TB3SMFFM
+      - T5YFFM
+      - AAAFFM
+      - WPSID62
+      - PPICMM
+      - CPIAPPSL
+      - CPITRNSL
+      - CPIMEDSL
+      - CUSR0000SAC
+      - CUSR0000SAD
+      - CUSR0000SAS
+      - CPIULFSL
+      - CUSR0000SA0L2
+      - CUSR0000SA0L5
+      - CES0600000008
+      - DTCOLNVHFNM
+      - DTCTHFNM
+      - INVEST
+      - HWIURATIOx
+      - CLAIMSx
+      - BUSINVx
+      - ISRATIOx
+      - CONSPIx
+      - CP3M
+      - COMPAPFF
+      - PERMITNE
+      - PERMITMW
+      - PERMITS
+      - PERMITW
+      - NIKKEI225
+      - NASDAQCOM
+      - CUSR0000SEHC
+      - TLBSNNCBx
+      - TLBSNNCBBDIx
+      - TTAABSNNCBx
+      - TNWMVBSNNCBx
+      - TNWMVBSNNCBBDIx
+      - TLBSNNBx
+      - TLBSNNBBDIx
+      - TABSNNBx
+      - TNWBSNNBx
+      - TNWBSNNBBDIx
+      - CNCFx
+      - S&P 500
+      - S&P div yield
+      - S&P PE ratio
+      covariate_target_variable_name: GDPC1
+      covariate_variable_names:
+      - PCECC96
+      - PCDGx
+      - PCESVx
+      - PCNDx
+      - GPDIC1
+      - FPIx
+      - Y033RC1Q027SBEAx
+      - PNFIx
+      - PRFIx
+      - A014RE1Q156NBEA
+      - GCEC1
+      - A823RL1Q225SBEA
+      - FGRECPTx
+      - SLCEx
+      - EXPGSC1
+      - IMPGSC1
+      - DPIC96
+      - OUTNFB
+      - OUTBS
+      - OUTMS
+      - INDPRO
+      - IPFINAL
+      - IPCONGD
+      - IPMAT
+      - IPDMAT
+      - IPNMAT
+      - IPDCONGD
+      - IPB51110SQ
+      - IPNCONGD
+      - IPBUSEQ
+      - IPB51220SQ
+      - TCU
+      - CUMFNS
+      - PAYEMS
+      - USPRIV
+      - MANEMP
+      - SRVPRD
+      - USGOOD
+      - DMANEMP
+      - NDMANEMP
+      - USCONS
+      - USEHS
+      - USFIRE
+      - USINFO
+      - USPBS
+      - USLAH
+      - USSERV
+      - USMINE
+      - USTPU
+      - USGOVT
+      - USTRADE
+      - USWTRADE
+      - CES9091000001
+      - CES9092000001
+      - CES9093000001
+      - CE16OV
+      - CIVPART
+      - UNRATE
+      - UNRATESTx
+      - UNRATELTx
+      - LNS14000012
+      - LNS14000025
+      - LNS14000026
+      - UEMPLT5
+      - UEMP5TO14
+      - UEMP15T26
+      - UEMP27OV
+      - LNS13023621
+      - LNS13023557
+      - LNS13023705
+      - LNS13023569
+      - LNS12032194
+      - HOABS
+      - HOAMS
+      - HOANBS
+      - AWHMAN
+      - AWHNONAG
+      - AWOTMAN
+      - HWIx
+      - HOUST
+      - HOUST5F
+      - PERMIT
+      - HOUSTMW
+      - HOUSTNE
+      - HOUSTS
+      - HOUSTW
+      - CMRMTSPLx
+      - RSAFSx
+      - AMDMNOx
+      - ACOGNOx
+      - AMDMUOx
+      - ANDENOx
+      - INVCQRMTSPL
+      - PCECTPI
+      - PCEPILFE
+      - GDPCTPI
+      - GPDICTPI
+      - IPDBS
+      - DGDSRG3Q086SBEA
+      - DDURRG3Q086SBEA
+      - DSERRG3Q086SBEA
+      - DNDGRG3Q086SBEA
+      - DHCERG3Q086SBEA
+      - DMOTRG3Q086SBEA
+      - DFDHRG3Q086SBEA
+      - DREQRG3Q086SBEA
+      - DODGRG3Q086SBEA
+      - DFXARG3Q086SBEA
+      - DCLORG3Q086SBEA
+      - DGOERG3Q086SBEA
+      - DONGRG3Q086SBEA
+      - DHUTRG3Q086SBEA
+      - DHLCRG3Q086SBEA
+      - DTRSRG3Q086SBEA
+      - DRCARG3Q086SBEA
+      - DFSARG3Q086SBEA
+      - DIFSRG3Q086SBEA
+      - DOTSRG3Q086SBEA
+      - CPIAUCSL
+      - CPILFESL
+      - WPSFD49207
+      - PPIACO
+      - WPSFD49502
+      - WPSFD4111
+      - PPIIDC
+      - WPSID61
+      - WPU0531
+      - WPU0561
+      - OILPRICEx
+      - AHETPIx
+      - CES2000000008x
+      - CES3000000008x
+      - COMPRMS
+      - COMPRNFB
+      - RCPHBS
+      - OPHMFG
+      - OPHNFB
+      - OPHPBS
+      - ULCBS
+      - ULCMFG
+      - ULCNFB
+      - UNLPNBS
+      - FEDFUNDS
+      - TB3MS
+      - TB6MS
+      - GS1
+      - GS10
+      - MORTGAGE30US
+      - AAA
+      - BAA
+      - BAA10YM
+      - MORTG10YRx
+      - TB6M3Mx
+      - GS1TB3Mx
+      - GS10TB3Mx
+      - CPF3MTB3Mx
+      - BOGMBASEREALx
+      - M1REAL
+      - M2REAL
+      - BUSLOANSx
+      - CONSUMERx
+      - NONREVSLx
+      - REALLNx
+      - REVOLSLx
+      - TOTALSLx
+      - DRIWCIL
+      - TABSHNOx
+      - TLBSHNOx
+      - LIABPIx
+      - TNWBSHNOx
+      - NWPIx
+      - TARESAx
+      - HNOREMQ027Sx
+      - TFAABSHNOx
+      - VIXCLSx
+      - USSTHPI
+      - SPCS10RSA
+      - SPCS20RSA
+      - TWEXAFEGSMTHx
+      - EXUSEU
+      - EXSZUSx
+      - EXJPUSx
+      - EXUSUKx
+      - EXCAUSx
+      - UMCSENTx
+      - USEPUINDXM
+      - B020RE1Q156NBEA
+      - B021RE1Q156NBEA
+      - GFDEGDQ188S
+      - GFDEBTNx
+      - IPMANSICS
+      - IPB51222S
+      - IPFUELS
+      - UEMPMEAN
+      - CES0600000007
+      - TOTRESNS
+      - NONBORRES
+      - GS5
+      - TB3SMFFM
+      - T5YFFM
+      - AAAFFM
+      - WPSID62
+      - PPICMM
+      - CPIAPPSL
+      - CPITRNSL
+      - CPIMEDSL
+      - CUSR0000SAC
+      - CUSR0000SAD
+      - CUSR0000SAS
+      - CPIULFSL
+      - CUSR0000SA0L2
+      - CUSR0000SA0L5
+      - CES0600000008
+      - DTCOLNVHFNM
+      - DTCTHFNM
+      - INVEST
+      - HWIURATIOx
+      - CLAIMSx
+      - BUSINVx
+      - ISRATIOx
+      - CONSPIx
+      - CP3M
+      - COMPAPFF
+      - PERMITNE
+      - PERMITMW
+      - PERMITS
+      - PERMITW
+      - NIKKEI225
+      - NASDAQCOM
+      - CUSR0000SEHC
+      - TLBSNNCBx
+      - TLBSNNCBBDIx
+      - TTAABSNNCBx
+      - TNWMVBSNNCBx
+      - TNWMVBSNNCBBDIx
+      - TLBSNNBx
+      - TLBSNNBBDIx
+      - TABSNNBx
+      - TNWBSNNBx
+      - TNWBSNNBBDIx
+      - CNCFx
+      - S&P 500
+      - S&P div yield
+      - S&P PE ratio
+    # number of multivariate targets : 245
+    # covariate_target_variable_name : GDPC1
+    # number of covariates : 244
+    # number of time-steps : 269
+
+  multivariate_nature_annually_global_carbon_budget:
+    rel_path: multivariate/multivariate_nature_annually_global_carbon_budget
+    # multivariate_target_variable_names: all 26 Barbados emissions/GDP indicators.
+    # covariate_target_variable_name=co2 — primary territorial CO2 emissions series.
+    # covariate_variable_names: population, GDP, fuel splits, GHG, energy, temperature, etc.
+    # file_name uses barbados suffix because output CSV is country-specific.
+    task:
+      context_window: 64
+      forecast_horizon: 16
+      handle_missing: interpolate
+      normalization_method: standard
+      file_name: multivariate_nature_annually_global_carbon_budget_barbados.csv
+      multivariate_target_variable_names:
+      - population
+      - gdp
+      - co2
+      - co2_per_capita
+      - co2_per_gdp
+      - co2_growth_abs
+      - co2_growth_prct
+      - coal_co2
+      - oil_co2
+      - gas_co2
+      - cement_co2
+      - flaring_co2
+      - land_use_change_co2
+      - co2_including_luc
+      - co2_including_luc_per_capita
+      - cumulative_co2
+      - cumulative_co2_including_luc
+      - methane
+      - nitrous_oxide
+      - total_ghg
+      - primary_energy_consumption
+      - energy_per_capita
+      - share_global_co2
+      - share_global_cumulative_co2
+      - trade_co2
+      - temperature_change_from_co2
+      covariate_target_variable_name: co2
+      covariate_variable_names:
+      - population
+      - gdp
+      - co2_per_capita
+      - co2_per_gdp
+      - co2_growth_abs
+      - co2_growth_prct
+      - coal_co2
+      - oil_co2
+      - gas_co2
+      - cement_co2
+      - flaring_co2
+      - land_use_change_co2
+      - co2_including_luc
+      - co2_including_luc_per_capita
+      - cumulative_co2
+      - cumulative_co2_including_luc
+      - methane
+      - nitrous_oxide
+      - total_ghg
+      - primary_energy_consumption
+      - energy_per_capita
+      - share_global_co2
+      - share_global_cumulative_co2
+      - trade_co2
+      - temperature_change_from_co2
+    # number of multivariate targets : 26
+    # covariate_target_variable_name : co2
+    # number of covariates : 25
+    # number of time-steps : 275

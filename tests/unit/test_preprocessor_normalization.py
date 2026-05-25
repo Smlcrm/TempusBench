@@ -11,8 +11,9 @@ os.environ.setdefault("TEMPUSBENCH_DISABLE_TENSORBOARD", "1")
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
+from tests.helpers.task_config_fixtures import dummy_univariate_task_config
 from tempus_bench.pipeline.preprocessor import Preprocessor
-from tempus_bench.utils.configs import DatasetConfig, EvaluationConfig, TaskConfig
+from tempus_bench.utils.configs import EvaluationConfig, TaskConfig
 from tempus_bench.utils.log_manager import LogManager
 
 
@@ -35,13 +36,7 @@ def _log_manager():
 
 
 def _dummy_task_config() -> TaskConfig:
-    return TaskConfig(
-        task_name="norm_test",
-        task_path="/tmp",
-        forecast_horizon=1,
-        context_window=1,
-        dataset=DatasetConfig(file_name="dummy.csv"),
-    )
+    return dummy_univariate_task_config()
 
 
 def _evaluation_config_for_norm_tests() -> EvaluationConfig:

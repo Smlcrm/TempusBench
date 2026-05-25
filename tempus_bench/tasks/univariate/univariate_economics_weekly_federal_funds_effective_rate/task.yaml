@@ -1,0 +1,13 @@
+task:
+  context_window: 1024
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: univariate_economics_weekly_federal_funds_effective_rate.csv
+  target_variable_names:
+  - federal_funds_effective_rate_us
+  covariate_variable_names: []
+
+# number of targets : 1
+# number of covariates : 0
+# number of time-steps : 3750

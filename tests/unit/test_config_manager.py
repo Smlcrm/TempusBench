@@ -25,6 +25,14 @@ from tempus_bench.utils.configs import (
 from tempus_bench.utils.paths import get_available_models, find_task_directories
 
 
+def _mock_task_manager(*, task_path: str = "*") -> Mock:
+    manager = Mock()
+    manager.task_path = task_path
+    manager.evaluation_config = EvaluationConfig(task_path=task_path, max_windows=1)
+    manager.logger = Mock()
+    return manager
+
+
 @pytest.fixture
 def sample_benchmark_config():
     """Sample benchmark configuration."""
@@ -365,46 +373,35 @@ class TestManagerValidateTaskConfigs:
         task_dir = tmp_path / "task1"
         task_dir.mkdir()
 
-        manager = Mock()
-        manager.task_path = "*"
-        manager.logger = Mock()
+        manager = _mock_task_manager()
 
         with patch(
             "tempus_bench.utils.config_manager.find_task_directories",
             return_value={"task1": str(task_dir)},
         ):
-            with pytest.raises(ValidationError, match="Task config not found"):
+            with pytest.raises(FileNotFoundError, match="Missing task.yaml"):
                 ConfigManager.init_tasks(manager)
 
     def test_validate_task_configs_success(self, tmp_path):
         """Test successful validation of task configs."""
-        task_dir = tmp_path / "test_task"
-        task_dir.mkdir()
+        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
+        task_dir.mkdir(parents=True)
 
         task_file = task_dir / "task.yaml"
         task_data = {
             "task": {
-                "name": "test_task",
                 "forecast_horizon": 24,
                 "context_window": 50,
-                "dataset": {
-                    "file_name": "test_dataset.csv",
-                    "normalize": True,
-                    "handle_missing": "interpolate",
-                },
+                "handle_missing": "interpolate",
+                "normalization_method": "standard",
+                "file_name": "test_dataset.csv",
+                "target_variable_names": ["series_a"],
+                "covariate_variable_names": [],
             }
         }
         task_file.write_text(yaml.dump(task_data))
 
-        # Note: ConfigManager.init_tasks will add task_path automatically
-
-        # Create the CSV file that the test expects
-        csv_file = task_dir / "test_dataset.csv"
-        csv_file.write_text("timestamp,value\n2023-01-01,1.0\n2023-01-02,2.0")
-
-        manager = Mock()
-        manager.task_path = "*"
-        manager.logger = Mock()
+        manager = _mock_task_manager()
 
         with patch(
             "tempus_bench.utils.config_manager.find_task_directories",
@@ -412,86 +409,83 @@ class TestManagerValidateTaskConfigs:
         ):
             result = ConfigManager.init_tasks(manager)
             assert "test_task" in result
-            assert result["test_task"].name == "test_task"
+            assert result["test_task"].task_name == "test_task"
             assert result["test_task"].forecast_horizon == 24
 
-    def test_validate_task_configs_multi_doc(self, tmp_path):
-        """Test successful validation of multi-document task configs."""
-        task_dir = tmp_path / "test_task"
-        task_dir.mkdir()
+    def test_validate_task_configs_multi_doc_uses_first_document(self, tmp_path):
+        """Multi-document yaml uses the first valid task document only."""
+        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
+        task_dir.mkdir(parents=True)
 
         task_file = task_dir / "task.yaml"
         task_file.write_text(
             """task:
   forecast_horizon: 24
   context_window: 50
-  dataset:     file_name: test_dataset
-    normalize: true
-    handle_missing: interpolate
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: test_dataset.csv
+  target_variable_names: [series_a]
+  covariate_variable_names: []
 ---
 task:
   forecast_horizon: 48
   context_window: 100
-  dataset:     file_name: test_dataset
-    normalize: false
-    handle_missing: drop
+  handle_missing: drop
+  normalization_method: none
+  file_name: test_dataset.csv
+  target_variable_names: [series_a]
+  covariate_variable_names: []
 """
         )
 
-        manager = Mock()
-        manager.task_path = "*"
-        manager.logger = Mock()
+        manager = _mock_task_manager()
 
         with patch(
             "tempus_bench.utils.config_manager.find_task_directories",
             return_value={"test_task": str(task_dir)},
         ):
-            # Note: The ConfigManager's init_tasks expects single task config per file
-            # Multi-doc support would need to be checked separately
-            with pytest.raises(ValidationError):
-                ConfigManager.init_tasks(manager)
+            result = ConfigManager.init_tasks(manager)
+            assert result["test_task"].forecast_horizon == 24
+            assert result["test_task"].context_window == 50
 
     def test_validate_task_configs_validation_error(self, tmp_path):
         """Test that ValidationError is raised for invalid task config."""
-        task_dir = tmp_path / "test_task"
-        task_dir.mkdir()
+        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
+        task_dir.mkdir(parents=True)
 
         task_file = task_dir / "task.yaml"
         task_file.write_text(
             """task:
   forecast_horizon: 24
-  # Missing context_window and dataset
+  # Missing context_window and required flat fields
 """
         )
 
-        manager = Mock()
-        manager.task_path = "*"
-        manager.logger = Mock()
+        manager = _mock_task_manager()
 
         with patch(
             "tempus_bench.utils.config_manager.find_task_directories",
             return_value={"test_task": str(task_dir)},
         ):
-            with pytest.raises(ValidationError):
+            with pytest.raises((ValidationError, KeyError)):
                 ConfigManager.init_tasks(manager)
 
     def test_validate_task_configs_empty_documents(self, tmp_path):
         """Test that empty task config raises error."""
-        task_dir = tmp_path / "test_task"
-        task_dir.mkdir()
+        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
+        task_dir.mkdir(parents=True)
 
         task_file = task_dir / "task.yaml"
         task_file.write_text("")
 
-        manager = Mock()
-        manager.task_path = "*"
-        manager.logger = Mock()
+        manager = _mock_task_manager()
 
         with patch(
             "tempus_bench.utils.config_manager.find_task_directories",
             return_value={"test_task": str(task_dir)},
         ):
-            with pytest.raises(ValueError, match="empty or invalid YAML"):
+            with pytest.raises(ValueError, match="No valid task document"):
                 ConfigManager.init_tasks(manager)
 
 
@@ -562,7 +556,11 @@ class TestManagerFullIntegration:
                     "task": {
                         "forecast_horizon": 24,
                         "context_window": 50,
-                        "dataset": {"name": "test"},
+                        "handle_missing": "interpolate",
+                        "normalization_method": "standard",
+                        "file_name": "test.csv",
+                        "target_variable_names": ["series_a"],
+                        "covariate_variable_names": [],
                     }
                 }
             )
@@ -651,22 +649,20 @@ class TestManagerTaskConfigBranch:
     """Test suite for task config validation branch."""
 
     def test_task_config_without_task_key_raises_error(self, tmp_path):
-        """Test that task config without 'task' key raises error (line 226)."""
-        task_dir = tmp_path / "test_task"
-        task_dir.mkdir()
+        """Test that task config without 'task' key raises error."""
+        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
+        task_dir.mkdir(parents=True)
 
         task_file = task_dir / "task.yaml"
         task_file.write_text("forecast_horizon: 24")  # No 'task' key
 
-        manager = Mock()
-        manager.task_path = "*"
-        manager.logger = Mock()
+        manager = _mock_task_manager()
 
         with patch(
             "tempus_bench.utils.config_manager.find_task_directories",
             return_value={"test_task": str(task_dir)},
         ):
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError, match="No valid task document"):
                 ConfigManager.init_tasks(manager)
 
 

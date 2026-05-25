@@ -1,0 +1,15 @@
+{
+  "name": "Average Price: Electricity per Kilowatt-Hour in U.S. City Average",
+  "link": "https://fred.stlouisfed.org/series/APU000072610",
+  "citation": "U.S. Bureau of Labor Statistics, Average Price: Electricity per Kilowatt-Hour in U.S. City Average [APU000072610], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/APU000072610, August 29, 2025.",
+  "license": "Public Domain",
+  "description": "All electricity. Average consumer prices are calculated for household fuel, motor fuel, and food items from prices collected for the Consumer Price Index (CPI). Average prices are best used to measure the price level in a particular month, not to measure price change over time. It is more appropriate to use CPI index values for the particular item categories to measure price change. Prices, except for electricity, are collected monthly by BLS representatives in the 75 urban areas priced for the CPI. Electricity prices are collected for the BLS for the same 75 areas on a monthly basis by the Department of Energy using mail questionnaires. All fuel prices include applicable Federal, State, and local taxes; prices for natural gas and electricity also include fuel and purchased gas adjustments.",
+  "preprocessing": [
+    "Load APU000072610.csv; rename observation_date to timestamps (UTC).",
+    "Keep value column APU000072610 only.",
+    "Frequency check: MS (month start).",
+    "Fill missing: standard monthly reindex on MS grid.",
+    "Transform: variable_name=electricity_price_kwh_us_city_avg, variable_unit=U.S. Dollars.",
+    "Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

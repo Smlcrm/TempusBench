@@ -1,0 +1,17 @@
+{
+  "name": "Federal Funds Effective Rate",
+  "link": "https://fred.stlouisfed.org/series/FF",
+  "citation": "Board of Governors of the Federal Reserve System (US), Federal Funds Effective Rate [FF], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/FF.",
+  "license": "Public Domain",
+  "description": "The federal funds rate is the interest rate at which depository institutions trade federal funds (balances held at Federal Reserve Banks) with each other overnight. When a depository institution has surplus balances in its reserve account, it lends to other banks in need of larger balances. In simpler terms, a bank with excess cash, which is often referred to as liquidity, will lend to another bank that needs to quickly raise liquidity. The weighted average rate for these overnight negotiations is the effective federal funds rate. The Federal Open Market Committee (FOMC) sets a target for the federal funds rate and influences it through open market operations.",
+  "preprocessing": [
+    "Load raw file FF.csv from raw_datasets/univariate/univariate_economics_weekly_federal_funds_effective_rate/.",
+    "Rename observation_date to timestamps; parse as UTC datetime.",
+    "Keep single value column FF; no row filtering.",
+    "Frequency check: pd.infer_freq yields W-WED (weekly, Wednesday anchor).",
+    "Fill missing: drop duplicate timestamps, reindex to full W-WED grid from min to max; missing steps become NaN.",
+    "Transform: one output row with variable_name=federal_funds_effective_rate_us, variable_unit=Percent.",
+    "Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate).",
+    "Write univariate_economics_weekly_federal_funds_effective_rate.csv."
+  ]
+}

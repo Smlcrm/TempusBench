@@ -6,7 +6,8 @@ It loads complete dataset files and creates Dataset objects for machine learning
 
 Key Features:
     - Complete CSV dataset loading (not chunked)
-    - Tabular schema: variable_name, timestamps, values, variable_type (targets and covariates)
+    - Tabular schema: variable_name, variable_unit, timestamps, values
+    - Target/covariate selection from task.yaml (tasks)
     - Rolling window generation with configurable splits
     - Integration with preprocessing pipeline
 
@@ -36,11 +37,11 @@ from ..utils.configs import EvaluationConfig, TaskConfig
 from .data_types import Dataset
 from .preprocessor import Preprocessor
 
-_DATASET_COLUMNS: Final[Set[str]] = {
+_REQUIRED_DATASET_COLUMNS: Final[Set[str]] = {
     "variable_name",
+    "variable_unit",
     "timestamps",
     "values",
-    "variable_type",
 }
 
 
@@ -82,6 +83,35 @@ def _infer_freq_from_iso_timestamp_strings(timestamps_str: List[str]) -> str:
     return "YE"
 
 
+def _select_rows_by_names(
+    file_data: pl.DataFrame,
+    variable_names: list[str],
+    *,
+    role: str,
+    dataset_path: Path,
+) -> pl.DataFrame:
+    if not variable_names:
+        return file_data.head(0)
+
+    available = set(file_data["variable_name"].to_list())
+    missing = [name for name in variable_names if name not in available]
+    if missing:
+        raise ValueError(
+            f"Dataset {dataset_path} missing {role} variable_name rows: {missing[:5]}"
+        )
+
+    selected: list[pl.DataFrame] = []
+    for name in variable_names:
+        rows = file_data.filter(pl.col("variable_name") == name)
+        if rows.height != 1:
+            raise ValueError(
+                f"Dataset {dataset_path} expected exactly one row for {role} "
+                f"variable {name!r}, found {rows.height}"
+            )
+        selected.append(rows)
+    return pl.concat(selected)
+
+
 class DataLoader:
     """
     Loads and processes complete time series datasets into Dataset objects.
@@ -91,7 +121,7 @@ class DataLoader:
     suitable for the task-based execution model.
 
     All data is treated as multivariate where univariate is simply num_targets == 1.
-    Targets are inferred from data structure and kept as raw arrays without
+    Targets are inferred from task.yaml lists and kept as raw arrays without
     artificial column naming for maximum flexibility.
     """
 
@@ -117,7 +147,7 @@ class DataLoader:
         self.evaluation_config = evaluation_config
         self._force_no_normalize = force_no_normalize
         task_path = Path(self.task_config.task_path)
-        self.dataset_path = task_path / self.task_config.dataset.file_name
+        self.dataset_path = task_path / self.task_config.file_name
 
         self._load_dataset()
 
@@ -125,7 +155,7 @@ class DataLoader:
         """
         Load a complete dataset CSV and build a Dataset via the preprocessor.
 
-        The CSV must have columns: variable_name, timestamps, values, variable_type.
+        The CSV must have columns: variable_name, variable_unit, timestamps, values.
         Each ``timestamps`` cell is a JSON array of ISO 8601 strings (UTC ``Z`` recommended).
         Each ``values`` cell is a JSON array of numbers (or null for missing).
 
@@ -133,11 +163,14 @@ class DataLoader:
             FileNotFoundError: If the dataset file doesn't exist.
             ValueError: If the dataset cannot be processed or has invalid format.
         """
+        if not self.dataset_path.is_file():
+            raise FileNotFoundError(f"Dataset file not found: {self.dataset_path}")
+
         file_data = pl.read_csv(self.dataset_path, encoding="utf8")
         columns = set(file_data.columns)
-        if columns != _DATASET_COLUMNS:
+        if not _REQUIRED_DATASET_COLUMNS.issubset(columns):
             raise ValueError(
-                f"Dataset CSV must have exactly columns {sorted(_DATASET_COLUMNS)}; "
+                f"Dataset CSV must include columns {sorted(_REQUIRED_DATASET_COLUMNS)}; "
                 f"got {sorted(columns)} ({self.dataset_path})"
             )
 
@@ -145,16 +178,29 @@ class DataLoader:
 
     def _load_tabular_dataset(self, file_data: pl.DataFrame) -> None:
         """
-        Load targets and optional covariates from the standard tabular schema.
+        Load targets and optional covariates using task.yaml variable name lists.
 
         Args:
-            file_data: Polars DataFrame with columns variable_name, timestamps, values, variable_type
+            file_data: Polars DataFrame with tasks tabular schema columns
         """
-        target_rows = file_data.filter(pl.col("variable_type") == "target")
-        covariate_rows = file_data.filter(pl.col("variable_type") == "covariate")
+        target_names = self.task_config.effective_targets()
+        covariate_names = self.task_config.effective_covariates()
+
+        target_rows = _select_rows_by_names(
+            file_data,
+            target_names,
+            role="target",
+            dataset_path=self.dataset_path,
+        )
+        covariate_rows = _select_rows_by_names(
+            file_data,
+            covariate_names,
+            role="covariate",
+            dataset_path=self.dataset_path,
+        )
 
         if target_rows.height == 0:
-            raise ValueError("Dataset must have at least one row with variable_type 'target'")
+            raise ValueError("Dataset must have at least one target variate")
 
         first_target = target_rows.row(0, named=True)
         timestamps_str = json.loads(first_target["timestamps"])
@@ -175,23 +221,27 @@ class DataLoader:
         ts_calendar = ts_series.to_numpy()
 
         target_data: List[list] = []
+        target_units: List[str] = []
         for row in target_rows.iter_rows(named=True):
             values = json.loads(row["values"])
             target_data.append(values)
+            target_units.append(str(row["variable_unit"]))
 
         target_raw_str = str(target_data)
 
         covariate_data: List[list] = []
+        covariate_units: List[str] = []
         for row in covariate_rows.iter_rows(named=True):
             values = json.loads(row["values"])
             covariate_data.append(values)
+            covariate_units.append(str(row["variable_unit"]))
 
         normalize = (
             False
             if self._force_no_normalize
-            else self.task_config.dataset.normalize
+            else self.task_config.is_normalize()
         )
-        handle_missing = self.task_config.dataset.handle_missing
+        handle_missing = self.task_config.handle_missing
 
         preprocessor = Preprocessor(self.task_config, self.evaluation_config)
 
@@ -233,6 +283,11 @@ class DataLoader:
             "time_freq": time_freq,
             "num_targets": target.shape[1],
             "num_covariates": covariate.shape[1] if covariate is not None else 0,
+            "task_mode": self.task_config.task_mode,
+            "target_variable_names": target_names,
+            "covariate_variable_names": covariate_names,
+            "target_variable_units": target_units,
+            "covariate_variable_units": covariate_units,
         }
         if scaler is not None:
             meta["target_scaler_mean"] = scaler.mean_.tolist()

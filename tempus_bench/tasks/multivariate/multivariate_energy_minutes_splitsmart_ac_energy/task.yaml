@@ -1,0 +1,29 @@
+task:
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: multivariate_energy_minutes_splitsmart_ac_energy.csv
+  multivariate_target_variable_names:
+  - Current
+  - voltage
+  - Power_Factor
+  - Real_Power
+  - room_temp
+  - External_temp
+  - Humidity
+  - unit_consumption
+  covariate_target_variable_name: unit_consumption
+  covariate_variable_names:
+  - Current
+  - voltage
+  - Power_Factor
+  - Real_Power
+  - room_temp
+  - External_temp
+  - Humidity
+
+# number of multivariate targets : 8
+# covariate_target_variable_name : unit_consumption
+# number of covariates : 7
+# number of time-steps : 384440
