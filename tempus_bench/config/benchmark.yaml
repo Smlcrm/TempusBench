@@ -2,7 +2,7 @@
 # This file provides sensible defaults for all configuration options
 
 evaluation:
-  task_path: 'covariate/solar_100_covariate'
+  task_path: 'univariate/absent_binary_univariate'
   tuning_loss: mae
   max_windows: 4
   max_num_variates: 10
@@ -12,24 +12,24 @@ evaluation:
 
 model:
   
-  # seasonal_naive: 
-  #   sp: [12, 24]
+  seasonal_naive: 
+    sp: [12, 24]
 
-  # # Deterministic Models
-  # arima:
-  #   p: [1, 2]
-  #   d: [1]
-  #   q: [1, 2]
-  #   s: [2]
+  # Deterministic Models
+  arima:
+    p: [1, 2]
+    d: [1]
+    q: [1, 2]
+    s: [2]
 
-  # croston_classic:
-  #   alpha: [0.1, 0.3, 0.5]
-  #   gamma: [0.1, 0.3, 0.5]
+  croston_classic:
+    alpha: [0.1, 0.3, 0.5]
+    gamma: [0.1, 0.3, 0.5]
 
-  # exponential_smoothing:
-  #   trend: ["null", "add"]
-  #   seasonal: ["null"]
-  #   seasonal_periods: [4, 8, 16, 32]
+  exponential_smoothing:
+    trend: ["null", "add"]
+    seasonal: ["null"]
+    seasonal_periods: [4, 8, 16, 32]
 
   # lstm:
   #   learning_rate: [0.01, 0.001, 0.0001]
@@ -67,55 +67,55 @@ model:
   #   learning_rate: [0.05, 0.01, 0.001]
 
     
-  # ML models
-  nbeats: {}
-  nhits: {}
-  tft: {}
-  itransformer: {}
-  timesnet: {}
-  patchtsmixer: {}
+  # # ML models
+  # nbeats: {}
+  # nhits: {}
+  # tft: {}
+  # itransformer: {}
+  # timesnet: {}
+  # patchtsmixer: {}
 
-  # Foundation models — deterministic
-  moment_small: {}
-  moment_base: {}
-  moment_large: {}
-  timesfm_200m: {}
-  time_moe_50m: {}
-  time_moe_200m: {}
-  tiny_time_mixer_r1: {}
-  tiny_time_mixer_r2: {}
-  tiny_time_mixer_r2_1: {}
+  # # Foundation models — deterministic
+  # moment_small: {}
+  # moment_base: {}
+  # moment_large: {}
+  # timesfm_200m: {}
+  # time_moe_50m: {}
+  # time_moe_200m: {}
+  # tiny_time_mixer_r1: {}
+  # tiny_time_mixer_r2: {}
+  # tiny_time_mixer_r2_1: {}
 
-  # Foundation models — stochastic
-  chronos_tiny: {}
-  chronos_mini: {}
-  chronos_small: {}
-  chronos_base: {}
-  chronos_large: {}
-  chronos_bolt_tiny: {}
-  chronos_bolt_mini: {}
-  chronos_bolt_small: {}
-  chronos_bolt_base: {}
-  chronos2: {}
-  chronos2_small: {}
-  timesfm2: {}
-  timesfm_500m: {}
-  granite_flowstate: {}
-  kairos_10m: {}
-  kairos_23m: {}
-  kairos_50m: {}
-  moirai_small: {}
-  moirai_base: {}
-  moirai_large: {}
-  moirai_moe: {}
-  moirai2: {}
-  patchtst_fm: {}
-  patchtst_granite: {}
-  lagllama: {}
-  toto: {}
-  tabpfn: {}
-  # tabpfn_ts: {}
-  tirex: {}
-  tirex_1_1_gifteval: {}
-  sundial: {}
-  # lafn: {}
+  # # Foundation models — stochastic
+  # chronos_tiny: {}
+  # chronos_mini: {}
+  # chronos_small: {}
+  # chronos_base: {}
+  # chronos_large: {}
+  # chronos_bolt_tiny: {}
+  # chronos_bolt_mini: {}
+  # chronos_bolt_small: {}
+  # chronos_bolt_base: {}
+  # chronos2: {}
+  # chronos2_small: {}
+  # timesfm2: {}
+  # timesfm_500m: {}
+  # granite_flowstate: {}
+  # kairos_10m: {}
+  # kairos_23m: {}
+  # kairos_50m: {}
+  # moirai_small: {}
+  # moirai_base: {}
+  # moirai_large: {}
+  # moirai_moe: {}
+  # moirai2: {}
+  # patchtst_fm: {}
+  # patchtst_granite: {}
+  # lagllama: {}
+  # toto: {}
+  # tabpfn: {}
+  # # tabpfn_ts: {}
+  # tirex: {}
+  # tirex_1_1_gifteval: {}
+  # sundial: {}
+  # # lafn: {}
