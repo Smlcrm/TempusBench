@@ -5,7 +5,7 @@ device: cpu
 # loads the model with ``Chronarium.load_model(model_name, model_init="interface")``
 # so every checkpoint that Chronarium can deserialise is supported here.
 model_repo_path: gs://lafn_artifacts/
-model_name: lafn_2026_05_09_03:01:30
+model_name: lafn_2026_05_16_23:42:47
 checkpoint_version: null
 checkpoint_step: null
 credentials_path: tempus_bench/models/lafn/gcp_credentials.json
