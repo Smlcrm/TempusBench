@@ -35,7 +35,7 @@ from tempus_bench.utils.lagllama_freq import coerce_freq_for_pandas_date_range
 from tempus_bench.utils.lagllama_freq import normalize_freq_for_lagllama
 from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.paths import find_task_directories
-from tempus_bench.utils.task_yaml_loader import build_task_configs
+from tempus_bench.utils.task_yaml_loader import build_task_config
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +61,7 @@ LAGLLAMA_FREQ_REGRESSION_TASKS: tuple[str, ...] = (
     "univariate/univariate_healthcare_monthly_all_employees_health_care",
     "univariate/univariate_energy_monthly_electricity_price_kwh",
     "multivariate/multivariate_healthcare_daily_nyc_covid_counts",
-    "multivariate/multivariate_healthcare_daily_nyc_covid_counts__covariate",
+    "covariate/covariate_healthcare_daily_nyc_covid_counts",
 )
 
 
@@ -71,8 +71,8 @@ def _load_task_config(task_rel_path: str) -> TaskConfig:
         raise AssertionError(
             f"expected exactly one task dir for {task_rel_path!r}, got {list(found.keys())}"
         )
-    logical_name, path = next(iter(found.items()))
-    return build_task_configs(logical_name, Path(path))[0]
+    _task_name, path = next(iter(found.items()))
+    return build_task_config(Path(path))
 
 
 @pytest.mark.parametrize("task_rel_path", LAGLLAMA_FREQ_REGRESSION_TASKS)

@@ -190,18 +190,16 @@ class TestTaskConfig:
 
     def test_covariate_mode_helpers(self):
         config = TaskConfig(
-            task_name="mv__covariate",
-            task_path="/path/to/task",
+            task_name="covariate_foo",
+            task_path="/path/to/covariate/covariate_foo",
             forecast_horizon=8,
             context_window=32,
             handle_missing="interpolate",
             normalization_method="standard",
-            file_name="task.csv",
+            file_name="covariate_foo.csv",
             task_mode="covariate",
             target_variable_names=["y"],
             covariate_variable_names=["x1", "x2"],
-            multivariate_target_variable_names=["y", "x1", "x2"],
-            covariate_target_variable_name="y",
         )
         assert config.effective_targets() == ["y"]
         assert config.effective_covariates() == ["x1", "x2"]

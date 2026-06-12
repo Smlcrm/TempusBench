@@ -89,8 +89,8 @@ def _task_id_for_results_sink(task_config) -> str:
     """
     Task key for external sinks (e.g. BigQuery ``task_id`` / Firestore execution_plan).
 
-    Uses ``<family>/<logical_task_name>`` after tasks/ so covariate logical ids retain
-    the ``__covariate`` suffix; falls back to task_name.
+    Uses ``<family>/<task_name>`` after tasks/ (e.g. ``covariate/covariate_foo``);
+    falls back to task_name.
     """
     parts = Path(task_config.task_path).parts
     for i, seg in enumerate(parts):

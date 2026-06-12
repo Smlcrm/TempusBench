@@ -1,0 +1,17 @@
+{
+  "name": "COVID-19 Daily Counts of Cases, Hospitalizations, and Deaths",
+  "link": "https://catalog.data.gov/dataset/covid-19-daily-counts-of-cases-hospitalizations-and-deaths",
+  "citation": "Department of Health and Mental Hygiene (DOHMH). COVID-19 Daily Counts of Cases, Hospitalizations, and Deaths [Data set]. City of New York / Data.gov.",
+  "license": "Public Domain (NYC Open Data)",
+  "description": "Granular epidemiological dataset tracking COVID-19 confirmed and probable cases, hospitalizations, and deaths across New York City. The data provides both city-wide aggregates and specific regional breakdowns across all five boroughs (Bronx, Brooklyn, Manhattan, Queens, Staten Island), making it an ideal benchmark for spatial-temporal infectious disease modeling.",
+  "preprocessing": [
+    "Load COVID-19_Daily_Counts_of_Cases__Hospitalizations__and_Deaths.csv.",
+    "Keep date_of_interest + 53 count series: CASE_COUNT, PROBABLE_CASE_COUNT, HOSPITALIZED_COUNT, DEATH_COUNT, CASE_COUNT_7DAY_AVG, ALL_CASE_COUNT_7DAY_AVG, HOSP_COUNT_7DAY_AVG, DEATH_COUNT_7DAY_AVG, BX_CASE_COUNT, BX_PROBABLE_CASE_COUNT, BX_HOSPITALIZED_COUNT, BX_DEATH_COUNT, BX_CASE_COUNT_7DAY_AVG, BX_PROBABLE_CASE_COUNT_7DAY_AVG, BX_ALL_CASE_COUNT_7DAY_AVG, BX_HOSPITALIZED_COUNT_7DAY_AVG, BX_DEATH_COUNT_7DAY_AVG, BK_CASE_COUNT, BK_PROBABLE_CASE_COUNT, BK_HOSPITALIZED_COUNT, BK_DEATH_COUNT, BK_CASE_COUNT_7DAY_AVG, BK_PROBABLE_CASE_COUNT_7DAY_AVG, BK_ALL_CASE_COUNT_7DAY_AVG, BK_HOSPITALIZED_COUNT_7DAY_AVG, BK_DEATH_COUNT_7DAY_AVG, MN_CASE_COUNT, MN_PROBABLE_CASE_COUNT, MN_HOSPITALIZED_COUNT, MN_DEATH_COUNT, MN_CASE_COUNT_7DAY_AVG, MN_PROBABLE_CASE_COUNT_7DAY_AVG, MN_ALL_CASE_COUNT_7DAY_AVG, MN_HOSPITALIZED_COUNT_7DAY_AVG, MN_DEATH_COUNT_7DAY_AVG, QN_CASE_COUNT, QN_PROBABLE_CASE_COUNT, QN_HOSPITALIZED_COUNT, QN_DEATH_COUNT, QN_CASE_COUNT_7DAY_AVG, QN_PROBABLE_CASE_COUNT_7DAY_AVG, QN_ALL_CASE_COUNT_7DAY_AVG, QN_HOSPITALIZED_COUNT_7DAY_AVG, QN_DEATH_COUNT_7DAY_AVG, SI_CASE_COUNT, SI_PROBABLE_CASE_COUNT, SI_HOSPITALIZED_COUNT, SI_DEATH_COUNT, SI_PROBABLE_CASE_COUNT_7DAY_AVG, SI_CASE_COUNT_7DAY_AVG, SI_ALL_CASE_COUNT_7DAY_AVG, SI_HOSPITALIZED_COUNT_7DAY_AVG, SI_DEATH_COUNT_7DAY_AVG.",
+    "Removed column INCOMPLETE (reporting completeness flag, not a count series).",
+    "Rename date_of_interest to timestamps; parse with format %m/%d/%Y (UTC).",
+    "Frequency check: D (daily).",
+    "Fill missing: standard daily reindex on all 53 variates.",
+    "Transform: 53 rows (one per variate); variable_unit blank; _to_json_number helper for values.",
+    "Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

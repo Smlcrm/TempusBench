@@ -6,8 +6,6 @@ task:
   file_name: univariate_climate_daily_mean_humidity_delhi.csv
   target_variable_names:
   - mean_humidity_delhi_india
-  covariate_variable_names: []
 
 # number of targets : 1
-# number of covariates : 0
 # number of time-steps : 1462

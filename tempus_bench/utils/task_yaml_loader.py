@@ -9,8 +9,6 @@ import yaml
 
 from tempus_bench.utils.configs import TaskConfig
 
-COVARIATE_TASK_SUFFIX = "__covariate"
-
 HandleMissing = Literal[
     "interpolate", "mean", "median", "drop", "forward_fill", "backward_fill"
 ]
@@ -56,7 +54,6 @@ def _base_fields(raw: dict, *, task_name: str, task_path: str, task_mode: TaskMo
 
 def _build_univariate_config(raw: dict, *, task_name: str, task_path: str) -> TaskConfig:
     target_names = list(raw["target_variable_names"])
-    covariate_names = list(raw.get("covariate_variable_names") or [])
     return TaskConfig(
         **_base_fields(
             raw,
@@ -65,14 +62,12 @@ def _build_univariate_config(raw: dict, *, task_name: str, task_path: str) -> Ta
             task_mode="univariate",
         ),
         target_variable_names=target_names,
-        covariate_variable_names=covariate_names,
-        multivariate_target_variable_names=None,
-        covariate_target_variable_name=None,
+        covariate_variable_names=[],
     )
 
 
 def _build_multivariate_config(raw: dict, *, task_name: str, task_path: str) -> TaskConfig:
-    all_names = list(raw["multivariate_target_variable_names"])
+    all_names = list(raw["target_variable_names"])
     return TaskConfig(
         **_base_fields(
             raw,
@@ -82,29 +77,15 @@ def _build_multivariate_config(raw: dict, *, task_name: str, task_path: str) -> 
         ),
         target_variable_names=all_names,
         covariate_variable_names=[],
-        multivariate_target_variable_names=all_names,
-        covariate_target_variable_name=raw.get("covariate_target_variable_name"),
     )
 
 
 def _build_covariate_config(raw: dict, *, task_name: str, task_path: str) -> TaskConfig:
-    covariate_target = raw["covariate_target_variable_name"]
+    covariate_target = raw["target_variable_name"]
     covariate_names = list(raw.get("covariate_variable_names") or [])
-    all_names = list(raw["multivariate_target_variable_names"])
-    if covariate_target not in all_names:
-        raise ValueError(
-            f"{task_name}: covariate_target_variable_name {covariate_target!r} "
-            f"not found in multivariate_target_variable_names"
-        )
-    missing = [name for name in covariate_names if name not in all_names]
-    if missing:
-        raise ValueError(
-            f"{task_name}: covariate_variable_names not in multivariate_target_variable_names: "
-            f"{missing[:5]}"
-        )
     if covariate_target in covariate_names:
         raise ValueError(
-            f"{task_name}: covariate_target_variable_name must not appear in covariate_variable_names"
+            f"{task_name}: target_variable_name must not appear in covariate_variable_names"
         )
     return TaskConfig(
         **_base_fields(
@@ -115,51 +96,36 @@ def _build_covariate_config(raw: dict, *, task_name: str, task_path: str) -> Tas
         ),
         target_variable_names=[covariate_target],
         covariate_variable_names=covariate_names,
-        multivariate_target_variable_names=all_names,
-        covariate_target_variable_name=covariate_target,
     )
 
 
-def build_task_configs(logical_name: str, task_dir: Path) -> list[TaskConfig]:
-    """
-    Build TaskConfig objects for a discovered logical task name and on-disk folder.
-
-    ``logical_name`` may include ``__covariate`` for covariate-mode logical tasks.
-    """
+def build_task_config(task_dir: Path) -> TaskConfig:
+    """Build a TaskConfig from a task directory (folder basename = task_name)."""
     task_dir = task_dir.resolve()
     task_path = str(task_dir)
+    task_name = task_dir.name
     raw = _read_task_documents(task_dir)[0]
     kind = _task_kind(task_dir)
-    folder_name = task_dir.name
-
-    if logical_name.endswith(COVARIATE_TASK_SUFFIX):
-        expected = f"{folder_name}{COVARIATE_TASK_SUFFIX}"
-        if logical_name != expected:
-            raise ValueError(
-                f"Logical task name {logical_name!r} does not match folder {folder_name!r}"
-            )
-        if kind != "multivariate":
-            raise ValueError(f"Covariate logical task requires multivariate folder: {task_dir}")
-        return [_build_covariate_config(raw, task_name=logical_name, task_path=task_path)]
-
-    if logical_name != folder_name:
-        raise ValueError(
-            f"Logical task name {logical_name!r} does not match folder {folder_name!r}"
-        )
 
     if kind == "univariate":
-        return [_build_univariate_config(raw, task_name=logical_name, task_path=task_path)]
+        return _build_univariate_config(raw, task_name=task_name, task_path=task_path)
     if kind == "multivariate":
-        return [_build_multivariate_config(raw, task_name=logical_name, task_path=task_path)]
+        return _build_multivariate_config(raw, task_name=task_name, task_path=task_path)
+    if kind == "covariate":
+        return _build_covariate_config(raw, task_name=task_name, task_path=task_path)
     raise ValueError(f"Unsupported task folder kind {kind!r} under {task_dir}")
 
 
-def load_task_config_from_task_dir(
-    task_dir: Path,
-    *,
-    logical_name: str | None = None,
-) -> TaskConfig:
-    """Load a single TaskConfig from a task directory (defaults to folder basename)."""
+def build_task_configs(logical_name: str, task_dir: Path) -> list[TaskConfig]:
+    """Backward-compatible wrapper returning a single TaskConfig."""
     task_dir = task_dir.resolve()
-    name = logical_name or task_dir.name
-    return build_task_configs(name, task_dir)[0]
+    if logical_name != task_dir.name:
+        raise ValueError(
+            f"Logical task name {logical_name!r} does not match folder {task_dir.name!r}"
+        )
+    return [build_task_config(task_dir)]
+
+
+def load_task_config_from_task_dir(task_dir: Path) -> TaskConfig:
+    """Load a single TaskConfig from a task directory."""
+    return build_task_config(task_dir.resolve())

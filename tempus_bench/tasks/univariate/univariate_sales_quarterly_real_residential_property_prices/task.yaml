@@ -6,8 +6,6 @@ task:
   file_name: univariate_sales_quarterly_real_residential_property_prices.csv
   target_variable_names:
   - real_residential_property_prices_quaterly_germany
-  covariate_variable_names: []
 
 # number of targets : 1
-# number of covariates : 0
 # number of time-steps : 56

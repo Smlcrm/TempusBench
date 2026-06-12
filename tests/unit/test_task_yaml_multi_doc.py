@@ -12,8 +12,7 @@ import yaml
 from tempus_bench.utils.configs import EvaluationConfig
 from tempus_bench.utils.config_manager import ConfigManager
 from tempus_bench.utils.task_yaml_loader import (
-    COVARIATE_TASK_SUFFIX,
-    build_task_configs,
+    build_task_config,
     load_task_config_from_task_dir,
 )
 
@@ -25,7 +24,6 @@ _FLAT_UNIVARIATE = """task:
   file_name: test_dataset.csv
   target_variable_names:
   - series_a
-  covariate_variable_names: []
 """
 
 
@@ -42,8 +40,8 @@ class TestTaskYamlLoader:
         assert cfg.is_normalize() is True
         assert cfg.effective_targets() == ["series_a"]
 
-    def test_multivariate_yaml_emits_covariate_logical_config(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "multivariate" / "mv_task"
+    def test_covariate_folder_yaml(self, tmp_path: Path):
+        task_dir = tmp_path / "tasks" / "covariate" / "cov_task"
         task_dir.mkdir(parents=True)
         (task_dir / "task.yaml").write_text(
             yaml.dump(
@@ -53,9 +51,8 @@ class TestTaskYamlLoader:
                         "forecast_horizon": 4,
                         "handle_missing": "interpolate",
                         "normalization_method": "none",
-                        "file_name": "mv.csv",
-                        "multivariate_target_variable_names": ["y", "x1"],
-                        "covariate_target_variable_name": "y",
+                        "file_name": "cov.csv",
+                        "target_variable_name": "y",
                         "covariate_variable_names": ["x1"],
                     }
                 }
@@ -63,9 +60,7 @@ class TestTaskYamlLoader:
             encoding="utf-8",
         )
 
-        joint = build_task_configs("mv_task", task_dir)[0]
-        cov = build_task_configs(f"mv_task{COVARIATE_TASK_SUFFIX}", task_dir)[0]
-        assert joint.task_mode == "multivariate"
+        cov = build_task_config(task_dir)
         assert cov.task_mode == "covariate"
         assert cov.effective_targets() == ["y"]
         assert cov.effective_covariates() == ["x1"]

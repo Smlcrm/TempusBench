@@ -6,8 +6,6 @@ task:
   file_name: univariate_manufacturing_seconds_skab_pressure.csv
   target_variable_names:
   - Skoltech Anomaly Benchmark (SKAB) - anomaly-free - Pressure
-  covariate_variable_names: []
 
 # number of targets : 1
-# number of covariates : 0
 # number of time-steps : 9961

@@ -6,8 +6,6 @@ task:
   file_name: univariate_software_daily_software_dev_postings_indeed.csv
   target_variable_names:
   - software_dev_postings_us_indeed
-  covariate_variable_names: []
 
 # number of targets : 1
-# number of covariates : 0
 # number of time-steps : 2282

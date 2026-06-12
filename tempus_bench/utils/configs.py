@@ -178,13 +178,12 @@ class TaskConfig(BaseModel):
     """
     Task configuration for tasks benchmark folders.
 
-    Supports univariate tasks and multivariate tasks that expose both joint
-    multivariate mode and covariate mode via logical task names.
+    Supports univariate, multivariate, and covariate task folders under tasks/.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    task_name: str = Field(..., description="Logical task name (may include __covariate suffix)")
+    task_name: str = Field(..., description="Task folder name (basename of task_path)")
     task_path: str = Field(..., description="On-disk task directory path")
     forecast_horizon: int = Field(
         ..., ge=1, le=128, description="Number of steps to forecast ahead (max 128)"
@@ -209,14 +208,6 @@ class TaskConfig(BaseModel):
     covariate_variable_names: list[str] = Field(
         default_factory=list,
         description="Active covariate variate names for this logical task/mode",
-    )
-    multivariate_target_variable_names: Optional[list[str]] = Field(
-        default=None,
-        description="All variates for joint multivariate mode (multivariate folders only)",
-    )
-    covariate_target_variable_name: Optional[str] = Field(
-        default=None,
-        description="Primary target for covariate mode (multivariate folders only)",
     )
 
     @property

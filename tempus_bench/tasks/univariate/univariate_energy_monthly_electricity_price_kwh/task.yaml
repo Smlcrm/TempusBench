@@ -6,8 +6,6 @@ task:
   file_name: univariate_energy_monthly_electricity_price_kwh.csv
   target_variable_names:
   - electricity_price_kwh_us_city_avg
-  covariate_variable_names: []
 
 # number of targets : 1
-# number of covariates : 0
 # number of time-steps : 570

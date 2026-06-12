@@ -14,6 +14,10 @@ tasks/
     task.yaml
     metadata.json
     <csv>
+  covariate/<task_id>/
+    task.yaml
+    metadata.json
+    <csv>   # copy of sibling multivariate data (covariate_*.csv)
   datasets_catalog.csv
   all_tasks.yaml
 ```
@@ -44,10 +48,9 @@ task:
   normalization_method: standard   # standard | none
   file_name: <csv>
   target_variable_names: [name]
-  covariate_variable_names: []
 ```
 
-### Multivariate (joint + covariate modes)
+### Multivariate (joint forecasting)
 
 ```yaml
 task:
@@ -55,35 +58,45 @@ task:
   forecast_horizon: 8
   handle_missing: interpolate
   normalization_method: standard
-  file_name: <csv>
-  multivariate_target_variable_names: [all variates]
-  covariate_target_variable_name: <primary target for covariate mode>
+  file_name: multivariate_<suffix>.csv
+  target_variable_names: [all variates]
+```
+
+### Covariate (single target + covariates)
+
+```yaml
+task:
+  context_window: 32
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: covariate_<suffix>.csv
+  target_variable_name: PM25
   covariate_variable_names: [remaining variates used as covariates]
 ```
 
-## Logical task fan-out (`__covariate`)
+Naming: `multivariate_transport_monthly_foo` pairs with
+`covariate/covariate_transport_monthly_foo` and `covariate_transport_monthly_foo.csv`.
 
-Each **multivariate folder** becomes two logical tasks at discovery:
+## Discovery
 
-| logical id | `task_mode` | targets | covariates |
-|------------|-------------|---------|------------|
-| `<folder>` | `multivariate` | all variates | `[]` |
-| `<folder>__covariate` | `covariate` | `covariate_target_variable_name` | `covariate_variable_names` |
-
-Both modes read the **same on-disk CSV**. The `__covariate` suffix appears only in
-logical task names, pickle filenames, and external result sink ids — not in folder
-paths.
+Wildcard discovery (`*`) registers every folder under `univariate/`, `multivariate/`,
+and `covariate/` (30 tasks total: 10 + 10 + 10).
 
 Examples:
 
 - `multivariate/multivariate_transport_monthly_airline_baggage_complaints` — joint multivariate
-- `multivariate/multivariate_transport_monthly_airline_baggage_complaints__covariate` — single target + covariates
-
-Wildcard discovery (`*`, `multivariate/*`) emits both logical ids for each multivariate folder.
+- `covariate/covariate_transport_monthly_airline_baggage_complaints` — single target + covariates
 
 ## Regenerating catalog artifacts
 
 ```bash
 python tempus_bench/scripts/generate_tasks_metadata.py
 python tempus_bench/scripts/generate_tasks_task_yaml.py
+```
+
+One-off migration from the legacy `__covariate` fan-out layout:
+
+```bash
+python tempus_bench/scripts/migrate_covariate_folders.py
 ```

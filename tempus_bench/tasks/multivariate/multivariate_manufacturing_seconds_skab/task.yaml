@@ -4,7 +4,7 @@ task:
   handle_missing: interpolate
   normalization_method: standard
   file_name: multivariate_manufacturing_seconds_skab.csv
-  multivariate_target_variable_names:
+  target_variable_names:
   - Accelerometer1RMS
   - Accelerometer2RMS
   - Current
@@ -13,17 +13,6 @@ task:
   - Thermocouple
   - Voltage
   - Volume Flow RateRMS
-  covariate_target_variable_name: Pressure
-  covariate_variable_names:
-  - Accelerometer1RMS
-  - Accelerometer2RMS
-  - Current
-  - Temperature
-  - Thermocouple
-  - Voltage
-  - Volume Flow RateRMS
 
-# number of multivariate targets : 8
-# covariate_target_variable_name : Pressure
-# number of covariates : 7
+# number of targets : 8
 # number of time-steps : 9961

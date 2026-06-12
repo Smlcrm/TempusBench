@@ -4,7 +4,7 @@ task:
   handle_missing: interpolate
   normalization_method: standard
   file_name: multivariate_climate_hourly_madrid_air_pollution.csv
-  multivariate_target_variable_names:
+  target_variable_names:
   - BEN
   - CH4
   - CO
@@ -19,23 +19,6 @@ task:
   - SO2
   - TCH
   - TOL
-  covariate_target_variable_name: PM25
-  covariate_variable_names:
-  - BEN
-  - CH4
-  - CO
-  - EBE
-  - NMHC
-  - 'NO'
-  - NO2
-  - NOx
-  - O3
-  - PM10
-  - SO2
-  - TCH
-  - TOL
 
-# number of multivariate targets : 14
-# covariate_target_variable_name : PM25
-# number of covariates : 13
+# number of targets : 14
 # number of time-steps : 186240

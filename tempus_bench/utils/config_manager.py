@@ -33,7 +33,7 @@ from .paths import (
     get_models_dir,
     find_task_directories,
 )
-from .task_yaml_loader import build_task_configs
+from .task_yaml_loader import build_task_config
 
 
 class ValidationError(Exception):
@@ -179,9 +179,8 @@ class ConfigManager:
         else:
             tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
 
-        for logical_name, task_path_str in tasks.items():
-            for task_config in build_task_configs(logical_name, Path(task_path_str)):
-                task_configs[task_config.task_name] = task_config
+        for task_name, task_path_str in tasks.items():
+            task_configs[task_name] = build_task_config(Path(task_path_str))
 
         return task_configs
 

@@ -4,18 +4,11 @@ task:
   handle_missing: interpolate
   normalization_method: standard
   file_name: multivariate_transport_monthly_airline_baggage_complaints.csv
-  multivariate_target_variable_names:
+  target_variable_names:
   - Baggage
   - Scheduled
   - Cancelled
   - Enplaned
-  covariate_target_variable_name: Baggage
-  covariate_variable_names:
-  - Scheduled
-  - Cancelled
-  - Enplaned
 
-# number of multivariate targets : 4
-# covariate_target_variable_name : Baggage
-# number of covariates : 3
+# number of targets : 4
 # number of time-steps : 84

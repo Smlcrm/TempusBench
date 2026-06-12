@@ -40,24 +40,17 @@ def extract_task_paths_from_config(config_yaml: str) -> list[str]:
 def get_tasks() -> dict[str, list[str]]:
     """Return tasks grouped by evaluation mode for tasks/."""
     from tempus_bench.utils.paths import get_tasks_dir
-    from tempus_bench.utils.task_yaml_loader import COVARIATE_TASK_SUFFIX
 
     tasks_dir = get_tasks_dir()
     result: dict[str, list[str]] = {"univariate": [], "multivariate": [], "covariate": []}
 
-    uni = tasks_dir / "univariate"
-    if uni.is_dir():
-        for task_path in uni.iterdir():
+    for kind in ("univariate", "multivariate", "covariate"):
+        kind_dir = tasks_dir / kind
+        if not kind_dir.is_dir():
+            continue
+        for task_path in kind_dir.iterdir():
             if task_path.is_dir():
-                result["univariate"].append(f"univariate/{task_path.name}")
-
-    multi = tasks_dir / "multivariate"
-    if multi.is_dir():
-        for task_path in multi.iterdir():
-            if task_path.is_dir():
-                rel = f"multivariate/{task_path.name}"
-                result["multivariate"].append(rel)
-                result["covariate"].append(f"{rel}{COVARIATE_TASK_SUFFIX}")
+                result[kind].append(f"{kind}/{task_path.name}")
 
     for key in result:
         result[key] = sorted(result[key])

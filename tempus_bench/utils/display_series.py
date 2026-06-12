@@ -55,9 +55,9 @@ def _ensure_log_manager_for_export() -> None:
     )
 
 
-def load_task_config_from_task_dir(task_dir: Path, *, logical_name: str | None = None) -> TaskConfig:
+def load_task_config_from_task_dir(task_dir: Path) -> TaskConfig:
     """Load ``TaskConfig`` from ``task_dir/task.yaml``."""
-    return _load_task_config_from_task_dir(task_dir, logical_name=logical_name)
+    return _load_task_config_from_task_dir(task_dir)
 
 
 def default_evaluation_config_for_display() -> EvaluationConfig:

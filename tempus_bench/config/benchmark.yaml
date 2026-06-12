@@ -2,7 +2,7 @@
 # This file provides sensible defaults for all configuration options
 
 evaluation:
-  task_path: 'multivariate/multivariate_transport_monthly_airline_baggage_complaints__covariate'
+  task_path: 'covariate/covariate_transport_monthly_airline_baggage_complaints'
   tuning_loss: mae
   max_windows: 4
   max_num_variates: 10

@@ -206,39 +206,26 @@ def find_task_directories(task_path_pattern: str) -> dict[str, str]:
     """
     Find task directories based on a task path pattern under tasks/.
 
-    Logical multivariate covariate tasks use the ``__covariate`` suffix in the
-    returned dict key while pointing at the same on-disk multivariate folder.
-
     Supported patterns:
-    - ``*``: all univariate folders plus each multivariate folder twice
-      (joint + ``__covariate`` logical ids)
-    - ``univariate/*`` / ``multivariate/*``: all folders in that category
-      (multivariate emits joint + covariate logical ids)
-    - ``univariate/foo`` / ``multivariate/foo`` / ``multivariate/foo__covariate``
+    - ``*``: all folders under univariate/, multivariate/, and covariate/
+    - ``univariate/*`` / ``multivariate/*`` / ``covariate/*``: all folders in that category
+    - ``univariate/foo`` / ``multivariate/foo`` / ``covariate/foo``
     """
-    from tempus_bench.utils.task_yaml_loader import COVARIATE_TASK_SUFFIX
-
     tasks_dir = get_tasks_dir()
     task_paths: dict[str, str] = {}
     pattern = task_path_pattern.strip()
 
-    def _register_folder(task_path: Path, *, include_covariate: bool) -> None:
-        if not task_path.is_dir():
-            return
-        task_paths[task_path.name] = str(task_path)
-        if include_covariate and task_path.parent.name == "multivariate":
-            task_paths[f"{task_path.name}{COVARIATE_TASK_SUFFIX}"] = str(task_path)
+    def _register_folder(task_path: Path) -> None:
+        if task_path.is_dir():
+            task_paths[task_path.name] = str(task_path)
 
     if pattern == "*":
-        for subdir_name in ("univariate", "multivariate"):
+        for subdir_name in ("univariate", "multivariate", "covariate"):
             subdir_path = tasks_dir / subdir_name
             if not subdir_path.is_dir():
                 continue
             for task_path in subdir_path.iterdir():
-                _register_folder(
-                    task_path,
-                    include_covariate=subdir_name == "multivariate",
-                )
+                _register_folder(task_path)
         return task_paths
 
     if pattern.endswith("/*"):
@@ -246,35 +233,11 @@ def find_task_directories(task_path_pattern: str) -> dict[str, str]:
         subdir_path = tasks_dir / subdir_name
         if subdir_path.is_dir():
             for task_path in subdir_path.iterdir():
-                _register_folder(
-                    task_path,
-                    include_covariate=subdir_name == "multivariate",
-                )
+                _register_folder(task_path)
         return task_paths
 
-    logical_name = pattern.split("/")[-1]
-    if "/" in pattern:
-        physical_pattern = pattern
-        if logical_name.endswith(COVARIATE_TASK_SUFFIX):
-            physical_pattern = pattern[: -len(COVARIATE_TASK_SUFFIX)]
-        task_path = tasks_dir / physical_pattern
-    else:
-        task_path = tasks_dir / pattern
-
-    if task_path.is_dir():
-        include_covariate = (
-            logical_name.endswith(COVARIATE_TASK_SUFFIX)
-            or (
-                task_path.parent.name == "multivariate"
-                and logical_name == task_path.name
-                and "/" not in pattern
-            )
-        )
-        if logical_name.endswith(COVARIATE_TASK_SUFFIX):
-            task_paths[logical_name] = str(task_path)
-        else:
-            _register_folder(task_path, include_covariate=include_covariate)
-
+    task_path = tasks_dir / pattern
+    _register_folder(task_path)
     return task_paths
 
 

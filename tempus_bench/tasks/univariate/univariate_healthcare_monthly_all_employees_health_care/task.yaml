@@ -6,8 +6,6 @@ task:
   file_name: univariate_healthcare_monthly_all_employees_health_care.csv
   target_variable_names:
   - all_employees_health_care_us_bls
-  covariate_variable_names: []
 
 # number of targets : 1
-# number of covariates : 0
 # number of time-steps : 436
