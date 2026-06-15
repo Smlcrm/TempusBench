@@ -1,5 +1,5 @@
 task:
-  task_path: 'multivariate/baggage_100_multivariate'
+  task_path: 'multivariate/multivariate_transport_monthly_airline_baggage_complaints'
 
 evaluation:
   tuning_loss: mae

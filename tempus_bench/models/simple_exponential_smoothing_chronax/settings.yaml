@@ -1,0 +1,10 @@
+model_type: deterministic
+python_version: '3.11'
+device: cpu
+foundation: false
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+default_hyperparameter_grid:
+  alpha: [0.1, 0.3, 0.5, 0.7, 0.9]

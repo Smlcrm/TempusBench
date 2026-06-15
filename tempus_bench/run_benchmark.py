@@ -238,7 +238,8 @@ class BenchmarkRunner:
         return failed_tasks
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Console entry point for ``run_benchmark``."""
     _import_stage("__main__")
     parser = argparse.ArgumentParser(
         description="Run benchmarking pipeline with specified config file."
@@ -256,3 +257,7 @@ if __name__ == "__main__":
 
     with BenchmarkRunner(config_path=config_path) as runner:
         runner.run()
+
+
+if __name__ == "__main__":
+    main()

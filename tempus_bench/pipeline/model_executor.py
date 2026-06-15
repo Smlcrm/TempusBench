@@ -251,19 +251,21 @@ class ModelExecutor:
             with open(job_config_path, "w") as f:
                 json.dump(job_config_to_write, f)
 
-            # Build CLI command
-            hyperparameters_json = json.dumps(hyperparameters)
+            hyperparameters_path = os.path.join(temp_dir, "hyperparameters.json")
+            with open(hyperparameters_path, "w", encoding="utf-8") as hp_file:
+                json.dump(hyperparameters, hp_file)
 
-            command = (
-                f"python -m tempus_bench.pipeline.model_executor "
-                f"--task-name {self.job_config['task_config']['task_name']} "
-                f"--model-name {model_name} "
-                f"--hyperparameters '{hyperparameters_json}' "
-                f"--context-steps {context_steps} "
-                f"--train-steps {train_steps} "
-                f"--validate-steps {validate_steps} "
-                f"--job-config-path {job_config_path} "
-            )
+            # Pass hyperparameters via file (shell-safe on Windows; inline JSON breaks cmd quoting)
+            command = [
+                "python", "-m", "tempus_bench.pipeline.model_executor",
+                "--task-name", str(self.job_config["task_config"]["task_name"]),
+                "--model-name", str(model_name),
+                "--hyperparameters-path", hyperparameters_path,
+                "--context-steps", str(context_steps),
+                "--train-steps", str(train_steps),
+                "--validate-steps", str(validate_steps),
+                "--job-config-path", job_config_path,
+            ]
 
             verbose = self.job_config.get("evaluation_setting", {}).get("verbose", False)
             result = None
@@ -404,8 +406,13 @@ def main():
     parser.add_argument(
         "--model-name", required=True, help="Name of the model to execute"
     )
-    parser.add_argument(
-        "--hyperparameters", required=True, help="JSON string of hyperparameter values"
+    hp_group = parser.add_mutually_exclusive_group(required=True)
+    hp_group.add_argument(
+        "--hyperparameters", help="JSON string of hyperparameter values"
+    )
+    hp_group.add_argument(
+        "--hyperparameters-path",
+        help="Path to JSON file containing hyperparameter values",
     )
     parser.add_argument(
         "--context-steps", type=int, required=True, help="Number of context steps"
@@ -424,8 +431,12 @@ def main():
 
     args = parser.parse_args()
 
-    # Parse hyperparameters JSON
-    hyperparameters = json.loads(args.hyperparameters)
+    # Parse hyperparameters JSON (inline or file path for shell-safe subprocess launch)
+    if args.hyperparameters_path:
+        with open(args.hyperparameters_path, encoding="utf-8") as hp_file:
+            hyperparameters = json.load(hp_file)
+    else:
+        hyperparameters = json.loads(args.hyperparameters)
 
     # Load configuration as dictionary
     with open(args.job_config_path, "r") as f:
@@ -637,14 +648,15 @@ def main():
         # BigQuery + UI alignment with raw task CSV (inverse StandardScaler when present).
         md = dataset.metadata if isinstance(dataset.metadata, dict) else {}
         tc = job_config.get("task_config") or {}
-        ds_cfg = tc.get("dataset") or {}
-        normalize = bool(ds_cfg.get("normalize", False))
+        normalize = bool(tc.get("normalization_method", "standard") == "standard")
+        if "dataset" in tc and isinstance(tc["dataset"], dict):
+            normalize = bool(tc["dataset"].get("normalize", normalize))
         scaler = _scaler_from_dataset_metadata(md)
         if normalize and scaler is None:
             raise RuntimeError(
-                "task dataset.normalize is true but the pickled Dataset metadata is missing "
-                "target_scaler_mean / target_scaler_scale; rebuild task datasets with the "
-                "current tempus_bench DataLoader."
+                "Task normalization_method is 'standard' but the pickled Dataset metadata is "
+                "missing target_scaler_mean / target_scaler_scale; rebuild task datasets with "
+                "the current tempus_bench DataLoader."
             )
 
         if job_config["model_setting"]["model_type"] == "hybrid":

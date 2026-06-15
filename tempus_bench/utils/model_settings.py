@@ -163,14 +163,20 @@ def merge_benchmark_params_with_default_grid(
     return merged
 
 
-def task_path_to_family(task_path: str) -> TaskFamily:
-    """Infer task family from dataset path (folder under tempus_bench/tasks/)."""
+def task_path_to_family(task_path: str, task_mode: str | None = None) -> TaskFamily:
+    """Infer task family from explicit mode or dataset path under tasks/."""
+    if task_mode in ("univariate", "multivariate", "covariate"):
+        return task_mode  # type: ignore[return-value]
     p = Path(task_path).resolve()
     parts = p.parts
-    try:
-        i = parts.index("tasks")
-        kind = parts[i + 1].lower()
-    except (ValueError, IndexError):
+    for marker in ("tasks",):
+        try:
+            i = parts.index(marker)
+            kind = parts[i + 1].lower()
+            break
+        except (ValueError, IndexError):
+            kind = None
+    else:
         raise ValueError(f"Cannot infer task family from path: {task_path!r}")
     if kind == "univariate":
         return "univariate"

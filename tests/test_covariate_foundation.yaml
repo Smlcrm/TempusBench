@@ -3,7 +3,7 @@
 # Uses a small covariate dataset for quick validation
 
 evaluation:
-  task_path: 'covariate/gdp_years_covariate'
+  task_path: 'covariate/covariate_healthcare_daily_nyc_covid_counts'
   tuning_loss: mae
   max_windows: 2
   max_num_variates: 4

@@ -171,12 +171,12 @@ class TestVarmaxTrendForecastRegression:
 class TestVarmaxNonstationaryPanelRegression:
     """Batch regression: default VARMAX init used to raise LinAlgError on some multivariate tasks."""
 
-    def test_batadal_window_fits_with_approximate_diffuse(self) -> None:
+    def test_batadal_software_window_fits_with_approximate_diffuse(self) -> None:
         csv_path = (
             get_tasks_dir()
             / "multivariate"
-            / "batadal_nonstationary_multivariate"
-            / "batadal_nonstationary_multivariate.csv"
+            / "batadal_software_multivariate"
+            / "batadal_software_multivariate.csv"
         )
         if not csv_path.is_file():
             pytest.skip(f"task CSV not present: {csv_path}")

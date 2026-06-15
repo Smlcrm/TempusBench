@@ -11,9 +11,9 @@
 
 evaluation:
   task_paths:
-    - univariate/chickenpox_dense_univariate
-    - multivariate/baggage_100_multivariate
-    - univariate/coinbase_days_univariate
+    - univariate/univariate_climate_daily_mean_humidity_delhi
+    - multivariate/multivariate_transport_monthly_airline_baggage_complaints
+    - univariate/univariate_economics_weekly_federal_funds_effective_rate
   tuning_loss: mae
   max_windows: 1
   max_num_variates: 4

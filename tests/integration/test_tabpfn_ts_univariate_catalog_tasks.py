@@ -37,12 +37,12 @@ import yaml
 from tempus_bench.pipeline.data_loader import DataLoader
 from tempus_bench.utils.configs import (
     MAX_EVALUATION_WINDOWS,
-    DatasetConfig,
     EvaluationConfig,
     TaskConfig,
 )
 from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.paths import find_task_directories, get_models_dir
+from tempus_bench.utils.task_yaml_loader import build_task_configs
 from tempus_bench.utils.utils import compute_point_forecast
 
 pytestmark = pytest.mark.skipif(
@@ -53,11 +53,9 @@ pytestmark = pytest.mark.skipif(
 PACKAGE = "tabpfn_ts"
 
 CATALOG_UNIVARIATE_TASKS: tuple[str, ...] = (
-    "synthetic_additive2_univariate",
-    "synthetic_cyclic_univariate",
-    "synthetic_multiplicative_univariate",
-    "synthetic_nonstationary_univariate",
-    "web_traffic_univariate",
+    "univariate_climate_daily_mean_humidity_delhi",
+    "univariate_web_hourly_hourly_web_requests",
+    "univariate_nature_minutes_soil_moisture",
 )
 
 NUM_SAMPLES = 4
@@ -100,16 +98,7 @@ def _task_config_for_folder(task_key: str) -> TaskConfig:
     if task_key not in paths:
         raise KeyError(f"Unknown task folder {task_key!r}")
     p = Path(paths[task_key])
-    with open(p / "task.yaml", encoding="utf-8") as f:
-        docs = list(yaml.safe_load_all(f))
-    for task_data in docs:
-        if not task_data or "task" not in task_data:
-            continue
-        raw = dict(task_data["task"])
-        raw.pop("task_name", None)
-        dataset = DatasetConfig(**raw.pop("dataset"))
-        return TaskConfig(task_name=task_key, task_path=str(p), **raw, dataset=dataset)
-    raise ValueError(f"No task document in {p / 'task.yaml'}")
+    return build_task_configs(task_key, p)[0]
 
 
 def _context_train_validate(task_config: TaskConfig) -> tuple[int, int, int]:

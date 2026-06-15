@@ -16,6 +16,16 @@ This project provides a unified benchmarking framework for evaluating the perfor
 - **Hyperparameter Tuning**: Automated optimization of model parameters
 - **Isolated Execution**: Each model runs in its own conda environment to avoid dependency conflicts
 
+## Task data (Hugging Face)
+
+Task CSV files are hosted on Hugging Face to keep this repository lightweight:
+
+**[Smlcrm/tempus_bench_tasks](https://huggingface.co/datasets/Smlcrm/tempus_bench_tasks)** (public dataset)
+
+On the first `run_benchmark` (or any call that resolves `tempus_bench/tasks/`), missing task
+CSVs are downloaded automatically with a progress bar. Upload or refresh the dataset with
+`python hugging_face_upload/upload_dataset.py` (see [hugging_face_upload/README.md](hugging_face_upload/README.md)).
+
 ## Documentation
 
 - [docs/README.md](docs/README.md) — models, covariates, development notes
@@ -33,15 +43,11 @@ tempus_bench/
 │   ├── settings.yaml          # System configuration
 │   ├── models.py              # Model configuration handling
 │   └── validator.py           # Configuration validation
-├── tasks/                     # Time series datasets
-│   ├── univariate/           # 25 univariate time series tasks
-│   │   ├── chickenpox_dense_univariate/
-│   │   ├── coinbase_days_univariate/
-│   │   └── ... (23 more)
-│   └── multivariate/         # 23 multivariate time series tasks
-│       ├── baggage_100_multivariate/
-│       ├── madrid_transport_multivariate/
-│       └── ... (21 more)
+├── tasks/                     # Time series datasets (gitignored; auto-downloaded from HF)
+│   ├── univariate/           # 10 univariate tasks
+│   ├── multivariate/         # 10 multivariate tasks
+│   └── covariate/            # 10 covariate tasks
+│   # See https://huggingface.co/datasets/Smlcrm/tempus_bench_tasks
 ├── metrics/                   # Evaluation metrics
 │   ├── __init__.py
 │   ├── crps.py                # Continuous Ranked Probability Score
@@ -142,23 +148,15 @@ The pipeline automatically handles:
 
 ```python
 from tempus_bench.pipeline.data_loader import DataLoader
-from tempus_bench.utils.configs import TaskConfig, EvaluationConfig, DatasetConfig
+from tempus_bench.utils.configs import EvaluationConfig
+from tempus_bench.utils.task_yaml_loader import load_task_config_from_task_dir
+from pathlib import Path
 
-# Create task and evaluation configurations
-task_config = TaskConfig(
-    name="chickenpox_dense_univariate",
-    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
-    forecast_horizon=25,
-    context_window=50,
-    dataset=DatasetConfig(
-        file_name="chickenpox_dense_univariate.csv",
-        normalize=True,
-        handle_missing="interpolate"
-    )
-)
+task_dir = Path("tempus_bench/tasks/univariate/univariate_climate_daily_mean_humidity_delhi")
+task_config = load_task_config_from_task_dir(task_dir)
 
 evaluation_config = EvaluationConfig(
-    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    task_path="univariate/univariate_climate_daily_mean_humidity_delhi",
     max_windows=5,
     max_num_variates=None
 )
@@ -343,7 +341,7 @@ results = executor.execute_model(
     context_steps=50,
     train_steps=25,
     validate_steps=25,
-    task_path="tempus_bench/tasks/univariate/chickenpox_dense_univariate",
+    task_path="tempus_bench/tasks/univariate/univariate_climate_daily_mean_humidity_delhi",
     window_idx=0,
     config_path=job_config.config_path
 )

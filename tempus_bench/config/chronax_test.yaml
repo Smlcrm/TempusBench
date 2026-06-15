@@ -1,0 +1,50 @@
+# Full Chronax benchmark reference config (uni- + multi-variate pass).
+#
+# Task families & compatibility:
+#   - All 21 *_chronax models declare univariate=true, multivariate=true.
+#   - Only arima_chronax and mfles_chronax declare covariates=past_future; the
+#     other 19 models are covariates=none. The ConfigManager validator aborts
+#     the whole run if any listed model does not support every listed task
+#     family, so the covariate task lives in a separate config:
+#         tempus_bench/config/chronax_test_covariate.yaml
+#
+# Smoke-test batches (slim single-value grids, fast evaluation settings):
+#   tempus_bench/config/chronax_test_batch1.yaml  (first 5 models)
+#   tempus_bench/config/chronax_test_batch2.yaml  (next 5)
+#   tempus_bench/config/chronax_test_batch3.yaml  (next 5)
+#   tempus_bench/config/chronax_test_batch4.yaml  (next 5)
+#   tempus_bench/config/chronax_test_batch5.yaml  (last 1)
+#   tempus_bench/config/chronax_test_covariate.yaml  (arima + mfles on covariate)
+evaluation:
+  task_paths:
+    - univariate/univariate_climate_daily_mean_humidity_delhi
+    - multivariate/multivariate_transport_monthly_airline_baggage_complaints
+  tuning_loss: mae
+  max_windows: 2
+  max_num_variates: 10
+  num_samples: 100
+  num_quantiles: 10
+  point_forecast_statistic: mean
+
+model:
+  adida_chronax: {}
+  arima_chronax: {}
+  croston_classic_chronax: {}
+  ets_chronax: {}
+  garch_chronax: {}
+  historic_average_chronax: {}
+  holt_chronax: {}
+  holt_winters_chronax: {}
+  imapa_chronax: {}
+  mfles_chronax: {}
+  mstl_chronax: {}
+  naive_chronax: {}
+  random_walk_with_drift_chronax: {}
+  seasonal_exponential_smoothing_chronax: {}
+  seasonal_naive_chronax: {}
+  seasonal_window_average_chronax: {}
+  simple_exponential_smoothing_chronax: {}
+  tbats_chronax: {}
+  theta_chronax: {}
+  tsb_chronax: {}
+  window_average_chronax: {}

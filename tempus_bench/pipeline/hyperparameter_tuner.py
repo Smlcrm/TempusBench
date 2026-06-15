@@ -89,13 +89,14 @@ def _task_id_for_results_sink(task_config) -> str:
     """
     Task key for external sinks (e.g. BigQuery ``task_id`` / Firestore execution_plan).
 
-    Uses the path segment after a ``tasks`` directory (e.g. ``univariate/foo``) so it
-    matches ``execution_plan[].tasks[]`` strings; falls back to folder name.
+    Uses ``<family>/<task_name>`` after tasks/ (e.g. ``covariate/covariate_foo``);
+    falls back to task_name.
     """
     parts = Path(task_config.task_path).parts
     for i, seg in enumerate(parts):
         if seg.lower() == "tasks" and i + 1 < len(parts):
-            return "/".join(parts[i + 1 :])
+            kind = parts[i + 1]
+            return f"{kind}/{task_config.task_name}"
     return task_config.task_name
 
 
@@ -150,7 +151,7 @@ class HyperparameterTuner:
         self.model_name = job_config.model_config.model_name
         self.tuning_loss = self.evaluation_config.tuning_loss
         self.dataset_path = Path(self.task_config.task_path)
-        self.dataset_file_path = self.dataset_path / self.task_config.dataset.file_name
+        self.dataset_file_path = self.dataset_path / self.task_config.file_name
         self.visualizer = Visualizer()
 
     def _generate_hyperparameter_grid(self) -> List[dict]:

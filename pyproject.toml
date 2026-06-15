@@ -41,6 +41,8 @@ dependencies = [
     "click>=8.0.0",
     "psutil>=5.8.0",
     "conda-merge>=0.1.5",
+    # Hugging Face dataset downloads (task CSVs)
+    "huggingface_hub>=0.26.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
