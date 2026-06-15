@@ -1,0 +1,15 @@
+{
+  "name": "Software Development Job Postings on Indeed in the United States",
+  "link": "https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE",
+  "citation": "Indeed, Software Development Job Postings on Indeed in the United States [IHLIDXUSTPSOFTDEVE], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/IHLIDXUSTPSOFTDEVE, April 28, 2026.",
+  "license": "Proprietary (Indeed)",
+  "description": "Indeed calculates the index change in seasonally-adjusted job postings since February 1, 2020, the pre-pandemic baseline. Indeed seasonally adjusts each series based on historical patterns in 2017, 2018, and 2019. Each series, including the national trend, occupational sectors, and sub-national geographies, is seasonally adjusted separately. Indeed switched to this new methodology in December 2022 and now reports all historical data using this new methodology. Historical numbers have been revised and may differ significantly from originally reported values. The new methodology applies a detrended seasonal adjustment factor to the index change in job postings. For more information, see Frequently Asked Questions regarding Indeed Data.",
+  "preprocessing": [
+    "Load IHLIDXUSTPSOFTDEVE (1).csv; rename observation_date to timestamps (UTC).",
+    "Keep value column IHLIDXUSTPSOFTDEVE only.",
+    "Frequency check: D (daily).",
+    "Fill missing: standard daily reindex.",
+    "Transform: variable_name=software_dev_postings_us_indeed, variable_unit=Index Feb 1, 2020=100, Count.",
+    "Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

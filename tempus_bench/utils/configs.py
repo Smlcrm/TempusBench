@@ -160,16 +160,9 @@ class ModelConfig:
 
 class DatasetConfig(BaseModel):
     """
-    Dataset configuration model for individual task folders.
+    Backward-compatible dataset view for legacy call sites.
 
-    This class defines dataset-specific configuration including file name,
-    missing value handling strategy, and normalization settings.
-
-    Attributes:
-        handle_missing (Literal[...]): Strategy for handling missing values.
-            Options: 'interpolate', 'mean', 'median', 'drop', 'forward_fill', 'backward_fill'.
-        file_name (str): Dataset file name (CSV file).
-        normalize (bool): Whether to normalize the data using StandardScaler.
+    Populated from flat ``TaskConfig`` fields via ``TaskConfig.dataset``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -183,32 +176,57 @@ class DatasetConfig(BaseModel):
 
 class TaskConfig(BaseModel):
     """
-    Task configuration model for individual task folders.
+    Task configuration for tasks benchmark folders.
 
-    This class defines task-specific configuration including task name, paths,
-    forecast horizon, context window, and dataset settings.
-
-    Attributes:
-        name (str): Task name (must match folder name).
-        task_path (str): Path to the task directory.
-        forecast_horizon (int): Number of steps to forecast ahead (1-128).
-        context_window (int): Number of context steps for training (>=1).
-        dataset (DatasetConfig): Dataset configuration for this task.
+    Supports univariate, multivariate, and covariate task folders under tasks/.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    task_name: str = Field(..., description="Task name (must match folder name)")
-    task_path: str = Field(..., description="Task path")
+    task_name: str = Field(..., description="Task folder name (basename of task_path)")
+    task_path: str = Field(..., description="On-disk task directory path")
     forecast_horizon: int = Field(
         ..., ge=1, le=128, description="Number of steps to forecast ahead (max 128)"
     )
     context_window: int = Field(
         ..., ge=1, description="Number of context steps for training"
     )
-    dataset: DatasetConfig = Field(
-        ..., description="Dataset configuration for this task"
+    handle_missing: Literal[
+        "interpolate", "mean", "median", "drop", "forward_fill", "backward_fill"
+    ] = Field(default="interpolate", description="Strategy for handling missing values")
+    normalization_method: Literal["standard", "none"] = Field(
+        default="standard",
+        description="Normalization applied to targets during preprocessing",
     )
+    file_name: str = Field(..., description="Dataset CSV file name inside task_path")
+    task_mode: Literal["univariate", "multivariate", "covariate"] = Field(
+        ..., description="Evaluation mode for this logical task"
+    )
+    target_variable_names: list[str] = Field(
+        ..., description="Active target variate names for this logical task/mode"
+    )
+    covariate_variable_names: list[str] = Field(
+        default_factory=list,
+        description="Active covariate variate names for this logical task/mode",
+    )
+
+    @property
+    def dataset(self) -> DatasetConfig:
+        """Legacy adapter exposing nested dataset fields."""
+        return DatasetConfig(
+            handle_missing=self.handle_missing,
+            file_name=self.file_name,
+            normalize=self.is_normalize(),
+        )
+
+    def is_normalize(self) -> bool:
+        return self.normalization_method == "standard"
+
+    def effective_targets(self) -> list[str]:
+        return list(self.target_variable_names)
+
+    def effective_covariates(self) -> list[str]:
+        return list(self.covariate_variable_names)
 
 
 ######################################################## EVALUATION SETTINGS ########################################################

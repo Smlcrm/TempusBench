@@ -1,0 +1,18 @@
+model_type: deterministic
+python_version: '3.11'
+device: cpu
+foundation: false
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+default_hyperparameter_grid:
+  season_length:
+    - 7
+    - 12
+    - [7, 365]
+  # Box-Cox needs strictly positive y; prefer false when tasks use normalization (values can be <= 0).
+  use_boxcox: [true, false, null]
+  use_trend: [true, false, null]
+  use_damped_trend: [true, false, null]
+  use_arma_errors: [true, false]

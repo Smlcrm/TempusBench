@@ -1,0 +1,19 @@
+task:
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: covariate_manufacturing_seconds_skab.csv
+  target_variable_name: Pressure
+  covariate_variable_names:
+  - Accelerometer1RMS
+  - Accelerometer2RMS
+  - Current
+  - Temperature
+  - Thermocouple
+  - Voltage
+  - Volume Flow RateRMS
+
+# target_variable_name : Pressure
+# number of covariates : 7
+# number of time-steps : 9961

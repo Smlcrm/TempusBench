@@ -17,7 +17,6 @@ from pydantic import ValidationError as PydanticValidationError
 from .configs import (
     EvaluationConfig,
     EvaluationSetting,
-    DatasetConfig,
     JobConfig,
     ModelConfig,
     TaskConfig,
@@ -28,15 +27,13 @@ from .model_settings import (
     assert_model_supports_task_family,
     merge_benchmark_params_with_default_grid,
     parse_capabilities_from_settings,
-    task_path_to_family,
 )
 from .paths import (
     get_project_root,
     get_models_dir,
-    get_task_path,
-    get_tasks_dir,
     find_task_directories,
 )
+from .task_yaml_loader import build_task_config
 
 
 class ValidationError(Exception):
@@ -182,26 +179,8 @@ class ConfigManager:
         else:
             tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
 
-        for task_path in tasks.values():
-            task_path_obj = Path(task_path)
-            task_config_path = task_path_obj / "task.yaml"
-
-            with open(task_config_path, "r") as f:
-                tasks_data = list(yaml.safe_load_all(f))
-
-            for task_data in tasks_data:
-                # Use folder name as task_name (e.g. madrid_cyclical_multivariate)
-                # so external sinks and display names match the naming convention
-                task_name = task_path_obj.name
-                task_data["task"].pop("task_name", None)  # discard; folder name is canonical
-                dataset_config = DatasetConfig(**task_data["task"].pop("dataset"))
-
-                task_configs[task_name] = TaskConfig(
-                    task_name=task_name,
-                    task_path=str(task_path),
-                    **task_data["task"],
-                    dataset=dataset_config,
-                )
+        for task_name, task_path_str in tasks.items():
+            task_configs[task_name] = build_task_config(Path(task_path_str))
 
         return task_configs
 
@@ -288,14 +267,13 @@ class ConfigManager:
                 model_name=model_name,
             )
             for task_name, tc in self.task_configs.items():
-                family = task_path_to_family(tc.task_path)
                 try:
                     assert_model_supports_task_family(
-                        cap, model_name=model_name, family=family
+                        cap, model_name=model_name, family=tc.task_mode
                     )
                 except ValueError as e:
                     raise ValidationError(
-                        f"Task {task_name!r} ({family}) vs model {model_name!r}: {e}"
+                        f"Task {task_name!r} ({tc.task_mode}) vs model {model_name!r}: {e}"
                     ) from e
 
     def generate_run_configs(self):

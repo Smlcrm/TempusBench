@@ -15,7 +15,6 @@ import pytest
 
 from tempus_bench.pipeline.hyperparameter_tuner import HyperparameterTuner
 from tempus_bench.utils.configs import (
-    DatasetConfig,
     EvaluationConfig,
     EvaluationSetting,
     JobConfig,
@@ -24,6 +23,17 @@ from tempus_bench.utils.configs import (
 )
 from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.model_settings import load_model_settings_yaml
+from tempus_bench.utils.task_yaml_loader import load_task_config_from_task_dir
+
+_CATALOG_UNIVARIATE = "univariate_climate_daily_mean_humidity_delhi"
+
+
+def _catalog_task_config() -> TaskConfig:
+    repo = Path(__file__).resolve().parents[2]
+    task_dir = (
+        repo / "tempus_bench" / "tasks" / "univariate" / _CATALOG_UNIVARIATE
+    )
+    return load_task_config_from_task_dir(task_dir)
 
 
 @pytest.fixture
@@ -45,8 +55,9 @@ def _init_log_manager():
 
 
 def _minimal_job_config(*, run_path: str) -> JobConfig:
+    task_config = _catalog_task_config()
     evaluation_config = EvaluationConfig(
-        task_path="univariate/chickenpox_dense_univariate",
+        task_path=f"univariate/{task_config.task_name}",
         tuning_loss="mae",
         max_windows=2,
         num_samples=5,
@@ -63,16 +74,6 @@ def _minimal_job_config(*, run_path: str) -> JobConfig:
     )
     model_config = ModelConfig("tiny_time_mixer_r2_1")
     model_setting = dict(load_model_settings_yaml("tiny_time_mixer_r2_1"))
-    repo = Path(__file__).resolve().parents[2]
-    task_config = TaskConfig(
-        task_name="chickenpox_dense_univariate",
-        task_path=str(
-            repo / "tempus_bench" / "tasks" / "univariate" / "chickenpox_dense_univariate"
-        ),
-        forecast_horizon=12,
-        context_window=64,
-        dataset=DatasetConfig(file_name="chickenpox_dense_univariate.csv"),
-    )
     return JobConfig(
         evaluation_config=evaluation_config,
         evaluation_setting=evaluation_setting,

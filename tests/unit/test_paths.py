@@ -87,7 +87,7 @@ class TestPathFunctions:
     
     def test_get_task_path(self):
         """Test that get_task_path returns correct task-specific paths."""
-        task_name = "multivariate/baggage_100_multivariate"
+        task_name = "multivariate/multivariate_transport_monthly_airline_baggage_complaints"
         expected = get_tasks_dir() / task_name
         actual = get_task_path(task_name)
         
@@ -99,7 +99,7 @@ class TestPathFunctions:
         assert actual == expected, "Task path mismatch"
         
         # Test with another task
-        task_name2 = "univariate/delhi_climate_univariate"
+        task_name2 = "univariate/univariate_climate_daily_mean_humidity_delhi"
         expected2 = get_tasks_dir() / task_name2
         actual2 = get_task_path(task_name2)
         
@@ -166,7 +166,7 @@ class TestPathFunctions:
             ("models_dir", get_models_dir()),
             ("runs_dir", get_runs_dir()),
             ("logs_path", get_logs_path()),
-            ("task_path", get_task_path("univariate/chickenpox_dense_univariate")),
+            ("task_path", get_task_path("univariate/univariate_climate_daily_mean_humidity_delhi")),
             ("model_path", get_model_path("deterministic", "prophet")),
         ]
         
@@ -223,9 +223,9 @@ class TestPathFunctions:
         
         print(f"\n6. Example Task Paths:")
         examples = [
-            "multivariate/baggage_100_multivariate",
-            "univariate/delhi_climate_univariate",
-            "multivariate/madrid_count_multivariate",
+            "multivariate/multivariate_transport_monthly_airline_baggage_complaints",
+            "univariate/univariate_climate_daily_mean_humidity_delhi",
+            "multivariate/multivariate_climate_hourly_madrid_air_pollution",
         ]
         for example in examples:
             print(f"   Task '{example}': {get_task_path(example)}")

@@ -1,0 +1,11 @@
+task:
+  context_window: 32
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: univariate_transport_annually_air_passengers_carried.csv
+  target_variable_names:
+  - Air transport, passengers carried - United States
+
+# number of targets : 1
+# number of time-steps : 54

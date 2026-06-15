@@ -25,3 +25,13 @@ def normalize_freq_for_lagllama(freq: str) -> str:
     s = re.sub(r"^(\d*)YE$", r"\1Y", s)
     s = re.sub(r"^(\d*)YS$", r"\1AS", s)
     return _FREQ_LEGACY_SUBDAY_TO_PANDAS.get(s, s)
+
+
+def coerce_freq_for_pandas_date_range(freq: str) -> str:
+    """Map legacy / GluonTS freq strings to aliases accepted by ``pd.date_range``."""
+    s = str(freq).strip()
+    s = re.sub(r"^(\d*)M$", r"\1ME", s)
+    s = re.sub(r"^(\d*)Q$", r"\1QE", s)
+    s = re.sub(r"^(\d*)Y$", r"\1YE", s)
+    s = re.sub(r"^(\d*)A$", r"\1YE", s)
+    return s

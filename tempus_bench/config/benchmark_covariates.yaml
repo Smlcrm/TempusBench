@@ -3,7 +3,7 @@
 # Run with: python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark_covariates.yaml
 
 evaluation:
-  task_path: 'covariate/solar_100_covariate'
+  task_path: 'covariate/covariate_healthcare_daily_nyc_covid_counts'
   tuning_loss: mae
   max_windows: 2
   max_num_variates: 4
@@ -13,7 +13,7 @@ evaluation:
 
 model:
   # Neural / ML models
-  nbeats: {}
+  # nbeats: {}
   nhits: {}
 
   # Chronos family

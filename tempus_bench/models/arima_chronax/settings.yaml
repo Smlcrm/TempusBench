@@ -1,0 +1,22 @@
+model_type: deterministic
+python_version: '3.11'
+device: cpu
+foundation: false
+capabilities:
+  covariates: past_future
+  univariate: true
+  multivariate: true
+default_hyperparameter_grid:
+  order:
+    - [1, 0, 0]
+    - [1, 1, 1]
+    - [2, 1, 2]
+    - [0, 1, 1]
+  seasonal_order:
+    - [0, 0, 0]
+    - [1, 0, 1]
+    - [0, 1, 1]
+  period: [1, 4, 7, 12]
+  include_mean: [true, false]
+  method: ['CSS', 'ML', 'CSS-ML']
+  standardize: [true, false]

@@ -11,11 +11,13 @@ from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
-import yaml
 
 from tempus_bench.pipeline.data_loader import DataLoader
-from tempus_bench.utils.configs import DatasetConfig, EvaluationConfig, TaskConfig
+from tempus_bench.utils.configs import EvaluationConfig, TaskConfig
 from tempus_bench.utils.log_manager import LogManager
+from tempus_bench.utils.task_yaml_loader import (
+    load_task_config_from_task_dir as _load_task_config_from_task_dir,
+)
 
 # Keep in sync with the Next.js route app/api/tasks/data/route.ts in inference-tempusbench-cloud (plot payload cap).
 _PLOT_BENCHMARK_MAX_WINDOW_INDEX: int = 1023
@@ -54,29 +56,8 @@ def _ensure_log_manager_for_export() -> None:
 
 
 def load_task_config_from_task_dir(task_dir: Path) -> TaskConfig:
-    """Load ``TaskConfig`` from ``task_dir/task.yaml`` (``task_path`` is the on-disk task directory)."""
-    yaml_path = task_dir / "task.yaml"
-    if not yaml_path.is_file():
-        raise FileNotFoundError(f"Missing task.yaml: {yaml_path}")
-
-    with open(yaml_path, encoding="utf-8") as f:
-        documents = list(yaml.safe_load_all(f))
-
-    task_name = task_dir.name
-    resolved_dir = str(task_dir.resolve())
-    for task_data in documents:
-        if not task_data or "task" not in task_data:
-            continue
-        task_data["task"].pop("task_name", None)
-        dataset = DatasetConfig(**task_data["task"].pop("dataset"))
-        return TaskConfig(
-            task_name=task_name,
-            task_path=resolved_dir,
-            **task_data["task"],
-            dataset=dataset,
-        )
-
-    raise ValueError(f"No valid task document in {yaml_path}")
+    """Load ``TaskConfig`` from ``task_dir/task.yaml``."""
+    return _load_task_config_from_task_dir(task_dir)
 
 
 def default_evaluation_config_for_display() -> EvaluationConfig:
@@ -131,13 +112,7 @@ def build_display_series_document(
         variates = [row[:cap] for row in variates]
         n_steps = cap
 
-    csv_path = Path(task_config.task_path) / task_config.dataset.file_name
-    df_meta = pd.read_csv(
-        csv_path,
-        usecols=["variable_name", "variable_type"],
-    )
-    vt = df_meta["variable_type"].astype(str).str.lower()
-    target_variable_names = df_meta.loc[vt == "target", "variable_name"].astype(str).tolist()
+    target_variable_names = list(task_config.effective_targets())
     if len(target_variable_names) != n_variates:
         target_variable_names = [f"target_{j}" for j in range(n_variates)]
 
@@ -152,8 +127,7 @@ def build_display_series_document(
         covariate_variates = [cov_arr[:, j].tolist() for j in range(cov_arr.shape[1])]
         if cap < n_steps_full:
             covariate_variates = [row[:cap] for row in covariate_variates]
-        names_series = df_meta.loc[vt == "covariate", "variable_name"].astype(str)
-        covariate_variable_names = names_series.tolist()
+        covariate_variable_names = list(task_config.effective_covariates())
         if len(covariate_variable_names) != len(covariate_variates):
             covariate_variable_names = [
                 f"covariate_{j}" for j in range(len(covariate_variates))
@@ -182,10 +156,11 @@ def build_display_series_document(
         "n_variates": int(n_variates),
         "n_steps": int(n_steps),
         "n_steps_full": n_steps_full,
-        "dataset_normalize": bool(task_config.dataset.normalize),
-        "dataset_handle_missing": str(task_config.dataset.handle_missing),
+        "dataset_normalize": bool(task_config.is_normalize()),
+        "dataset_handle_missing": str(task_config.handle_missing),
         "plot_preprocessing_note": note,
         "target_variable_names": target_variable_names,
+        "task_mode": task_config.task_mode,
     }
     if covariate_variates is not None and len(covariate_variates) > 0:
         out["covariate_variates"] = covariate_variates

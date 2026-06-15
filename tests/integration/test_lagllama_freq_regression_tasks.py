@@ -30,11 +30,12 @@ import yaml
 os.environ.setdefault("TEMPUSBENCH_DISABLE_TENSORBOARD", "1")
 
 from tempus_bench.pipeline.data_loader import DataLoader
-from tempus_bench.utils.configs import DatasetConfig, EvaluationConfig, TaskConfig
+from tempus_bench.utils.configs import EvaluationConfig, TaskConfig
 from tempus_bench.utils.lagllama_freq import coerce_freq_for_pandas_date_range
 from tempus_bench.utils.lagllama_freq import normalize_freq_for_lagllama
 from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.paths import find_task_directories
+from tempus_bench.utils.task_yaml_loader import build_task_config
 
 
 @pytest.fixture(autouse=True)
@@ -57,10 +58,10 @@ def _log_manager():
 
 # Catalog paths aligned with cloud ``benchmark-metadata.json`` task ids.
 LAGLLAMA_FREQ_REGRESSION_TASKS: tuple[str, ...] = (
-    "univariate/employees_healthcare_univariate",
-    "univariate/power_consumption_years_univariate",
-    "multivariate/nyc_covid_healthcare_multivariate",
-    "covariate/nyc_covid_healthcare_covariate",
+    "univariate/univariate_healthcare_monthly_all_employees_health_care",
+    "univariate/univariate_energy_monthly_electricity_price_kwh",
+    "multivariate/multivariate_healthcare_daily_nyc_covid_counts",
+    "covariate/covariate_healthcare_daily_nyc_covid_counts",
 )
 
 
@@ -70,15 +71,8 @@ def _load_task_config(task_rel_path: str) -> TaskConfig:
         raise AssertionError(
             f"expected exactly one task dir for {task_rel_path!r}, got {list(found.keys())}"
         )
-    _name, path = next(iter(found.items()))
-    p = Path(path)
-    with open(p / "task.yaml", encoding="utf-8") as f:
-        docs = list(yaml.safe_load_all(f))
-    task_data = next(d for d in docs if d and "task" in d)
-    raw = dict(task_data["task"])
-    raw.pop("task_name", None)
-    dataset = DatasetConfig(**raw.pop("dataset"))
-    return TaskConfig(task_name=_name, task_path=str(p), **raw, dataset=dataset)
+    _task_name, path = next(iter(found.items()))
+    return build_task_config(Path(path))
 
 
 @pytest.mark.parametrize("task_rel_path", LAGLLAMA_FREQ_REGRESSION_TASKS)
