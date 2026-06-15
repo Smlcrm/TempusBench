@@ -1,0 +1,18 @@
+task:
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: multivariate_energy_minutes_splitsmart_ac_energy.csv
+  target_variable_names:
+  - Current
+  - voltage
+  - Power_Factor
+  - Real_Power
+  - room_temp
+  - External_temp
+  - Humidity
+  - unit_consumption
+
+# number of targets : 8
+# number of time-steps : 384440

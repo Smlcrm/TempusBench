@@ -73,3 +73,15 @@ temp/
 
 .cursor/
 .venv*
+
+hugging_face_upload/
+
+# Local-only — data prep / smoke configs (do not commit)
+_find_fill.py
+_fix_all_transform_cells.py
+data_transform.ipynb
+raw_datasets/
+tempus_bench/config/benchmark_fast_smoke.yaml
+tempus_bench/config/benchmark_smoke_theta.yaml
+tempus_bench/config/benchmark_svr_smoke.yaml
+tempus_bench/scripts/

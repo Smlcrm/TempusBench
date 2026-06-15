@@ -1,0 +1,18 @@
+task:
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: multivariate_manufacturing_seconds_skab.csv
+  target_variable_names:
+  - Accelerometer1RMS
+  - Accelerometer2RMS
+  - Current
+  - Pressure
+  - Temperature
+  - Thermocouple
+  - Voltage
+  - Volume Flow RateRMS
+
+# number of targets : 8
+# number of time-steps : 9961

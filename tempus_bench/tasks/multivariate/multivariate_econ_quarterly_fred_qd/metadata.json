@@ -1,0 +1,18 @@
+{
+  "name": "FRED-QD: A Quarterly Database for Macroeconomic Research",
+  "link": "https://research.stlouisfed.org/econ/mccracken/fred-databases/",
+  "citation": "McCracken, M. W., & Ng, S. (2020). FRED-QD: A Quarterly Database for Macroeconomic Research. Federal Reserve Bank of St. Louis.",
+  "license": "Public Domain",
+  "description": "Engineered by the Federal Reserve Bank of St. Louis, this massive econometric matrix harmonizes over 200 distinct quarterly time series into a single dense panel. It categorizes macro indicators into 14 groups—including real GDP, personal consumption, industrial production, labor markets, price indices, and interest rates—making it the definitive benchmark for training and evaluating large-scale \"big data\" forecasting algorithms.",
+  "preprocessing": [
+    "Load 2026-04-QD.csv.",
+    "Drop first two rows (factors and transform metadata rows in sasdate column); data begins at 1959-Q1.",
+    "Rename sasdate to timestamps; parse as UTC datetime.",
+    "Kept all 245 FRED series columns (every column except sasdate); no series removed.",
+    "Examples: GDPC1, PCECC96, INDPRO, CPIAUCSL, FEDFUNDS, UNRATE, S&P 500, etc.",
+    "Frequency check: quarterly grid (QS or median-interval fallback for ~90-day spacing).",
+    "Fill missing: standard quarterly reindex; early missing values per series retained as NaN.",
+    "Transform: 245 variates; variable_name = raw FRED series id; variable_unit blank.",
+    "Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

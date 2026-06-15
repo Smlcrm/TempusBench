@@ -38,21 +38,22 @@ def extract_task_paths_from_config(config_yaml: str) -> list[str]:
 
 
 def get_tasks() -> dict[str, list[str]]:
-    """Return tasks grouped by type. Values are full task_path for YAML (e.g. covariate/solar_100_covariate)."""
-    from pathlib import Path
-
+    """Return tasks grouped by evaluation mode for tasks/."""
     from tempus_bench.utils.paths import get_tasks_dir
 
     tasks_dir = get_tasks_dir()
     result: dict[str, list[str]] = {"univariate": [], "multivariate": [], "covariate": []}
-    for subdir in ("univariate", "multivariate", "covariate"):
-        subpath = tasks_dir / subdir
-        if subpath.exists():
-            for task_path in subpath.iterdir():
-                if task_path.is_dir():
-                    full_path = f"{subdir}/{task_path.name}"
-                    result[subdir].append(full_path)
-            result[subdir] = sorted(result[subdir])
+
+    for kind in ("univariate", "multivariate", "covariate"):
+        kind_dir = tasks_dir / kind
+        if not kind_dir.is_dir():
+            continue
+        for task_path in kind_dir.iterdir():
+            if task_path.is_dir():
+                result[kind].append(f"{kind}/{task_path.name}")
+
+    for key in result:
+        result[key] = sorted(result[key])
     return result
 
 

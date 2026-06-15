@@ -1,0 +1,15 @@
+task:
+  context_window: 32
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: covariate_transport_monthly_airline_baggage_complaints.csv
+  target_variable_name: Baggage
+  covariate_variable_names:
+  - Scheduled
+  - Cancelled
+  - Enplaned
+
+# target_variable_name : Baggage
+# number of covariates : 3
+# number of time-steps : 84

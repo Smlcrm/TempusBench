@@ -1,0 +1,11 @@
+task:
+  context_window: 32
+  forecast_horizon: 17
+  handle_missing: interpolate
+  normalization_method: standard
+  file_name: univariate_sales_quarterly_real_residential_property_prices.csv
+  target_variable_names:
+  - real_residential_property_prices_quaterly_germany
+
+# number of targets : 1
+# number of time-steps : 56

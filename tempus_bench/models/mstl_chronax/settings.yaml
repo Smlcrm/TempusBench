@@ -1,0 +1,20 @@
+model_type: deterministic
+python_version: '3.11'
+device: cpu
+foundation: false
+capabilities:
+  covariates: none
+  univariate: true
+  multivariate: true
+default_hyperparameter_grid:
+  period:
+    - 7
+    - 12
+    - [7, 365]
+  iterate: [1, 2, 3]
+  seasonal_deg: [0, 1]
+  trend_deg: [0, 1]
+  seasonal_jump: [1, 2]
+  trend_jump: [1, 2]
+  inner: [1, 2]
+  fitted: [true, false]
