@@ -74,7 +74,11 @@ temp/
 .cursor/
 .venv*
 
-hugging_face_upload/
+hugging_face_upload_old/
+hugging_face_upload/.staging/
+
+# Task data hosted on Hugging Face (Smlcrm/tempus_bench_tasks); keep locally, not in git
+tempus_bench/tasks/
 
 # Local-only — data prep / smoke configs (do not commit)
 _find_fill.py

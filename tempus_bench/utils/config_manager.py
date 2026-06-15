@@ -169,6 +169,9 @@ class ConfigManager:
         Raises:
             FileNotFoundError or ValidationError if a task.yaml file is missing or invalid.
         """
+        from tempus_bench.utils.task_assets import ensure_task_assets
+
+        ensure_task_assets()
 
         task_configs = {}
         eval_config = self.evaluation_config

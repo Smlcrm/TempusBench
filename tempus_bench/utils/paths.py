@@ -27,12 +27,17 @@ def get_tasks_dir() -> Path:
     """
     Get the absolute path to the tasks directory.
 
+    Downloads task CSV data from Hugging Face on first use when files are missing.
+
     Returns:
         Path: Absolute path to tempus_bench/tasks/
 
     Raises:
         FileNotFoundError: If the tasks directory doesn't exist
     """
+    from tempus_bench.utils.task_assets import ensure_task_assets
+
+    ensure_task_assets()
     tasks_dir = get_project_root() / "tempus_bench" / "tasks"
     if not tasks_dir.exists():
         raise FileNotFoundError(f"Tasks directory not found: {tasks_dir}")
@@ -104,7 +109,7 @@ def get_task_path(task_name: str) -> Path:
     Get the absolute path to a specific task directory.
 
     Args:
-        task_name: Name of the task (e.g., 'multivariate/baggage_100_multivariate')
+        task_name: Name of the task (e.g., 'multivariate/multivariate_transport_monthly_airline_baggage_complaints')
 
     Returns:
         Path: Absolute path to the task directory
