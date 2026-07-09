@@ -1,6 +1,6 @@
 ![Simulacrum Logo](https://github.com/Smlcrm/smlcrm-brand-assets/blob/main/Asset%201@4x-8.png?raw=true "Simulacrum — TempusBench")
 
-# Time Series Forecasting Benchmarking Pipeline (`tempus_bench`)
+# TempusBench
 
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
@@ -8,7 +8,7 @@
 
 A comprehensive framework for benchmarking time series forecasting models, including both traditional statistical models and modern foundation models.
 
-This repository is the **`tempus_bench`** Python package and its assets (tasks, models, tests, docs). **Cloud/UI, worker, GCP deploy scripts, and Dockerfiles** live in a separate private repo (for example **`inference-tempusbench-cloud`** under your org); clone that repo and place this library at **`tempusbench_open/`** next to `tempusbench_cloud/` and `deployment/` to match its documented layout.
+This repository is the **TempusBench** Python package and its assets (tasks, models, tests, docs). **Cloud/UI, worker, GCP deploy scripts, and Dockerfiles** live in a separate private repo (for example **`inference-tempusbench-cloud`** under your org); clone that repo and place this library at **`tempusbench_open/`** next to `tempusbench_cloud/` and `deployment/` to match its documented layout.
 
 ## Overview
 
