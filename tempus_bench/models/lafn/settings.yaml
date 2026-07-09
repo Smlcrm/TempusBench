@@ -1,10 +1,13 @@
-model_type: hybrid
-python_version: 3.11.10
+model_type: stochastic
+python_version: '3.11'
 device: cpu
-bucket_name: chronarium_artifacts
-model_name: 2025_11_01_14:28:04lafn_mse_2.619_nll_10.816/
-model_version: 1
-project: sim-inference
+# Chronarium repository pointing at any LAFN artifact bucket. The benchmark
+# loads the model with ``Chronarium.load_model(model_name, model_init="interface")``
+# so every checkpoint that Chronarium can deserialise is supported here.
+model_repo_path: gs://lafn_artifacts/
+model_name: lafn_2026_05_16_23:42:47
+checkpoint_version: null
+checkpoint_step: null
 credentials_path: tempus_bench/models/lafn/gcp_credentials.json
 capabilities:
   covariates: none
