@@ -1,5 +1,5 @@
 """
-Unit tests for stochastic metrics: CRPS, QuantileScore, WeightedIntervalScore.
+Unit tests for stochastic metrics: CRPS, EnergyScore, QuantileScore, WeightedIntervalScore.
 
 Tests cover:
 - Basic stochastic calculations with sample distributions
@@ -14,6 +14,7 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_raises
 
 from tempus_bench.metrics.crps import CRPS
+from tempus_bench.metrics.energy_score import EnergyScore
 from tempus_bench.metrics.quantile_score import QuantileScore
 from tempus_bench.metrics.weighted_interval_score import WeightedIntervalScore
 
@@ -106,6 +107,64 @@ class TestCRPS:
         
         result = crps(y_true, y_pred, model_type='stochastic')
         assert result >= 0
+
+
+class TestEnergyScore:
+    """Test EnergyScore metric (stochastic; unbiased multivariate ES, beta=1)."""
+
+    def test_perfect_predictions(self):
+        """All samples equal to y => energy score is 0."""
+        es = EnergyScore()
+        y_true = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y_pred = np.broadcast_to(y_true, (5, 2, 2)).copy()
+        result = es(y_true, y_pred, model_type="stochastic")
+        assert_allclose(result, 0.0, atol=1e-12)
+
+    def test_hand_checked_s2_univariate(self):
+        """S=2 univariate case against the closed-form unbiased estimator."""
+        # y=0, samples={1, 3}
+        # term1 = (|1-0| + |3-0|) / 2 = 2
+        # term2 = (|1-3| + |3-1|) / (2*2*1) = 1
+        # ES = 2 - 1 = 1
+        es = EnergyScore()
+        y_true = np.array([[0.0]])
+        y_pred = np.array([[[1.0]], [[3.0]]])  # (S=2, T=1, M=1)
+        result = es(y_true, y_pred, model_type="stochastic")
+        assert_allclose(result, 1.0, atol=1e-12)
+
+    def test_single_sample(self):
+        """S=1 => pairwise term is 0; score equals ||s - y||_2."""
+        es = EnergyScore()
+        y_true = np.array([[2.0]])
+        y_pred = np.array([[[2.5]]])  # (1, 1, 1)
+        result = es(y_true, y_pred, model_type="stochastic")
+        assert_allclose(result, 0.5, atol=1e-12)
+
+    def test_multivariate_joint_norm(self):
+        """Score uses one L2 over the full (T, M) vector, not elementwise mean."""
+        # y = (0, 0), one sample s = (3, 4) => ||s-y||_2 = 5
+        es = EnergyScore()
+        y_true = np.array([[0.0, 0.0]])
+        y_pred = np.array([[[3.0, 4.0]]])  # (1, 1, 2)
+        result = es(y_true, y_pred, model_type="stochastic")
+        assert_allclose(result, 5.0, atol=1e-12)
+
+    def test_shape_validation_incorrect(self):
+        """Mismatched y_true / y_pred shapes raise via BaseMetric."""
+        es = EnergyScore()
+        y_true = np.array([2.0, 3.0])  # Wrong shape
+        y_pred = np.random.randn(50, 2, 2)
+        with pytest.raises(ValueError, match="Shape mismatch"):
+            es(y_true, y_pred, model_type="stochastic")
+
+    def test_hybrid_uses_samples(self):
+        """Hybrid model_type feeds sample tensor into the stochastic metric."""
+        es = EnergyScore()
+        y_true = np.array([[0.0]])
+        point = np.array([[99.0]])
+        samples = np.array([[[1.0]], [[3.0]]])  # same as hand-checked case
+        result = es(y_true, (point, samples), model_type="hybrid")
+        assert_allclose(result, 1.0, atol=1e-12)
 
 
 class TestQuantileScore:
