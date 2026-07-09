@@ -72,7 +72,17 @@ temp/
 *.tmp
 *.temp
 
-.cursor/
+# Cursor — track shared project config, ignore local/ephemeral state
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/python-env.json
+.cursor/mcp.json
+.cursor/plans/
+
 .venv*
 
 hugging_face_upload_old/
