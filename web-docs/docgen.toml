@@ -5,6 +5,7 @@
 name = "TempusBench"
 description = "A unified benchmarking framework for time series forecasting, comparing traditional and foundation models with automated pipelines and isolated execution."
 package = "tempus_bench"
+# instructions = [add repo link to the instructions]
 
 [theme]
 preset = "simulacrum"
