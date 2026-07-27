@@ -1,0 +1,10 @@
+# Documentation config for docgen (github.com/Smlcrm/web-doc-generator).
+# Passed explicitly via --config in web-docs/cloudbuild.yaml.
+
+[project]
+name = "TempusBench"
+description = "A unified benchmarking framework for time series forecasting, comparing traditional and foundation models with automated pipelines and isolated execution."
+package = "tempus_bench"
+
+[theme]
+preset = "simulacrum"
