@@ -1,0 +1,14 @@
+{
+  "name": "US Monthly Death Counts",
+  "link": "https://data.cdc.gov/resource/y5bj-9g5w",
+  "citation": "U.S. Centers for Disease Control and Prevention, NCHS. \"Weekly Counts of Deaths by Jurisdiction and Age (predicted, weighted).\" data.cdc.gov/resource/y5bj-9g5w. Accessed 15 July 2026.",
+  "license": "U.S. federal public-domain data (CDC NCHS mortality counts; FRED/Federal Reserve Bank of St. Louis) plus Open-Meteo weather data (CC-BY 4.0). Free to use and redistribute.",
+  "description": "Monthly U.S. all-cause deaths (national, weighted/complete estimate), 2015-2023 (weekly counts aggregated to months), spanning the 2020-21 COVID mortality surge in-sample. Application: hospital/hospice/funeral capacity and life-insurance planning. Covariate glossary:\n- all cause deaths: total U.S. deaths per month, all ages, NCHS predicted-weighted counts (y5bj-9g5w).\n- us mean temperature: monthly-mean 2m air temperature at a central-US point (39.5N,98.35W), degrees Celsius (Open-Meteo) - cold drives winter mortality.\n- us unemployment rate: U.S. civilian unemployment rate, percent, SA (FRED UNRATE).",
+  "preprocessing": [
+    "1. Pulled the all-cause death counts from the cited CDC/Socrata open-data API (y5bj-9g5w).",
+    "2. Aligned covariates (Open-Meteo monthly-mean 2m temperature at 39.5N,98.35W; FRED UNRATE) onto the target's time index.",
+    "3. Weekly NCHS predicted-weighted death counts aggregated to calendar-month totals.",
+    "4. Forward/back-filled sparse covariate gaps; dropped provisional/partial tail periods.",
+    "5. Single shared ISO-8601 time index; no calendar columns."
+  ]
+}

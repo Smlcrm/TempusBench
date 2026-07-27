@@ -1,0 +1,22 @@
+{
+  "name": "NYISO N.Y.C. zone \u2014 hourly load, DA/RT LBMP price, weather & calendar \u2014 N.Y.C. hourly day-ahead LBMP wholesale electricity price (covariate forecasting bundle)",
+  "link": "http://mis.nyiso.com/public/csv/palIntegrated/20260401palIntegrated_csv.zip",
+  "citation": "NYISO (http://mis.nyiso.com/public/csv/palIntegrated/20260401palIntegrated_csv.zip); Open-Meteo Historical Weather API (https://archive-api.open-meteo.com/v1/archive); pandas USFederalHolidayCalendar (n/a)",
+  "license": "NYISO data: public OASIS postings (attribution). Open-Meteo: CC-BY 4.0 (non-commercial free tier).",
+  "description": "N.Y.C. hourly day-ahead LBMP wholesale electricity price. This bundle forecasts `nyc_day_ahead_locational_marginal_price` from a covariate panel of nyc_zone_electricity_load, air_temperature, relative_humidity, wind_speed, cloud_cover, global_horizontal_irradiance, hour_of_day, day_of_week, is_weekend, is_holiday. Source dataset 'NYISO N.Y.C. zone \u2014 hourly load, DA/RT LBMP price, weather & calendar' \u2014 hourly cadence, 26301 rows, 2023-07-01T04:00:00Z..2026-07-01T03:00:00Z (ISO-8601 UTC). NON-EIA (the forecasting model is trained on EIA data, so EIA inputs are excluded): NONE of these are EIA. NYISO is the NY grid operator publishing its own metered load & market-clearing prices. Open-Meteo weather is ERA5 reanalysis from ECMWF/Copernicus. No series is sourced from or derived from eia.gov.",
+  "preprocessing": [
+    "1. Download NYISO monthly ZIP archives for 2026-04/05/06: palIntegrated (hourly load), damlbmp_zone (DA LBMP), realtime_zone (5-min RT LBMP). Cached under datasets/raw/.",
+    "2. Unzip each; concatenate all daily CSVs in the month. Strip quotes/whitespace from headers.",
+    "3. Filter every source to the single load zone Name == 'N.Y.C.'.",
+    "4. Parse 'Time Stamp' as local Eastern (EDT, no DST transition in Apr-Jun). load & DA are already hourly; group-mean any dup rows.",
+    "5. Resample 5-min real-time LBMP to hourly mean -> rt_price.",
+    "6. Pull Open-Meteo ERA5 hourly weather (temp, humidity, wind, cloud, GHI) for NYC lat/lon with timezone=America/New_York so its naive-local hours align 1:1 with NYISO.",
+    "7. Inner-join load + da_price + rt_price + weather on the hourly timestamp (keeps only fully-observed hours).",
+    "8. Add known-future calendar covariates: hour, dow, is_weekend, is_holiday (USFederalHolidayCalendar).",
+    "9. Time-interpolate residual gaps up to 3h; drop any remaining NaN rows. Write wide CSV sorted by ts.",
+    "10. EXTENDED 2026-07: history pulled back to 2023-07-01 (3 years) from the same NON-EIA grid-operator + Open-Meteo sources; series rebuilt on a UTC hourly index (DST-safe); timestamps emitted as ISO-8601 UTC.",
+    "11. Dropped calendar/time-derived variables (hour_of_day, day_of_week) so the only notion of time retained is the shared timestamps list.",
+    "12. Renamed all variable names and units from snake_case codes to plain English (CSV row/column structure unchanged). Name and unit mapping \u2014 nyc_day_ahead_locational_marginal_price [$/MWh] -> \"NYC day-ahead locational marginal price\" [US dollars per megawatt-hour] (target; N.Y.C. day-ahead Locational-Based Marginal Price (LBMP)); nyc_zone_electricity_load [MW] -> \"NYC zone electricity load\" [megawatts] (covariate; N.Y.C. load-zone integrated actual electricity demand); air_temperature [\u00b0C] -> \"air temperature\" [degrees Celsius] (covariate; 2 m air temperature); relative_humidity [%] -> \"relative humidity\" [percent] (covariate; 2 m relative humidity); wind_speed [km/h] -> \"wind speed\" [kilometers per hour] (covariate; 10 m wind speed); cloud_cover [%] -> \"cloud cover\" [percent] (covariate; total cloud cover); global_horizontal_irradiance [W/m\u00b2] -> \"global horizontal irradiance\" [watts per square meter] (covariate; downward shortwave solar radiation (GHI)); is_weekend [] -> \"is weekend\" [] (covariate; weekend indicator (0/1)); is_holiday [] -> \"is holiday\" [] (covariate; US federal holiday indicator (0/1)).",
+    "13. Removed the calendar covariates 'is weekend' and 'is holiday' from the delivered CSV."
+  ]
+}

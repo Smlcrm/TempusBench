@@ -1,0 +1,10 @@
+{
+  "name": "Netflix Weekly Engagement & Streaming Market Signals",
+  "link": "https://www.netflix.com/tudum/top10",
+  "citation": "Netflix Tudum Global Top 10 TSV + Google Trends US weekly indices.",
+  "license": "Netflix Tudum open data; Google Trends (Google ToS)",
+  "description": "Weekly TV (English) Top-10 minutes viewed with release calendar and churn/competitor search signals.",
+  "preprocessing": [
+    "1. Summed Top-10 hours->minutes; new releases = first week in Top 10; Trends aligned weekly."
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "covariate_construction_monthly_public_infrastructure_spending",
+  "link": [
+    "https://fred.stlouisfed.org/graph/fredgraph.csv?id=TLPBLCONS"
+  ],
+  "citation": "FRED (US Census, BLS, Federal Reserve, IMF, LBMA)",
+  "license": "public domain / FRED terms of use",
+  "description": "c3-infra-spending \u2014 'Public construction spending' forecasting bundle. Native cadence monthly; 401 timesteps 1993-01-01..2026-05-01. Non-EIA sources. Known-future covariates: IIJA highway apportionment. NO contemporaneous covariates \u2014 all covariates enter as past values only; known-future covariates (weather forecasts, scheduled budgets/releases) are genuinely available at forecast time. Timestamp-derived calendar features are NOT included \u2014 time information is carried only by the timestamps column.",
+  "preprocessing": [
+    "1. curl FRED fredgraph.csv per series (plain UA + --http1.1; browser UA triggers HTTP/2 reset)",
+    "2. parse CSV, '.'->NaN, first col=date",
+    "3. resample to month-start mean (weekly MORTGAGE30US and daily DTWEXBGS/GOLDAMGBD228NLBM -> monthly mean; monthly series unchanged)",
+    "4. Renamed raw source fields to human-readable (FRED series ID -> column): TLPBLCONS->Public construction spending, GS10->10-year Treasury yield, USCONS->Construction employment, WPUSI012011->Construction materials PPI, IPG3273S->Cement and concrete output, PERMIT->Building permits.",
+    "5. inner-join covariates on month-start index ; derive IIJA highway apportionment from FHWA FY2022-2026 contract authority",
+    "6. restrict to window_start=1993-01-01",
+    "7. write CSV (timestamp + target-first columns)",
+    "8. Reformatted wide -> TempusBench long (variable_name, variable_unit, timestamps, values); variable names are human-readable English; timestamp-derived calendar features dropped (time lives only in the timestamps column); timestamps ISO-8601 UTC-labelled, shared across variables; missing -> null; CSV-writer quoted."
+  ]
+}

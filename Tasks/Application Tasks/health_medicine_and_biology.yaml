@@ -1,0 +1,391 @@
+task:
+  task_name: COVID-19 Daily Counts of Cases, Hospitalizations, and Deaths Multivariate
+  task_description: Granular epidemiological dataset tracking COVID-19 confirmed and
+    probable cases, hospitalizations, and deaths across New York City. The data provides
+    both city-wide aggregates and specific regional breakdowns across all five boroughs
+    (Bronx, Brooklyn, Manhattan, Queens, Staten Island), making it an ideal benchmark
+    for spatial-temporal infectious disease modeling.
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: Daily_NYC_COVID_Counts_Multivariate
+  target_variable_names:
+  - daily all case count 7-day average
+  - Brooklyn daily all case count 7-day average
+  - Brooklyn daily case count
+  - Brooklyn daily case count 7-day average
+  - Brooklyn daily death count
+  - Brooklyn daily death count 7-day average
+  - Brooklyn daily hospitalized count
+  - Brooklyn hospitalized count 7day avg
+  - Brooklyn daily probable case count
+  - Brooklyn probable case count 7day avg
+  - Bronx daily all case count 7-day average
+  - Bronx daily case count
+  - Bronx daily case count 7-day average
+  - Bronx daily death count
+  - Bronx daily death count 7-day average
+  - Bronx daily hospitalized count
+  - Bronx hospitalized count 7day avg
+  - Bronx daily probable case count
+  - Bronx probable case count 7day avg
+  - daily case count
+  - daily case count 7-day average
+  - daily death count
+  - daily death count 7-day average
+  - daily hospitalized count
+  - daily hospitalized count 7-day average
+  - Manhattan daily all case count 7-day average
+  - Manhattan daily case count
+  - Manhattan daily case count 7-day average
+  - Manhattan daily death count
+  - Manhattan daily death count 7-day average
+  - Manhattan daily hospitalized count
+  - Manhattan hospitalized count 7day avg
+  - Manhattan daily probable case count
+  - Manhattan probable case count 7day avg
+  - daily probable case count
+  - Queens daily all case count 7-day average
+  - Queens daily case count
+  - Queens daily case count 7-day average
+  - Queens daily death count
+  - Queens daily death count 7-day average
+  - Queens daily hospitalized count
+  - Queens hospitalized count 7day avg
+  - Queens daily probable case count
+  - Queens probable case count 7day avg
+  - Staten Island daily all case count 7-day average
+  - Staten Island daily case count
+  - Staten Island daily case count 7-day average
+  - Staten Island daily death count
+  - Staten Island daily death count 7-day average
+  - Staten Island daily hospitalized count
+  - Staten Island hospitalized count 7day avg
+  - Staten Island daily probable case count
+  - Staten Island probable case count 7day avg
+  covariate_variable_names: []
+---
+task:
+  task_name: COVID-19 Daily Counts of Cases, Hospitalizations, and Deaths
+  task_description: Granular epidemiological dataset tracking COVID-19 confirmed and
+    probable cases, hospitalizations, and deaths across New York City. The data provides
+    both city-wide aggregates and specific regional breakdowns across all five boroughs
+    (Bronx, Brooklyn, Manhattan, Queens, Staten Island), making it an ideal benchmark
+    for spatial-temporal infectious disease modeling.
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: Daily_NYC_COVID_Deaths
+  target_variable_names:
+  - daily death count
+  covariate_variable_names:
+  - daily case count
+  - daily probable case count
+  - daily hospitalized count
+  - daily case count 7-day average
+  - daily all case count 7-day average
+  - daily hospitalized count 7-day average
+  - daily death count 7-day average
+  - Bronx daily case count
+  - Bronx daily probable case count
+  - Bronx daily hospitalized count
+  - Bronx daily death count
+  - Bronx daily case count 7-day average
+  - Bronx probable case count 7day avg
+  - Bronx daily all case count 7-day average
+  - Bronx hospitalized count 7day avg
+  - Bronx daily death count 7-day average
+  - Brooklyn daily case count
+  - Brooklyn daily probable case count
+  - Brooklyn daily hospitalized count
+  - Brooklyn daily death count
+  - Brooklyn daily case count 7-day average
+  - Brooklyn probable case count 7day avg
+  - Brooklyn daily all case count 7-day average
+  - Brooklyn hospitalized count 7day avg
+  - Brooklyn daily death count 7-day average
+  - Manhattan daily case count
+  - Manhattan daily probable case count
+  - Manhattan daily hospitalized count
+  - Manhattan daily death count
+  - Manhattan daily case count 7-day average
+  - Manhattan probable case count 7day avg
+  - Manhattan daily all case count 7-day average
+  - Manhattan hospitalized count 7day avg
+  - Manhattan daily death count 7-day average
+  - Queens daily case count
+  - Queens daily probable case count
+  - Queens daily hospitalized count
+  - Queens daily death count
+  - Queens daily case count 7-day average
+  - Queens probable case count 7day avg
+  - Queens daily all case count 7-day average
+  - Queens hospitalized count 7day avg
+  - Queens daily death count 7-day average
+  - Staten Island daily case count
+  - Staten Island daily probable case count
+  - Staten Island daily hospitalized count
+  - Staten Island daily death count
+  - Staten Island probable case count 7day avg
+  - Staten Island daily case count 7-day average
+  - Staten Island daily all case count 7-day average
+  - Staten Island hospitalized count 7day avg
+  - Staten Island daily death count 7-day average
+---
+task:
+  task_name: M01AB Acetic Acid NSAIDs
+  task_description: Weekly forecasting of M01AB acetic-acid NSAID dispensing units
+    for pharmacy inventory and demand planning, with weather and influenza-like-illness
+    covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: M01AB_Acetic_Acid_NSAIDs
+  target_variable_names:
+  - m01ab acetic acid units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: M01AE Propionic Acid NSAIDs
+  task_description: Weekly forecasting of M01AE propionic-acid NSAID (e.g. ibuprofen)
+    dispensing units for pharmacy inventory and demand planning, with weather and
+    influenza-like-illness covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: M01AE_Propionic_Acid_NSAIDs
+  target_variable_names:
+  - m01ae propionic acid units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: Mingo County Oxycodone Dosage
+  task_description: Daily forecasting of oxycodone dosage-units shipped to Mingo County,
+    WV pharmacies for opioid-supply monitoring, with retail- and chain-pharmacy dosage
+    covariates (DEA ARCOS, 2006-2012).
+  context_window: 90
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: Mingo_County_Oxycodone_Dosage
+  target_variable_names:
+  - Oxycodone Dosage
+  covariate_variable_names:
+  - Retail Pharmacy Dosage
+  - Chain Pharmacy Dosage
+---
+task:
+  task_name: All Employees in Health Care - U.S. Bureau of Labor Statistics
+  task_description: Monthly observations tracking the total number of employees in
+    the health care sector in the United States, measured in thousands of persons.
+    The data comes from the Current Employment Statistics (Establishment Survey) and
+    is seasonally adjusted.
+  context_window: 64
+  forecast_horizon: 33
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: Monthly_Healthcare_Employment
+  target_variable_names:
+  - all employees health care United States BLS
+  covariate_variable_names: []
+---
+task:
+  task_name: N02BA Aspirin Weekly Dispensing
+  task_description: Weekly forecasting of N02BA salicylic-acid/aspirin dispensing
+    units for pharmacy inventory and demand planning, with weather and influenza-like-illness
+    covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: N02BA_Aspirin_Weekly_Dispensing
+  target_variable_names:
+  - n02ba aspirin units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: N02BE Paracetamol Weekly Dispensing
+  task_description: Weekly forecasting of N02BE anilide/paracetamol dispensing units
+    for pharmacy inventory and demand planning, with weather and influenza-like-illness
+    covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: N02BE_Paracetamol_Weekly_Dispensing
+  target_variable_names:
+  - n02be paracetamol units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: N05B Anxiolytics Weekly Dispensing
+  task_description: Weekly forecasting of N05B anxiolytic dispensing units for pharmacy
+    inventory and demand planning, with weather and influenza-like-illness covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: N05B_Anxiolytics_Weekly_Dispensing
+  target_variable_names:
+  - n05b anxiolytic units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: N05C Hypnotics Sedatives Dispensing
+  task_description: Weekly forecasting of N05C hypnotic and sedative dispensing units
+    for pharmacy inventory and demand planning, with weather and influenza-like-illness
+    covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: N05C_Hypnotics_Sedatives_Dispensing
+  target_variable_names:
+  - n05c hypnotic sedative units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: R03 Airway Drugs Dispensing
+  task_description: Weekly forecasting of R03 obstructive-airway (inhaler) medication
+    dispensing units for pharmacy inventory and demand planning, with weather and
+    influenza-like-illness covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: R03_Airway_Drugs_Dispensing
+  target_variable_names:
+  - r03 airway medication units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: R06 Antihistamines Weekly Dispensing
+  task_description: Weekly forecasting of R06 systemic antihistamine dispensing units
+    for pharmacy inventory and demand planning, with weather and influenza-like-illness
+    covariates.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: R06_Antihistamines_Weekly_Dispensing
+  target_variable_names:
+  - r06 antihistamine units
+  covariate_variable_names:
+  - mean temperature
+  - min temperature
+  - max temperature
+  - precipitation
+  - snowfall
+  - max wind speed
+  - shortwave radiation
+  - weighted influenza-like illness
+  - influenza-like illness
+---
+task:
+  task_name: US Pharmaceutical Factory Shipments
+  task_description: Monthly forecasting of U.S. pharmaceutical factory shipments for
+    manufacturing and supply-chain planning, with retail-pharmacy sales and factory-inventory
+    covariates (FRED).
+  context_window: 36
+  forecast_horizon: 6
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: health_medicine_and_biology
+  dataset_name: US_Pharmaceutical_Factory_Shipments
+  target_variable_names:
+  - Factory Shipments
+  covariate_variable_names:
+  - Retail Pharmacy Sales
+  - Factory Inventory

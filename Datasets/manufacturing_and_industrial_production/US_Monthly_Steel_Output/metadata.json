@@ -1,0 +1,14 @@
+{
+  "name": "US Monthly Steel Output",
+  "link": "https://fred.stlouisfed.org/series/IPN3311A2RS",
+  "citation": "U.S. Federal Reserve Board of Governors. \"Industrial Production: Manufacturing: Iron and Steel Products (IPN3311A2RS).\" FRED, Federal Reserve Bank of St. Louis, https://fred.stlouisfed.org/series/IPN3311A2RS. Accessed 15 July 2026.",
+  "license": "U.S. Government public data (Federal Reserve Board G.17 Industrial Production; U.S. Bureau of Labor Statistics Current Employment Statistics; U.S. Census Bureau Construction Spending and New Residential Construction), redistributed via FRED (Federal Reserve Bank of St. Louis). Free to use and redistribute; see FRED Terms of Use https://fred.stlouisfed.org/legal.",
+  "description": "Monthly seasonally-adjusted U.S. raw-steel (iron & steel products) industrial-production index (Federal Reserve G.17, NAICS 3311/3312), with manufacturing-sector and construction-demand covariates. Application: blast-furnace/EAF campaign planning and order-book commitment (capacity-utilization, furnace idling, scrap-vs-ore procurement).\n\nCovariate glossary:\n- raw steel industrial production index: Fed G.17 industrial-production index for iron & steel products, seasonally adjusted, 2017=100.\n- manufacturing employment: all-employees, manufacturing sector, thousands of persons (FRED MANEMP).\n- total construction spending: total U.S. construction put in place, millions of USD, seasonally-adjusted annual rate (FRED TTLCONS) - downstream steel demand.\n- housing starts: new privately-owned housing units started, thousands of units, seasonally-adjusted annual rate (FRED HOUST) - downstream steel demand.",
+  "preprocessing": [
+    "1. Downloaded each monthly series from the FRED CSV endpoint (fredgraph.csv?id=<ID>).",
+    "2. Aligned target and covariates onto a common month-start (MS) time index.",
+    "3. Restricted to the common native span (first month where every covariate is observed through the last observed target month).",
+    "4. Forward-filled only sparse internal covariate gaps; no target imputation.",
+    "5. Dropped all calendar/timestep columns; kept a single shared ISO-8601 UTC timestamp index."
+  ]
+}

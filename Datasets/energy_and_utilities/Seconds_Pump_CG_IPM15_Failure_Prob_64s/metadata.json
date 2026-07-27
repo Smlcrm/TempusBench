@@ -1,0 +1,18 @@
+{
+  "name": "Crompton Greaves CG-IPM-15 synthetic industrial pump \u2014 1-second multi-domain telemetry \u2014 64-second near-failure probability (univariate near-failure probability forecasting bundle)",
+  "link": "https://doi.org/10.21227/1bzr-hq65",
+  "citation": "Rajesh T. & Pillai, A. S. (2025). Crompton Greeves Three Phase Pump-Predictive Maintenance Dataset. IEEE DataPort. DOI: 10.21227/1bzr-hq65 (https://doi.org/10.21227/1bzr-hq65). Dataset page: https://ieee-dataport.org/documents/crompton-greeves-three-phase-pump-predictive-maintenance-dataset. Public CSV mirror used by this pipeline: https://github.com/rajesh-amrita/pump_maintenance (MBG12_1sec_data.csv).",
+  "license": "IEEE DataPort default: Creative Commons Attribution (CC BY) \u2014 attribution required (https://doi.org/10.21227/1bzr-hq65). Also cite the GitHub mirror if redistributing the CSV.",
+  "description": "Near-failure indicator. This bundle forecasts `failure_probability_64s` (1 when RUL \u2264 64 seconds). Source: IEEE DataPort DOI 10.21227/1bzr-hq65 (Rajesh & Pillai 2025); CSV fetched from https://raw.githubusercontent.com/rajesh-amrita/pump_maintenance/main/MBG12_1sec_data.csv. SYNTHETIC 1 Hz series (not field meters): 259200 rows spanning 2024-01-01..2024-01-03 after second expansion. Windows aligned with TempusBench SKAB seconds tasks: context_window=2048, forecast_horizon=64. Sensors used: tri-axial vibration, inlet/outlet pressure, stator/bearing temperature, flow.",
+  "preprocessing": [
+    "1. download_pump.py: GET GitHub raw MBG12_1sec_data.csv \u2192 data/maintenance/pump/raw/.",
+    "2. Dataset is SYNTHETIC (GPT-4o + stochastic hybrid generator) emulating Crompton Greaves CG-IPM-15 three-phase centrifugal pump; 26 sensor streams + Failure_Code.",
+    "3. transform_pump.py: snake_case columns; map vibration_x/y/z, inlet/outlet_pressure, stator/bearing_temperature, flow_rate, motor_speed, failure_code.",
+    "4. Raw Timestamp column is minute-resolution with 60 rows per minute; expand each minute group to unique 1-second UTC stamps (offsets 0..59s) \u2014 true 1 Hz grid.",
+    "5. Keep native 1-second sampling (no hourly resample). Drop duplicate timestamps; coerce sensors numeric.",
+    "6. first_fail = first index with failure_code > 0 (observed first_fail_idx=216000); remaining_useful_life = seconds until that index (clipped \u22650).",
+    "7. failure_probability_64s = 1.0 iff RUL \u2264 64 (matches forecast_horizon=64 / SKAB-style seconds windows).",
+    "8. Rolling-median window=5 + mean\u00b14\u03c3 clip on sensor channels (not failure_code).",
+    "9. Write pump_cg_ipm15.parquet (259200 rows, 2024-01-01T00:00:00Z..2024-01-03T23:59:59Z \u2248 3 days @ 1 Hz) then TempusBench CSV (context=2048, horizon=64)."
+  ]
+}

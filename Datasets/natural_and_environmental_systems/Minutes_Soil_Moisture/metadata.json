@@ -1,0 +1,15 @@
+{
+  "name": "Soil and Environmental Monitoring - Soil Moisture",
+  "link": "https://www.kaggle.com/datasets/noeyislearning/soil-and-environmental-monitoring",
+  "citation": "NoeyIsLearning. “Soil and Environmental Monitoring.” Kaggle, uploaded by NoeyIsLearning, updated 8 months ago, https://www.kaggle.com/datasets/noeyislearning/soil-and-environmental-monitoring.",
+  "license": "CC0: Public Domain",
+  "description": "This dataset provides a detailed time-series record of soil moisture data collected over a specific period. The data is structured to facilitate analysis of environmental conditions and their impact on soil properties. This dataset is particularly useful for researchers, environmental scientists, and agricultural professionals interested in understanding soil health, vegetation monitoring, and environmental modeling.",
+  "preprocessing": [
+    "1. Load soil_moisture.csv (~129 columns: spectral bands + environmental sensors); rename datetime to timestamps (UTC).",
+    "2. Export only soil_moisture; all other raw columns omitted from output.",
+    "3. Frequency check: median interval ~120s; infer_freq fallback would be min.",
+    "4. Fill missing (special): force strict 2min grid reindex (not 1min).",
+    "5. Transform: variable_name=soil_moisture_env_monitoring_2_min, variable_unit=Percent (%).",
+    "6. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

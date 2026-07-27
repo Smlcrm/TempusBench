@@ -1,0 +1,13 @@
+{
+  "name": "Daily Euro Dollar Exchange Rate",
+  "link": "https://finance.yahoo.com/quote/EURUSD=X/history",
+  "citation": "Yahoo Finance. \"EUR/USD (EURUSD=X) Historical Data.\" Yahoo Finance, 2026, finance.yahoo.com/quote/EURUSD=X. Covariates: CBOE Volatility Index (^VIX), Brent crude front-month (BZ=F), CBOE 10-Year Treasury Yield index (^TNX).",
+  "license": "Market data via Yahoo Finance, for research/benchmark use.",
+  "description": "Daily EUR/USD spot exchange rate (mid quote) with market covariates: the CBOE Volatility Index (VIX, risk sentiment), Brent crude oil, and the US 10-year Treasury yield. Target is near-random-walk (Meese-Rogoff); covariate value is limited at short horizons. Application: FX desk hedging and exposure planning.\n\nCovariate glossary:\n- eurusd: EUR/USD spot exchange rate, US dollars per euro (target).\n- vix: CBOE Volatility Index, 30-day implied volatility of S&P 500 options, index points (risk sentiment).\n- brent: Brent crude oil front-month price, USD per barrel.\n- ust10y: US 10-year Treasury constant-maturity yield, percent per annum.",
+  "preprocessing": [
+    "1. Downloaded from the cited public source (Yahoo Finance) on 2026-07-14.",
+    "2. Aligned all variates onto a single shared time index; covariates forward-filled where a release lag left a gap.",
+    "3. Long TempusBench layout: one row per variate; a single shared 'timestamps' JSON array of ISO-8601 UTC strings; 'values' a JSON array (missing -> null).",
+    "4. Calendar/derived features (week-of-year, holiday flags) are NOT included as columns; a single time index is provided and models derive calendar features from it."
+  ]
+}

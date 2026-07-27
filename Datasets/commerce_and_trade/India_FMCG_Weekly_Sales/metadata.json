@@ -1,0 +1,18 @@
+{
+  "name": "India FMCG Weekly Sales",
+  "link": "https://www.kaggle.com/datasets/subhagatoadak/mmm-weekly-data-geoindia",
+  "citation": "Adak, S. MMM Weekly Data - Geo:India (synthetic FMCG Geo\u00d7SKU\u00d7week panel). Kaggle dataset subhagatoadak/mmm-weekly-data-geoindia (https://www.kaggle.com/datasets/subhagatoadak/mmm-weekly-data-geoindia). Primary file used: synthetic_mmm_weekly_india.csv (largest CSV in the zip; companion synthetic_mmm_weekly_india_SAT.csv also present).",
+  "license": "Apache License 2.0 (as reported by the Kaggle dataset download metadata for subhagatoadak/mmm-weekly-data-geoindia).",
+  "description": "National weekly sales. This bundle forecasts `sales_value`. Source: Kaggle synthetic MMM Weekly Data - Geo:India \u2014 weekly after national rollup, 155 rows, 2022-07-04..2025-06-16. Windows: context_window=52, forecast_horizon=8. Classic marketing-mix setup with geometric adstock (decay=0.2) and CPI macros.",
+  "preprocessing": [
+    "1. download_mmm_india.py: `python -m kaggle datasets download -d subhagatoadak/mmm-weekly-data-geoindia -p data/marketing/mmm_india/raw --unzip`; write schema manifest.",
+    "2. transform_mmm_india.py: choose largest CSV (synthetic_mmm_weekly_india.csv); snake_case columns.",
+    "3. Parse Week \u2192 UTC week-start timestamps (W-MON); rename sales column \u2192 sales_value.",
+    "4. Auto-detect numeric media/spend columns via name hints (tv, facebook, youtube, instagram, print, radio, display, trade, impression, spend, \u2026).",
+    "5. National aggregation by timestamps: SUM sales_value + all spend/impression columns across Geo\u00d7Brand\u00d7SKU; macros (cpi, gdp, \u2026) take FIRST per week (not summed).",
+    "6. Geometric adstock on each spend-like column: adstock_t = X_t + 0.2 * adstock_{t-1}; emit {col}_adstock. No Hill/log saturation.",
+    "7. Complete weekly index min\u2192max; fill missing sales/spend with 0; ffill/bfill macros; assert \u226561 weeks.",
+    "8. Observed output: 155 weeks (2022-07-04..2025-06-16); adstock channels include display_flag, trade_spend, tv/youtube/facebook/instagram impressions, print_readership, radio_listenership.",
+    "9. build_tasks.py: univariate/multivariate/covariate TempusBench CSVs (context_window=52, forecast_horizon=8). ISLR Advertising.csv intentionally excluded."
+  ]
+}

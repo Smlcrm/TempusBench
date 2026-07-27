@@ -1,0 +1,17 @@
+{
+  "name": "Web Traffic Time Series Forecasting",
+  "link": "https://www.kaggle.com/c/web-traffic-time-series-forecasting/data",
+  "citation": "Maggie, Oren Anava, Vitaly Kuznetsov, and Will Cukierski. (2017). Web Traffic Time Series Forecasting [Data set]. Kaggle.",
+  "license": "CC BY-SA 3.0",
+  "description": "A definitive benchmark for web server load forecasting, tracking the daily hits of approximately 145,000 specific Wikipedia articles. The dataset is characterized by noisy, bursty data distributions driven by real-world cultural trends, distinguishing between human users and automated web-spiders across various language locales.",
+  "preprocessing": [
+    "1. Load train_1.csv (wide format: Page column + daily date columns).",
+    "2. Select first N_PAGES=145 page rows (deterministic slice of raw file, not random).",
+    "3. Reshape without melt/pivot: transpose so dates become rows and page names become columns.",
+    "4. Parse transposed index as UTC daily timestamps; 145 variates named by Wikipedia page identifiers.",
+    "5. Frequency check: D (daily).",
+    "6. Fill missing: standard daily reindex on all 145 page series.",
+    "7. Transform: 145 variates; variable_unit blank.",
+    "8. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

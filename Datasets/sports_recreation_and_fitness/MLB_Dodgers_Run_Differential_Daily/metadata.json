@@ -1,0 +1,20 @@
+{
+  "name": "MLB Dodgers run differential per game (win margin), 2024 daily",
+  "link": "https://www.retrosheet.org/gamelogs/",
+  "citation": "MLB Dodgers run differential per game (win margin), 2024 daily. Data obtained from Retrosheet 2024 game logs (gl2024.zip), www.retrosheet.org/gamelogs/. The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at www.retrosheet.org.",
+  "license": "Retrosheet \u2014 free to use with attribution (non-commercial); see https://www.retrosheet.org/notice.txt",
+  "description": "Per-game run differential (runs scored minus runs allowed) for the 2024 Los Angeles Dodgers, with a MERGED covariate panel drawing offensive drivers (hits, home_runs, walks) and defensive drivers (hits_allowed, home_runs_allowed, walks_allowed) from two datasets. Application: win-margin forecasting (\"will we outscore them?\"). Target = run differential (can be negative).",
+  "preprocessing": [
+    "1. Per-game Dodgers 2024 box-score series extracted from Retrosheet game logs; one value per game.",
+    "2. Reshaped to TempusBench long format: one row per variable with columns variable_name, variable_unit, timestamps, values.",
+    "3. Games re-indexed to consecutive daily dates; timestamps emitted as ISO-8601 UTC strings (00:00:00Z), shared across all variables.",
+    "4. Variable and unit names written in plain English (spaces, no underscores); the target_ prefix dropped. No calendar/time-feature covariates are included \u2014 the only notion of time is the shared timestamps list.",
+    "5. run differential (target, runs): Run differential = runs scored minus runs allowed (per game)",
+    "6. hits (covariate, hits): Hits by the Dodgers (per game)",
+    "7. home runs (covariate, home runs): Home runs by the Dodgers (per game)",
+    "8. walks (covariate, walks): Walks drawn by the Dodgers (per game)",
+    "9. hits allowed (covariate, hits): Hits allowed by Dodgers pitching (per game)",
+    "10. home runs allowed (covariate, home runs): Home runs allowed by Dodgers pitching (per game)",
+    "11. walks allowed (covariate, walks): Walks allowed by Dodgers pitching (per game)"
+  ]
+}

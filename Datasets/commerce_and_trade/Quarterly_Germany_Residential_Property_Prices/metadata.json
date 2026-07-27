@@ -1,0 +1,15 @@
+{
+  "name": "Real Residential Property Prices for Germany",
+  "link": "https://fred.stlouisfed.org/series/QDER628BIS",
+  "citation": "Bank for International Settlements, Real Residential Property Prices for Germany [QDER628BIS], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/QDER628BIS, April 28, 2026.",
+  "license": "Open Data (BIS)",
+  "description": "Quarterly observations of the real (CPI-deflated) residential property price index (2010=100) for Germany. It is a \"selected\" BIS indicator covering all types of owner-occupied new and existing dwellings across the whole country. The data is not seasonally adjusted and contains historical series backdated to 1970.",
+  "preprocessing": [
+    "1. Load QDER628BIS.csv; rename observation_date to timestamps (UTC).",
+    "2. Keep value column QDER628BIS only.",
+    "3. Frequency check: AS-JAN (annual, January year-start anchor) — one observation per year despite quarterly folder naming.",
+    "4. Fill missing: standard annual reindex on AS-JAN grid.",
+    "5. Transform: variable_name=real_residential_property_prices_quaterly_germany, variable_unit=Index 2010=100, U.S. Dollar.",
+    "6. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

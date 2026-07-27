@@ -1,0 +1,510 @@
+task:
+  task_name: 15Min PVDAQ9068 Plant Output
+  task_description: Fifteen-minute forecasting of utility-scale solar plant AC power
+    output from plane-of-array irradiance, ambient temperature, and wind-speed covariates.
+  context_window: 288
+  forecast_horizon: 96
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: 15Min_PVDAQ9068_Plant_Output
+  target_variable_names:
+  - plant AC power output
+  covariate_variable_names:
+  - plane-of-array irradiance
+  - ambient temperature
+  - wind speed
+---
+task:
+  task_name: Daily LNG Throughput
+  task_description: Daily forecasting of Great Britain liquefied natural gas terminal
+    sendout from weather, gas-demand, and storage covariates.
+  context_window: 365
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Daily_LNG_Throughput
+  target_variable_names:
+  - Great Britain liquefied natural gas terminal sendout
+  covariate_variable_names:
+  - heating degree days
+  - air temperature
+  - wind speed
+  - Great Britain gas storage stock
+  - Great Britain National Transmission System gas demand
+---
+task:
+  task_name: Daily Natural Gas Demand
+  task_description: Daily forecasting of Great Britain National Transmission System
+    natural gas demand from weather, storage, and liquefied-natural-gas sendout covariates.
+  context_window: 365
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Daily_Natural_Gas_Demand
+  target_variable_names:
+  - Great Britain National Transmission System gas demand
+  covariate_variable_names:
+  - heating degree days
+  - air temperature
+  - wind speed
+  - Great Britain gas storage stock
+  - Great Britain liquefied natural gas terminal sendout
+---
+task:
+  task_name: Hourly CAISO Day Ahead Solar
+  task_description: Hourly forecasting of California Independent System Operator actual
+    solar generation against its day-ahead market forecast.
+  context_window: 168
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CAISO_Day_Ahead_Solar
+  target_variable_names:
+  - actual solar generation
+  covariate_variable_names:
+  - day-ahead solar generation forecast
+---
+task:
+  task_name: Hourly CMAPSS FD001
+  task_description: Hourly forecasting of turbofan remaining useful life (single operating
+    condition) from operating settings and selected sensor covariates.
+  context_window: 168
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CMAPSS_FD001
+  target_variable_names:
+  - remaining useful life
+  - operating setting 1
+  - operating setting 2
+  - operating setting 3
+  - low-pressure compressor outlet temperature
+  - high-pressure compressor outlet pressure
+  - physical fan speed
+  covariate_variable_names: []
+---
+task:
+  task_name: Hourly CMAPSS FD001 Failure Prob 14d
+  task_description: Univariate hourly forecasting of 14-step near-failure probability
+    for a single-condition turbofan.
+  context_window: 168
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CMAPSS_FD001_Failure_Prob_14d
+  target_variable_names:
+  - 14-day failure probability
+  covariate_variable_names: []
+---
+task:
+  task_name: Hourly CMAPSS FD001 RUL
+  task_description: Univariate hourly forecasting of single-condition turbofan remaining
+    useful life.
+  context_window: 168
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CMAPSS_FD001_RUL
+  target_variable_names:
+  - remaining useful life
+  covariate_variable_names: []
+---
+task:
+  task_name: Hourly CMAPSS FD004
+  task_description: Hourly forecasting of turbofan remaining useful life (six operating
+    conditions, two fault modes) from operating settings and selected sensor covariates.
+  context_window: 168
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CMAPSS_FD004
+  target_variable_names:
+  - remaining useful life
+  - operating setting 1
+  - operating setting 2
+  - operating setting 3
+  - low-pressure compressor outlet temperature
+  - high-pressure compressor outlet pressure
+  - physical fan speed
+  covariate_variable_names: []
+---
+task:
+  task_name: Hourly CMAPSS FD004 Failure Prob 14d
+  task_description: Univariate hourly forecasting of 14-step near-failure probability
+    for a multi-condition, multi-fault turbofan.
+  context_window: 168
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CMAPSS_FD004_Failure_Prob_14d
+  target_variable_names:
+  - 14-day failure probability
+  covariate_variable_names: []
+---
+task:
+  task_name: Hourly CMAPSS FD004 RUL
+  task_description: Univariate hourly forecasting of multi-condition, multi-fault
+    turbofan remaining useful life.
+  context_window: 168
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_CMAPSS_FD004_RUL
+  target_variable_names:
+  - remaining useful life
+  covariate_variable_names: []
+---
+task:
+  task_name: Hourly EIA930 Grid Demand
+  task_description: Hourly forecasting of PJM balancing-authority electricity demand
+    against its day-ahead demand forecast for short-term grid load.
+  context_window: 168
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_EIA930_Grid_Demand
+  target_variable_names:
+  - electricity demand
+  covariate_variable_names:
+  - day-ahead electricity demand forecast
+---
+task:
+  task_name: Hourly Electricity Demand
+  task_description: Hourly forecasting of New York City zone electricity load from
+    weather and solar-irradiance covariates for short-term demand.
+  context_window: 720
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_Electricity_Demand
+  target_variable_names:
+  - New York City zone electricity load
+  covariate_variable_names:
+  - air temperature
+  - relative humidity
+  - wind speed
+  - cloud cover
+  - global horizontal irradiance
+---
+task:
+  task_name: Hourly GEFCom2014 PV Output
+  task_description: Hourly forecasting of capacity-normalized solar photovoltaic plant
+    output from irradiance, temperature, cloud-cover, and wind-speed covariates.
+  context_window: 168
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_GEFCom2014_PV_Output
+  target_variable_names:
+  - normalized solar power output
+  covariate_variable_names:
+  - global horizontal irradiance
+  - air temperature at 2 meters
+  - total cloud cover
+  - wind speed at 10 meters
+---
+task:
+  task_name: Hourly Market Price Day Ahead
+  task_description: Hourly forecasting of New York City day-ahead wholesale electricity
+    price from load and weather covariates.
+  context_window: 720
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_Market_Price_Day_Ahead
+  target_variable_names:
+  - New York City day-ahead locational marginal price
+  covariate_variable_names:
+  - New York City zone electricity load
+  - air temperature
+  - relative humidity
+  - wind speed
+  - cloud cover
+  - global horizontal irradiance
+---
+task:
+  task_name: Hourly Solar Bidding Day Ahead
+  task_description: Hourly forecasting of California Independent System Operator solar
+    generation for day-ahead market bidding from weather covariates.
+  context_window: 720
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_Solar_Bidding_Day_Ahead
+  target_variable_names:
+  - California Independent System Operator solar generation
+  covariate_variable_names:
+  - global horizontal irradiance
+  - air temperature
+  - cloud cover
+  - wind speed
+---
+task:
+  task_name: Hourly Solar Output
+  task_description: Hourly forecasting of California Independent System Operator utility-scale
+    solar generation from weather, wind, load, and price covariates.
+  context_window: 720
+  forecast_horizon: 24
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Hourly_Solar_Output
+  target_variable_names:
+  - California Independent System Operator solar generation
+  covariate_variable_names:
+  - global horizontal irradiance
+  - air temperature
+  - cloud cover
+  - wind speed
+  - California Independent System Operator wind generation
+  - California Independent System Operator system load
+  - South of Path 15 day-ahead locational marginal price
+---
+task:
+  task_name: Minutes Predictive Maintenance Oil Well
+  task_description: Minute-level forecasting of offshore oil-well production-choke
+    upstream pressure from downhole pressure and temperature sensor covariates for
+    predictive maintenance.
+  context_window: 720
+  forecast_horizon: 120
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Minutes_Predictive_Maintenance_Oil_Well
+  target_variable_names:
+  - production choke upstream pressure
+  covariate_variable_names:
+  - tubing transducer pressure
+  - annulus pressure
+  - gaslift choke downstream pressure
+  - production choke downstream temperature
+  - tubing transducer temperature
+---
+task:
+  task_name: 'SplitSmart: An Open Dataset for Enabling Research in Energy-Efficient
+    Ductless-Split Air Conditioner'
+  task_description: IoT sensor data collected over four years from ductless-split
+    AC units in a living lab setting at BITS Pilani. It combines electrical consumption
+    metrics (power factor, voltage, current) with environmental factors (internal/external
+    temperature, humidity) to facilitate machine learning research in optimizing HVAC
+    energy efficiency and reducing carbon footprints.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Minutes_SplitSmart_AC_Energy
+  target_variable_names:
+  - unit consumption
+  covariate_variable_names:
+  - electrical current
+  - voltage
+  - power factor
+  - real power
+  - room temperature
+  - external temperature
+  - humidity
+---
+task:
+  task_name: 'SplitSmart: An Open Dataset for Enabling Research in Energy-Efficient
+    Ductless-Split Air Conditioner Multivariate'
+  task_description: IoT sensor data collected over four years from ductless-split
+    AC units in a living lab setting at BITS Pilani. It combines electrical consumption
+    metrics (power factor, voltage, current) with environmental factors (internal/external
+    temperature, humidity) to facilitate machine learning research in optimizing HVAC
+    energy efficiency and reducing carbon footprints.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Minutes_SplitSmart_AC_Energy_Multivariate
+  target_variable_names:
+  - electrical current
+  - external temperature
+  - humidity
+  - power factor
+  - real power
+  - room temperature
+  - unit consumption
+  - voltage
+  covariate_variable_names: []
+---
+task:
+  task_name: Monthly Capacity Planning Demand
+  task_description: Monthly forecasting of U.S. electricity demand for long-term capacity
+    planning from weather, population, industrial-production, and clean-share covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Monthly_Capacity_Planning_Demand
+  target_variable_names:
+  - United States electricity demand
+  covariate_variable_names:
+  - heating degree days
+  - cooling degree days
+  - United States population
+  - industrial production index
+  - clean electricity share
+---
+task:
+  task_name: Monthly Crude Oil Inventory
+  task_description: Monthly forecasting of U.S. crude oil closing stocks from production,
+    refinery intake, apparent demand, and crude-price covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Monthly_Crude_Oil_Inventory
+  target_variable_names:
+  - United States crude oil closing stocks
+  covariate_variable_names:
+  - United States crude oil production
+  - United States refinery crude intake
+  - United States crude oil apparent demand
+  - West Texas Intermediate crude oil price
+---
+task:
+  task_name: 'Average Price: Electricity per Kilowatt-Hour in U.S. City Average'
+  task_description: All electricity. Average consumer prices are calculated for household
+    fuel, motor fuel, and food items from prices collected for the Consumer Price
+    Index (CPI). Average prices are best used to measure the price level in a particular
+    month, not to measure price change over time. It is more appropriate to use CPI
+    index values for the particular item categories to measure price change. Prices,
+    except for electricity, are collected monthly by BLS representatives in the 75
+    urban areas priced for the CPI. Electricity prices are collected for the BLS for
+    the same 75 areas on a monthly basis by the Department of Energy using mail questionnaires.
+    All fuel prices include applicable Federal, State, and local taxes; prices for
+    natural gas and electricity also include fuel and purchased gas adjustments.
+  context_window: 128
+  forecast_horizon: 39
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Monthly_Electricity_Price_KWh
+  target_variable_names:
+  - electricity price per kilowatt hour United States city average
+  covariate_variable_names: []
+---
+task:
+  task_name: Seconds Pump CG IPM15
+  task_description: Second-level forecasting of industrial pump remaining useful life
+    from vibration, pressure, and thermal sensor covariates.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Seconds_Pump_CG_IPM15
+  target_variable_names:
+  - remaining useful life
+  - vibration x-axis
+  - vibration y-axis
+  - vibration z-axis
+  - inlet pressure
+  - outlet pressure
+  - stator temperature
+  covariate_variable_names: []
+---
+task:
+  task_name: Seconds Pump CG IPM15 Failure Prob 64s
+  task_description: Univariate second-level forecasting of 64-second near-failure
+    probability for an industrial pump.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Seconds_Pump_CG_IPM15_Failure_Prob_64s
+  target_variable_names:
+  - 64-second failure probability
+  covariate_variable_names: []
+---
+task:
+  task_name: Seconds Pump CG IPM15 RUL
+  task_description: Univariate second-level forecasting of industrial pump remaining
+    useful life.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Seconds_Pump_CG_IPM15_RUL
+  target_variable_names:
+  - remaining useful life
+  covariate_variable_names: []
+---
+task:
+  task_name: Weekly Cushing US
+  task_description: Weekly forecasting of Cushing, Oklahoma commercial crude oil stocks
+    from refinery utilization and lagged Gulf-tanker-transit covariates.
+  context_window: 52
+  forecast_horizon: 4
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Weekly_Cushing_US
+  target_variable_names:
+  - Cushing crude oil stocks
+  - refinery utilization
+  - loaded tanker transits United States Gulf (4-week lag)
+  covariate_variable_names: []
+---
+task:
+  task_name: Weekly Cushing US Univariate
+  task_description: Univariate weekly forecasting of Cushing, Oklahoma commercial
+    crude oil stocks.
+  context_window: 52
+  forecast_horizon: 4
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: energy_and_utilities
+  dataset_name: Weekly_Cushing_US_Univariate
+  target_variable_names:
+  - Cushing crude oil stocks
+  covariate_variable_names: []

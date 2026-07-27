@@ -1,0 +1,17 @@
+{
+  "name": "Walmart Sales",
+  "link": "https://www.kaggle.com/datasets/mikhail1681/walmart-sales",
+  "citation": "Mikhail. (2022). Walmart Sales [Data set]. Kaggle.",
+  "license": "Other (Proprietary)",
+  "description": "Comprehensive retail dataset capturing weekly revenue figures across multiple stores, heavily enriched with external covariates. Models must leverage regional environmental factors (air temperature), logistical costs (fuel prices), macroeconomic indicators (unemployment, CPI), and seasonal spikes (holiday flags) to accurately predict purchasing power and consumer demand.",
+  "preprocessing": [
+    "1. Load Walmart_Sales.csv; filter to Store == 1.",
+    "2. Parse Date with format %d-%m-%Y (day-first) as UTC.",
+    "3. Kept variates: Weekly_Sales, Holiday_Flag, Temperature, Fuel_Price, CPI, Unemployment.",
+    "4. Store column retained in fill frame but not exported as a variate.",
+    "5. Frequency check: W-FRI (weekly, Friday anchor).",
+    "6. Fill missing: standard weekly reindex.",
+    "7. Transform: 6 variates; variable_unit blank.",
+    "8. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

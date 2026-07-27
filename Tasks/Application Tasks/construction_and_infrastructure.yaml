@@ -1,0 +1,68 @@
+task:
+  task_name: Monthly Construction Materials Cost
+  task_description: Monthly forecasting of the construction materials producer price
+    index from lumber, steel, concrete, chemical, copper, and broader macroeconomic
+    covariates.
+  context_window: 113
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: construction_and_infrastructure
+  dataset_name: Monthly_Construction_Materials_Cost
+  target_variable_names:
+  - Construction materials producer price index
+  covariate_variable_names:
+  - Lumber producer price index
+  - Steel mill products producer price index
+  - Ready-mix concrete producer price index
+  - Industrial chemicals producer price index
+  - Copper global price
+  - Broad dollar index
+  - Housing starts
+  - Industrial production
+  - Cass freight shipments
+---
+task:
+  task_name: Monthly Housing Starts
+  task_description: Monthly forecasting of U.S. housing starts from building permits,
+    mortgage rates, construction employment, housing supply, income, and lumber-price
+    covariates.
+  context_window: 180
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: construction_and_infrastructure
+  dataset_name: Monthly_Housing_Starts
+  target_variable_names:
+  - Housing starts
+  covariate_variable_names:
+  - Building permits
+  - 30-year fixed mortgage rate
+  - Residential construction employment
+  - Months supply of new houses
+  - Real disposable personal income
+  - Lumber producer price index
+---
+task:
+  task_name: Monthly Public Infrastructure Spending
+  task_description: Monthly forecasting of U.S. public construction spending from
+    Treasury yields, construction employment, materials prices, cement output, permits,
+    and federal highway funding covariates.
+  context_window: 180
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: construction_and_infrastructure
+  dataset_name: Monthly_Public_Infrastructure_Spending
+  target_variable_names:
+  - Public construction spending
+  covariate_variable_names:
+  - 10-year Treasury yield
+  - Construction employment
+  - Construction materials producer price index
+  - Cement and concrete output
+  - Building permits
+  - Infrastructure Investment and Jobs Act highway apportionment

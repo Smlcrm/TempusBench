@@ -1,0 +1,13 @@
+{
+  "name": "US Monthly Consumer Price Index",
+  "link": "https://www.bls.gov/cpi/",
+  "citation": "U.S. Bureau of Labor Statistics. \"CPI for All Urban Consumers (CUSR0000SA0), seasonally adjusted.\" BLS, 2026, bls.gov/cpi. Covariates: West Texas Intermediate crude (Yahoo CL=F, monthly average) and Producer Price Index for Final Demand, SA (BLS WPSFD4).",
+  "license": "BLS series are U.S. Government works (public domain); WTI via Yahoo Finance for research use.",
+  "description": "US monthly CPI-U (all items, seasonally adjusted, index level) with leading covariates: West Texas Intermediate (WTI) crude oil (monthly average) and the Producer Price Index (PPI) for final demand. CPI level is non-stationary (I(1)) and persistent; covariates captured the 2026 energy move. Application: inflation nowcasting and cost-of-living/COLA planning.\n\nCovariate glossary:\n- cpi: US Consumer Price Index for All Urban Consumers, all items (CPI-U, seasonally adjusted), index 1982-84=100 (target).\n- wti: West Texas Intermediate crude oil price, monthly average, USD per barrel.\n- ppi: US Producer Price Index for final demand, seasonally adjusted, index 2009=100.",
+  "preprocessing": [
+    "1. Downloaded from the cited public sources (BLS CPI/PPI; Yahoo Finance WTI) on 2026-07-14.",
+    "2. Aligned all variates onto a single shared time index; covariates forward-filled where a release lag left a gap.",
+    "3. Long TempusBench layout: one row per variate; a single shared 'timestamps' JSON array of ISO-8601 UTC strings; 'values' a JSON array (missing -> null).",
+    "4. Calendar/derived features (month-of-year) are NOT included as columns; a single time index is provided and models derive calendar features from it."
+  ]
+}

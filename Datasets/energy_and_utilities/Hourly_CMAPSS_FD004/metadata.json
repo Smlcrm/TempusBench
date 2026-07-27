@@ -1,0 +1,18 @@
+{
+  "name": "NASA C-MAPSS FD004 turbofan run-to-failure (six operating conditions / two fault modes) \u2014 hourly PHM telemetry \u2014 RUL with operating settings & selected sensors as covariates (covariate RUL forecasting bundle)",
+  "link": "https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/",
+  "citation": "A. Saxena and K. Goebel (2008). \"Turbofan Engine Degradation Simulation Data Set\", NASA Prognostics Data Repository, NASA Ames Research Center, Moffett Field, CA. Official repository: https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/. Download mirror used by this pipeline: https://zenodo.org/records/15346912 (CMAPSSData.zip). Related paper: Saxena, A., Goebel, K., Simon, D., & Eklund, N. (2008). Damage Propagation Modeling for Aircraft Engine Run-to-Failure Simulation. International Conference on Prognostics and Health Management (PHM08).",
+  "license": "U.S. government / NASA Ames PCoE public research data (public domain in the U.S.; attribute Saxena & Goebel 2008). Zenodo mirror redistributes the same archive.",
+  "description": "Covariate RUL. This bundle forecasts `remaining_useful_life` from `op_setting_1`,`op_setting_2`,`op_setting_3`,`T24`,`P30`,`Nf`. Source: NASA C-MAPSS / PCoE turbofan degradation simulation (Saxena & Goebel 2008); pipeline download = Zenodo https://zenodo.org/records/15346912/files/CMAPSSData.zip?download=1. Exemplar longest unit only; hourly cadence via cycle\u2192hour mapping; 543 rows; 2020-01-01T00:00:00Z..2020-01-23T14:00:00Z. Windows: context_window=168, forecast_horizon=14. C-MAPSS is the PHM community gold-standard for remaining useful life benchmarking.",
+  "preprocessing": [
+    "1. download_cmapss.py: GET Zenodo record 15346912 CMAPSSData.zip \u2192 data/maintenance/cmapss/raw/; unzip to CMAPSSData/.",
+    "2. transform_cmapss.py: read train_FD004.txt (whitespace-separated) with the same 26-column C-MAPSS layout.",
+    "3. FD004 = six operating conditions + two fault modes (hardest C-MAPSS subset).",
+    "4. Select the longest run-to-failure unit by max(cycle) as the TempusBench exemplar trajectory.",
+    "5. remaining_useful_life = max_cycle - cycle; failure_probability_14d = 1.0 iff RUL <= 14.",
+    "6. Drop near-constant sensors {T2, P2, P15, epr, farB, Nf_dmd, PCNfR_dmd}; retain informative sensors.",
+    "7. Centered rolling-median window=5 + clip to mean\u00b14\u03c3.",
+    "8. Synthetic UTC timestamps: 2020-01-01T00:00:00Z + (cycle-1) hours.",
+    "9. Write cmapss_fd004_unit*.parquet then TempusBench CSV (context_window=168, forecast_horizon=14)."
+  ]
+}

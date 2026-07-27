@@ -1,0 +1,16 @@
+{
+  "name": "Olist Daily Closed Deals",
+  "link": "https://www.kaggle.com/datasets/olistbr/marketing-funnel-olist",
+  "citation": "Olist. Marketing Funnel Dataset (seller MQLs & closed deals), Kaggle dataset olistbr/marketing-funnel-olist (https://www.kaggle.com/datasets/olistbr/marketing-funnel-olist). Real anonymized sample of ~8k Marketing Qualified Leads requesting contact 2017-06-01..2018-06-01 (see also olist/work-at-olist-marketing). Files: olist_marketing_qualified_leads_dataset.csv, olist_closed_deals_dataset.csv.",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) as published on the Kaggle dataset page \u2014 non-commercial use with attribution and share-alike.",
+  "description": "Covariate closed deals. This bundle forecasts `closed_deals` from `origin_organic_pct`, `origin_paid_search_pct`, `origin_social_pct`. Source: Kaggle olistbr/marketing-funnel-olist \u2014 daily cadence, 366 rows, 2017-06-01..2018-06-01. Windows: context_window=60, forecast_horizon=14. B2B seller-side acquisition for a Brazilian retail marketplace. Covariate task uses same-day lead-origin mix (organic / paid search / social) only.",
+  "preprocessing": [
+    "1. download_olist.py: `python -m kaggle datasets download -d olistbr/marketing-funnel-olist` \u2192 data/marketing/olist/raw/ (or manual drop of the two CSVs).",
+    "2. transform_olist.py: new_leads = count of MQLs grouped by first_contact_date (UTC day).",
+    "3. Left-join closed deals on mql_id; closed_deals = count of rows with non-null won_date grouped by won_date (calendar counts, not cohort conversion rates).",
+    "4. Daily origin mix from MQL.origin: organic_search \u2192 origin_organic_pct, paid_search \u2192 origin_paid_search_pct, social \u2192 origin_social_pct (percent of that day's leads).",
+    "5. Outer-merge leads + closes; reindex daily calendar 2017-06-01..2018-06-01; fill empty days with 0.",
+    "6. No engineered lag features (prior 7-day lead lag removed by design).",
+    "7. Write olist_funnel_daily.parquet (366 rows) then TempusBench CSV (context_window=60, forecast_horizon=14)."
+  ]
+}

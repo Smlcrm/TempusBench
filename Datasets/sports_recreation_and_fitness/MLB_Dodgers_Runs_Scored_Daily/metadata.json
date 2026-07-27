@@ -1,0 +1,21 @@
+{
+  "name": "MLB Dodgers runs scored per game (offense), 2024 daily",
+  "link": "https://www.retrosheet.org/gamelogs/",
+  "citation": "MLB Dodgers runs scored per game (offense), 2024 daily. Data obtained from Retrosheet 2024 game logs (gl2024.zip), www.retrosheet.org/gamelogs/. The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact Retrosheet at www.retrosheet.org.",
+  "license": "Retrosheet \u2014 free to use with attribution (non-commercial); see https://www.retrosheet.org/notice.txt",
+  "description": "Per-game runs scored by the 2024 Los Angeles Dodgers offense, with a covariate panel of same-game offensive box-score counts. Application: run-production forecasting (\"how many runs will we score?\"). Target = runs scored.",
+  "preprocessing": [
+    "1. Per-game Dodgers 2024 box-score series extracted from Retrosheet game logs; one value per game.",
+    "2. Reshaped to TempusBench long format: one row per variable with columns variable_name, variable_unit, timestamps, values.",
+    "3. Games re-indexed to consecutive daily dates; timestamps emitted as ISO-8601 UTC strings (00:00:00Z), shared across all variables.",
+    "4. Variable and unit names written in plain English (spaces, no underscores); the target_ prefix dropped. No calendar/time-feature covariates are included \u2014 the only notion of time is the shared timestamps list.",
+    "5. runs scored (target, runs): Runs scored by the Dodgers (per game)",
+    "6. hits (covariate, hits): Hits by the Dodgers (per game)",
+    "7. doubles (covariate, doubles): Doubles by the Dodgers (per game)",
+    "8. home runs (covariate, home runs): Home runs by the Dodgers (per game)",
+    "9. walks (covariate, walks): Walks drawn by the Dodgers (per game)",
+    "10. strikeouts (covariate, strikeouts): Strikeouts by Dodgers batters (per game)",
+    "11. stolen bases (covariate, stolen bases): Stolen bases by the Dodgers (per game)",
+    "12. left on base (covariate, runners): Runners left on base by the Dodgers (per game)"
+  ]
+}

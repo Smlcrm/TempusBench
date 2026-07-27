@@ -1,0 +1,22 @@
+{
+  "name": "CAISO \u2014 hourly utility-scale solar & wind generation, system load, DA price, weather & calendar \u2014 CAISO hourly solar PV generation for day-ahead market bidding (known-future NWP covariates) (covariate forecasting bundle)",
+  "link": "http://oasis.caiso.com/oasisapi/SingleZip?queryname=SLD_REN_FCST&market_run_id=ACTUAL&version=1",
+  "citation": "CAISO (http://oasis.caiso.com/oasisapi/SingleZip?queryname=SLD_REN_FCST&market_run_id=ACTUAL&version=1); Open-Meteo Historical Weather API (https://archive-api.open-meteo.com/v1/archive); python stdlib zoneinfo (n/a)",
+  "license": "CAISO OASIS: public postings (attribution). Open-Meteo: CC-BY 4.0 (non-commercial free tier).",
+  "description": "CAISO hourly solar PV generation for day-ahead market bidding (known-future NWP covariates). This bundle forecasts `caiso_solar_generation` from a covariate panel of global_horizontal_irradiance, air_temperature, cloud_cover, wind_speed, hour_of_day, day_of_week. Source dataset 'CAISO \u2014 hourly utility-scale solar & wind generation, system load, DA price, weather & calendar' \u2014 hourly cadence, 26245 rows, 2023-07-01T07:00:00Z..2026-07-01T06:00:00Z (ISO-8601 UTC). NON-EIA (the forecasting model is trained on EIA data, so EIA inputs are excluded): NONE of these are EIA. solar_gen_mw is REAL metered/actual solar generation published by CAISO (the California grid operator) via its OASIS SLD_REN_FCST ACTUAL report \u2014 it is a legitimate utility-scale PV output series, NOT a physics proxy and NOT fabricated. Wind, load and price are likewise CAISO OASIS actuals/day-ahead postings. Open-Meteo weather is ERA5 reanalysis from ECMWF/Copernicus. No series is sourced from or derived from eia.gov.",
+  "preprocessing": [
+    "1. Loop over three monthly windows (2026-04, 2026-05, 2026-06; CAISO caps a SingleZip call at ~31 days). startdatetime/enddatetime pinned to 07:00 UTC = 00:00 PDT so windows tile cleanly.",
+    "2. For each window GET CAISO OASIS SingleZip queryname=SLD_REN_FCST&market_run_id=ACTUAL, follow the 302 redirect, save the ZIP under datasets/raw/, and parse the XML REPORT_DATA rows (with sleeps + retries for throttling).",
+    "3. Convert INTERVAL_START_GMT (UTC) to naive America/Los_Angeles local hours. Sum RENEW_FCST_ACT_MW across the three trading hubs (NP15,SP15,ZP26) per hour: RENEWABLE_TYPE=Solar -> solar_gen_mw, Wind -> wind_gen_mw.",
+    "4. Clip generation lower bound to 0 (small nightly auxiliary-load negatives, ~-50 MW vs ~19 GW peak, are not physical PV/wind output).",
+    "5. GET SLD_FCST&market_run_id=ACTUAL per window; keep RESOURCE_NAME=='CA ISO-TAC' (CAISO system total) -> load_mw (hourly).",
+    "6. GET PRC_LMP&market_run_id=DAM&node=TH_SP15_GEN-APND per window; keep DATA_ITEM=='LMP_PRC' (total LMP) -> price (hourly day-ahead).",
+    "7. Pull Open-Meteo ERA5 hourly weather (shortwave_radiation=GHI, temperature_2m, cloud_cover, wind_speed_10m) for the CAISO solar-fleet point (Kern County 35.29,-119.01) with timezone=America/Los_Angeles so its naive-local hours align 1:1 with CAISO.",
+    "8. Inner-join solar + wind + load + price + weather on the hourly local timestamp (keeps only fully-observed hours).",
+    "9. Add known-future calendar covariates hour, dow. Reorder columns to ts, target, grid covariates, weather covariates, calendar.",
+    "10. Time-interpolate residual gaps up to 3h; drop any remaining NaN rows. Write wide CSV sorted by ts.",
+    "11. EXTENDED 2026-07: history pulled back to 2023-07-01 (3 years) from the same NON-EIA grid-operator + Open-Meteo sources; series rebuilt on a UTC hourly index (DST-safe); timestamps emitted as ISO-8601 UTC.",
+    "12. Dropped calendar/time-derived variables (hour_of_day, day_of_week) so the only notion of time retained is the shared timestamps list.",
+    "13. Renamed all variable names and units from snake_case codes to plain English (CSV row/column structure unchanged). Name and unit mapping \u2014 caiso_solar_generation [MW] -> \"CAISO solar generation\" [megawatts] (target; CAISO actual utility-scale solar PV generation); global_horizontal_irradiance [W/m\u00b2] -> \"global horizontal irradiance\" [watts per square meter] (covariate; downward shortwave solar radiation (GHI)); air_temperature [\u00b0C] -> \"air temperature\" [degrees Celsius] (covariate; 2 m air temperature); cloud_cover [%] -> \"cloud cover\" [percent] (covariate; total cloud cover); wind_speed [km/h] -> \"wind speed\" [kilometers per hour] (covariate; 10 m wind speed)."
+  ]
+}

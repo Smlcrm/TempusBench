@@ -1,0 +1,17 @@
+{
+  "name": "SplitSmart: An Open Dataset for Enabling Research in Energy-Efficient Ductless-Split Air Conditioner",
+  "link": "https://catalog.data.gov/dataset/splitsmart-an-open-dataset-for-enabling-research-in-energy-efficient-ductless-split-air-co",
+  "citation": "Kaushik, K. (2023). SplitSmart: An Open Dataset for Enabling Research in Energy-Efficient Ductless-Split Air Conditioner [Data set]. Data.gov.",
+  "license": "CC BY 4.0",
+  "description": "IoT sensor data collected over four years from ductless-split AC units in a living lab setting at BITS Pilani. It combines electrical consumption metrics (power factor, voltage, current) with environmental factors (internal/external temperature, humidity) to facilitate machine learning research in optimizing HVAC energy efficiency and reducing carbon footprints.",
+  "preprocessing": [
+    "1. Load dataA200AC03.csv (device A200AC03, room A200 third AC unit).",
+    "2. Kept columns: Time_Stamp + Current, voltage, Power_Factor, Real_Power, room_temp, External_temp, Humidity, unit_consumption.",
+    "3. Removed metadata/group columns: _id, Device_ID, _updated, _created, _etag.",
+    "4. Rename Time_Stamp to timestamps (UTC).",
+    "5. Frequency check (special): median interval ~121s (~2 min, not 1 min); floor timestamps to 2min; freq=2min.",
+    "6. Fill missing (special): drop duplicate timestamps; reindex to strict 2min grid; missing steps NaN.",
+    "7. Transform: 8 variates (Current, voltage, Power_Factor, Real_Power, room_temp, External_temp, Humidity, unit_consumption); variable_unit blank per variate.",
+    "8. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

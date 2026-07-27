@@ -1,0 +1,14 @@
+{
+  "name": "LA Port Container Throughput",
+  "link": "https://catalog.data.gov/dataset/port-of-los-angeles-teu-counts-monthly-and-calendar-ytd",
+  "citation": "Port of Los Angeles / City of Los Angeles. \"Port of Los Angeles - TEU Counts Monthly and Calendar YTD.\" data.lacity.org, 2020. Covariate: U.S. Census Bureau, \"Advance Retail Sales: Retail and Food Services (RSAFS),\" retrieved from FRED, Federal Reserve Bank of St. Louis.",
+  "license": "Public domain (City of Los Angeles open data; U.S. Census Bureau / FRED public-domain series).",
+  "description": "Monthly total container throughput in twenty-foot equivalent units (TEU) at the Port of Los Angeles, 2009-01 to 2016-09, with U.S. advance retail sales as a leading external covariate. Strong annual peak-season seasonality. Application: port/terminal capacity and drayage planning.\n\nCovariate glossary:\n- container throughput teu: total monthly container throughput at the Port of Los Angeles, twenty-foot equivalent units per month (target).\n- retail sales: U.S. advance retail & food-services sales, seasonally adjusted, USD millions (FRED RSAFS); a leading indicator of import container demand.",
+  "preprocessing": [
+    "1. Loaded monthly Total TEUs from data.lacity.org (93 rows, 2009-01..2016-09).",
+    "2. Reindexed to a complete monthly grid; linearly interpolated the few missing 2016 months.",
+    "3. Joined U.S. advance retail sales (FRED RSAFS) on year-month as an external leading covariate.",
+    "4. Removed month-of-year Fourier helper columns; single shared time index only.",
+    "5. Suggested split: context_window=71, forecast_horizon=12."
+  ]
+}

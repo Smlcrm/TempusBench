@@ -1,0 +1,79 @@
+task:
+  task_name: MLB Dodgers Run Differential Daily
+  task_description: Daily forecasting of the 2024 Los Angeles Dodgers per-game run
+    differential from offensive and defensive box-score covariates.
+  context_window: 131
+  forecast_horizon: 30
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: sports_recreation_and_fitness
+  dataset_name: MLB_Dodgers_Run_Differential_Daily
+  target_variable_names:
+  - run differential
+  covariate_variable_names:
+  - hits
+  - home runs
+  - walks
+  - hits allowed
+  - home runs allowed
+  - walks allowed
+---
+task:
+  task_name: MLB Dodgers Runs Allowed Daily
+  task_description: Daily forecasting of the 2024 Los Angeles Dodgers per-game runs
+    allowed from opponent same-game batting covariates.
+  context_window: 131
+  forecast_horizon: 30
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: sports_recreation_and_fitness
+  dataset_name: MLB_Dodgers_Runs_Allowed_Daily
+  target_variable_names:
+  - runs allowed
+  covariate_variable_names:
+  - hits allowed
+  - home runs allowed
+  - walks allowed
+  - strikeouts pitched
+---
+task:
+  task_name: MLB Dodgers Runs Roll10 Daily
+  task_description: Daily forecasting of the 2024 Los Angeles Dodgers trailing 10-game
+    average runs scored from rolled offensive box-score covariates.
+  context_window: 131
+  forecast_horizon: 30
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: sports_recreation_and_fitness
+  dataset_name: MLB_Dodgers_Runs_Roll10_Daily
+  target_variable_names:
+  - 10-game rolling runs scored
+  covariate_variable_names:
+  - 10-game rolling hits
+  - 10-game rolling home runs
+  - 10-game rolling walks
+---
+task:
+  task_name: MLB Dodgers Runs Scored Daily
+  task_description: Daily forecasting of the 2024 Los Angeles Dodgers per-game runs
+    scored from same-game offensive box-score covariates.
+  context_window: 131
+  forecast_horizon: 30
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: sports_recreation_and_fitness
+  dataset_name: MLB_Dodgers_Runs_Scored_Daily
+  target_variable_names:
+  - runs scored
+  covariate_variable_names:
+  - hits
+  - doubles
+  - home runs
+  - walks
+  - strikeouts
+  - stolen bases
+  - left on base

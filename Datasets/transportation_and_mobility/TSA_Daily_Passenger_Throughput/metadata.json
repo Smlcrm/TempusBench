@@ -1,0 +1,13 @@
+{
+  "name": "TSA Daily Passenger Throughput",
+  "link": "https://www.tsa.gov/travel/passenger-volumes",
+  "citation": "U.S. Transportation Security Administration. \"TSA Checkpoint Travel Numbers.\" TSA.gov, 2021. CSV mirror: github.com/hunj/tsa-passenger-throughput. Covariates: U.S. Energy Information Administration via FRED, Federal Reserve Bank of St. Louis (jet fuel DJFUELUSGULF; WTI crude DCOILWTICO).",
+  "license": "U.S. Government public-domain data (TSA throughput; EIA energy prices redistributed via FRED). CSV mirror under MIT License. Free to use and redistribute.",
+  "description": "Daily count of travelers and crew screened at U.S. TSA airport security checkpoints, nationally, 2018-12-27 to 2021-12-26, spanning the 2020 COVID air-travel collapse and recovery. Strong weekly and annual (holiday) seasonality. Covariate version paired with daily energy-price drivers of airline operating cost. Application: airport staffing and passenger-flow planning.\n\nCovariate glossary:\n- tsa passenger throughput (passengers screened per day): total travelers and crew screened at U.S. TSA airport checkpoints nationally per day (target).\n- jet fuel price (USD per gallon): U.S. Gulf Coast kerosene-type jet fuel spot price, business-day series forward-filled onto the daily grid (FRED DJFUELUSGULF).\n- wti crude price (USD per barrel): West Texas Intermediate crude oil spot price, business-day series forward-filled onto the daily grid (FRED DCOILWTICO).",
+  "preprocessing": [
+    "1. Loaded daily national TSA checkpoint throughput from the tsa.gov GitHub mirror (headerless date,value).",
+    "2. Joined FRED daily energy prices (DJFUELUSGULF jet fuel; DCOILWTICO WTI crude) on date; business-day quotes forward-filled across weekends/holidays onto the every-day TSA grid.",
+    "3. Dropped calendar-derived helper columns; calendar position is carried by the single shared time index.",
+    "4. Suggested split: context_window=364, forecast_horizon=28 (held-out window includes the December holiday ramp)."
+  ]
+}

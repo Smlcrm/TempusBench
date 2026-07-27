@@ -1,0 +1,14 @@
+{
+  "name": "Online Retail Weekly Returns",
+  "link": "https://archive.ics.uci.edu/dataset/502/online+retail+ii",
+  "citation": "Chen, Daqing. \"Online Retail II.\" UCI Machine Learning Repository, 2019, doi:10.24432/C5CG6D. archive.ics.uci.edu/dataset/502/online+retail+ii.",
+  "license": "CC BY 4.0 (UCI Online Retail II).",
+  "description": "Weekly volume of returned items (units) for a UK online retailer, 2009-2011, derived from Online Retail II (returns = negative-quantity / cancellation line items), with lagged gross sales as the leading covariate (returns lag sales, so the lags are known at forecast time). Application: reverse-logistics and refund-processing capacity planning.\n\nCovariate glossary:\n- returns units (units): weekly returned-item volume (target).\n- sales units lag 1/2/4/8 (units): gross weekly sales volume, lagged 1/2/4/8 weeks.\n- sales value lag 1/2/4/8 (GBP): gross weekly sales value, lagged 1/2/4/8 weeks.",
+  "preprocessing": [
+    "1. Returns = negative-quantity / cancellation-invoice line items, summed to weekly (W-SUN) returned units.",
+    "2. Covariate: gross weekly sales (positive-quantity line items) lagged 1/2/4/8 weeks (returns lag sales).",
+    "3. Converted the wide (date-indexed) layout to the long-form TempusBench schema: variable_name, variable_unit, timestamps (shared ISO-8601 UTC array), values.",
+    "4. Dropped calendar-derived helper columns (week-of-year, month, is-January, is-Q4); a single shared time index carries calendar position.",
+    "5. Shipping-delay covariate unavailable (Project44 = paid enterprise) - documented gap."
+  ]
+}

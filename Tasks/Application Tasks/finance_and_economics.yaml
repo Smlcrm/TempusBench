@@ -1,0 +1,598 @@
+task:
+  task_name: Daily Euro Dollar Exchange Rate
+  task_description: Daily forecasting of the EUR/USD spot exchange rate for FX hedging
+    and risk management, with VIX, Brent crude, and 10-year Treasury-yield covariates.
+  context_window: 250
+  forecast_horizon: 20
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: finance_and_economics
+  dataset_name: Daily_Euro_Dollar_Exchange_Rate
+  target_variable_names:
+  - eurusd
+  covariate_variable_names:
+  - vix
+  - brent
+  - ust10y
+---
+task:
+  task_name: 'FRED-QD: A Quarterly Database for Macroeconomic Research'
+  task_description: Engineered by the Federal Reserve Bank of St. Louis, this massive
+    econometric matrix harmonizes over 200 distinct quarterly time series into a single
+    dense panel. It categorizes macro indicators into 14 groups—including real GDP,
+    personal consumption, industrial production, labor markets, price indices, and
+    interest rates—making it the definitive benchmark for training and evaluating
+    large-scale "big data" forecasting algorithms.
+  context_window: 128
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: finance_and_economics
+  dataset_name: Quarterly_FRED_GDP
+  target_variable_names:
+  - FRED series GDPC1
+  covariate_variable_names:
+  - FRED series PCECC96
+  - FRED series PCDGx
+  - FRED series PCESVx
+  - FRED series PCNDx
+  - FRED series GPDIC1
+  - FRED series FPIx
+  - FRED series Y033RC1Q027SBEAx
+  - FRED series PNFIx
+  - FRED series PRFIx
+  - FRED series A014RE1Q156NBEA
+  - FRED series GCEC1
+  - FRED series A823RL1Q225SBEA
+  - FRED series FGRECPTx
+  - FRED series SLCEx
+  - FRED series EXPGSC1
+  - FRED series IMPGSC1
+  - FRED series DPIC96
+  - FRED series OUTNFB
+  - FRED series OUTBS
+  - FRED series OUTMS
+  - FRED series INDPRO
+  - FRED series IPFINAL
+  - FRED series IPCONGD
+  - FRED series IPMAT
+  - FRED series IPDMAT
+  - FRED series IPNMAT
+  - FRED series IPDCONGD
+  - FRED series IPB51110SQ
+  - FRED series IPNCONGD
+  - FRED series IPBUSEQ
+  - FRED series IPB51220SQ
+  - FRED series TCU
+  - FRED series CUMFNS
+  - FRED series PAYEMS
+  - FRED series USPRIV
+  - FRED series MANEMP
+  - FRED series SRVPRD
+  - FRED series USGOOD
+  - FRED series DMANEMP
+  - FRED series NDMANEMP
+  - FRED series USCONS
+  - FRED series USEHS
+  - FRED series USFIRE
+  - FRED series USINFO
+  - FRED series USPBS
+  - FRED series USLAH
+  - FRED series USSERV
+  - FRED series USMINE
+  - FRED series USTPU
+  - FRED series USGOVT
+  - FRED series USTRADE
+  - FRED series USWTRADE
+  - FRED series CES9091000001
+  - FRED series CES9092000001
+  - FRED series CES9093000001
+  - FRED series CE16OV
+  - FRED series CIVPART
+  - FRED series UNRATE
+  - FRED series UNRATESTx
+  - FRED series UNRATELTx
+  - FRED series LNS14000012
+  - FRED series LNS14000025
+  - FRED series LNS14000026
+  - FRED series UEMPLT5
+  - FRED series UEMP5TO14
+  - FRED series UEMP15T26
+  - FRED series UEMP27OV
+  - FRED series LNS13023621
+  - FRED series LNS13023557
+  - FRED series LNS13023705
+  - FRED series LNS13023569
+  - FRED series LNS12032194
+  - FRED series HOABS
+  - FRED series HOAMS
+  - FRED series HOANBS
+  - FRED series AWHMAN
+  - FRED series AWHNONAG
+  - FRED series AWOTMAN
+  - FRED series HWIx
+  - FRED series HOUST
+  - FRED series HOUST5F
+  - FRED series PERMIT
+  - FRED series HOUSTMW
+  - FRED series HOUSTNE
+  - FRED series HOUSTS
+  - FRED series HOUSTW
+  - FRED series CMRMTSPLx
+  - FRED series RSAFSx
+  - FRED series AMDMNOx
+  - FRED series ACOGNOx
+  - FRED series AMDMUOx
+  - FRED series ANDENOx
+  - FRED series INVCQRMTSPL
+  - FRED series PCECTPI
+  - FRED series PCEPILFE
+  - FRED series GDPCTPI
+  - FRED series GPDICTPI
+  - FRED series IPDBS
+  - FRED series DGDSRG3Q086SBEA
+  - FRED series DDURRG3Q086SBEA
+  - FRED series DSERRG3Q086SBEA
+  - FRED series DNDGRG3Q086SBEA
+  - FRED series DHCERG3Q086SBEA
+  - FRED series DMOTRG3Q086SBEA
+  - FRED series DFDHRG3Q086SBEA
+  - FRED series DREQRG3Q086SBEA
+  - FRED series DODGRG3Q086SBEA
+  - FRED series DFXARG3Q086SBEA
+  - FRED series DCLORG3Q086SBEA
+  - FRED series DGOERG3Q086SBEA
+  - FRED series DONGRG3Q086SBEA
+  - FRED series DHUTRG3Q086SBEA
+  - FRED series DHLCRG3Q086SBEA
+  - FRED series DTRSRG3Q086SBEA
+  - FRED series DRCARG3Q086SBEA
+  - FRED series DFSARG3Q086SBEA
+  - FRED series DIFSRG3Q086SBEA
+  - FRED series DOTSRG3Q086SBEA
+  - FRED series CPIAUCSL
+  - FRED series CPILFESL
+  - FRED series WPSFD49207
+  - FRED series PPIACO
+  - FRED series WPSFD49502
+  - FRED series WPSFD4111
+  - FRED series PPIIDC
+  - FRED series WPSID61
+  - FRED series WPU0531
+  - FRED series WPU0561
+  - FRED series OILPRICEx
+  - FRED series AHETPIx
+  - FRED series CES2000000008x
+  - FRED series CES3000000008x
+  - FRED series COMPRMS
+  - FRED series COMPRNFB
+  - FRED series RCPHBS
+  - FRED series OPHMFG
+  - FRED series OPHNFB
+  - FRED series OPHPBS
+  - FRED series ULCBS
+  - FRED series ULCMFG
+  - FRED series ULCNFB
+  - FRED series UNLPNBS
+  - FRED series FEDFUNDS
+  - FRED series TB3MS
+  - FRED series TB6MS
+  - FRED series GS1
+  - FRED series GS10
+  - FRED series MORTGAGE30US
+  - FRED series AAA
+  - FRED series BAA
+  - FRED series BAA10YM
+  - FRED series MORTG10YRx
+  - FRED series TB6M3Mx
+  - FRED series GS1TB3Mx
+  - FRED series GS10TB3Mx
+  - FRED series CPF3MTB3Mx
+  - FRED series BOGMBASEREALx
+  - FRED series M1REAL
+  - FRED series M2REAL
+  - FRED series BUSLOANSx
+  - FRED series CONSUMERx
+  - FRED series NONREVSLx
+  - FRED series REALLNx
+  - FRED series REVOLSLx
+  - FRED series TOTALSLx
+  - FRED series DRIWCIL
+  - FRED series TABSHNOx
+  - FRED series TLBSHNOx
+  - FRED series LIABPIx
+  - FRED series TNWBSHNOx
+  - FRED series NWPIx
+  - FRED series TARESAx
+  - FRED series HNOREMQ027Sx
+  - FRED series TFAABSHNOx
+  - FRED series VIXCLSx
+  - FRED series USSTHPI
+  - FRED series SPCS10RSA
+  - FRED series SPCS20RSA
+  - FRED series TWEXAFEGSMTHx
+  - FRED series EXUSEU
+  - FRED series EXSZUSx
+  - FRED series EXJPUSx
+  - FRED series EXUSUKx
+  - FRED series EXCAUSx
+  - FRED series UMCSENTx
+  - FRED series USEPUINDXM
+  - FRED series B020RE1Q156NBEA
+  - FRED series B021RE1Q156NBEA
+  - FRED series GFDEGDQ188S
+  - FRED series GFDEBTNx
+  - FRED series IPMANSICS
+  - FRED series IPB51222S
+  - FRED series IPFUELS
+  - FRED series UEMPMEAN
+  - FRED series CES0600000007
+  - FRED series TOTRESNS
+  - FRED series NONBORRES
+  - FRED series GS5
+  - FRED series TB3SMFFM
+  - FRED series T5YFFM
+  - FRED series AAAFFM
+  - FRED series WPSID62
+  - FRED series PPICMM
+  - FRED series CPIAPPSL
+  - FRED series CPITRNSL
+  - FRED series CPIMEDSL
+  - FRED series CUSR0000SAC
+  - FRED series CUSR0000SAD
+  - FRED series CUSR0000SAS
+  - FRED series CPIULFSL
+  - FRED series CUSR0000SA0L2
+  - FRED series CUSR0000SA0L5
+  - FRED series CES0600000008
+  - FRED series DTCOLNVHFNM
+  - FRED series DTCTHFNM
+  - FRED series INVEST
+  - FRED series HWIURATIOx
+  - FRED series CLAIMSx
+  - FRED series BUSINVx
+  - FRED series ISRATIOx
+  - FRED series CONSPIx
+  - FRED series CP3M
+  - FRED series COMPAPFF
+  - FRED series PERMITNE
+  - FRED series PERMITMW
+  - FRED series PERMITS
+  - FRED series PERMITW
+  - FRED series NIKKEI225
+  - FRED series NASDAQCOM
+  - FRED series CUSR0000SEHC
+  - FRED series TLBSNNCBx
+  - FRED series TLBSNNCBBDIx
+  - FRED series TTAABSNNCBx
+  - FRED series TNWMVBSNNCBx
+  - FRED series TNWMVBSNNCBBDIx
+  - FRED series TLBSNNBx
+  - FRED series TLBSNNBBDIx
+  - FRED series TABSNNBx
+  - FRED series TNWBSNNBx
+  - FRED series TNWBSNNBBDIx
+  - FRED series CNCFx
+  - S and P 500
+  - S and P dividend yield
+  - S and P PE ratio
+---
+task:
+  task_name: 'FRED-QD: A Quarterly Database for Macroeconomic Research Multivariate'
+  task_description: Engineered by the Federal Reserve Bank of St. Louis, this massive
+    econometric matrix harmonizes over 200 distinct quarterly time series into a single
+    dense panel. It categorizes macro indicators into 14 groups—including real GDP,
+    personal consumption, industrial production, labor markets, price indices, and
+    interest rates—making it the definitive benchmark for training and evaluating
+    large-scale "big data" forecasting algorithms.
+  context_window: 128
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: finance_and_economics
+  dataset_name: Quarterly_FRED_QD_Multivariate
+  target_variable_names:
+  - FRED series A014RE1Q156NBEA
+  - FRED series A823RL1Q225SBEA
+  - FRED series AAA
+  - FRED series AAAFFM
+  - FRED series ACOGNOx
+  - FRED series AHETPIx
+  - FRED series AMDMNOx
+  - FRED series AMDMUOx
+  - FRED series ANDENOx
+  - FRED series AWHMAN
+  - FRED series AWHNONAG
+  - FRED series AWOTMAN
+  - FRED series B020RE1Q156NBEA
+  - FRED series B021RE1Q156NBEA
+  - FRED series BAA
+  - FRED series BAA10YM
+  - FRED series BOGMBASEREALx
+  - FRED series BUSINVx
+  - FRED series BUSLOANSx
+  - FRED series CE16OV
+  - FRED series CES0600000007
+  - FRED series CES0600000008
+  - FRED series CES2000000008x
+  - FRED series CES3000000008x
+  - FRED series CES9091000001
+  - FRED series CES9092000001
+  - FRED series CES9093000001
+  - FRED series CIVPART
+  - FRED series CLAIMSx
+  - FRED series CMRMTSPLx
+  - FRED series CNCFx
+  - FRED series COMPAPFF
+  - FRED series COMPRMS
+  - FRED series COMPRNFB
+  - FRED series CONSPIx
+  - FRED series CONSUMERx
+  - FRED series CP3M
+  - FRED series CPF3MTB3Mx
+  - FRED series CPIAPPSL
+  - FRED series CPIAUCSL
+  - FRED series CPILFESL
+  - FRED series CPIMEDSL
+  - FRED series CPITRNSL
+  - FRED series CPIULFSL
+  - FRED series CUMFNS
+  - FRED series CUSR0000SA0L2
+  - FRED series CUSR0000SA0L5
+  - FRED series CUSR0000SAC
+  - FRED series CUSR0000SAD
+  - FRED series CUSR0000SAS
+  - FRED series CUSR0000SEHC
+  - FRED series DCLORG3Q086SBEA
+  - FRED series DDURRG3Q086SBEA
+  - FRED series DFDHRG3Q086SBEA
+  - FRED series DFSARG3Q086SBEA
+  - FRED series DFXARG3Q086SBEA
+  - FRED series DGDSRG3Q086SBEA
+  - FRED series DGOERG3Q086SBEA
+  - FRED series DHCERG3Q086SBEA
+  - FRED series DHLCRG3Q086SBEA
+  - FRED series DHUTRG3Q086SBEA
+  - FRED series DIFSRG3Q086SBEA
+  - FRED series DMANEMP
+  - FRED series DMOTRG3Q086SBEA
+  - FRED series DNDGRG3Q086SBEA
+  - FRED series DODGRG3Q086SBEA
+  - FRED series DONGRG3Q086SBEA
+  - FRED series DOTSRG3Q086SBEA
+  - FRED series DPIC96
+  - FRED series DRCARG3Q086SBEA
+  - FRED series DREQRG3Q086SBEA
+  - FRED series DRIWCIL
+  - FRED series DSERRG3Q086SBEA
+  - FRED series DTCOLNVHFNM
+  - FRED series DTCTHFNM
+  - FRED series DTRSRG3Q086SBEA
+  - FRED series EXCAUSx
+  - FRED series EXJPUSx
+  - FRED series EXPGSC1
+  - FRED series EXSZUSx
+  - FRED series EXUSEU
+  - FRED series EXUSUKx
+  - FRED series FEDFUNDS
+  - FRED series FGRECPTx
+  - FRED series FPIx
+  - FRED series GCEC1
+  - FRED series GDPC1
+  - FRED series GDPCTPI
+  - FRED series GFDEBTNx
+  - FRED series GFDEGDQ188S
+  - FRED series GPDIC1
+  - FRED series GPDICTPI
+  - FRED series GS1
+  - FRED series GS10
+  - FRED series GS10TB3Mx
+  - FRED series GS1TB3Mx
+  - FRED series GS5
+  - FRED series HNOREMQ027Sx
+  - FRED series HOABS
+  - FRED series HOAMS
+  - FRED series HOANBS
+  - FRED series HOUST
+  - FRED series HOUST5F
+  - FRED series HOUSTMW
+  - FRED series HOUSTNE
+  - FRED series HOUSTS
+  - FRED series HOUSTW
+  - FRED series HWIURATIOx
+  - FRED series HWIx
+  - FRED series IMPGSC1
+  - FRED series INDPRO
+  - FRED series INVCQRMTSPL
+  - FRED series INVEST
+  - FRED series IPB51110SQ
+  - FRED series IPB51220SQ
+  - FRED series IPB51222S
+  - FRED series IPBUSEQ
+  - FRED series IPCONGD
+  - FRED series IPDBS
+  - FRED series IPDCONGD
+  - FRED series IPDMAT
+  - FRED series IPFINAL
+  - FRED series IPFUELS
+  - FRED series IPMANSICS
+  - FRED series IPMAT
+  - FRED series IPNCONGD
+  - FRED series IPNMAT
+  - FRED series ISRATIOx
+  - FRED series LIABPIx
+  - FRED series LNS12032194
+  - FRED series LNS13023557
+  - FRED series LNS13023569
+  - FRED series LNS13023621
+  - FRED series LNS13023705
+  - FRED series LNS14000012
+  - FRED series LNS14000025
+  - FRED series LNS14000026
+  - FRED series M1REAL
+  - FRED series M2REAL
+  - FRED series MANEMP
+  - FRED series MORTG10YRx
+  - FRED series MORTGAGE30US
+  - FRED series NASDAQCOM
+  - FRED series NDMANEMP
+  - FRED series NIKKEI225
+  - FRED series NONBORRES
+  - FRED series NONREVSLx
+  - FRED series NWPIx
+  - FRED series OILPRICEx
+  - FRED series OPHMFG
+  - FRED series OPHNFB
+  - FRED series OPHPBS
+  - FRED series OUTBS
+  - FRED series OUTMS
+  - FRED series OUTNFB
+  - FRED series PAYEMS
+  - FRED series PCDGx
+  - FRED series PCECC96
+  - FRED series PCECTPI
+  - FRED series PCEPILFE
+  - FRED series PCESVx
+  - FRED series PCNDx
+  - FRED series PERMIT
+  - FRED series PERMITMW
+  - FRED series PERMITNE
+  - FRED series PERMITS
+  - FRED series PERMITW
+  - FRED series PNFIx
+  - FRED series PPIACO
+  - FRED series PPICMM
+  - FRED series PPIIDC
+  - FRED series PRFIx
+  - FRED series RCPHBS
+  - FRED series REALLNx
+  - FRED series REVOLSLx
+  - FRED series RSAFSx
+  - S and P 500
+  - S and P PE ratio
+  - S and P dividend yield
+  - FRED series SLCEx
+  - FRED series SPCS10RSA
+  - FRED series SPCS20RSA
+  - FRED series SRVPRD
+  - FRED series T5YFFM
+  - FRED series TABSHNOx
+  - FRED series TABSNNBx
+  - FRED series TARESAx
+  - FRED series TB3MS
+  - FRED series TB3SMFFM
+  - FRED series TB6M3Mx
+  - FRED series TB6MS
+  - FRED series TCU
+  - FRED series TFAABSHNOx
+  - FRED series TLBSHNOx
+  - FRED series TLBSNNBBDIx
+  - FRED series TLBSNNBx
+  - FRED series TLBSNNCBBDIx
+  - FRED series TLBSNNCBx
+  - FRED series TNWBSHNOx
+  - FRED series TNWBSNNBBDIx
+  - FRED series TNWBSNNBx
+  - FRED series TNWMVBSNNCBBDIx
+  - FRED series TNWMVBSNNCBx
+  - FRED series TOTALSLx
+  - FRED series TOTRESNS
+  - FRED series TTAABSNNCBx
+  - FRED series TWEXAFEGSMTHx
+  - FRED series UEMP15T26
+  - FRED series UEMP27OV
+  - FRED series UEMP5TO14
+  - FRED series UEMPLT5
+  - FRED series UEMPMEAN
+  - FRED series ULCBS
+  - FRED series ULCMFG
+  - FRED series ULCNFB
+  - FRED series UMCSENTx
+  - FRED series UNLPNBS
+  - FRED series UNRATE
+  - FRED series UNRATELTx
+  - FRED series UNRATESTx
+  - FRED series USCONS
+  - FRED series USEHS
+  - FRED series USEPUINDXM
+  - FRED series USFIRE
+  - FRED series USGOOD
+  - FRED series USGOVT
+  - FRED series USINFO
+  - FRED series USLAH
+  - FRED series USMINE
+  - FRED series USPBS
+  - FRED series USPRIV
+  - FRED series USSERV
+  - FRED series USSTHPI
+  - FRED series USTPU
+  - FRED series USTRADE
+  - FRED series USWTRADE
+  - FRED series VIXCLSx
+  - FRED series WPSFD4111
+  - FRED series WPSFD49207
+  - FRED series WPSFD49502
+  - FRED series WPSID61
+  - FRED series WPSID62
+  - FRED series WPU0531
+  - FRED series WPU0561
+  - FRED series Y033RC1Q027SBEAx
+  covariate_variable_names: []
+---
+task:
+  task_name: US Monthly Consumer Price Index
+  task_description: Monthly nowcasting of the U.S. CPI-U index for inflation monitoring,
+    with WTI crude and producer-price-index covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: finance_and_economics
+  dataset_name: US_Monthly_Consumer_Price_Index
+  target_variable_names:
+  - cpi
+  covariate_variable_names:
+  - wti
+  - ppi
+---
+task:
+  task_name: US Weekly Jobless Claims
+  task_description: Weekly nowcasting of U.S. initial unemployment-insurance claims
+    for labor-market monitoring, with continued claims as covariate.
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: finance_and_economics
+  dataset_name: US_Weekly_Jobless_Claims
+  target_variable_names:
+  - initial claims
+  covariate_variable_names:
+  - continued claims
+---
+task:
+  task_name: Federal Funds Effective Rate
+  task_description: The federal funds rate is the interest rate at which depository
+    institutions trade federal funds (balances held at Federal Reserve Banks) with
+    each other overnight. When a depository institution has surplus balances in its
+    reserve account, it lends to other banks in need of larger balances. In simpler
+    terms, a bank with excess cash, which is often referred to as liquidity, will
+    lend to another bank that needs to quickly raise liquidity. The weighted average
+    rate for these overnight negotiations is the effective federal funds rate. The
+    Federal Open Market Committee (FOMC) sets a target for the federal funds rate
+    and influences it through open market operations.
+  context_window: 1024
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: finance_and_economics
+  dataset_name: Weekly_Federal_Funds_Effective_Rate
+  target_variable_names:
+  - federal funds effective rate United States
+  covariate_variable_names: []

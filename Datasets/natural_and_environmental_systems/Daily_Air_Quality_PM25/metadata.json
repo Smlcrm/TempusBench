@@ -1,0 +1,29 @@
+{
+  "name": "covariate_environment_daily_air_quality_pm25",
+  "link": [
+    "https://aqs.epa.gov/aqsweb/airdata/download_files.html"
+  ],
+  "citation": [
+    "US EPA Air Quality System (AQS) AirData",
+    "Open-Meteo ERA5 archive"
+  ],
+  "license": {
+    "epa_aqs": "US Government public domain (EPA AirData, unrestricted public use)",
+    "open_meteo": "CC-BY 4.0 (Open-Meteo); ERA5 data (C) Copernicus Climate Change Service"
+  },
+  "description": "e2-air-quality \u2014 'PM2.5 concentration' forecasting bundle. Native cadence daily; 1818 timesteps 2019-01-01..2023-12-31. Non-EIA sources. Known-future covariates: Wind speed, Wind direction, Mean air temperature, Relative humidity, Precipitation, Surface pressure, Boundary layer height. NO contemporaneous covariates \u2014 all covariates enter as past values only; known-future covariates (weather forecasts, scheduled budgets/releases) are genuinely available at forecast time. Timestamp-derived calendar features are NOT included \u2014 time information is carried only by the timestamps column.",
+  "preprocessing": [
+    "1. Download EPA AQS AirData bulk daily PM2.5 (88101) yearly ZIPs 2019-2024 to datasets/raw/e2/ (cached, no re-pull).",
+    "2. Filter each yearly CSV to State=06 County=001 Site=0009, Sample Duration '1 HOUR' (continuous daily means).",
+    "3. Deduplicate per date (prefer Event Type Included>None>Excluded; primary/lowest POC); build daily PM2.5 = Arithmetic Mean.",
+    "4. Clean PM2.5: drop negative and implausible (>900 ug/m3) values, dedup by date.",
+    "5. Pull Open-Meteo ERA5 HOURLY meteorology at site lat/lon, timezone America/Los_Angeles, 2019-01-01..2024-12-31 (7 vars).",
+    "6. Aggregate hourly->daily: means (temp, RH, wind speed, pressure, PBL height), precipitation sum, wind direction circular (unit-vector) mean.",
+    "7. Reindex PM2.5 to full daily grid; linearly interpolate ONLY interior single-day gaps; leave multi-day gaps NaN.",
+    "8. Renamed raw source fields to human-readable: EPA AQS 'Arithmetic Mean' (parameter 88101)->PM2.5 concentration, Open-Meteo temperature_2m->Mean air temperature, relative_humidity_2m->Relative humidity, precipitation->Precipitation, surface_pressure->Surface pressure, boundary_layer_height->Boundary layer height (Wind speed and Wind direction kept their Open-Meteo names, aggregated hourly->daily), EPA 'Date Local'->weekday/is_weekend (derived).",
+    "9. Inner-join PM2.5 + daily meteorology on local date (YYYY-MM-DD); drop days without a target.",
+    "10. Derive calendar known-future features (weekday, is_weekend); write CSV + meta.",
+    "11. Trimmed to 2019-01-01..2023-12-31: boundary_layer_height had a genuine Open-Meteo ERA5 archive gap over 2024-01-01..2024-06-29 (178 days); trimmed rather than drop the PBL covariate or fabricate. Retains the Sep-2020 wildfire spike.",
+    "12. Reformatted wide -> TempusBench long (variable_name, variable_unit, timestamps, values); variable names are human-readable English; timestamp-derived calendar features dropped (time lives only in the timestamps column); timestamps ISO-8601 UTC-labelled, shared across variables; missing -> null; CSV-writer quoted."
+  ]
+}

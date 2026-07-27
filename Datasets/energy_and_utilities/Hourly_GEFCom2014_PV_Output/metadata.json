@@ -1,0 +1,13 @@
+{
+  "name": "GEFCom2014 Solar PV Plant Output",
+  "link": "https://www.dropbox.com/s/pqenrr2mcvl0hk9/GEFCom2014.zip",
+  "citation": "GEFCom2014 Solar Track. Utility-scale PV plant Zone 1, Australia. ECMWF weather covariates.",
+  "license": "GEFCom2014 competition data (research use)",
+  "description": "Hourly capacity-normalized solar PV output (Zone 1) with GHI, temperature, cloud cover, wind speed.",
+  "preprocessing": [
+    "1. Source: GEFCom2014.zip, Solar Task 15.",
+    "2. Filtered to ZONEID=1.",
+    "3. Derived GHI from SSRD hourly increments; temp from 2m K; wind from 10m U/V.",
+    "4. Frequency: hourly UTC. 5 variates (1 target + 4 covariates)."
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "US Annual Live Births",
+  "link": "https://data.cdc.gov/resource/89yk-m38d",
+  "citation": "U.S. Centers for Disease Control and Prevention, NCHS. \"Natality Measures for Females by Race and Hispanic Origin: United States.\" data.cdc.gov/resource/89yk-m38d. Accessed 15 July 2026.",
+  "license": "U.S. federal public data (CDC NCHS natality; FRED/Federal Reserve Bank of St. Louis). Free to use and redistribute.",
+  "description": "Annual U.S. live births (all races), 1960-2018, with annual macro covariates. Application: OB/maternity-ward and K-12 school-capacity planning. Covariate glossary:\n- live births: total U.S. live births per year, NCHS natality measures (89yk-m38d).\n- us unemployment rate annual: annual-mean U.S. unemployment rate, percent (FRED UNRATE).\n- us house price index: annual-mean Case-Shiller U.S. National Home Price Index, Jan-2000=100 (FRED CSUSHPINSA); back-filled constant pre-1987 (series start).",
+  "preprocessing": [
+    "1. Pulled target from the cited open-data API (Socrata/CDC).",
+    "2. Aligned FRED macro covariates (UNRATE, CSUSHPINSA) onto the target's annual time index by calendar-year mean.",
+    "3. Back-filled the Case-Shiller index with a constant prior to 1987 (series start); births are annual and required no aggregation.",
+    "4. Forward/back-filled sparse covariate gaps; dropped provisional/partial tail periods.",
+    "5. Single shared ISO-8601 time index; no calendar columns."
+  ]
+}

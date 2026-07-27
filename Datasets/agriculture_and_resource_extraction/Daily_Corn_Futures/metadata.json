@@ -1,0 +1,24 @@
+{
+  "name": "Agriculture \u2014 cbot_corn_front_month_settlement covariate forecasting bundle (daily)",
+  "link": "ZC=F",
+  "citation": "Yahoo Finance (yfinance); Open-Meteo Archive API (ERA5)",
+  "license": "Yahoo Finance data for personal/research use (Yahoo ToS); Open-Meteo data CC-BY 4.0 (ERA5 reanalysis via Copernicus).",
+  "description": "Non-EIA, non-benchmark commodity/weather sources: CBOT front-month futures (Yahoo) and ERA5 reanalysis weather (Open-Meteo). Not derived from any known forecasting-benchmark corpus, so not a contaminating training source. Long-format TempusBench bundle for application 'covariate_agriculture_daily_corn_futures'. Target 'cbot_corn_front_month_settlement' forecast from 5 covariates. daily cadence, 2890 timesteps, 2015-01-02..2026-07-07. NON-EIA (the foundation model is EIA-trained, so EIA sources are excluded). eia_derived=false.",
+  "preprocessing": [
+    "1. Pull daily OHLCV for ZC=F, ZS=F, ZW=F, CL=F from yfinance (auto_adjust=True), keep 'Close'.",
+    "2. Normalize each series to naive daily DatetimeIndex, drop NaN, dedupe.",
+    "3. Inner-join the four futures on shared trading dates -> base trading-day index.",
+    "4. Cap the trading index at today-7 (ERA5 archive lag).",
+    "5. Pull Open-Meteo archive daily temperature_2m_mean + precipitation_sum at Des Moines IA (41.59,-93.62), America/Chicago tz.",
+    "6. Interpolate small (<=3) internal gaps in the continuous weather series; edge-fill.",
+    "7. Left-join weather onto the trading-day index (every trading day gets weather).",
+    "8. Interpolate any residual weather gaps on the trading grid, then ffill/bfill.",
+    "9. Derive calendar covariates dow (0=Mon..4=Fri) and month_num (1-12) from the date.",
+    "10. Order columns date,targets,covariates; round; assert monotonic/unique/zero-NaN; write CSV.",
+    "11. Reformatted wide->long TempusBench (variable_name, variable_unit, timestamps, values); timestamps ISO-8601 UTC; variable names expanded; missing->null; values round-trip-verified against source.",
+    "12. Removed calendar/time covariates (day_of_week, month_of_year) from the CSV so the only representation of time is the shared 'timestamps' column.",
+    "13. Variable names are written in plain English (underscores replaced with spaces). Target \u2014 'cbot corn front month settlement' (from source column 'corn_close', unit: cents/bushel). Covariates \u2014 'cbot soybeans front month settlement' (from source column 'soy_close', unit: cents/bushel); 'cbot wheat front month settlement' (from source column 'wheat_close', unit: cents/bushel); 'wti crude oil front month settlement' (from source column 'crude_close', unit: USD/barrel); 'daily mean temperature des moines ia' (from source column 'temp_mean_c', unit: degrees Celsius); 'daily precipitation des moines ia' (from source column 'precip_mm', unit: mm).",
+    "14. Added binary calendar covariates 'is weekend', 'is holiday' (0/1), derived deterministically from the shared 'timestamps' (weekend = Sat/Sun; holiday = US federal holidays). This series covers exchange trading days only, so 'is weekend' is all-zero and 'is holiday' near-zero (markets are closed those days) \u2014 near-constant here.",
+    "15. Removed the calendar covariates 'is weekend' and 'is holiday' from the delivered CSV."
+  ]
+}

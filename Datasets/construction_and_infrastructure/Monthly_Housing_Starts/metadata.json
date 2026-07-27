@@ -1,0 +1,19 @@
+{
+  "name": "covariate_construction_monthly_housing_starts",
+  "link": [
+    "https://fred.stlouisfed.org/graph/fredgraph.csv?id=HOUST"
+  ],
+  "citation": "FRED (US Census, BLS, Federal Reserve, IMF, LBMA)",
+  "license": "public domain / FRED terms of use",
+  "description": "c1-housing-starts \u2014 'Housing starts' forecasting bundle. Native cadence monthly; 437 timesteps 1990-01-01..2026-05-01. Non-EIA sources. Known-future covariates: none (all covariates are past-only). NO contemporaneous covariates \u2014 all covariates enter as past values only; known-future covariates (weather forecasts, scheduled budgets/releases) are genuinely available at forecast time. Timestamp-derived calendar features are NOT included \u2014 time information is carried only by the timestamps column.",
+  "preprocessing": [
+    "1. curl FRED fredgraph.csv per series (plain UA + --http1.1; browser UA triggers HTTP/2 reset)",
+    "2. parse CSV, '.'->NaN, first col=date",
+    "3. resample to month-start mean (weekly MORTGAGE30US and daily DTWEXBGS/GOLDAMGBD228NLBM -> monthly mean; monthly series unchanged)",
+    "4. Renamed raw source fields to human-readable (FRED series ID -> column): HOUST->Housing starts, PERMIT->Building permits, MORTGAGE30US->30-year fixed mortgage rate, CES2023610001->Residential construction employment, MSACSR->Months supply of new houses, DSPIC96->Real disposable personal income, WPU081->Lumber PPI.",
+    "5. inner-join covariates on month-start index",
+    "6. restrict to window_start=1990-01-01",
+    "7. write CSV (timestamp + target-first columns)",
+    "8. Reformatted wide -> TempusBench long (variable_name, variable_unit, timestamps, values); variable names are human-readable English; timestamp-derived calendar features dropped (time lives only in the timestamps column); timestamps ISO-8601 UTC-labelled, shared across variables; missing -> null; CSV-writer quoted."
+  ]
+}

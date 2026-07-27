@@ -1,0 +1,14 @@
+{
+  "name": "US Monthly Electronics Shipments",
+  "link": "https://fred.stlouisfed.org/series/A34SVS",
+  "citation": "U.S. Census Bureau. \"Manufacturers Shipments: Computers and Electronic Products (A34SVS).\" FRED, Federal Reserve Bank of St. Louis, https://fred.stlouisfed.org/series/A34SVS. Accessed 15 July 2026.",
+  "license": "U.S. Government public data (U.S. Census Bureau M3 Manufacturers' Shipments & Inventories), redistributed via FRED (Federal Reserve Bank of St. Louis). Free to use and redistribute; see FRED Terms of Use https://fred.stlouisfed.org/legal.",
+  "description": "Monthly U.S. Census M3 value of shipments for Computers & Electronic Products, seasonally adjusted (millions USD), used as the free downloadable proxy for the WSTS/SIA global semiconductor-billings silicon cycle, with the matching M3 inventories covariate. Application: fab capacity/inventory-cycle planning (the glut-vs-shortage call). NOTE: the standalone Census semiconductor series (U34GVS) was discontinued in 2010, so the broader electronics aggregate is the maintained proxy; WSTS/SIA billings are the pure-play (paywalled) target.\n\nCovariate glossary:\n- computers and electronic products shipments: Census M3 total value of shipments, Computers & Electronic Products, millions of USD, seasonally adjusted (FRED A34SVS).\n- computers and electronic products inventories: Census M3 total inventories, Computers & Electronic Products, millions of USD (FRED A34STI) - channel-inventory / bullwhip signal.",
+  "preprocessing": [
+    "1. Downloaded each monthly series from the FRED CSV endpoint (fredgraph.csv?id=<ID>).",
+    "2. Aligned target and covariates onto a common month-start (MS) time index.",
+    "3. Restricted to the common native span (first month where every covariate is observed through the last observed target month).",
+    "4. Forward-filled only sparse internal covariate gaps; no target imputation.",
+    "5. Dropped all calendar/timestep columns; kept a single shared ISO-8601 UTC timestamp index."
+  ]
+}

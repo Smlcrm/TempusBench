@@ -1,0 +1,15 @@
+{
+  "name": "Favorita Store 24 Weekly Sales",
+  "link": "https://www.kaggle.com/c/favorita-grocery-sales-forecasting",
+  "citation": "Corporacion Favorita, and Kaggle. \"Corporacion Favorita Grocery Sales Forecasting.\" Kaggle, 2017, www.kaggle.com/c/favorita-grocery-sales-forecasting.",
+  "license": "Competition data - see Kaggle source (verify terms before redistribution); weather Open-Meteo/ERA5.",
+  "description": "Corporacion Favorita weekly UNIT SALES (Ecuador grocery), 2013-01-13 to 2017-08-13 (226 weeks, W-SUN). Series: store 24, Guayaquil (type D). Target column renamed from 'target' to 'unit sales'. Covariates (7) are genuine exogenous known-future drivers (weather, macro, promotion) - none are calendar timestep columns.\n\nCovariate glossary:\n- unit sales (units): weekly total store unit sales (target).\n- max temperature (degC): maximum daily air temperature, weekly mean (Open-Meteo/ERA5).\n- min temperature (degC): minimum daily air temperature, weekly mean (Open-Meteo/ERA5).\n- precipitation (mm): total daily precipitation, weekly mean (Open-Meteo/ERA5).\n- wind speed (km/h): daily mean wind speed, weekly mean (Open-Meteo/ERA5).\n- store transactions (count): per-store weekly receipts, a foot-traffic proxy.\n- oil price (USD): Ecuador WTI oil price, a macro demand driver.\n- promotion share (fraction): share of items on promotion that week.",
+  "preprocessing": [
+    "1. Source: Kaggle 'Corporacion Favorita Grocery Sales Forecasting' competition (2017); aggregated to weekly (W-SUN) unit sales.",
+    "2. Weather covariates (tmax, tmin, precip, wind) from Open-Meteo/ERA5, daily aggregated to the weekly grid.",
+    "3. Macro/promo covariates: Ecuador WTI oil price, per-store transactions (foot-traffic proxy), and promotion share.",
+    "4. No calendar columns were dropped because the wide input had none - all 7 covariates are genuine exogenous drivers.",
+    "5. Target column renamed from 'target' to 'unit sales'; target vs covariate roles are declared in task.yaml.",
+    "6. Long-form TempusBench schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings, shared across variates), values (JSON array; NaN serialized as null)."
+  ]
+}

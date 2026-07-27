@@ -1,0 +1,26 @@
+{
+  "name": "covariate_environment_daily_reservoir_level",
+  "link": [
+    "https://data.usbr.gov/rise/api/result?itemId=508&itemStructureId=1&after=2014-01-01&before=2026-07-11",
+    "https://data.usbr.gov/catalog/2362/item/508 (human-readable catalog page)"
+  ],
+  "citation": [
+    "USBR RISE (Reclamation open-data)",
+    "USGS NWIS WaterServices",
+    "Open-Meteo ERA5 archive",
+    "USDA NRCS SNOTEL"
+  ],
+  "license": "USBR RISE / USGS NWIS: U.S. Government public domain (provisional, subject to revision); Open-Meteo: CC-BY 4.0 (ERA5, Copernicus/ECMWF); NRCS SNOTEL: U.S. Government public domain",
+  "description": "e3-reservoir \u2014 'Reservoir elevation' forecasting bundle. Native cadence daily; 4574 timesteps 2014-01-02..2026-07-11. Non-EIA sources. Known-future covariates: Scheduled total release, Precipitation, Mean air temperature. NO contemporaneous covariates \u2014 all covariates enter as past values only; known-future covariates (weather forecasts, scheduled budgets/releases) are genuinely available at forecast time. Timestamp-derived calendar features are NOT included \u2014 time information is carried only by the timestamps column.",
+  "preprocessing": [
+    "1. Pull USBR RISE items 508/509/4354/4301 via paged JSON:API (Accept: application/vnd.api+json), following links.next; parse results[].attributes.{dateTime,result}.",
+    "2. Pull USGS 09180500 discharge (rdb), Open-Meteo ERA5 daily temp/precip, NRCS SNOTEL Agua Canyon 907:UT WTEQ; cache all raw under datasets/raw/e3/.",
+    "3. RISE dateTime (07:00:00 UTC) mapped to America/Denver local calendar date; all sources aligned on local date; filter to 2014-01-01..2026-07-11.",
+    "4. Renamed raw source fields to human-readable: USBR RISE Item 508 'result'->Reservoir elevation, Item 509->Reservoir storage, Item 4354->Scheduled total release, Item 4301->Unregulated inflow, USGS site 09180500 param 00060->Upstream river discharge, Open-Meteo temperature_2m_mean->Mean air temperature, precipitation_sum->Precipitation, NRCS SNOTEL WTEQ->Snow water equivalent.",
+    "5. Build continuous daily index from target (elevation) min..max; left-join all covariates.",
+    "6. Interpolate interior single-day gaps (linear, limit=1, limit_area='inside').",
+    "7. Derive elevation_change_ft = day-over-day diff of Reservoir elevation.",
+    "8. Drop leading/trailing rows containing any NaN (interior multi-day gaps left honest); round; write CSV.",
+    "9. Reformatted wide -> TempusBench long (variable_name, variable_unit, timestamps, values); variable names are human-readable English; timestamp-derived calendar features dropped (time lives only in the timestamps column); timestamps ISO-8601 UTC-labelled, shared across variables; missing -> null; CSV-writer quoted."
+  ]
+}
