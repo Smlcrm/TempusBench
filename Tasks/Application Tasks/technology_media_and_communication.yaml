@@ -1,0 +1,518 @@
+task:
+  task_name: Software Development Job Postings on Indeed in the United States
+  task_description: Indeed calculates the index change in seasonally-adjusted job
+    postings since February 1, 2020, the pre-pandemic baseline. Indeed seasonally
+    adjusts each series based on historical patterns in 2017, 2018, and 2019. Each
+    series, including the national trend, occupational sectors, and sub-national geographies,
+    is seasonally adjusted separately. Indeed switched to this new methodology in
+    December 2022 and now reports all historical data using this new methodology.
+    Historical numbers have been revised and may differ significantly from originally
+    reported values. The new methodology applies a detrended seasonal adjustment factor
+    to the index change in job postings. For more information, see Frequently Asked
+    Questions regarding Indeed Data.
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Daily_Software_Dev_Postings_Indeed
+  target_variable_names:
+  - software development job postings United States Indeed
+  covariate_variable_names: []
+---
+task:
+  task_name: Daily Streaming Attention
+  task_description: Daily forecasting of Netflix Wikipedia pageviews from related
+    title and service pageviews and streaming-equity price covariates.
+  context_window: 180
+  forecast_horizon: 30
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Daily_Streaming_Attention
+  target_variable_names:
+  - netflix wikipedia pageviews
+  covariate_variable_names:
+  - stranger things wikipedia pageviews
+  - spotify wikipedia pageviews
+  - netflix share price
+  - spotify share price
+---
+task:
+  task_name: Web Traffic Time Series Forecasting
+  task_description: A definitive benchmark for web server load forecasting, tracking
+    the daily hits of approximately 145,000 specific Wikipedia articles. The dataset
+    is characterized by noisy, bursty data distributions driven by real-world cultural
+    trends, distinguishing between human users and automated web-spiders across various
+    language locales.
+  context_window: 128
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Daily_Wikipedia_Python_Traffic
+  target_variable_names:
+  - Python zh wikipedia page views
+  covariate_variable_names:
+  - 2NE1 zh wikipedia page views
+  - 2PM zh wikipedia page views
+  - 3C zh wikipedia page views
+  - 4minute zh wikipedia page views
+  - 52 Hz I Love You zh wikipedia page views
+  - 5566 zh wikipedia page views
+  - 91Days zh wikipedia page views
+  - A'N'D zh wikipedia page views
+  - AKB48 zh wikipedia page views
+  - ASCII zh wikipedia page views
+  - ASTRO zh wikipedia page views
+  - Ahq e-Sports Club zh wikipedia page views
+  - All your base are belong to us zh wikipedia page views
+  - AlphaGo zh wikipedia page views
+  - Android zh wikipedia page views
+  - Angelababy zh wikipedia page views
+  - Apink zh wikipedia page views
+  - Apple II zh wikipedia page views
+  - As One zh wikipedia page views
+  - B-PROJECT zh wikipedia page views
+  - B1A4 zh wikipedia page views
+  - BDSM zh wikipedia page views
+  - BEAST zh wikipedia page views
+  - BIGBANG zh wikipedia page views
+  - BLACK PINK zh wikipedia page views
+  - BLEACH zh wikipedia page views
+  - BTOB zh wikipedia page views
+  - Beautiful Mind zh wikipedia page views
+  - Beyond zh wikipedia page views
+  - Big zh wikipedia page views
+  - Block B zh wikipedia page views
+  - CHAOS;CHILD zh wikipedia page views
+  - CHAOS;HEAD zh wikipedia page views
+  - CLC zh wikipedia page views
+  - CNBLUE zh wikipedia page views
+  - DIA zh wikipedia page views
+  - Daigo zh wikipedia page views
+  - Dear My Friends zh wikipedia page views
+  - Doctors zh wikipedia page views
+  - EGOIST zh wikipedia page views
+  - EXID zh wikipedia page views
+  - EXO zh wikipedia page views
+  - Energy zh wikipedia page views
+  - Eric Nam zh wikipedia page views
+  - FAIRY TAIL zh wikipedia page views
+  - FIESTAR zh wikipedia page views
+  - FIRST CLASS zh wikipedia page views
+  - Facebook zh wikipedia page views
+  - Fantastic Duo zh wikipedia page views
+  - Fate/Grand Order zh wikipedia page views
+  - Fate/Zero zh wikipedia page views
+  - Fate/stay night zh wikipedia page views
+  - File:427FW 126.JPG zh wikipedia page views
+  - File:Ap F23 20110324114153669.jpg zh wikipedia page views
+  - File:Christian-krohg-leiv-eriksson.jpg zh wikipedia page views
+  - File:Sebastiaosalgado2006.jpg zh wikipedia page views
+  - File:Zhongxiao West Road2.JPG zh wikipedia page views
+  - G-Dragon zh wikipedia page views
+  - G.NA zh wikipedia page views
+  - GFRIEND zh wikipedia page views
+  - GNZ48 zh wikipedia page views
+  - GOT7 zh wikipedia page views
+  - GUMMY zh wikipedia page views
+  - Girl's Day zh wikipedia page views
+  - Goodbye Mr. Black zh wikipedia page views
+  - Google zh wikipedia page views
+  - Gu9udan zh wikipedia page views
+  - HDMI zh wikipedia page views
+  - Hand Shakers zh wikipedia page views
+  - Hisasi zh wikipedia page views
+  - Hit The Stage zh wikipedia page views
+  - Hotel King zh wikipedia page views
+  - I'm Home zh wikipedia page views
+  - I.O.I zh wikipedia page views
+  - IKON zh wikipedia page views
+  - INFINITE zh wikipedia page views
+  - IPhone zh wikipedia page views
+  - Ingress zh wikipedia page views
+  - Intel740 zh wikipedia page views
+  - Intel 80386 zh wikipedia page views
+  - Juksy zh wikipedia page views
+  - K.A.R.D zh wikipedia page views
+  - KNK zh wikipedia page views
+  - KUROMUKURO zh wikipedia page views
+  - Kara zh wikipedia page views
+  - Kill Me Heal Me zh wikipedia page views
+  - Lady Gaga zh wikipedia page views
+  - Legal high zh wikipedia page views
+  - LoveLive! zh wikipedia page views
+  - LoveLive! Sunshine!! zh wikipedia page views
+  - Lovelyz zh wikipedia page views
+  - Lulu zh wikipedia page views
+  - MADTOWN zh wikipedia page views
+  - MAMAMOO zh wikipedia page views
+  - MONSTA X zh wikipedia page views
+  - Madame Antoine zh wikipedia page views
+  - Mamamoo zh wikipedia page views
+  - Mike D. Angelo zh wikipedia page views
+  - Miss A zh wikipedia page views
+  - Missing9 zh wikipedia page views
+  - Monstar zh wikipedia page views
+  - Mrs. Cop 2 zh wikipedia page views
+  - NBA zh wikipedia page views
+  - NCT zh wikipedia page views
+  - NEW GAME! zh wikipedia page views
+  - Netflix zh wikipedia page views
+  - Niantic zh wikipedia page views
+  - ONE OK ROCK zh wikipedia page views
+  - ONE PIECE zh wikipedia page views
+  - ONE PIECE FILM GOLD zh wikipedia page views
+  - Oh My Girl zh wikipedia page views
+  - Oh My Venus zh wikipedia page views
+  - PRODUCE 101 zh wikipedia page views
+  - Page Turner zh wikipedia page views
+  - Pen-Pineapple-Apple-Pen zh wikipedia page views
+  - PewDiePie zh wikipedia page views
+  - Popu Lady zh wikipedia page views
+  - Pristin zh wikipedia page views
+  - Qualidea Code zh wikipedia page views
+  - RADWIMPS zh wikipedia page views
+  - RAID zh wikipedia page views
+  - RWBY zh wikipedia page views
+  - Rain zh wikipedia page views
+  - ReLIFE zh wikipedia page views
+  - Red Velvet zh wikipedia page views
+  - Rewrite zh wikipedia page views
+  - Running Man zh wikipedia page views
+  - S.H.E zh wikipedia page views
+  - SF9 zh wikipedia page views
+  - SHINee zh wikipedia page views
+  - SISTAR zh wikipedia page views
+  - SIXTEEN zh wikipedia page views
+  - SMAP zh wikipedia page views
+  - SNH48 zh wikipedia page views
+  - SUPER LOVERS zh wikipedia page views
+  - Schwarzesmarken zh wikipedia page views
+  - Secret Love zh wikipedia page views
+  - SpeXial zh wikipedia page views
+  - Special:Search zh wikipedia page views
+  - Super Junior zh wikipedia page views
+  - Supper Moment zh wikipedia page views
+  - T-ara zh wikipedia page views
+  - T.O.P. zh wikipedia page views
+  - TANet zh wikipedia page views
+---
+task:
+  task_name: Web Traffic Time Series Forecasting Multivariate
+  task_description: A definitive benchmark for web server load forecasting, tracking
+    the daily hits of approximately 145,000 specific Wikipedia articles. The dataset
+    is characterized by noisy, bursty data distributions driven by real-world cultural
+    trends, distinguishing between human users and automated web-spiders across various
+    language locales.
+  context_window: 128
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Daily_Wikipedia_Web_Traffic_Multivariate
+  target_variable_names:
+  - 2NE1 zh wikipedia page views
+  - 2PM zh wikipedia page views
+  - 3C zh wikipedia page views
+  - 4minute zh wikipedia page views
+  - 52 Hz I Love You zh wikipedia page views
+  - 5566 zh wikipedia page views
+  - 91Days zh wikipedia page views
+  - A'N'D zh wikipedia page views
+  - AKB48 zh wikipedia page views
+  - ASCII zh wikipedia page views
+  - ASTRO zh wikipedia page views
+  - Ahq e-Sports Club zh wikipedia page views
+  - All your base are belong to us zh wikipedia page views
+  - AlphaGo zh wikipedia page views
+  - Android zh wikipedia page views
+  - Angelababy zh wikipedia page views
+  - Apink zh wikipedia page views
+  - Apple II zh wikipedia page views
+  - As One zh wikipedia page views
+  - B-PROJECT zh wikipedia page views
+  - B1A4 zh wikipedia page views
+  - BDSM zh wikipedia page views
+  - BEAST zh wikipedia page views
+  - BIGBANG zh wikipedia page views
+  - BLACK PINK zh wikipedia page views
+  - BLEACH zh wikipedia page views
+  - BTOB zh wikipedia page views
+  - Beautiful Mind zh wikipedia page views
+  - Beyond zh wikipedia page views
+  - Big zh wikipedia page views
+  - Block B zh wikipedia page views
+  - CHAOS;CHILD zh wikipedia page views
+  - CHAOS;HEAD zh wikipedia page views
+  - CLC zh wikipedia page views
+  - CNBLUE zh wikipedia page views
+  - DIA zh wikipedia page views
+  - Daigo zh wikipedia page views
+  - Dear My Friends zh wikipedia page views
+  - Doctors zh wikipedia page views
+  - EGOIST zh wikipedia page views
+  - EXID zh wikipedia page views
+  - EXO zh wikipedia page views
+  - Energy zh wikipedia page views
+  - Eric Nam zh wikipedia page views
+  - FAIRY TAIL zh wikipedia page views
+  - FIESTAR zh wikipedia page views
+  - FIRST CLASS zh wikipedia page views
+  - Facebook zh wikipedia page views
+  - Fantastic Duo zh wikipedia page views
+  - Fate/Grand Order zh wikipedia page views
+  - Fate/Zero zh wikipedia page views
+  - Fate/stay night zh wikipedia page views
+  - File:427FW 126.JPG zh wikipedia page views
+  - File:Ap F23 20110324114153669.jpg zh wikipedia page views
+  - File:Christian-krohg-leiv-eriksson.jpg zh wikipedia page views
+  - File:Sebastiaosalgado2006.jpg zh wikipedia page views
+  - File:Zhongxiao West Road2.JPG zh wikipedia page views
+  - G-Dragon zh wikipedia page views
+  - G.NA zh wikipedia page views
+  - GFRIEND zh wikipedia page views
+  - GNZ48 zh wikipedia page views
+  - GOT7 zh wikipedia page views
+  - GUMMY zh wikipedia page views
+  - Girl's Day zh wikipedia page views
+  - Goodbye Mr. Black zh wikipedia page views
+  - Google zh wikipedia page views
+  - Gu9udan zh wikipedia page views
+  - HDMI zh wikipedia page views
+  - Hand Shakers zh wikipedia page views
+  - Hisasi zh wikipedia page views
+  - Hit The Stage zh wikipedia page views
+  - Hotel King zh wikipedia page views
+  - I'm Home zh wikipedia page views
+  - I.O.I zh wikipedia page views
+  - IKON zh wikipedia page views
+  - INFINITE zh wikipedia page views
+  - IPhone zh wikipedia page views
+  - Ingress zh wikipedia page views
+  - Intel740 zh wikipedia page views
+  - Intel 80386 zh wikipedia page views
+  - Juksy zh wikipedia page views
+  - K.A.R.D zh wikipedia page views
+  - KNK zh wikipedia page views
+  - KUROMUKURO zh wikipedia page views
+  - Kara zh wikipedia page views
+  - Kill Me Heal Me zh wikipedia page views
+  - Lady Gaga zh wikipedia page views
+  - Legal high zh wikipedia page views
+  - LoveLive! Sunshine!! zh wikipedia page views
+  - LoveLive! zh wikipedia page views
+  - Lovelyz zh wikipedia page views
+  - Lulu zh wikipedia page views
+  - MADTOWN zh wikipedia page views
+  - MAMAMOO zh wikipedia page views
+  - MONSTA X zh wikipedia page views
+  - Madame Antoine zh wikipedia page views
+  - Mamamoo zh wikipedia page views
+  - Mike D. Angelo zh wikipedia page views
+  - Miss A zh wikipedia page views
+  - Missing9 zh wikipedia page views
+  - Monstar zh wikipedia page views
+  - Mrs. Cop 2 zh wikipedia page views
+  - NBA zh wikipedia page views
+  - NCT zh wikipedia page views
+  - NEW GAME! zh wikipedia page views
+  - Netflix zh wikipedia page views
+  - Niantic zh wikipedia page views
+  - ONE OK ROCK zh wikipedia page views
+  - ONE PIECE FILM GOLD zh wikipedia page views
+  - ONE PIECE zh wikipedia page views
+  - Oh My Girl zh wikipedia page views
+  - Oh My Venus zh wikipedia page views
+  - PRODUCE 101 zh wikipedia page views
+  - Page Turner zh wikipedia page views
+  - Pen-Pineapple-Apple-Pen zh wikipedia page views
+  - PewDiePie zh wikipedia page views
+  - Popu Lady zh wikipedia page views
+  - Pristin zh wikipedia page views
+  - Python zh wikipedia page views
+  - Qualidea Code zh wikipedia page views
+  - RADWIMPS zh wikipedia page views
+  - RAID zh wikipedia page views
+  - RWBY zh wikipedia page views
+  - Rain zh wikipedia page views
+  - ReLIFE zh wikipedia page views
+  - Red Velvet zh wikipedia page views
+  - Rewrite zh wikipedia page views
+  - Running Man zh wikipedia page views
+  - S.H.E zh wikipedia page views
+  - SF9 zh wikipedia page views
+  - SHINee zh wikipedia page views
+  - SISTAR zh wikipedia page views
+  - SIXTEEN zh wikipedia page views
+  - SMAP zh wikipedia page views
+  - SNH48 zh wikipedia page views
+  - SUPER LOVERS zh wikipedia page views
+  - Schwarzesmarken zh wikipedia page views
+  - Secret Love zh wikipedia page views
+  - SpeXial zh wikipedia page views
+  - Special:Search zh wikipedia page views
+  - Super Junior zh wikipedia page views
+  - Supper Moment zh wikipedia page views
+  - T-ara zh wikipedia page views
+  - T.O.P. zh wikipedia page views
+  - TANet zh wikipedia page views
+  covariate_variable_names: []
+---
+task:
+  task_name: CyberTec IIoT Malware Dataset
+  task_description: A cutting-edge cybersecurity dataset capturing hourly network
+    traffic and system health logs across an Industrial Internet of Things (IIoT)
+    environment. It merges low-level network behaviors (packet entropy, flow duration)
+    with system resource utilization (CPU/Memory) to facilitate AI-driven classification
+    of zero-day intrusions, ransomware, botnets, and data exfiltration attempts.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Hourly_CyberTec_IIoT_Malware
+  target_variable_names:
+  - malicious signatures
+  covariate_variable_names:
+  - packet size
+  - packet length
+  - inter-arrival time
+  - flow duration
+  - total packets
+  - total bytes
+  - average packet size
+  - packet arrival rate
+  - payload entropy
+  - flow entropy
+  - baseline deviation
+  - packet size variance
+  - embedded commands
+  - device activity patterns
+  - cpu usage
+  - memory usage
+  - network interface stats
+  - duration anomaly
+  - known ioc
+  - c&c communication
+  - data exfiltration
+---
+task:
+  task_name: CyberTec IIoT Malware Dataset Multivariate
+  task_description: A cutting-edge cybersecurity dataset capturing hourly network
+    traffic and system health logs across an Industrial Internet of Things (IIoT)
+    environment. It merges low-level network behaviors (packet entropy, flow duration)
+    with system resource utilization (CPU/Memory) to facilitate AI-driven classification
+    of zero-day intrusions, ransomware, botnets, and data exfiltration attempts.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Hourly_CyberTec_IIoT_Malware_Multivariate
+  target_variable_names:
+  - average packet size
+  - baseline deviation
+  - c&c communication
+  - cpu usage
+  - data exfiltration
+  - device activity patterns
+  - duration anomaly
+  - embedded commands
+  - flow duration
+  - flow entropy
+  - inter-arrival time
+  - known ioc
+  - malicious signatures
+  - memory usage
+  - network interface stats
+  - packet arrival rate
+  - packet length
+  - packet size
+  - packet size variance
+  - payload entropy
+  - total bytes
+  - total packets
+  covariate_variable_names: []
+---
+task:
+  task_name: Web Traffic Dataset - Single Website
+  task_description: A time series containing observations of the total number of web
+    requests (traffic counts) to a single website. The data is recorded at an hourly
+    (and occasionally half-hourly) frequency, beginning on January 20, 2020.
+  context_window: 1024
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Hourly_Web_Requests
+  target_variable_names:
+  - hourly web requests single website
+  covariate_variable_names: []
+---
+task:
+  task_name: Monthly Advertising PPI
+  task_description: Monthly forecasting of the advertising-agencies producer price
+    index from cable-advertising prices, retail sales, consumer sentiment, and ad-tech
+    equity covariates.
+  context_window: 103
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Monthly_Advertising_PPI
+  target_variable_names:
+  - advertising agencies producer price index
+  covariate_variable_names:
+  - cable network advertising producer price index
+  - advance retail sales
+  - university of michigan consumer sentiment
+  - trade desk share price
+  - nasdaq composite index
+---
+task:
+  task_name: Monthly Semiconductor Output
+  task_description: Monthly forecasting of seasonally adjusted semiconductor industrial
+    production from semiconductor prices, component shipments, and chip-equity covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Monthly_Semiconductor_Output
+  target_variable_names:
+  - semiconductor industrial production seasonally adjusted
+  covariate_variable_names:
+  - semiconductor producer price index
+  - electronic component shipments
+  - Taiwan Semiconductor Manufacturing Company share price
+  - VanEck semiconductor exchange-traded fund price
+---
+task:
+  task_name: Weekly Netflix Content Decay
+  task_description: Weekly forecasting of Netflix English-language TV minutes viewed
+    from release counts and churn and competitor search-interest covariates.
+  context_window: 12
+  forecast_horizon: 4
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: technology_media_and_communication
+  dataset_name: Weekly_Netflix_Content_Decay
+  target_variable_names:
+  - weekly minutes viewed English-language TV
+  covariate_variable_names:
+  - new release count
+  - churn intent index
+  - Disney Plus search interest
+  - HBO Max search interest

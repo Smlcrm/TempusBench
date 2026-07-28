@@ -1,0 +1,19 @@
+{
+  "name": "Global CO2 Emissions 1750-2024",
+  "link": "https://www.kaggle.com/datasets/elvisbui/global-co2-emissions-1750-2024",
+  "citation": "Global Carbon Project, Our World in Data (2024). Global CO2 Emissions 1750-2024 [Data set]. Kaggle.",
+  "license": "CC BY 4.0",
+  "description": "A foundational dataset mapping the historical anthropogenic footprint on the natural world since the start of the Industrial Revolution. It contextualizes annual terrestrial CO2 emissions and atmospheric temperature changes by aligning them against human population growth, GDP, specialized fuel consumptions (coal, oil, gas, cement), and global land-use alterations.",
+  "preprocessing": [
+    "1. Load global_co2_emissions_1750_2024.csv.",
+    "2. Select one country with np.random.default_rng(seed=42) → Barbados.",
+    "3. Filter and sort by year; rename year to timestamps (UTC).",
+    "4. Removed identifier columns from variates: country, year, iso_code.",
+    "5. Kept 26 numeric variates: population, gdp, co2, co2_per_capita, co2_per_gdp, co2_growth_abs, co2_growth_prct, coal_co2, oil_co2, gas_co2, cement_co2, flaring_co2, land_use_change_co2, co2_including_luc, co2_including_luc_per_capita, cumulative_co2, cumulative_co2_including_luc, methane, nitrous_oxide, total_ghg, primary_energy_consumption, energy_per_capita, share_global_co2, share_global_cumulative_co2, trade_co2, temperature_change_from_co2.",
+    "6. Frequency check: annual (YS or ~365-day median fallback).",
+    "7. Fill missing: standard annual reindex.",
+    "8. Transform: 26 variates for Barbados; variable_unit blank.",
+    "9. Output file: multivariate_nature_annually_global_carbon_budget.csv (Barbados subset).",
+    "10. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

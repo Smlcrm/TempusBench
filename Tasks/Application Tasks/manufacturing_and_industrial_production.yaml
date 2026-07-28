@@ -1,0 +1,118 @@
+task:
+  task_name: Skoltech Anomaly Benchmark (SKAB)
+  task_description: The Skoltech Anomaly Benchmark (SKAB) is designed for evaluating
+    algorithms in industrial IoT using sensor data from a physical water-circulation
+    testbed. Measurements are recorded at 1-second intervals. For this univariate
+    dataset, we are using only the pressure column from the anomaly-free.csv file.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: manufacturing_and_industrial_production
+  dataset_name: Seconds_SKAB_Pressure
+  target_variable_names:
+  - SKAB anomaly-free pressure
+  covariate_variable_names: []
+---
+task:
+  task_name: Skoltech Anomaly Benchmark (SKAB)
+  task_description: A high-frequency physical testbed dataset specifically engineered
+    for predictive maintenance and industrial anomaly detection. It tracks continuous
+    1-second telemetry from eight distinct sensors—including vibrations, pressure
+    dynamics, and volume flow rates—mounted on a functioning water-circulation loop,
+    capturing both steady-state operations and mechanically injected faults.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: manufacturing_and_industrial_production
+  dataset_name: Seconds_SKAB_Pressure_Covariate
+  target_variable_names:
+  - pressure
+  covariate_variable_names:
+  - accelerometer 1 RMS
+  - accelerometer 2 RMS
+  - electrical current
+  - temperature
+  - thermocouple temperature
+  - voltage
+  - volume flow rate RMS
+---
+task:
+  task_name: Skoltech Anomaly Benchmark (SKAB) Multivariate
+  task_description: A high-frequency physical testbed dataset specifically engineered
+    for predictive maintenance and industrial anomaly detection. It tracks continuous
+    1-second telemetry from eight distinct sensors—including vibrations, pressure
+    dynamics, and volume flow rates—mounted on a functioning water-circulation loop,
+    capturing both steady-state operations and mechanically injected faults.
+  context_window: 2048
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: manufacturing_and_industrial_production
+  dataset_name: Seconds_SKAB_Sensor_Multivariate
+  target_variable_names:
+  - accelerometer 1 RMS
+  - accelerometer 2 RMS
+  - electrical current
+  - pressure
+  - temperature
+  - thermocouple temperature
+  - voltage
+  - volume flow rate RMS
+  covariate_variable_names: []
+---
+task:
+  task_name: US Monthly Electronics Shipments
+  task_description: Monthly forecasting of U.S. computer and electronic-product shipments
+    for fab and supply-chain capacity planning, with sector inventories as covariate.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: manufacturing_and_industrial_production
+  dataset_name: US_Monthly_Electronics_Shipments
+  target_variable_names:
+  - computers and electronic products shipments
+  covariate_variable_names:
+  - computers and electronic products inventories
+---
+task:
+  task_name: US Monthly Steel Output
+  task_description: Monthly forecasting of U.S. raw-steel output for furnace-campaign
+    and production planning, with manufacturing-employment, construction-spending,
+    and housing-starts covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: manufacturing_and_industrial_production
+  dataset_name: US_Monthly_Steel_Output
+  target_variable_names:
+  - raw steel industrial production index
+  covariate_variable_names:
+  - manufacturing employment
+  - total construction spending
+  - housing starts
+---
+task:
+  task_name: US Monthly Vehicle Assemblies
+  task_description: Monthly forecasting of U.S. motor-vehicle assemblies for automotive
+    build and supply planning, with vehicle-sales and auto-loan-rate covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: manufacturing_and_industrial_production
+  dataset_name: US_Monthly_Vehicle_Assemblies
+  target_variable_names:
+  - motor vehicle assemblies
+  covariate_variable_names:
+  - total vehicle sales
+  - auto loan rate 48 month

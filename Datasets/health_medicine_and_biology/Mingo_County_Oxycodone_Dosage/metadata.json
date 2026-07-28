@@ -1,0 +1,15 @@
+{
+  "name": "Mingo County Oxycodone Dosage",
+  "link": "https://www.washingtonpost.com/graphics/2019/investigations/dea-pain-pill-database/",
+  "citation": "The Washington Post. (2019). DEA ARCOS pain pill database [Data set].",
+  "license": "Public release via Washington Post / DEA ARCOS litigation",
+  "description": "Daily oxycodone dosage shipped to Mingo County, West Virginia pharmacies (2006\u20132012). Concurrent retail and chain pharmacy dosage are provided as covariates.",
+  "preprocessing": [
+    "1. Source: ARCOS transaction export filtered to BUYER_COUNTY=MINGO, BUYER_STATE=WV, DRUG_NAME=OXYCODONE.",
+    "2. Aggregate transaction-level DOSAGE_UNIT to daily sums.",
+    "3. Split covariates by BUYER_BUS_ACT: Retail_Pharmacy_Dosage, Chain_Pharmacy_Dosage.",
+    "4. Reindex to complete daily calendar; fill no-transaction days with 0.",
+    "5. Timestamps as ISO-8601 UTC strings shared across variates.",
+    "6. Output CSV schema: variable_name, variable_unit, timestamps, values (3 variates)."
+  ]
+}

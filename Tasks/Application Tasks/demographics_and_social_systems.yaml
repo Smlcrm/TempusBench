@@ -1,0 +1,50 @@
+task:
+  task_name: Chicago Monthly Crime Counts
+  task_description: Monthly forecasting of reported Chicago crime incidents for police
+    patrol and resource allocation, with weather and unemployment covariates.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: demographics_and_social_systems
+  dataset_name: Chicago_Monthly_Crime_Counts
+  target_variable_names:
+  - reported crime incidents
+  covariate_variable_names:
+  - chicago mean temperature
+  - us unemployment rate
+---
+task:
+  task_name: US Annual Live Births
+  task_description: Annual forecasting of U.S. live births for maternity and pediatric
+    capacity planning, with unemployment and house-price covariates.
+  context_window: 51
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: demographics_and_social_systems
+  dataset_name: US_Annual_Live_Births
+  target_variable_names:
+  - live births
+  covariate_variable_names:
+  - us unemployment rate annual
+  - us house price index
+---
+task:
+  task_name: US Monthly Death Counts
+  task_description: Monthly forecasting of U.S. all-cause deaths for hospital and
+    public-health capacity planning, with temperature and unemployment covariates.
+  context_window: 89
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: demographics_and_social_systems
+  dataset_name: US_Monthly_Death_Counts
+  target_variable_names:
+  - all cause deaths
+  covariate_variable_names:
+  - us mean temperature
+  - us unemployment rate

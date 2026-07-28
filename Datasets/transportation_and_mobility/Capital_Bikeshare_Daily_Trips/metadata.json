@@ -1,0 +1,14 @@
+{
+  "name": "Capital Bikeshare Daily Trips",
+  "link": "https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset",
+  "citation": "Fanaee-T, Hadi, and Joao Gama. \"Event Labeling Combining Ensemble Detectors and Background Knowledge.\" Progress in Artificial Intelligence, vol. 2, Springer, 2013, pp. 113-127.",
+  "license": "Creative Commons Attribution 4.0 International (CC BY 4.0), UCI Machine Learning Repository.",
+  "description": "Daily total rental-bike trip counts for the Capital Bikeshare system (Washington, DC), 2011-01-01 to 2012-12-31, with the UCI-bundled normalized weather covariates. Target = realized daily trips. Application: fleet rebalancing and demand planning.\n\nCovariate glossary:\n- bike trips: total system-wide rental-bike trips per day on Capital Bikeshare, Washington DC (target).\n- temp: air temperature normalized to [0,1] as t/41 in Celsius (UCI convention).\n- atemp: apparent 'feels-like' temperature normalized to [0,1] as t/50 in Celsius.\n- hum: relative humidity normalized to [0,1] (raw percent / 100).\n- windspeed: wind speed normalized to [0,1] (raw / 67).\n- weathersit: weather situation category 1 to 4 (1 clear, 2 mist/cloudy, 3 light rain/snow, 4 heavy rain/snow/fog).",
+  "preprocessing": [
+    "1. Loaded UCI Bike Sharing day.csv (731 daily rows).",
+    "2. Target = cnt (total daily rentals), renamed bike trips.",
+    "3. Dropped casual & registered (they sum exactly to the target -> composing-partition leakage).",
+    "4. Removed all calendar-derived features (day-of-week Fourier, working-day, holiday) so only the single shared time index encodes calendar position; kept genuine external weather covariates.",
+    "5. Suggested split: context_window=365, forecast_horizon=28."
+  ]
+}

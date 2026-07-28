@@ -1,0 +1,21 @@
+{
+  "name": "GB natural-gas \u2014 daily NTS demand, LNG terminal send-out, storage stock, weather & calendar \u2014 GB daily natural gas demand (power & heating) (covariate forecasting bundle)",
+  "link": "https://data.nationalgas.com/api/find-gas-data-download?ids=PUBOB637&dateType=GASDAY&latestFlag=Y&applicableFor=Y&type=CSV&dateFrom=2023-07-01&dateTo=2026-06-30",
+  "citation": "National Gas Transmission (https://data.nationalgas.com/api/find-gas-data-download?ids=PUBOB637&dateType=GASDAY&latestFlag=Y&applicableFor=Y&type=CSV&dateFrom=2023-07-01&dateTo=2026-06-30); Open-Meteo Historical Weather API (https://archive-api.open-meteo.com/v1/archive); pandas / stdlib calendar (n/a)",
+  "license": "National Gas Data Portal: public postings, free reuse with attribution. Open-Meteo: CC-BY 4.0 (non-commercial free tier).",
+  "description": "GB daily natural gas demand (power & heating). This bundle forecasts `gb_nts_gas_demand` from a covariate panel of heating_degree_days, air_temperature, wind_speed, day_of_week, is_weekend, gb_gas_storage_stock, gb_lng_terminal_sendout. Source dataset 'GB natural-gas \u2014 daily NTS demand, LNG terminal send-out, storage stock, weather & calendar' \u2014 daily cadence, 1096 rows, 2023-07-01..2026-06-30. NON-EIA (the forecasting model is trained on EIA data, so EIA inputs are excluded): NONE of these are EIA. National Gas Transmission is the GB gas system operator publishing its own metered NTS demand, LNG send-out and storage flows on data.nationalgas.com (the portal that replaced the legacy 'MIPI' service). Open-Meteo weather is ERA5 reanalysis from ECMWF/Copernicus. No series is sourced from or derived from eia.gov.",
+  "preprocessing": [
+    "1. Download three National Gas Data-Portal items over 2023-07-01..2026-06-30 via /api/find-gas-data-download (ids=PUBOB637 demand, PUBOBJ1621 LNG send-out, PUBOBJ330 storage stock), dateType=GASDAY, latestFlag=Y. Cached under datasets/raw/.",
+    "2. Parse each CSV: 'Applicable For' -> gas-day date, 'Value' -> number; group-mean to one value per gas day (latest posting).",
+    "3. gas_demand = demand (mscm/day); lng_sendout = aggregate LNG send-out (mcm/day); storage_gwh = storage stock kWh / 1e6.",
+    "4. Mask storage glitches (value <= 0 or > 40,000 GWh, i.e. above the 99th pct ~28,700) to NaN for interpolation.",
+    "5. Pull Open-Meteo ERA5 DAILY weather for London (51.5074,-0.1278) timezone=Europe/London: temperature_2m_mean (temp_c), wind_speed_10m_mean (wind_kmh).",
+    "6. Inner-join gas + weather on calendar date (GB gas day == calendar date).",
+    "7. Derive hdd = max(0, 15.5 - temp_c); add calendar dow, is_weekend.",
+    "8. Time-interpolate residual gaps up to 5 days (storage glitches etc.); recompute hdd; drop any remaining NaN rows. Write wide CSV sorted by date.",
+    "9. Recommended eval hold-out = last 30 days (documented in shape.eval_holdout; all rows kept in CSV).",
+    "10. Dropped calendar/time-derived variables (day_of_week) so the only notion of time retained is the shared timestamps list.",
+    "11. Renamed all variable names and units from snake_case codes to plain English (CSV row/column structure unchanged). Name and unit mapping \u2014 gb_nts_gas_demand [mscm/day] -> \"GB NTS gas demand\" [million standard cubic meters per day] (target; GB National Transmission System natural-gas demand); heating_degree_days [\u00b0C\u00b7day] -> \"heating degree days\" [degree-days Celsius] (covariate; heating degree-days); air_temperature [\u00b0C] -> \"air temperature\" [degrees Celsius] (covariate; 2 m air temperature); wind_speed [km/h] -> \"wind speed\" [kilometers per hour] (covariate; 10 m wind speed); is_weekend [] -> \"is weekend\" [] (covariate; weekend indicator (0/1)); gb_gas_storage_stock [GWh] -> \"GB gas storage stock\" [gigawatt-hours] (covariate; GB natural-gas storage stock); gb_lng_terminal_sendout [mcm/day] -> \"GB LNG terminal sendout\" [million cubic meters per day] (covariate; GB LNG terminal send-out (throughput)).",
+    "12. Removed the calendar covariates 'is weekend' from the delivered CSV."
+  ]
+}

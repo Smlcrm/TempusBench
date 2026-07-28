@@ -1,0 +1,13 @@
+{
+  "name": "US Weekly Jobless Claims",
+  "link": "https://oui.doleta.gov/unemploy/csv/ar539.csv",
+  "citation": "U.S. Department of Labor, Employment and Training Administration. \"ETA 539: Unemployment Insurance Weekly Claims (ar539).\" DOL, 2026, oui.doleta.gov/unemploy/claims.asp.",
+  "license": "U.S. Government work, public domain.",
+  "description": "US national weekly initial unemployment-insurance claims (sum of state filings from ETA-539, not seasonally adjusted), with continued claims as a correlated covariate (not a partition of the target). Strong weekly/annual seasonality and holiday distortions; models should derive calendar features from the single shared time index. Application: labor-market nowcasting and staffing/benefits planning.\n\nCovariate glossary:\n- initial claims: US initial unemployment-insurance claims, national weekly new filings (count; target).\n- continued claims: US continued unemployment-insurance claims / insured unemployment, national weekly (count).",
+  "preprocessing": [
+    "1. Downloaded from the cited public source (DOL ETA-539) on 2026-07-14.",
+    "2. Aligned all variates onto a single shared time index; covariates forward-filled where a release lag left a gap.",
+    "3. Long TempusBench layout: one row per variate; a single shared 'timestamps' JSON array of ISO-8601 UTC strings; 'values' a JSON array (missing -> null).",
+    "4. Calendar/derived features (week-of-year, holiday flags) are NOT included as columns; a single time index is provided and models derive calendar features from it."
+  ]
+}

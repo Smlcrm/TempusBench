@@ -1,0 +1,16 @@
+{
+  "name": "Skoltech Anomaly Benchmark (SKAB)",
+  "link": "https://www.kaggle.com/datasets/yuriykatser/skoltech-anomaly-benchmark-skab",
+  "citation": "Katser, Y., Kozitsin, V., Maksimov, V., & Martynenko, I. (2021). Skoltech Anomaly Benchmark (SKAB) [Data set]. Kaggle. https://www.kaggle.com/datasets/yuriykatser/skoltech-anomaly-benchmark-skab",
+  "license": "Apache 2.0 / CC BY 4.0",
+  "description": "The Skoltech Anomaly Benchmark (SKAB) is designed for evaluating algorithms in industrial IoT using sensor data from a physical water-circulation testbed. Measurements are recorded at 1-second intervals. For this univariate dataset, we are using only the pressure column from the anomaly-free.csv file.",
+  "preprocessing": [
+    "1. Load anomaly-free (1).csv with sep=\";\"; rename datetime to timestamps (UTC).",
+    "2. Raw file has 8 sensor columns; export only Pressure.",
+    "3. Removed from output: Accelerometer1RMS, Accelerometer2RMS, Current, Temperature, Thermocouple, Voltage, Volume Flow RateRMS.",
+    "4. Frequency check: s (1-second; median interval 1s).",
+    "5. Fill missing (special): force strict 1-second grid reindex.",
+    "6. Transform: variable_name=Skoltech Anomaly Benchmark (SKAB) - anomaly-free - Pressure, variable_unit=Bar.",
+    "7. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

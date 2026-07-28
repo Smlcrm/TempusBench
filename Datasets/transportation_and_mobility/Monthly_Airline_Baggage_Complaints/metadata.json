@@ -1,0 +1,18 @@
+{
+  "name": "Airline Baggage Complaints",
+  "link": "https://www.kaggle.com/datasets/gabrielsantello/airline-baggage-complaints-time-series-dataset",
+  "citation": "Santello, G. (2021). Airline Baggage Complaints - Time Series Dataset [Data set]. Kaggle.",
+  "license": "Public Domain",
+  "description": "A multivariate transport logistics dataset tracking monthly observations from 2004 to 2010 for major US airlines. By juxtaposing total passenger complaints regarding lost or damaged baggage against total scheduled flights, cancellations, and boarded passengers, this data allows models to forecast operational friction and its subsequent impact on customer satisfaction in the aviation industry.",
+  "preprocessing": [
+    "1. Load baggagecomplaints.csv.",
+    "2. Filter to first airline in file (American Eagle) via df['Airline'].iloc[0].",
+    "3. Parse Date with format %m/%Y as UTC month-start timestamps.",
+    "4. Kept variates: Baggage, Scheduled, Cancelled, Enplaned.",
+    "5. Non-exported columns during fill frame: Airline, Month, Year (metadata; not in transform output).",
+    "6. Frequency check: MS (month start).",
+    "7. Fill missing: standard monthly reindex.",
+    "8. Transform: 4 variates; variable_unit blank.",
+    "9. Output CSV schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings), values (JSON array; NaN serialized as null via allow_nan=True). Timestamps are shared across variates in multivariate tasks (one row per variate)."
+  ]
+}

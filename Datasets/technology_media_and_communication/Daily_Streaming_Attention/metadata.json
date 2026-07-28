@@ -1,0 +1,21 @@
+{
+  "name": "Media \u2014 netflix_wikipedia_pageviews covariate forecasting bundle (daily)",
+  "link": "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/Netflix/daily/20160101/20260707",
+  "citation": "Wikimedia Pageviews REST API; Yahoo Finance (yfinance)",
+  "license": "Wikimedia pageviews: CC0 1.0 Public Domain; Yahoo Finance data for research use.",
+  "description": "Non-EIA, non-benchmark web-attention + equity data. Pageviews use agent=user (bots stripped) so the stored series is not bot-inflated; no all-agents series and no user-vs-all duplicate of any target are included (avoids leakage). These sources are not standard forecasting-benchmark training corpora. Long-format TempusBench bundle for application 'covariate_media_daily_streaming_attention'. Target 'netflix_wikipedia_pageviews' forecast from 4 covariates. daily cadence, 3018 timesteps, 2018-04-03..2026-07-07. NON-EIA (the foundation model is EIA-trained, so EIA sources are excluded). eia_derived=false.",
+  "preprocessing": [
+    "1. Pull Wikimedia daily pageviews (agent=user) for Netflix, Stranger_Things, Spotify from 20160101 to 20260707 via REST with User-Agent header; cache raw JSON.",
+    "2. Pull yfinance NFLX and SPOT daily Close (auto_adjust=True) from 2016-01-01 to end; cache raw CSV.",
+    "3. Compute first-available date per source; set common-overlap start = latest first date (SPOT IPO 2018-04-03); end = today - 7 days.",
+    "4. Build a continuous daily calendar index over the common span.",
+    "5. Reindex pageviews onto the calendar; linear-interpolate internal gaps of <=3 consecutive days.",
+    "6. Forward-fill equity closes across weekends/holidays onto the calendar.",
+    "7. Derive deterministic known-future calendar covariates: dow, is_weekend, is_holiday (USFederalHolidayCalendar).",
+    "8. Order columns date, targets, covariates; interpolate/ffill/bfill any residual NaN so the final CSV has zero NaN; write CSV + meta.json.",
+    "9. Reformatted wide->long TempusBench (variable_name, variable_unit, timestamps, values); timestamps ISO-8601 UTC; variable names expanded; missing->null; values round-trip-verified against source.",
+    "10. Removed the day_of_week calendar covariate. Retained two binary calendar flags \u2014 'is weekend' and 'is holiday' (0/1, both derivable from the shared 'timestamps') \u2014 as covariates, since they are genuine drivers (e.g. 'is weekend' was the selected winning covariate for the Netflix-attention forecast).",
+    "11. Variable names are written in plain English (underscores replaced with spaces). Target \u2014 'netflix wikipedia pageviews' (from source column 'netflix_views', unit: views/day). Covariates \u2014 'stranger things wikipedia pageviews' (from 'stranger_things_views', views/day); 'spotify wikipedia pageviews' (from 'spotify_views', views/day); 'netflix share price' (from 'nflx_close', USD); 'spotify share price' (from 'spot_close', USD); 'is weekend' (from 'is_weekend', binary 0/1); 'is holiday' (from 'is_holiday', binary 0/1).",
+    "12. Removed the calendar covariates 'is weekend' and 'is holiday' from the delivered CSV."
+  ]
+}

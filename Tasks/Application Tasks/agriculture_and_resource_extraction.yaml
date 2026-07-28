@@ -1,0 +1,63 @@
+task:
+  task_name: Daily Corn Futures
+  task_description: Daily forecasting of Chicago Board of Trade front-month corn futures
+    settlement prices from related grain and oilseed futures, crude oil, and local
+    weather covariates.
+  context_window: 252
+  forecast_horizon: 20
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: agriculture_and_resource_extraction
+  dataset_name: Daily_Corn_Futures
+  target_variable_names:
+  - Chicago Board of Trade corn front month settlement
+  covariate_variable_names:
+  - Chicago Board of Trade soybeans front month settlement
+  - Chicago Board of Trade wheat front month settlement
+  - West Texas Intermediate crude oil front month settlement
+  - daily mean temperature Des Moines Iowa
+  - daily precipitation Des Moines Iowa
+---
+task:
+  task_name: Daily Live Cattle Futures
+  task_description: Daily forecasting of Chicago Mercantile Exchange front-month live
+    cattle futures settlement prices from feeder cattle, feed grain, and local weather
+    covariates.
+  context_window: 252
+  forecast_horizon: 20
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: agriculture_and_resource_extraction
+  dataset_name: Daily_Live_Cattle_Futures
+  target_variable_names:
+  - Chicago Mercantile Exchange live cattle front month settlement
+  covariate_variable_names:
+  - Chicago Mercantile Exchange feeder cattle front month settlement
+  - Chicago Board of Trade corn front month settlement
+  - Chicago Board of Trade soybean meal front month settlement
+  - daily maximum temperature Dodge City Kansas
+  - daily minimum temperature Dodge City Kansas
+---
+task:
+  task_name: Monthly Coal Mining Output
+  task_description: Monthly forecasting of U.S. coal mining industrial production
+    from related mining and industrial output indices and energy and metal commodity
+    prices.
+  context_window: 120
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: agriculture_and_resource_extraction
+  dataset_name: Monthly_Coal_Mining_Output
+  target_variable_names:
+  - coal mining industrial production
+  covariate_variable_names:
+  - metal ore mining industrial production
+  - coal mining producer price index
+  - total mining industrial production
+  - total industrial production
+  - henry hub natural gas front month settlement
+  - Commodity Exchange copper front month settlement

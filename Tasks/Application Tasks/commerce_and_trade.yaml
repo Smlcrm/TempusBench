@@ -1,0 +1,393 @@
+task:
+  task_name: Favorita Store 24 Weekly Sales
+  task_description: Store-level weekly unit-sales forecasting for stockout prevention
+    and replenishment (Corporacion Favorita store 24, Guayaquil).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_24_Weekly_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: Favorita Store 37 Weekly Sales
+  task_description: Store-level weekly unit-sales forecasting for stockout prevention
+    and replenishment (Corporacion Favorita store 37, Cuenca).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_37_Weekly_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: Favorita Store 44 Weekly Sales
+  task_description: Store-level weekly unit-sales forecasting for stockout prevention
+    and replenishment (Corporacion Favorita store 44, Quito).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_44_Weekly_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: Favorita Store 45 Liquor Sales
+  task_description: Store-level weekly liquor unit-sales forecasting for stockout
+    prevention and replenishment (Corporacion Favorita store 45).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_45_Liquor_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: Favorita Store 47 Weekly Sales
+  task_description: Store-level weekly unit-sales forecasting for stockout prevention
+    and replenishment (Corporacion Favorita store 47, Quito).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_47_Weekly_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: Favorita Store 50 Weekly Sales
+  task_description: Store-level weekly unit-sales forecasting for stockout prevention
+    and replenishment (Corporacion Favorita store 50, Ambato).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_50_Weekly_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: Favorita Store 51 Weekly Sales
+  task_description: Store-level weekly unit-sales forecasting for stockout prevention
+    and replenishment (Corporacion Favorita store 51, Guayaquil).
+  context_window: 104
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Favorita_Store_51_Weekly_Sales
+  target_variable_names:
+  - unit sales
+  covariate_variable_names:
+  - max temperature
+  - min temperature
+  - precipitation
+  - wind speed
+  - store transactions
+  - oil price
+  - promotion share
+---
+task:
+  task_name: GA4 Daily Revenue
+  task_description: Daily univariate forecasting of Google Merchandise Store e-commerce
+    revenue for sales and inventory planning (GA4 BigQuery sample).
+  context_window: 35
+  forecast_horizon: 7
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: GA4_Daily_Revenue
+  target_variable_names:
+  - daily revenue usd
+  covariate_variable_names: []
+---
+task:
+  task_name: GA4 Ecommerce KPI Panel
+  task_description: Daily joint forecasting of Google Merchandise Store e-commerce
+    KPIs (pageviews, active users, purchase events, revenue) for demand and marketing
+    planning (GA4 BigQuery sample).
+  context_window: 35
+  forecast_horizon: 7
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: GA4_Ecommerce_KPI_Panel
+  target_variable_names:
+  - daily pageviews
+  - daily active users
+  - daily purchase events
+  - daily revenue usd
+  covariate_variable_names: []
+---
+task:
+  task_name: GA4 Revenue And Traffic
+  task_description: Daily forecasting of Google Merchandise Store e-commerce revenue
+    for marketing and inventory planning, with mobile- and paid-traffic share covariates
+    (GA4 BigQuery sample).
+  context_window: 35
+  forecast_horizon: 7
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: GA4_Revenue_And_Traffic
+  target_variable_names:
+  - daily revenue usd
+  covariate_variable_names:
+  - percent mobile traffic
+  - percent paid traffic
+---
+task:
+  task_name: India FMCG KPI Panel
+  task_description: Weekly joint forecasting of FMCG sales, adstocked media channels,
+    and CPI for marketing-mix and macro planning (synthetic India geo-SKU panel).
+  context_window: 52
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: India_FMCG_KPI_Panel
+  target_variable_names:
+  - sales value
+  - display flag adstock
+  - trade spend adstock
+  - tv impressions adstock
+  - youtube impressions adstock
+  - cpi
+  covariate_variable_names: []
+---
+task:
+  task_name: India FMCG Sales Media
+  task_description: Weekly forecasting of national FMCG sales for marketing-mix planning,
+    with adstocked media-spend covariates (synthetic India geo-SKU panel).
+  context_window: 52
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: India_FMCG_Sales_Media
+  target_variable_names:
+  - sales value
+  covariate_variable_names:
+  - display flag adstock
+  - trade spend adstock
+---
+task:
+  task_name: India FMCG Weekly Sales
+  task_description: Weekly univariate forecasting of national FMCG sales for demand
+    planning (synthetic India geo-SKU panel).
+  context_window: 52
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: India_FMCG_Weekly_Sales
+  target_variable_names:
+  - sales value
+  covariate_variable_names: []
+---
+task:
+  task_name: Olist Daily Closed Deals
+  task_description: Daily forecasting of closed seller deals in the Olist marketing
+    funnel for sales-capacity planning, with lead-origin mix covariates.
+  context_window: 60
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Olist_Daily_Closed_Deals
+  target_variable_names:
+  - closed deals
+  covariate_variable_names:
+  - origin organic pct
+  - origin paid search pct
+  - origin social pct
+---
+task:
+  task_name: Olist Daily New Leads
+  task_description: Daily univariate forecasting of new marketing-qualified seller
+    leads in the Olist funnel for sales-capacity planning.
+  context_window: 60
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Olist_Daily_New_Leads
+  target_variable_names:
+  - new leads
+  covariate_variable_names: []
+---
+task:
+  task_name: Olist Lead Deal Funnel
+  task_description: Daily joint forecasting of the Olist seller-acquisition funnel
+    (new marketing-qualified leads and closed deals) for pipeline planning.
+  context_window: 60
+  forecast_horizon: 14
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Olist_Lead_Deal_Funnel
+  target_variable_names:
+  - new leads
+  - closed deals
+  covariate_variable_names: []
+---
+task:
+  task_name: Online Retail Weekly Returns
+  task_description: Weekly reverse-logistics forecasting of customer product returns
+    to plan restocking and refund capacity (UK Online Retail II, 2009-2011).
+  context_window: 52
+  forecast_horizon: 13
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Online_Retail_Weekly_Returns
+  target_variable_names:
+  - returns units
+  covariate_variable_names:
+  - sales units lag 1
+  - sales value lag 1
+  - sales units lag 2
+  - sales value lag 2
+  - sales units lag 4
+  - sales value lag 4
+  - sales units lag 8
+  - sales value lag 8
+---
+task:
+  task_name: Real Residential Property Prices for Germany
+  task_description: Quarterly observations of the real (CPI-deflated) residential
+    property price index (2010=100) for Germany. It is a "selected" BIS indicator
+    covering all types of owner-occupied new and existing dwellings across the whole
+    country. The data is not seasonally adjusted and contains historical series backdated
+    to 1970.
+  context_window: 32
+  forecast_horizon: 17
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Quarterly_Germany_Residential_Property_Prices
+  target_variable_names:
+  - real residential property prices quarterly Germany
+  covariate_variable_names: []
+---
+task:
+  task_name: Walmart Sales
+  task_description: Comprehensive retail dataset capturing weekly revenue figures
+    across multiple stores, heavily enriched with external covariates. Models must
+    leverage regional environmental factors (air temperature), logistical costs (fuel
+    prices), macroeconomic indicators (unemployment, CPI), and seasonal spikes (holiday
+    flags) to accurately predict purchasing power and consumer demand.
+  context_window: 45
+  forecast_horizon: 16
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Weekly_Walmart_Sales
+  target_variable_names:
+  - weekly sales
+  covariate_variable_names:
+  - holiday flag
+  - temperature
+  - fuel price
+  - consumer price index
+  - unemployment rate
+---
+task:
+  task_name: Walmart Sales Multivariate
+  task_description: Comprehensive retail dataset capturing weekly revenue figures
+    across multiple stores, heavily enriched with external covariates. Models must
+    leverage regional environmental factors (air temperature), logistical costs (fuel
+    prices), macroeconomic indicators (unemployment, CPI), and seasonal spikes (holiday
+    flags) to accurately predict purchasing power and consumer demand.
+  context_window: 45
+  forecast_horizon: 16
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: commerce_and_trade
+  dataset_name: Weekly_Walmart_Sales_Multivariate
+  target_variable_names:
+  - consumer price index
+  - fuel price
+  - holiday flag
+  - temperature
+  - unemployment rate
+  - weekly sales
+  covariate_variable_names: []

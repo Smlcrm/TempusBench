@@ -1,0 +1,12 @@
+{
+  "name": "NREL PVDAQ SR_CO Utility-Scale Solar Plant",
+  "link": "https://data.openei.org/submissions/4568",
+  "citation": "NREL PVDAQ system 9068 (SR_CO), 4.7 MW tracked plant, Colorado. DOI:10.25984/1846021.",
+  "license": "DOE Open Energy Data Initiative (OEDI)",
+  "description": "5-min meter AC power (kW) with on-site POA irradiance, ambient temp, wind speed. Aug 2017\u2013Nov 2023.",
+  "preprocessing": [
+    "1. Source: PVDAQ 9068 prize files from Drive.",
+    "2. Inner-joined on measured_on; native 5-min resolution.",
+    "3. 4 variates: 1 target + 3 covariates."
+  ]
+}

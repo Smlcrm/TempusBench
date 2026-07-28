@@ -1,0 +1,15 @@
+{
+  "name": "N02BA Aspirin Weekly Dispensing",
+  "link": "https://www.kaggle.com/datasets/milanzdravkovic/pharma-sales-data",
+  "citation": "Zdravkovic, Milan. \"Pharma Sales Data.\" Kaggle, 2019, www.kaggle.com/datasets/milanzdravkovic/pharma-sales-data.",
+  "license": "Source dataset license not explicitly stated on Kaggle (Milan Zdravkovic, 'Pharma Sales Data') - verify terms before redistribution. Weather covariates: Open-Meteo (CC BY 4.0). Influenza covariates: CDC FluView / Delphi Epidata (US Government public domain).",
+  "description": "N02BA - Salicylic acid and derivatives (e.g. acetylsalicylic acid / aspirin). Real weekly point-of-sale UNITS DISPENSED at a single pharmacy (Kaggle 'Pharma Sales Data', Milan Zdravkovic), aggregated to ISO weeks, 2014-01-05 to 2019-10-13 (302 weeks). This is actual dispensed volume, not a search/interest proxy. Target: n02ba aspirin units (weekly dispensed units). Covariates are exogenous weather (Open-Meteo) and US influenza surveillance (CDC FluView / Delphi Epidata) aligned to the same weekly grid.\n\nCovariate glossary:\n- n02ba aspirin units (units): weekly dispensed units for this ATC drug class at the source pharmacy (target).\n- mean temperature (degC): mean daily air temperature at 2 m, weekly mean (Open-Meteo).\n- min temperature (degC): minimum daily air temperature at 2 m, weekly mean (Open-Meteo).\n- max temperature (degC): maximum daily air temperature at 2 m, weekly mean (Open-Meteo).\n- precipitation (mm): total daily precipitation (rain + snow water-equivalent), weekly mean (Open-Meteo).\n- snowfall (cm): daily snowfall, weekly mean (Open-Meteo).\n- max wind speed (km/h): maximum daily wind speed at 10 m, weekly mean (Open-Meteo).\n- shortwave radiation (MJ/m^2): daily shortwave (global) solar radiation sum, weekly mean (Open-Meteo).\n- weighted influenza-like illness (%): CDC FluView / Delphi Epidata weighted ILI, population-weighted percent of outpatient visits.\n- influenza-like illness (%): CDC FluView / Delphi Epidata unweighted ILI, raw percent of outpatient visits.",
+  "preprocessing": [
+    "1. Source: Kaggle 'Pharma Sales Data' (single-pharmacy POS, ATC-classified), resampled to weekly (week-starting Sunday) dispensed units for this ATC group.",
+    "2. Weather covariates from Open-Meteo historical archive (daily), averaged to the ISO week.",
+    "3. Influenza covariates from CDC FluView / Delphi Epidata weighted & unweighted ILI (%).",
+    "4. Dropped calendar-derived columns (week-of-year, month, holiday count): the CSV carries a single shared time index only.",
+    "5. Target column renamed from its upload alias to its real variable name; target vs covariate roles are declared in task.yaml.",
+    "6. Long-form TempusBench schema: variable_name, variable_unit, timestamps (JSON array of ISO-8601 UTC strings, shared across variates), values (JSON array; NaN serialized as null)."
+  ]
+}

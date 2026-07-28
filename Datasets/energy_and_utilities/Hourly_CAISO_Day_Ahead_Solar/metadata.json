@@ -1,0 +1,10 @@
+{
+  "name": "CAISO Day-Ahead Solar Forecast vs Actual",
+  "link": "https://www.caiso.com/market/Pages/OASIS.aspx",
+  "citation": "CAISO OASIS SLD_REN_FCST \u2014 DAM forecast + actual embedded solar (NP15+SP15+ZP26).",
+  "license": "CAISO Open Access",
+  "description": "Hourly CAISO day-ahead solar market forecast vs actual embedded solar generation.",
+  "preprocessing": [
+    "1. Monthly CAISO API downloads merged; hubs summed; hourly UTC."
+  ]
+}

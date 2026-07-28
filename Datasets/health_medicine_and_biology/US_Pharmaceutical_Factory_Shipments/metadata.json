@@ -1,0 +1,14 @@
+{
+  "name": "US Pharmaceutical Factory Shipments",
+  "link": "https://fred.stlouisfed.org/",
+  "citation": "U.S. Census Bureau via FRED: A25BVS (Factory Shipments), MRTSSM44611USS (Retail Pharmacy Sales), A25BTI (Factory Inventory).",
+  "license": "Public domain (FRED / U.S. government data)",
+  "description": "Monthly macro-level U.S. pharmaceutical supply chain series (1992\u2013present). Concurrent retail pharmacy sales and factory inventory are covariates for factory shipments (no lag features).",
+  "preprocessing": [
+    "1. Source: FRED series A25BVS, MRTSSM44611USS, A25BTI merged on timesteps.",
+    "2. Dropped Month_Index and Inventory_to_Shipment_Ratio from task variates.",
+    "3. Frequency: monthly (MS).",
+    "4. Timestamps as ISO-8601 UTC strings shared across variates.",
+    "5. Output CSV schema: variable_name, variable_unit, timestamps, values (3 variates)."
+  ]
+}

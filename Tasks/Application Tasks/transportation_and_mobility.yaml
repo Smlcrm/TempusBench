@@ -1,0 +1,112 @@
+task:
+  task_name: Air transport, passengers carried
+  task_description: Annual observations tracking the total number of domestic and
+    international aircraft passengers of air carriers registered in the country. For
+    this univariate dataset, we are extracting and using only the historical data
+    specific to the United States.
+  context_window: 32
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: transportation_and_mobility
+  dataset_name: Annual_US_Air_Passengers
+  target_variable_names:
+  - air transport passengers carried United States
+  covariate_variable_names: []
+---
+task:
+  task_name: Capital Bikeshare Daily Trips
+  task_description: Daily forecasting of Capital Bikeshare rental trips for fleet
+    rebalancing and staffing (Washington DC), with weather covariates.
+  context_window: 365
+  forecast_horizon: 28
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: transportation_and_mobility
+  dataset_name: Capital_Bikeshare_Daily_Trips
+  target_variable_names:
+  - bike trips
+  covariate_variable_names:
+  - temp
+  - atemp
+  - hum
+  - windspeed
+  - weathersit
+---
+task:
+  task_name: LA Port Container Throughput
+  task_description: Monthly forecasting of Port of Los Angeles container throughput
+    (TEU) for terminal-capacity and labor planning, with U.S. retail-sales covariate.
+  context_window: 71
+  forecast_horizon: 12
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: transportation_and_mobility
+  dataset_name: LA_Port_Container_Throughput
+  target_variable_names:
+  - container throughput teu
+  covariate_variable_names:
+  - retail sales
+---
+task:
+  task_name: Airline Baggage Complaints
+  task_description: A multivariate transport logistics dataset tracking monthly observations
+    from 2004 to 2010 for major US airlines. By juxtaposing total passenger complaints
+    regarding lost or damaged baggage against total scheduled flights, cancellations,
+    and boarded passengers, this data allows models to forecast operational friction
+    and its subsequent impact on customer satisfaction in the aviation industry.
+  context_window: 32
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: transportation_and_mobility
+  dataset_name: Monthly_Airline_Baggage_Complaints
+  target_variable_names:
+  - baggage complaints
+  covariate_variable_names:
+  - scheduled flights
+  - cancelled flights
+  - enplaned passengers
+---
+task:
+  task_name: Airline Baggage Complaints Multivariate
+  task_description: A multivariate transport logistics dataset tracking monthly observations
+    from 2004 to 2010 for major US airlines. By juxtaposing total passenger complaints
+    regarding lost or damaged baggage against total scheduled flights, cancellations,
+    and boarded passengers, this data allows models to forecast operational friction
+    and its subsequent impact on customer satisfaction in the aviation industry.
+  context_window: 32
+  forecast_horizon: 8
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: transportation_and_mobility
+  dataset_name: Monthly_Airline_Baggage_Complaints_Multivariate
+  target_variable_names:
+  - baggage complaints
+  - cancelled flights
+  - enplaned passengers
+  - scheduled flights
+  covariate_variable_names: []
+---
+task:
+  task_name: TSA Daily Passenger Throughput
+  task_description: Daily forecasting of U.S. TSA checkpoint passenger throughput
+    for airport staffing and passenger-flow planning, with jet-fuel and crude-oil-price
+    covariates.
+  context_window: 364
+  forecast_horizon: 28
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: application
+  dataset_category: transportation_and_mobility
+  dataset_name: TSA_Daily_Passenger_Throughput
+  target_variable_names:
+  - tsa passenger throughput
+  covariate_variable_names:
+  - jet fuel price
+  - wti crude price

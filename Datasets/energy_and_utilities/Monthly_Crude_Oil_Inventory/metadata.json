@@ -1,0 +1,19 @@
+{
+  "name": "JODI United States \u2014 monthly crude-oil stocks, production, refinery intake, apparent demand & WTI price \u2014 US monthly crude oil closing stocks (inventory / storage) (covariate forecasting bundle)",
+  "link": "https://www.jodidata.org/_resources/files/downloads/oil-data/world_Primary_CSV.zip",
+  "citation": "JODI World Database (https://www.jodidata.org/_resources/files/downloads/oil-data/world_Primary_CSV.zip); Yahoo Finance (https://query1.finance.yahoo.com)",
+  "license": "JODI: freely redistributable with attribution to JODI/IEF. Yahoo Finance data via yfinance: personal/research use per Yahoo terms.",
+  "description": "US monthly crude oil closing stocks (inventory / storage). This bundle forecasts `us_crude_oil_closing_stocks` from a covariate panel of us_crude_oil_production, us_refinery_crude_intake, us_crude_oil_apparent_demand, wti_crude_oil_price. Source dataset 'JODI United States \u2014 monthly crude-oil stocks, production, refinery intake, apparent demand & WTI price' \u2014 monthly cadence, 196 rows, 2010-01..2026-04. NON-EIA (the forecasting model is trained on EIA data, so EIA inputs are excluded): NONE of these are EIA. JODI is compiled by the International Energy Forum (IEF) Secretariat from national administrations' own monthly submissions \u2014 it is a global initiative INDEPENDENT of the U.S. EIA. Explicitly, even the United States ('US') rows used here are the country's JODI submission harmonised by the IEF, NOT sourced from or derived from eia.gov. WTI is Yahoo/NYMEX market data. Baker Hughes (a private oilfield-services firm) rig count was attempted but is not EIA either. No series is sourced from or derived from eia.gov.",
+  "preprocessing": [
+    "1. Download the JODI World Database oil 'Primary' world CSV ZIP (NewProcedure_Primary_CSV.csv, ~283 MB). Cached under datasets/raw/.",
+    "2. Chunk-read the long-format CSV; keep rows REF_AREA=='US', ENERGY_PRODUCT=='CRUDEOIL', UNIT_MEASURE=='KBBL'. Coerce OBS_VALUE ('-','x' confidential/NA -> NaN).",
+    "3. Pivot FLOW_BREAKDOWN to wide columns keyed by TIME_PERIOD (YYYY-MM).",
+    "4. Map CLOSTLV->crude_stocks (closing LEVEL), INDPROD->crude_production, REFINOBS->refinery_intake.",
+    "5. Compute crude_demand = INDPROD + TOTIMPSB - TOTEXPSB - STOCKCH (JODI apparent-demand identity; == refinery intake + direct use + statistical difference).",
+    "6. Fetch WTI front-month CL=F daily via yfinance (retry w/ backoff on HTTP 429) and resample to a monthly mean of daily closes -> wti_price; left-join on month.",
+    "7. Attempt Baker Hughes rig count (best-effort); on the observed no-key bot-block, DROP the column and record the exact HTTP outcome (not fabricated).",
+    "8. Restrict to months >= 2010-01 through JODI's latest month (2026-04). Assert no residual NaNs (JODI+WTI both complete over the window). Write wide CSV sorted by month.",
+    "9. No calendar/time-derived variables were present; the only notion of time is the shared timestamps list.",
+    "10. Renamed all variable names and units from snake_case codes to plain English (CSV row/column structure unchanged). Name and unit mapping \u2014 us_crude_oil_closing_stocks [kbbl] -> \"US crude oil closing stocks\" [thousand barrels] (target; US monthly crude-oil closing stocks); us_crude_oil_production [kbbl] -> \"US crude oil production\" [thousand barrels] (covariate; US monthly crude-oil production); us_refinery_crude_intake [kbbl] -> \"US refinery crude intake\" [thousand barrels] (covariate; US monthly refinery crude intake); us_crude_oil_apparent_demand [kbbl] -> \"US crude oil apparent demand\" [thousand barrels] (covariate; US crude-oil apparent demand (JODI identity)); wti_crude_oil_price [$/bbl] -> \"WTI crude oil price\" [US dollars per barrel] (covariate; WTI front-month crude-oil price)."
+  ]
+}

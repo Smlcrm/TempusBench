@@ -1,0 +1,16 @@
+{
+  "name": "GA4 Ecommerce KPI Panel",
+  "link": "https://developers.google.com/analytics/bigquery/web-ecommerce-demo-dataset",
+  "citation": "Google. BigQuery sample dataset for Google Analytics ecommerce web implementation \u2014 ga4_obfuscated_sample_ecommerce (https://developers.google.com/analytics/bigquery/web-ecommerce-demo-dataset). Query tables `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` (Google Merchandise Store obfuscated GA4 event export, 2020-11-01..2021-01-31). Hosted via Google Cloud Public Datasets / BigQuery.",
+  "license": "Google Cloud Public Dataset Program sample \u2014 provided for analysis via BigQuery; obfuscated demo data (not identical to the GA4 Merchandise Store demo account). Subject to Google Cloud / BigQuery public dataset terms; query costs may apply beyond free tier.",
+  "description": "Daily e-commerce KPI panel. This bundle jointly forecasts `daily_pageviews`, `daily_active_users`, `daily_purchase_events`, `daily_revenue_usd`. Source: `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` \u2014 daily cadence, 92 rows, 2020-11-01..2021-01-31. Windows: context_window=35, forecast_horizon=7. Digital retail storefront funnel: pageviews / DAU / purchases / revenue; covariate task uses % mobile and % paid traffic mix.",
+  "preprocessing": [
+    "1. Source events from BigQuery public dataset ga4_obfuscated_sample_ecommerce (or place pre-aggregated ga4_daily.csv in data/marketing/ga4/raw/).",
+    "2. Daily rollup SQL (see benchmark_build/README.md): PARSE_DATE event_date; COUNTIF page_view; COUNT DISTINCT user_pseudo_id; COUNTIF purchase; SUM purchase_revenue_in_usd; % mobile device.category; % paid traffic_source.medium \u2208 {cpc,paid,ppc}.",
+    "3. transform_ga4.py: parse date \u2192 UTC day timestamps; numeric coerce count/revenue/% columns.",
+    "4. Reindex complete daily calendar 2020-11-01..2021-01-31 (92 days).",
+    "5. Fill missing count/revenue with 0; ffill/bfill traffic percentages then fillna 0.",
+    "6. Note: purchase_events counts purchase events (orders), not unique buyers; data are obfuscated so some fields are placeholders.",
+    "7. Write ga4_daily.parquet then TempusBench CSV (context_window=35, forecast_horizon=7 \u2014 constrained by short history)."
+  ]
+}

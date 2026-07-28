@@ -1,0 +1,14 @@
+{
+  "name": "US Monthly Vehicle Assemblies",
+  "link": "https://fred.stlouisfed.org/series/MVATOTASSS",
+  "citation": "U.S. Bureau of Economic Analysis / Federal Reserve Board. \"Motor Vehicle Assemblies: Total (MVATOTASSS).\" FRED, Federal Reserve Bank of St. Louis, https://fred.stlouisfed.org/series/MVATOTASSS. Accessed 15 July 2026.",
+  "license": "U.S. Government public data (U.S. Bureau of Economic Analysis: motor-vehicle assemblies and total vehicle sales; Federal Reserve Board G.19 Consumer Credit: new-car auto finance rate), redistributed via FRED (Federal Reserve Bank of St. Louis). Free to use and redistribute; see FRED Terms of Use https://fred.stlouisfed.org/legal.",
+  "description": "Monthly U.S. total motor-vehicle assemblies, seasonally-adjusted annual rate (millions of units), with downstream demand (vehicle sales) and credit-cost (auto-loan rate) covariates. Application: assembly-line build-rate and JIT supplier-release planning under supply constraints.\n\nCovariate glossary:\n- motor vehicle assemblies: total U.S. motor-vehicle assemblies, millions of units, seasonally-adjusted annual rate (FRED MVATOTASSS).\n- total vehicle sales: total U.S. vehicle sales, thousands of units, not seasonally adjusted (FRED TOTALNSA) - downstream demand pull.\n- auto loan rate 48 month: finance rate on 48-month new-car consumer loans at commercial banks, percent (FRED TERMCBAUTO48NS) - demand/credit cost.",
+  "preprocessing": [
+    "1. Downloaded each monthly series from the FRED CSV endpoint (fredgraph.csv?id=<ID>).",
+    "2. Aligned target and covariates onto a common month-start (MS) time index.",
+    "3. Restricted to the common native span (first month where every covariate is observed through the last observed target month).",
+    "4. Forward-filled only sparse internal covariate gaps; no target imputation.",
+    "5. Dropped all calendar/timestep columns; kept a single shared ISO-8601 UTC timestamp index."
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "EIA Form 930 Hourly Grid Demand",
+  "link": "https://www.eia.gov/electricity/gridmonitor/",
+  "citation": "U.S. Energy Information Administration, Form EIA-930 Hourly Electric Grid Monitor. Balancing Authority: PJM.",
+  "license": "Public domain (EIA / U.S. government data)",
+  "description": "Hourly electricity demand and day-ahead demand forecast for balancing authority PJM (Jul 2015\u2013present). Used for short-term grid load forecasting.",
+  "preprocessing": [
+    "1. Source: eia930_hourly_demand_all_bas.csv from PUDL/Zenodo EIA-930 archives.",
+    "2. Filtered to balancing authority PJM.",
+    "3. Kept utc_time_end, demand_mw, demand_forecast_mw.",
+    "4. Dropped duplicate timestamps (kept latest).",
+    "5. Frequency: hourly (UTC end-of-hour timestamps).",
+    "6. Output CSV schema: variable_name, variable_unit, timestamps, values (2 variates)."
+  ]
+}

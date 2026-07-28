@@ -1,0 +1,26 @@
+{
+  "name": "covariate_environment_daily_river_streamflow",
+  "link": [
+    "https://waterservices.usgs.gov/nwis/dv/?format=rdb&sites=01463500&parameterCd=00060&startDT=2014-01-01&endDT=2026-07-11"
+  ],
+  "citation": [
+    "USGS NWIS (National Water Information System)",
+    "Open-Meteo ERA5 Historical archive"
+  ],
+  "license": {
+    "usgs": "US Geological Survey data are public domain (US Government work, no copyright).",
+    "open_meteo": "Open-Meteo data are free for non-commercial/commercial use under CC-BY 4.0; ERA5 reanalysis by Copernicus Climate Change Service (C3S)/ECMWF."
+  },
+  "description": "e1-river-streamflow \u2014 'River discharge' forecasting bundle. Native cadence daily; 4575 timesteps 2014-01-01..2026-07-11. Non-EIA sources. Known-future covariates: Precipitation, Mean air temperature, Maximum air temperature, Minimum air temperature. NO contemporaneous covariates \u2014 all covariates enter as past values only; known-future covariates (weather forecasts, scheduled budgets/releases) are genuinely available at forecast time. Timestamp-derived calendar features are NOT included \u2014 time information is carried only by the timestamps column.",
+  "preprocessing": [
+    "1. Parsed USGS RDB target (01463500, param 00060): tab-delimited, dropped '#' comment lines and format-spec row; selected the *_00060_00003 value column dynamically.",
+    "2. Parsed USGS RDB upstream covariate (01438500, param 00060) the same way (value column prefix 97263 differs from target 97504 -> matched by suffix).",
+    "3. Parsed Open-Meteo ERA5 daily JSON (timezone=America/New_York, local daily dates). Converted snowfall_sum from Open-Meteo native cm -> mm (x10); Snow depthax already in m.",
+    "4. Renamed raw source fields to human-readable: USGS site 01463500 param 00060 (discharge)->River discharge, USGS site 01438500 param 00060->Upstream river discharge, Open-Meteo precipitation_sum->Precipitation, temperature_2m_mean->Mean air temperature, temperature_2m_max->Maximum air temperature, temperature_2m_min->Minimum air temperature, snowfall_sum->Snowfall, Snow depthax->Snow depth.",
+    "5. Inner-joined target + upstream + weather on local calendar date (YYYY-MM-DD).",
+    "6. Reindexed to continuous daily calendar and linearly interpolated interior single-day gaps only (per-column fills: none).",
+    "7. Dropped leading/trailing and any remaining (multi-day-gap) NaN rows (0 rows).",
+    "8. Wrote CSV with human-readable columns; raw cfs stored (log-space deferred to modeling).",
+    "9. Reformatted wide -> TempusBench long (variable_name, variable_unit, timestamps, values); variable names are human-readable English; timestamp-derived calendar features dropped (time lives only in the timestamps column); timestamps ISO-8601 UTC-labelled, shared across variables; missing -> null; CSV-writer quoted."
+  ]
+}

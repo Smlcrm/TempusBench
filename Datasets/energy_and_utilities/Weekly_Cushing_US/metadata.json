@@ -1,0 +1,18 @@
+{
+  "name": "U.S. EIA Cushing, Oklahoma \u2014 weekly commercial crude oil stocks (WPSR hub) \u2014 Cushing stocks with utilization & lagged Gulf tanker covariates (covariate inventory forecasting bundle)",
+  "link": "https://www.eia.gov/petroleum/supply/weekly/",
+  "citation": "U.S. Energy Information Administration (EIA). Weekly Petroleum Status Report / Open Data API v2 (https://www.eia.gov/opendata/). Routes used by download_eia.py: petroleum/stoc/wstk facets duoarea=YCUOK, product=EPC0, process=SAX \u2192 cushing_crude_stocks_mbbl; petroleum/pnp/wiup process=YUP averaged over PADD duoareas R10\u2013R50 \u2192 refinery_utilization_pct; petroleum/sum/sndw duoarea=NUS, product=EPC0, process=FPF \u2192 us_crude_production_mbpd. Optional AIS covariate: NOAA Marine Cadastre / U.S. Coast Guard NAIS vessel tracks (https://marinecadastre.gov/ais/; 2024\u20132025 GeoParquet aistrack + optional 2023 ZIP).",
+  "license": "EIA Open Data: free under EIA API Terms of Service / Copyrights & Reuse Policy (https://www.eia.gov/opendata/terms-of-service.php) \u2014 U.S. government information. Marine Cadastre AIS historical tracks: U.S. government public-domain / CC0 guidance from NOAA OCM; do not retransmit contrary to USCG NAIS Level-C sharing rules.",
+  "description": "Covariate Cushing inventory. This bundle forecasts `cushing_crude_stocks_mbbl` from `refinery_utilization_pct` and `loaded_tanker_transits_us_gulf_lag4w`. Source: EIA Weekly Petroleum Status Report via Open Data API v2 \u2014 weekly W-WED cadence, 1160 rows, 2004-04-14..2026-07-01. Cushing OK is the NYMEX WTI delivery / key U.S. commercial storage hub. Windows: context_window=52, forecast_horizon=4. Refinery utilization is PADD-mean (R10\u2013R50). AIS Gulf tanker counts (when built) are lagged 4 weeks to avoid same-week leakage into stocks.",
+  "preprocessing": [
+    "1. download_eia.py: EIA API v2 GET with EIA_API_KEY (or data/inventory/eia/.api_key); frequency=weekly; length\u22645000; write JSON under data/inventory/eia/raw/.",
+    "2. Cushing stocks: route petroleum/stoc/wstk, facets duoarea=YCUOK (Cushing OK), product=EPC0 (crude), process=SAX (stocks).",
+    "3. Refinery utilization: route petroleum/pnp/wiup, process=YUP for each PADD duoarea R10,R20,R30,R40,R50; aggregate = arithmetic mean across PADDs per week (NUS national not used \u2014 API coverage).",
+    "4. U.S. crude production: route petroleum/sum/sndw, facets duoarea=NUS, product=EPC0, process=FPF.",
+    "5. transform_inventory.py: parse each JSON response.data; period\u2192UTC; align to W-WED week-ending timestamps; groupby last.",
+    "6. Optional FRED WTI (DCOILWTICO / wti_spot_daily.csv): daily\u2192W-WED mean; outer-join if present (may be absent).",
+    "7. Optional process_ais.py on Marine Cadastre monthly aistrack-*.parquet: VesselType\u2208[80,89], draft\u22658 m, track centroid in US Gulf bbox lon[-97,-88]\u00d7lat[25,31]; count per W-WED; shift 4 weeks \u2192 loaded_tanker_transits_us_gulf_lag4w.",
+    "8. Left-join EIA (+FRED/+AIS); ffill; dropna on cushing_crude_stocks_mbbl; write inventory_cushing_us.parquet.",
+    "9. build_tasks.py: TempusBench CSV with context_window=52 weeks, forecast_horizon=4 weeks."
+  ]
+}
