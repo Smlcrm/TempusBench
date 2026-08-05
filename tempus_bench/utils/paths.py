@@ -1,13 +1,16 @@
 """
 Path utilities for inferring absolute paths from the project structure.
 
-This module provides utilities to infer absolute paths based on the fixed
-project structure, eliminating the need for directory path configuration.
+Discovers catalog tasks under repo-root ``Tasks/`` and resolves dataset CSVs
+under repo-root ``Datasets/``.
 """
 
-import os
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional
+from typing import Any
+
+import yaml
 
 
 def get_project_root() -> Path:
@@ -17,31 +20,175 @@ def get_project_root() -> Path:
     Returns:
         Path: Absolute path to the project root
     """
-    # Get the directory containing this file (tempus_bench/utils/)
     current_file = Path(__file__).resolve()
-    # Go up two levels to reach project root
     return current_file.parent.parent.parent
 
 
 def get_tasks_dir() -> Path:
     """
-    Get the absolute path to the tasks directory.
-
-    Downloads task CSV data from Hugging Face on first use when files are missing.
+    Get the absolute path to the catalog task definitions directory.
 
     Returns:
-        Path: Absolute path to tempus_bench/tasks/
+        Path: Absolute path to repo-root ``Tasks/``
 
     Raises:
-        FileNotFoundError: If the tasks directory doesn't exist
+        FileNotFoundError: If the Tasks directory doesn't exist
     """
-    from tempus_bench.utils.task_assets import ensure_task_assets
-
-    ensure_task_assets()
-    tasks_dir = get_project_root() / "tempus_bench" / "tasks"
-    if not tasks_dir.exists():
+    tasks_dir = get_project_root() / "Tasks"
+    if not tasks_dir.is_dir():
         raise FileNotFoundError(f"Tasks directory not found: {tasks_dir}")
     return tasks_dir
+
+
+def get_datasets_dir(*, ensure: bool = True) -> Path:
+    """
+    Get the absolute path to the local Datasets directory.
+
+    When ``ensure`` is True, syncs missing CSVs from Hugging Face once per process.
+
+    Returns:
+        Path: Absolute path to repo-root ``Datasets/``
+    """
+    if ensure:
+        from tempus_bench.utils.task_assets import ensure_dataset_assets
+
+        ensure_dataset_assets()
+    return get_project_root() / "Datasets"
+
+
+def list_task_catalog_dirs() -> list[Path]:
+    """Return immediate catalog directories under ``Tasks/`` (e.g. Application Tasks)."""
+    tasks_dir = get_tasks_dir()
+    return sorted(
+        p
+        for p in tasks_dir.iterdir()
+        if p.is_dir() and not p.name.startswith(".") and not p.name.startswith("__")
+    )
+
+
+def _iter_category_yaml_files() -> list[Path]:
+    files: list[Path] = []
+    for catalog_dir in list_task_catalog_dirs():
+        files.extend(sorted(catalog_dir.glob("*.yaml")))
+        files.extend(sorted(catalog_dir.glob("*.yml")))
+    return files
+
+
+def load_all_task_documents() -> list[dict[str, Any]]:
+    """
+    Load every ``task:`` document from all catalog YAML files under ``Tasks/``.
+
+    Raises:
+        ValueError: On duplicate human ``task_name`` values across the catalog.
+        ValueError: If a document uses singular ``target_variable_name``.
+    """
+    docs: list[dict[str, Any]] = []
+    seen_names: dict[str, str] = {}
+
+    for yaml_path in _iter_category_yaml_files():
+        with yaml_path.open(encoding="utf-8") as handle:
+            raw_docs = list(yaml.safe_load_all(handle))
+        for doc in raw_docs:
+            if not doc or "task" not in doc:
+                continue
+            task = doc["task"]
+            if not isinstance(task, dict):
+                raise ValueError(f"Invalid task document in {yaml_path}")
+            if "target_variable_name" in task:
+                raise ValueError(
+                    f"Singular 'target_variable_name' is not allowed in {yaml_path} "
+                    f"(task_name={task.get('task_name')!r}). Use only 'target_variable_names'."
+                )
+            name = task.get("task_name")
+            if not name or not isinstance(name, str):
+                raise ValueError(f"Missing task_name in {yaml_path}")
+            if name in seen_names:
+                raise ValueError(
+                    f"Duplicate task_name {name!r}: seen in {seen_names[name]} and {yaml_path}"
+                )
+            seen_names[name] = str(yaml_path)
+            enriched = dict(task)
+            enriched["_source_yaml"] = str(yaml_path)
+            docs.append(enriched)
+    return docs
+
+
+def find_task_documents(task_path_pattern: str) -> dict[str, dict[str, Any]]:
+    """
+    Find task documents matching a selector under ``Tasks/``.
+
+    Supported patterns:
+    - ``*``: all tasks in every catalog
+    - ``{dataset_category}/*``: all tasks in that category
+    - ``{dataset_category}/{human task_name}``: one exact task
+
+    Returns:
+        Mapping of human ``task_name`` -> raw task document dict.
+    """
+    pattern = task_path_pattern.strip()
+    all_docs = load_all_task_documents()
+    matched: dict[str, dict[str, Any]] = {}
+
+    if pattern == "*":
+        for doc in all_docs:
+            matched[doc["task_name"]] = doc
+        return matched
+
+    if pattern.endswith("/*"):
+        category = pattern[:-2]
+        for doc in all_docs:
+            if doc.get("dataset_category") == category:
+                matched[doc["task_name"]] = doc
+        return matched
+
+    if "/" not in pattern:
+        raise ValueError(
+            f"Invalid task selector {pattern!r}. Expected '*', "
+            "'{category}/*', or '{category}/{task_name}'."
+        )
+
+    category, _, task_name = pattern.partition("/")
+    for doc in all_docs:
+        if doc.get("dataset_category") == category and doc.get("task_name") == task_name:
+            matched[doc["task_name"]] = doc
+            return matched
+    return matched
+
+
+def find_task_directories(task_path_pattern: str) -> dict[str, str]:
+    """
+    Backward-compatible discovery API.
+
+    Returns mapping of human ``task_name`` -> logical selector
+    ``{dataset_category}/{task_name}``. Prefer ``find_task_documents`` for
+    loading full YAML payloads.
+    """
+    docs = find_task_documents(task_path_pattern)
+    return {
+        name: f"{doc['dataset_category']}/{doc['task_name']}"
+        for name, doc in docs.items()
+    }
+
+
+def get_dataset_path(
+    dataset_category: str,
+    dataset_name: str,
+    *,
+    ensure: bool = True,
+) -> Path:
+    """
+    Resolve ``Datasets/{dataset_category}/{dataset_name}/{dataset_name}.csv``.
+
+    Raises:
+        FileNotFoundError: If the CSV is missing after optional HF sync.
+    """
+    datasets_root = get_datasets_dir(ensure=ensure)
+    dataset_path = (
+        datasets_root / dataset_category / dataset_name / f"{dataset_name}.csv"
+    )
+    if not dataset_path.is_file():
+        raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
+    return dataset_path
 
 
 def get_models_dir() -> Path:
@@ -64,117 +211,40 @@ def get_available_models() -> set:
     """
     Get all available model names from the models directory structure.
 
-    This function scans the models directory to find all model folders that contain
-    a corresponding model file. The model file naming convention is {model_name}_model.py.
-
     Returns:
         set: Set of available model names found in the models directory
     """
     available_models = set()
     models_dir = get_models_dir()
-    # Look for model folders directly in the models directory
     for model_folder in models_dir.iterdir():
         if (
             model_folder.is_dir()
             and not model_folder.name.startswith("__")
             and not model_folder.name.startswith(".")
         ):
-            # Check if it has a model file
             model_file = model_folder / f"{model_folder.name}_model.py"
             settings_file = model_folder / "settings.yaml"
             if model_file.exists() and settings_file.exists():
                 available_models.add(model_folder.name)
-
     return available_models
 
 
 def get_absolute_runs_dir(runs_dir_relative: str) -> Path:
-    """
-    Get the absolute path to the runs directory from a relative path.
-
-    Args:
-        runs_dir_relative: Relative path to runs directory (e.g., "runs")
-
-    Returns:
-        Path: Absolute path to runs directory
-    """
+    """Get the absolute path to the runs directory from a relative path."""
     runs_path = Path(runs_dir_relative)
     if runs_path.is_absolute():
         return runs_path
     return get_project_root() / runs_dir_relative
 
 
-def get_task_path(task_name: str) -> Path:
-    """
-    Get the absolute path to a specific task directory.
-
-    Args:
-        task_name: Name of the task (e.g., 'multivariate/multivariate_transport_monthly_airline_baggage_complaints')
-
-    Returns:
-        Path: Absolute path to the task directory
-
-    Raises:
-        FileNotFoundError: If the task directory doesn't exist
-    """
-    task_path = get_tasks_dir() / task_name
-    if not task_path.exists():
-        raise FileNotFoundError(f"Task directory not found: {str(task_path)}")
-    return task_path
-
-
-def get_dataset_path(task_name: str, *, file_name: str | None = None) -> Path:
-    """
-    Get the absolute path to a task dataset CSV.
-
-    Args:
-        task_name: Relative task path (e.g. ``univariate/foo`` or ``multivariate/bar``).
-        file_name: CSV filename from task.yaml; when omitted, tries ``{basename}.csv``
-            then the sole ``*.csv`` in the task folder.
-
-    Returns:
-        Path: Absolute path to the dataset file
-
-    Raises:
-        FileNotFoundError: If the dataset file doesn't exist
-    """
-    task_dir = get_task_path(task_name)
-    if file_name:
-        dataset_path = task_dir / file_name
-    else:
-        primary = task_dir / f"{task_dir.name}.csv"
-        if primary.exists():
-            dataset_path = primary
-        else:
-            csv_files = sorted(task_dir.glob("*.csv"))
-            if len(csv_files) == 1:
-                dataset_path = csv_files[0]
-            else:
-                dataset_path = primary
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
-    return dataset_path
-
-
 def get_model_path(model_type: str, model_name: str) -> Path:
     """
     Get the absolute path to a specific model directory.
 
-    Args:
-        model_type: Type of model ('deterministic', 'stochastic', or 'hybrid') - deprecated, kept for backwards compatibility
-        model_name: Name of the model
-
-    Returns:
-        Path: Absolute path to the model directory
-
-    Raises:
-        FileNotFoundError: If the model directory doesn't exist
-
     Note:
-        The model_type parameter is deprecated as models are now organized by their
-        settings.yaml file rather than folder structure. It's kept for backwards compatibility.
+        ``model_type`` is deprecated and ignored.
     """
-    # Models are now directly in the models directory, not in subdirectories
+    del model_type
     model_path = get_models_dir() / model_name
     if not model_path.exists():
         raise FileNotFoundError(f"Model directory not found: {model_path}")
@@ -182,15 +252,7 @@ def get_model_path(model_type: str, model_name: str) -> Path:
 
 
 def get_runs_dir() -> Path:
-    """
-    Get the absolute path to the runs directory.
-
-    Returns:
-        Path: Absolute path to runs directory
-
-    Raises:
-        FileNotFoundError: If the runs directory doesn't exist
-    """
+    """Get the absolute path to the runs directory."""
     runs_dir = get_project_root() / "runs"
     if not runs_dir.exists():
         raise FileNotFoundError(f"Runs directory not found: {runs_dir}")
@@ -198,61 +260,12 @@ def get_runs_dir() -> Path:
 
 
 def get_logs_path() -> Path:
-    """
-    Get the absolute path to the project logs directory (may not exist yet).
-
-    Returns:
-        Path: Absolute path to ``<project_root>/logs``
-    """
+    """Get the absolute path to the project logs directory (may not exist yet)."""
     return get_project_root() / "logs"
 
 
-def find_task_directories(task_path_pattern: str) -> dict[str, str]:
-    """
-    Find task directories based on a task path pattern under tasks/.
-
-    Supported patterns:
-    - ``*``: all folders under univariate/, multivariate/, and covariate/
-    - ``univariate/*`` / ``multivariate/*`` / ``covariate/*``: all folders in that category
-    - ``univariate/foo`` / ``multivariate/foo`` / ``covariate/foo``
-    """
-    tasks_dir = get_tasks_dir()
-    task_paths: dict[str, str] = {}
-    pattern = task_path_pattern.strip()
-
-    def _register_folder(task_path: Path) -> None:
-        if task_path.is_dir():
-            task_paths[task_path.name] = str(task_path)
-
-    if pattern == "*":
-        for subdir_name in ("univariate", "multivariate", "covariate"):
-            subdir_path = tasks_dir / subdir_name
-            if not subdir_path.is_dir():
-                continue
-            for task_path in subdir_path.iterdir():
-                _register_folder(task_path)
-        return task_paths
-
-    if pattern.endswith("/*"):
-        subdir_name = pattern[:-2]
-        subdir_path = tasks_dir / subdir_name
-        if subdir_path.is_dir():
-            for task_path in subdir_path.iterdir():
-                _register_folder(task_path)
-        return task_paths
-
-    task_path = tasks_dir / pattern
-    _register_folder(task_path)
-    return task_paths
-
-
 def ensure_directory_exists(path: Path) -> None:
-    """
-    Ensure that a directory exists, creating it if necessary.
-
-    Args:
-        path: Path to the directory to ensure exists
-    """
+    """Ensure that a directory exists, creating it if necessary."""
     path.mkdir(parents=True, exist_ok=True)
 
 
@@ -260,30 +273,19 @@ def get_available_metrics() -> list[Path]:
     """
     Get all files containing subclasses of the BaseMetric class.
 
-    This function scans the metrics directory for Python files and assumes all files
-    (except base_metric.py, __init__.py, and cache files) contain BaseMetric subclasses.
-
     Returns:
         list[Path]: List of absolute file paths containing BaseMetric subclasses
-
-    Raises:
-        FileNotFoundError: If the metrics directory doesn't exist
     """
-    # Get the absolute path to the metrics directory
     metrics_dir = get_project_root() / "tempus_bench" / "metrics"
     if not metrics_dir.exists():
         raise FileNotFoundError(f"Metrics directory not found: {metrics_dir}")
 
     metric_files = []
-
-    # Scan all Python files in the metrics directory
     for file_path in metrics_dir.glob("*.py"):
-        # Skip files starting with "." or "__", and base_metric.py
         if (
             not file_path.name.startswith(".")
             and not file_path.name.startswith("__")
             and file_path.name != "base_metric.py"
         ):
             metric_files.append(file_path.resolve())
-
     return metric_files

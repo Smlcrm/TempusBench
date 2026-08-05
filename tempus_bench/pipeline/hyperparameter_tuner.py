@@ -27,7 +27,6 @@ from tempus_bench.utils.utils import compute_point_forecast
 from ..utils.configs import JobConfig
 from ..utils.log_manager import LogManager
 from ..utils.visualizer import Visualizer
-from ..utils.paths import get_task_path
 from .data_loader import DataLoader
 from .model_executor import ModelExecutor
 from .metric_registry import MetricRegistry
@@ -89,14 +88,11 @@ def _task_id_for_results_sink(task_config) -> str:
     """
     Task key for external sinks (e.g. BigQuery ``task_id`` / Firestore execution_plan).
 
-    Uses ``<family>/<task_name>`` after tasks/ (e.g. ``covariate/covariate_foo``);
-    falls back to task_name.
+    Uses ``{task_mode}/{task_name}`` (e.g. ``covariate/Favorita Store 24 Weekly Sales``).
     """
-    parts = Path(task_config.task_path).parts
-    for i, seg in enumerate(parts):
-        if seg.lower() == "tasks" and i + 1 < len(parts):
-            kind = parts[i + 1]
-            return f"{kind}/{task_config.task_name}"
+    mode = getattr(task_config, "task_mode", None)
+    if mode:
+        return f"{mode}/{task_config.task_name}"
     return task_config.task_name
 
 
@@ -150,8 +146,13 @@ class HyperparameterTuner:
 
         self.model_name = job_config.model_config.model_name
         self.tuning_loss = self.evaluation_config.tuning_loss
-        self.dataset_path = Path(self.task_config.task_path)
-        self.dataset_file_path = self.dataset_path / self.task_config.file_name
+        from tempus_bench.utils.paths import get_dataset_path
+
+        self.dataset_file_path = get_dataset_path(
+            self.task_config.dataset_category,
+            self.task_config.dataset_name,
+        )
+        self.dataset_path = self.dataset_file_path.parent
         self.visualizer = Visualizer()
 
     def _generate_hyperparameter_grid(self) -> List[dict]:

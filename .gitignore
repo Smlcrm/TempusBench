@@ -87,8 +87,11 @@ temp/
 
 hugging_face_upload_old/
 hugging_face_upload/.staging/
+hugging_face_upload/.staging_datasets_dev/
 
-# Task data hosted on Hugging Face (Smlcrm/tempus_bench_tasks); keep locally, not in git
+# Task definitions live in git under Tasks/; dataset CSVs sync from Hugging Face
+# (Smlcrm/tempus_bench_tasks Datasets/). Local Datasets/ is a runtime cache.
+Datasets/
 tempus_bench/tasks/
 
 # Local-only — data prep / smoke configs (do not commit)

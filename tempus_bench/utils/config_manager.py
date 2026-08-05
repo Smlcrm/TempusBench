@@ -31,9 +31,7 @@ from .model_settings import (
 from .paths import (
     get_project_root,
     get_models_dir,
-    find_task_directories,
 )
-from .task_yaml_loader import build_task_config
 
 
 class ValidationError(Exception):
@@ -160,30 +158,32 @@ class ConfigManager:
         """
         Initialize the tasks.
 
-        Discovers and loads all TaskConfig objects from task.yaml files in directories
-        found via find_task_directories using self.task_path.
+        Discovers and loads all TaskConfig objects from catalog YAML documents
+        under ``Tasks/`` matching ``evaluation.task_path`` / ``task_paths``.
 
         Returns:
-            Dict[str, TaskConfig]: Mapping of task directory names to their validated TaskConfig objects.
+            Dict[str, TaskConfig]: Mapping of human task names to TaskConfig objects.
 
         Raises:
-            FileNotFoundError or ValidationError if a task.yaml file is missing or invalid.
+            FileNotFoundError or ValidationError if task documents are missing or invalid.
         """
-        from tempus_bench.utils.task_assets import ensure_task_assets
+        from tempus_bench.utils.task_assets import ensure_dataset_assets
+        from tempus_bench.utils.paths import find_task_documents
+        from tempus_bench.utils.task_yaml_loader import build_task_config_from_raw
 
-        ensure_task_assets()
+        ensure_dataset_assets()
 
         task_configs = {}
         eval_config = self.evaluation_config
         if eval_config.task_paths:
-            tasks = {}
+            docs: dict = {}
             for p in eval_config.task_paths:
-                tasks.update(find_task_directories(p))
+                docs.update(find_task_documents(p))
         else:
-            tasks = find_task_directories(self.task_path)  # Dict[str, str]: name => path
+            docs = find_task_documents(self.task_path)
 
-        for task_name, task_path_str in tasks.items():
-            task_configs[task_name] = build_task_config(Path(task_path_str))
+        for task_name, raw in docs.items():
+            task_configs[task_name] = build_task_config_from_raw(raw)
 
         return task_configs
 
@@ -272,7 +272,10 @@ class ConfigManager:
             for task_name, tc in self.task_configs.items():
                 try:
                     assert_model_supports_task_family(
-                        cap, model_name=model_name, family=tc.task_mode
+                        cap,
+                        model_name=model_name,
+                        family=tc.task_mode,
+                        num_targets=len(tc.target_variable_names),
                     )
                 except ValueError as e:
                     raise ValidationError(

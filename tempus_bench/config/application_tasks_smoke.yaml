@@ -1,0 +1,23 @@
+# Smoke config for the application catalog layout (Tasks/ + Datasets/).
+#
+# Selectors use: {dataset_category}/{human task_name}
+# Also supported:
+#   - '*'                      all tasks in every catalog under Tasks/
+#   - 'commerce_and_trade/*'   all tasks in one category
+#
+# Example category glob (commented):
+#   # - commerce_and_trade/*
+evaluation:
+  task_paths:
+    - commerce_and_trade/Favorita Store 24 Weekly Sales
+    - natural_and_environmental_systems/Daily Humidity Time Series Data - Delhi
+    - energy_and_utilities/Weekly Cushing US
+  tuning_loss: mae
+  max_windows: 1
+  max_num_variates: 5
+  num_samples: 20
+  num_quantiles: 9
+  point_forecast_statistic: mean
+
+model:
+  naive_chronax: {}

@@ -146,8 +146,12 @@ class DataLoader:
         self.task_config = task_config
         self.evaluation_config = evaluation_config
         self._force_no_normalize = force_no_normalize
-        task_path = Path(self.task_config.task_path)
-        self.dataset_path = task_path / self.task_config.file_name
+        from tempus_bench.utils.paths import get_dataset_path
+
+        self.dataset_path = get_dataset_path(
+            self.task_config.dataset_category,
+            self.task_config.dataset_name,
+        )
 
         self._load_dataset()
 
