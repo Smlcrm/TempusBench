@@ -5,10 +5,8 @@ import os
 os.environ.setdefault("TEMPUSBENCH_DISABLE_TENSORBOARD", "1")
 import sys
 import tempfile
-from pathlib import Path
 
 import pytest
-import yaml
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, PROJECT_ROOT)
@@ -37,17 +35,20 @@ def _log_manager():
 
 
 def test_clean_maps_unknown_start_and_freq():
-    task_yaml = (
-        Path(PROJECT_ROOT)
-        / "tempus_bench"
-        / "tasks"
-        / "univariate"
-        / "synthetic_nonstationary_univariate"
-        / "task.yaml"
+    tc = TaskConfig(
+        task_name="synthetic_nonstationary_univariate",
+        task_path="synthetic/synthetic_nonstationary_univariate",
+        dataset_category="synthetic",
+        dataset_name="synthetic_nonstationary_univariate",
+        forecast_horizon=24,
+        context_window=50,
+        handle_missing="interpolate",
+        normalization_method="standard",
+        file_name="synthetic_nonstationary_univariate.csv",
+        task_mode="univariate",
+        target_variable_names=["target"],
+        covariate_variable_names=[],
     )
-    doc = yaml.safe_load(task_yaml.read_text(encoding="utf-8"))
-    t = doc["task"]
-    tc = TaskConfig(**t, task_path=str(task_yaml.parent.resolve()))
     ev = EvaluationConfig(
         task_path="*",
         tuning_loss="mae",

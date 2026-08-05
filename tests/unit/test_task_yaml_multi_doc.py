@@ -1,85 +1,69 @@
-"""
-Unit tests for tasks task.yaml loading via shared task_yaml_loader.
-"""
+"""Unit tests for catalog task YAML loading via task_yaml_loader."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
-import yaml
 
 from tempus_bench.utils.configs import EvaluationConfig
 from tempus_bench.utils.config_manager import ConfigManager
 from tempus_bench.utils.task_yaml_loader import (
     build_task_config,
-    load_task_config_from_task_dir,
+    build_task_config_from_raw,
 )
 
-_FLAT_UNIVARIATE = """task:
-  context_window: 50
-  forecast_horizon: 24
-  handle_missing: interpolate
-  normalization_method: standard
-  file_name: test_dataset.csv
-  target_variable_names:
-  - series_a
-"""
+
+def _raw(**overrides):
+    base = {
+        "task_name": "test_task",
+        "task_description": "demo",
+        "task_catalog": "application",
+        "dataset_category": "commerce_and_trade",
+        "dataset_name": "test_task",
+        "context_window": 50,
+        "forecast_horizon": 24,
+        "handle_missing": "interpolate",
+        "normalization_method": "standard",
+        "target_variable_names": ["series_a"],
+        "covariate_variable_names": [],
+    }
+    base.update(overrides)
+    return base
 
 
 class TestTaskYamlLoader:
-    def test_load_flat_univariate_config(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
-        task_dir.mkdir(parents=True)
-        (task_dir / "task.yaml").write_text(_FLAT_UNIVARIATE, encoding="utf-8")
-
-        cfg = load_task_config_from_task_dir(task_dir)
+    def test_load_univariate_config(self):
+        cfg = build_task_config_from_raw(_raw())
         assert cfg.task_mode == "univariate"
         assert cfg.forecast_horizon == 24
         assert cfg.context_window == 50
         assert cfg.is_normalize() is True
         assert cfg.effective_targets() == ["series_a"]
+        assert cfg.file_name == "test_task.csv"
 
-    def test_covariate_folder_yaml(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "covariate" / "cov_task"
-        task_dir.mkdir(parents=True)
-        (task_dir / "task.yaml").write_text(
-            yaml.dump(
-                {
-                    "task": {
-                        "context_window": 8,
-                        "forecast_horizon": 4,
-                        "handle_missing": "interpolate",
-                        "normalization_method": "none",
-                        "file_name": "cov.csv",
-                        "target_variable_name": "y",
-                        "covariate_variable_names": ["x1"],
-                    }
-                }
-            ),
-            encoding="utf-8",
+    def test_covariate_config(self):
+        cov = build_task_config_from_raw(
+            _raw(
+                target_variable_names=["y"],
+                covariate_variable_names=["x1"],
+                normalization_method="none",
+            )
         )
-
-        cov = build_task_config(task_dir)
         assert cov.task_mode == "covariate"
         assert cov.effective_targets() == ["y"]
         assert cov.effective_covariates() == ["x1"]
 
-    def test_config_manager_init_tasks_uses_shared_loader(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "univariate" / "test_task"
-        task_dir.mkdir(parents=True)
-        (task_dir / "task.yaml").write_text(_FLAT_UNIVARIATE, encoding="utf-8")
-
-        from unittest.mock import Mock, patch
-
+    def test_config_manager_init_tasks_uses_documents(self):
         mgr = Mock()
         mgr.task_path = "*"
         mgr.evaluation_config = EvaluationConfig(task_path="*", max_windows=1)
         mgr.logger = Mock()
 
-        with patch(
-            "tempus_bench.utils.config_manager.find_task_directories",
-            return_value={"test_task": str(task_dir)},
+        with patch("tempus_bench.utils.task_assets.ensure_dataset_assets"), patch(
+            "tempus_bench.utils.paths.find_task_documents",
+            return_value={"test_task": _raw()},
         ):
             result = ConfigManager.init_tasks(mgr)
 
@@ -87,29 +71,6 @@ class TestTaskYamlLoader:
         assert result["test_task"].task_name == "test_task"
         assert result["test_task"].forecast_horizon == 24
 
-    def test_empty_file_raises(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "univariate" / "empty_task"
-        task_dir.mkdir(parents=True)
-        (task_dir / "task.yaml").write_text("", encoding="utf-8")
-
-        with pytest.raises(ValueError, match="No valid task document"):
-            load_task_config_from_task_dir(task_dir)
-
-    def test_invalid_schema_raises(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "univariate" / "bad_task"
-        task_dir.mkdir(parents=True)
-        (task_dir / "task.yaml").write_text(
-            "task:\n  forecast_horizon: 24\n",
-            encoding="utf-8",
-        )
-
-        with pytest.raises(Exception):
-            load_task_config_from_task_dir(task_dir)
-
-    def test_missing_task_key_raises(self, tmp_path: Path):
-        task_dir = tmp_path / "tasks" / "univariate" / "no_task_key"
-        task_dir.mkdir(parents=True)
-        (task_dir / "task.yaml").write_text("forecast_horizon: 24\n", encoding="utf-8")
-
-        with pytest.raises(ValueError, match="No valid task document"):
-            load_task_config_from_task_dir(task_dir)
+    def test_legacy_folder_loader_raises(self, tmp_path: Path):
+        with pytest.raises(RuntimeError, match="no longer supported"):
+            build_task_config(tmp_path / "old_task")

@@ -1,8 +1,9 @@
 """
-Ensure TempusBench task data is present locally by downloading from Hugging Face.
+Ensure TempusBench dataset CSVs are present locally by syncing from Hugging Face.
 
-Task CSVs (and optionally the full ``tempus_bench/tasks/`` tree) are hosted at
-``Smlcrm/tempus_bench_tasks`` so the git repository stays lightweight.
+Task definitions live in git under ``Tasks/``. Dataset CSVs are hosted at
+``Smlcrm/tempus_bench_tasks`` under ``Datasets/`` and synced into repo-root
+``Datasets/`` once at benchmark start.
 """
 
 from __future__ import annotations
@@ -10,100 +11,93 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
 from tqdm import tqdm
 
-from tempus_bench.utils.paths import get_project_root
+from tempus_bench.utils.paths import get_project_root, load_all_task_documents
 
 TASKS_REPO_ID = os.environ.get("TEMPUS_BENCH_TASKS_REPO_ID", "Smlcrm/tempus_bench_tasks")
+DATASETS_REVISION = os.environ.get("TEMPUS_BENCH_DATASETS_REVISION", "dev")
 SKIP_DOWNLOAD_ENV = "TEMPUS_BENCH_SKIP_TASK_DOWNLOAD"
-HF_TASKS_PREFIX = "tasks"
-CATEGORIES = ("univariate", "multivariate", "covariate")
+SKIP_DATASET_SYNC_ENV = "TEMPUS_BENCH_SKIP_DATASET_SYNC"
+HF_DATASETS_PREFIX = "Datasets"
 
 _ensured = False
 
 
 @dataclass(frozen=True)
-class TaskAssetSpec:
-    """One task file expected under ``tempus_bench/tasks/``."""
+class DatasetAssetSpec:
+    """One dataset CSV expected under repo-root ``Datasets/``."""
 
-    category: str
-    folder_name: str
-    file_name: str
+    dataset_category: str
+    dataset_name: str
     local_path: Path
-    hf_path: str  # repo-relative posix path
+    hf_path: str
 
 
-def _tasks_root() -> Path:
-    return get_project_root() / "tempus_bench" / "tasks"
+def _datasets_root() -> Path:
+    return get_project_root() / "Datasets"
 
 
-def _load_task_block(task_yaml: Path) -> dict:
-    with task_yaml.open(encoding="utf-8") as handle:
-        docs = list(yaml.safe_load_all(handle))
-    for doc in docs:
-        if doc and isinstance(doc, dict) and "task" in doc:
-            return doc["task"]
-    raise ValueError(f"No 'task:' block found in {task_yaml}")
+def discover_expected_datasets() -> list[DatasetAssetSpec]:
+    """Build expected dataset inventory from catalog task YAMLs under ``Tasks/``."""
+    root = _datasets_root()
+    specs: list[DatasetAssetSpec] = []
+    seen: set[tuple[str, str]] = set()
 
-
-def discover_expected_assets(tasks_root: Path | None = None) -> list[TaskAssetSpec]:
-    """
-    Discover per-task CSV assets from local ``task.yaml`` files.
-
-    Returns an empty list when no task definitions exist locally (fresh clone).
-    """
-    root = tasks_root or _tasks_root()
-    specs: list[TaskAssetSpec] = []
-
-    if not root.is_dir():
-        return specs
-
-    for category in CATEGORIES:
-        cat_dir = root / category
-        if not cat_dir.is_dir():
+    for doc in load_all_task_documents():
+        category = doc["dataset_category"]
+        name = doc["dataset_name"]
+        key = (category, name)
+        if key in seen:
             continue
-        for task_dir in sorted(cat_dir.iterdir(), key=lambda p: p.name.lower()):
-            if not task_dir.is_dir():
-                continue
-            task_yaml = task_dir / "task.yaml"
-            if not task_yaml.is_file():
-                continue
-            block = _load_task_block(task_yaml)
-            dataset = block.get("dataset") or {}
-            file_name = dataset.get("file_name")
-            if not file_name:
-                file_name = block.get("file_name")
-            if not file_name:
-                raise ValueError(f"Missing dataset.file_name in {task_yaml}")
-
-            folder = task_dir.name
-            local_csv = task_dir / file_name
-            hf_path = f"{HF_TASKS_PREFIX}/{category}/{folder}/{file_name}".replace("\\", "/")
-            specs.append(
-                TaskAssetSpec(
-                    category=category,
-                    folder_name=folder,
-                    file_name=file_name,
-                    local_path=local_csv,
-                    hf_path=hf_path,
-                )
+        seen.add(key)
+        local_csv = root / category / name / f"{name}.csv"
+        hf_path = f"{HF_DATASETS_PREFIX}/{category}/{name}/{name}.csv".replace("\\", "/")
+        specs.append(
+            DatasetAssetSpec(
+                dataset_category=category,
+                dataset_name=name,
+                local_path=local_csv,
+                hf_path=hf_path,
             )
+        )
     return specs
 
 
-def _missing_assets(specs: list[TaskAssetSpec]) -> list[TaskAssetSpec]:
+def _missing_assets(specs: list[DatasetAssetSpec]) -> list[DatasetAssetSpec]:
     return [spec for spec in specs if not spec.local_path.is_file()]
 
 
-def _skip_download_enabled() -> bool:
-    return os.environ.get(SKIP_DOWNLOAD_ENV, "").strip().lower() in {"1", "true", "yes"}
+def _skip_sync_enabled() -> bool:
+    for env_name in (SKIP_DATASET_SYNC_ENV, SKIP_DOWNLOAD_ENV):
+        if os.environ.get(env_name, "").strip().lower() in {"1", "true", "yes"}:
+            return True
+    return False
 
 
-def _download_file(repo_id: str, hf_path: str, dest: Path) -> None:
+def _list_remote_dataset_csv_paths(repo_id: str, revision: str) -> set[str]:
+    from huggingface_hub import HfApi
+
+    api = HfApi()
+    items = api.list_repo_tree(
+        repo_id,
+        repo_type="dataset",
+        revision=revision,
+        recursive=True,
+    )
+    paths: set[str] = set()
+    for item in items:
+        path = getattr(item, "path", None) or str(item)
+        if path.endswith(".csv") and path.startswith(f"{HF_DATASETS_PREFIX}/"):
+            paths.add(path.replace("\\", "/"))
+    return paths
+
+
+def _download_file(repo_id: str, revision: str, hf_path: str, dest: Path) -> None:
     from huggingface_hub import hf_hub_download
 
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -111,112 +105,111 @@ def _download_file(repo_id: str, hf_path: str, dest: Path) -> None:
         repo_id=repo_id,
         filename=hf_path,
         repo_type="dataset",
+        revision=revision,
     )
     shutil.copy2(cached, dest)
 
 
-def _download_snapshot(repo_id: str, tasks_root: Path) -> None:
-    from huggingface_hub import snapshot_download
-
-    project_root = get_project_root()
-    package_root = project_root / "tempus_bench"
-    snapshot_download(
-        repo_id=repo_id,
-        repo_type="dataset",
-        local_dir=str(package_root),
-        allow_patterns=[f"{HF_TASKS_PREFIX}/**"],
-    )
-    if not tasks_root.is_dir():
-        # Recover from older downloads that used project_root as local_dir.
-        misplaced = project_root / HF_TASKS_PREFIX
-        if misplaced.is_dir():
-            package_root.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(misplaced), str(tasks_root))
-    if not tasks_root.is_dir():
-        raise FileNotFoundError(
-            f"Download completed but tasks directory is still missing: {tasks_root}"
-        )
-
-
-def ensure_task_assets(*, force: bool = False) -> None:
+def ensure_dataset_assets(*, force: bool = False) -> None:
     """
-    Ensure task CSV files exist under ``tempus_bench/tasks/``.
+    Ensure expected dataset CSVs exist under repo-root ``Datasets/``.
 
-    When files are missing, downloads them from the public Hugging Face dataset
-    with an explanatory message and a progress bar.
-
-    Args:
-        force: Re-check even if a prior call succeeded in this process.
+    Once per process (unless ``force``):
+    1. Build expected inventory from ``Tasks/``
+    2. Compare to local ``Datasets/``
+    3. Auto-download missing files from HF
+    4. Fail if HF is unreachable and any expected CSV is missing
     """
     global _ensured
     if _ensured and not force:
         return
 
-    tasks_root = _tasks_root()
-    specs = discover_expected_assets(tasks_root)
+    specs = discover_expected_datasets()
+    if not specs:
+        raise FileNotFoundError(
+            "No task documents found under Tasks/. Add catalog YAML files before running."
+        )
+
     missing = _missing_assets(specs)
-
-    if not missing and tasks_root.is_dir() and specs:
+    if not missing:
+        _warn_extra_local(specs)
         _ensured = True
         return
 
-    if _skip_download_enabled():
-        if not tasks_root.is_dir() or missing:
-            missing_paths = [str(s.local_path) for s in missing]
-            raise FileNotFoundError(
-                "Task data is not available locally and automatic download is disabled "
-                f"({SKIP_DOWNLOAD_ENV} is set). Missing: {missing_paths or [str(tasks_root)]}. "
-                f"Unset {SKIP_DOWNLOAD_ENV} or run: "
-                f"python hugging_face_upload/upload_dataset.py --repo-id {TASKS_REPO_ID}"
-            )
-        _ensured = True
-        return
+    if _skip_sync_enabled():
+        missing_paths = [str(s.local_path) for s in missing]
+        raise FileNotFoundError(
+            "Dataset CSVs are missing locally and automatic sync is disabled "
+            f"({SKIP_DATASET_SYNC_ENV}/{SKIP_DOWNLOAD_ENV}). Missing: {missing_paths}."
+        )
 
     repo_id = TASKS_REPO_ID
-    dataset_url = f"https://huggingface.co/datasets/{repo_id}"
-
-    if not specs:
-        print(
-            f"\n[TempusBench] Task definitions not found under {tasks_root}.\n"
-            f"  Task data is hosted on Hugging Face to keep the repository lightweight.\n"
-            f"  Dataset: {dataset_url}\n"
-            f"  Downloading the tasks folder now...\n",
-            flush=True,
-        )
-        _download_snapshot(repo_id, tasks_root)
-        specs = discover_expected_assets(tasks_root)
-        missing = _missing_assets(specs)
-        if missing:
-            missing_list = ", ".join(s.hf_path for s in missing)
-            raise FileNotFoundError(
-                f"Tasks folder downloaded but CSV assets are still missing: {missing_list}"
-            )
-        print("[TempusBench] Task data download complete.\n", flush=True)
-        _ensured = True
-        return
-
-    if not missing:
-        _ensured = True
-        return
+    revision = DATASETS_REVISION
+    dataset_url = f"https://huggingface.co/datasets/{repo_id}/tree/{revision}"
 
     print(
-        f"\n[TempusBench] Task CSV data is hosted on Hugging Face ({repo_id}) "
-        f"to keep the git repository lightweight.\n"
+        f"\n[TempusBench] Dataset CSVs are hosted on Hugging Face ({repo_id}@{revision}).\n"
         f"  Dataset: {dataset_url}\n"
-        f"  {len(missing)} of {len(specs)} task CSV file(s) missing locally; downloading now...\n",
+        f"  {len(missing)} of {len(specs)} CSV file(s) missing locally; syncing now...\n",
         flush=True,
     )
 
-    for spec in tqdm(missing, desc="Downloading task CSVs", unit="file", file=sys.stdout):
-        _download_file(repo_id, spec.hf_path, spec.local_path)
+    try:
+        remote_csvs = _list_remote_dataset_csv_paths(repo_id, revision)
+    except Exception as exc:
+        missing_paths = [str(s.local_path) for s in missing]
+        raise FileNotFoundError(
+            "Hugging Face is unreachable and required dataset CSVs are missing locally. "
+            f"Missing: {missing_paths}. Error: {exc}"
+        ) from exc
+
+    expected_hf = {s.hf_path for s in specs}
+    remote_missing = sorted(expected_hf - remote_csvs)
+    if remote_missing:
+        raise FileNotFoundError(
+            f"Remote dataset inventory is incomplete on {repo_id}@{revision}. "
+            f"Missing on Hub: {remote_missing}"
+        )
+
+    for spec in tqdm(missing, desc="Downloading dataset CSVs", unit="file", file=sys.stdout):
+        try:
+            _download_file(repo_id, revision, spec.hf_path, spec.local_path)
+        except Exception as exc:
+            raise FileNotFoundError(
+                f"Failed to download {spec.hf_path} from {repo_id}@{revision}: {exc}"
+            ) from exc
 
     still_missing = _missing_assets(specs)
     if still_missing:
         paths = ", ".join(str(s.local_path) for s in still_missing)
-        raise FileNotFoundError(f"Failed to download task CSV(s): {paths}")
+        raise FileNotFoundError(f"Failed to download dataset CSV(s): {paths}")
 
-    print("[TempusBench] Task data download complete.\n", flush=True)
+    _warn_extra_local(specs)
+    print("[TempusBench] Dataset sync complete.\n", flush=True)
     _ensured = True
+
+
+def _warn_extra_local(specs: list[DatasetAssetSpec]) -> None:
+    root = _datasets_root()
+    if not root.is_dir():
+        return
+    expected = {s.local_path.resolve() for s in specs}
+    extras: list[str] = []
+    for path in root.rglob("*.csv"):
+        if path.resolve() not in expected:
+            extras.append(str(path.relative_to(root)))
+    if extras:
+        warnings.warn(
+            "Local Datasets/ contains CSV files not referenced by Tasks/: "
+            + ", ".join(sorted(extras)[:20])
+            + (" ..." if len(extras) > 20 else ""),
+            stacklevel=2,
+        )
+
+
+def ensure_task_assets(*, force: bool = False) -> None:
+    """Backward-compatible alias for ``ensure_dataset_assets``."""
+    ensure_dataset_assets(force=force)
 
 
 def reset_ensure_cache() -> None:

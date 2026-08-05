@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import copy
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, Literal
 
 import yaml
@@ -164,28 +163,13 @@ def merge_benchmark_params_with_default_grid(
 
 
 def task_path_to_family(task_path: str, task_mode: str | None = None) -> TaskFamily:
-    """Infer task family from explicit mode or dataset path under tasks/."""
+    """Infer task family from explicit mode (preferred) or legacy path markers."""
     if task_mode in ("univariate", "multivariate", "covariate"):
         return task_mode  # type: ignore[return-value]
-    p = Path(task_path).resolve()
-    parts = p.parts
-    for marker in ("tasks",):
-        try:
-            i = parts.index(marker)
-            kind = parts[i + 1].lower()
-            break
-        except (ValueError, IndexError):
-            kind = None
-    else:
-        raise ValueError(f"Cannot infer task family from path: {task_path!r}")
-    if kind == "univariate":
-        return "univariate"
-    if kind == "multivariate":
-        return "multivariate"
-    if kind == "covariate":
-        return "covariate"
+    # Logical selectors are "{category}/{task_name}" and do not encode family.
     raise ValueError(
-        f"Unknown task family {kind!r} under tasks/ in path: {task_path!r}"
+        f"Cannot infer task family from path {task_path!r} without task_mode. "
+        "Pass task_mode from TaskConfig."
     )
 
 
@@ -194,6 +178,7 @@ def assert_model_supports_task_family(
     *,
     model_name: str,
     family: TaskFamily,
+    num_targets: int = 1,
 ) -> None:
     if family == "univariate" and not cap.univariate:
         raise ValueError(
@@ -209,6 +194,11 @@ def assert_model_supports_task_family(
         raise ValueError(
             f"Model {model_name!r} is not declared for covariate tasks "
             f"(capabilities.covariates: none)."
+        )
+    if family == "covariate" and num_targets > 1 and not cap.multivariate:
+        raise ValueError(
+            f"Model {model_name!r} is not declared for multi-target covariate tasks "
+            f"(capabilities.multivariate: false, num_targets={num_targets})."
         )
 
 

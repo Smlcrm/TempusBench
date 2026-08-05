@@ -126,18 +126,14 @@ class TestModelConfig:
         assert config.model_name == "arima"
 
     def test_model_config_missing_model_name(self):
-        """Test that missing model_name raises ValidationError."""
-        with pytest.raises(ValidationError):
+        """Test that missing model_name raises TypeError."""
+        with pytest.raises(TypeError):
             ModelConfig()  # type: ignore  # Missing required model_name
 
-    def test_model_config_extra_fields_forbidden(self):
-        """Test that extra fields are forbidden."""
-        with pytest.raises(ValidationError) as exc_info:
+    def test_model_config_extra_fields_must_be_lists(self):
+        """Test that non-list hyperparameter values raise ValueError."""
+        with pytest.raises(ValueError, match="must be a list"):
             ModelConfig(model_name="arima", extra_field="not allowed")  # type: ignore
-        assert (
-            "extra" in str(exc_info.value).lower()
-            or "forbidden" in str(exc_info.value).lower()
-        )
 
 
 class TestDatasetConfig:
@@ -172,7 +168,9 @@ class TestTaskConfig:
         """Test valid task configuration."""
         config = TaskConfig(
             task_name="test_task",
-            task_path="/path/to/task",
+            task_path="commerce_and_trade/test_task",
+            dataset_category="commerce_and_trade",
+            dataset_name="test_task",
             forecast_horizon=24,
             context_window=100,
             handle_missing="interpolate",
@@ -184,14 +182,16 @@ class TestTaskConfig:
         )
         assert config.forecast_horizon == 24
         assert config.context_window == 100
-        assert config.task_path == "/path/to/task"
+        assert config.task_path == "commerce_and_trade/test_task"
         assert config.dataset.file_name == "test.csv"
         assert config.is_normalize() is True
 
     def test_covariate_mode_helpers(self):
         config = TaskConfig(
             task_name="covariate_foo",
-            task_path="/path/to/covariate/covariate_foo",
+            task_path="commerce_and_trade/covariate_foo",
+            dataset_category="commerce_and_trade",
+            dataset_name="covariate_foo",
             forecast_horizon=8,
             context_window=32,
             handle_missing="interpolate",
@@ -209,7 +209,9 @@ class TestTaskConfig:
         with pytest.raises(ValidationError) as exc_info:
             TaskConfig(
                 task_name="test_task",
-                task_path="/path/to/task",
+                task_path="commerce_and_trade/test_task",
+                dataset_category="commerce_and_trade",
+                dataset_name="test_task",
                 forecast_horizon=200,
                 context_window=100,
                 handle_missing="interpolate",
@@ -225,7 +227,9 @@ class TestTaskConfig:
         with pytest.raises(ValidationError):
             TaskConfig(
                 task_name="test_task",
-                task_path="/path/to/task",
+                task_path="commerce_and_trade/test_task",
+                dataset_category="commerce_and_trade",
+                dataset_name="test_task",
                 forecast_horizon=0,
                 context_window=100,
                 handle_missing="interpolate",
@@ -240,7 +244,9 @@ class TestTaskConfig:
         with pytest.raises(ValidationError):
             TaskConfig(
                 task_name="test_task",
-                task_path="/path/to/task",
+                task_path="commerce_and_trade/test_task",
+                dataset_category="commerce_and_trade",
+                dataset_name="test_task",
                 forecast_horizon=24,
                 context_window=0,
                 handle_missing="interpolate",

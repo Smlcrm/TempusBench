@@ -176,15 +176,31 @@ class DatasetConfig(BaseModel):
 
 class TaskConfig(BaseModel):
     """
-    Task configuration for tasks benchmark folders.
+    Task configuration for catalog tasks under ``Tasks/``.
 
-    Supports univariate, multivariate, and covariate task folders under tasks/.
+    Mode is inferred from target/covariate lists. Dataset CSVs resolve via
+    ``dataset_category`` / ``dataset_name`` under repo-root ``Datasets/``.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    task_name: str = Field(..., description="Task folder name (basename of task_path)")
-    task_path: str = Field(..., description="On-disk task directory path")
+    task_name: str = Field(..., description="Human-readable task name")
+    task_path: str = Field(
+        ...,
+        description="Logical selector '{dataset_category}/{task_name}'",
+    )
+    task_description: str = Field(
+        default="", description="Human-readable task description from catalog YAML"
+    )
+    task_catalog: str = Field(
+        default="application", description="Catalog id (e.g. application)"
+    )
+    dataset_category: str = Field(
+        ..., description="Domain category folder under Datasets/"
+    )
+    dataset_name: str = Field(
+        ..., description="Dataset slug / folder name under Datasets/{category}/"
+    )
     forecast_horizon: int = Field(
         ..., ge=1, le=128, description="Number of steps to forecast ahead (max 128)"
     )
@@ -198,7 +214,10 @@ class TaskConfig(BaseModel):
         default="standard",
         description="Normalization applied to targets during preprocessing",
     )
-    file_name: str = Field(..., description="Dataset CSV file name inside task_path")
+    file_name: str = Field(
+        ...,
+        description="Dataset CSV file name ({dataset_name}.csv); kept for legacy call sites",
+    )
     task_mode: Literal["univariate", "multivariate", "covariate"] = Field(
         ..., description="Evaluation mode for this logical task"
     )
