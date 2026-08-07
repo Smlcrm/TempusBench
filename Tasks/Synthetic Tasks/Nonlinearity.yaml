@@ -1,0 +1,49 @@
+task:
+  task_name: SETAR
+  task_description: Self-exciting threshold AR with asymmetric persistence (threshold
+    0)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: nonlinearity
+  dataset_name: setar
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Logistic Map
+  task_description: 'Chaotic logistic map: x_{t+1} = r x_t (1 - x_t), r=3.9, x in
+    (0,1).'
+  context_window: 512
+  forecast_horizon: 20
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: nonlinearity
+  dataset_name: logistic_map
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Mackey Glass
+  task_description: Mackey-Glass delay differential equation (chaotic regime, tau=17)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: nonlinearity
+  dataset_name: mackey_glass
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

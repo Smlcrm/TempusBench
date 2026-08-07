@@ -1,0 +1,129 @@
+task:
+  task_name: Random Walk
+  task_description: 'Driftless random walk: y_t = y_{t-1} + sigma*eps_t, y_0 = 0.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: random_walk
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Random Walk Drift
+  task_description: 'Random walk with drift: y_t = drift + y_{t-1} + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: random_walk_drift
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Linear Trend
+  task_description: 'Trend-stationary linear trend: y_t = a + b*(t/T) + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: linear_trend
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Exponential Trend
+  task_description: 'Exponential growth: y_t = y0 * growth^(t/T) + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: exponential_trend
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Log Trend
+  task_description: 'Logarithmic (decelerating) trend: y_t = base + c*ln(1+t) + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: log_trend
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Power Trend
+  task_description: 'Power-law ("p-root") trend: y_t = base + scale*(t/T)^p + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: power_trend
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Logistic Trend
+  task_description: 'Sigmoid (saturating) trend: y_t = base + L/(1 + exp(-k(t - t0)))
+    + sigma*eps_t'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: logistic_trend
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Piecewise Linear Trend
+  task_description: 'Broken trend: slope b1/T before the break at frac_break*T, b2/T
+    after (continuous at the break), plus N(0, sigma^2) noise.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: trend
+  dataset_name: piecewise_linear_trend
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

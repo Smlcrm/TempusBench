@@ -1,0 +1,113 @@
+task:
+  task_name: Binary Latent AR
+  task_description: Binary series from a thresholded latent process
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: binary_latent_ar
+  target_type: binary
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Ordinal Categorical
+  task_description: 'Ordered 3-category series: the same latent construction as binary_latent_ar,
+    cut at thresholds (-0.8, +0.8)'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: ordinal_categorical
+  target_type: categorical_ordinal
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Poisson Counts
+  task_description: Non-negative counts, canonical log-link Poisson
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: poisson_counts
+  target_type: count_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: NegBin Counts
+  task_description: Overdispersed counts via a Gamma-Poisson (negative binomial) mixture
+    with the same mean path as poisson_counts
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: negbin_counts
+  target_type: count_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Skellam Integer
+  task_description: Signed integers (difference of two seasonal Poisson flows)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: skellam_integer
+  target_type: count_signed
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Lognormal Positive
+  task_description: Strictly positive continuous series, multiplicative on every scale
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: lognormal_positive
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Intermittent Demand
+  task_description: Zero-inflated intermittent demand (Croston setting)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: target_type
+  dataset_name: intermittent_demand
+  target_type: count_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

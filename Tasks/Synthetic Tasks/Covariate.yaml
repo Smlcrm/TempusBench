@@ -1,0 +1,18 @@
+task:
+  task_name: Covariate Nonlinear
+  task_description: Covariate-driven target with a nonlinear, lagged link (returns
+    (T, 2) = [y, x]; x is the covariate, known over context+horizon per the TempusBench
+    task definition)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: covariate
+  dataset_name: covariate_nonlinear
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names:
+  - x

@@ -1,0 +1,48 @@
+task:
+  task_name: Intermittent Bursty
+  task_description: Intermittent demand with serially dependent occurrence
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: intermittency
+  dataset_name: intermittent_bursty
+  target_type: count_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Lumpy Demand
+  task_description: 'Lumpy demand (Syntetos-Boylan ''lumpy'' quadrant): rare occurrences
+    AND highly variable sizes'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: intermittency
+  dataset_name: lumpy_demand
+  target_type: count_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Zero Inflated Continuous
+  task_description: Zero-inflated *continuous* series (precipitation analogue)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: intermittency
+  dataset_name: zero_inflated_continuous
+  target_type: continuous_zero_inflated
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

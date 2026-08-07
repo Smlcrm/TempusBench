@@ -1,0 +1,144 @@
+task:
+  task_name: IID Gaussian
+  task_description: 'White noise: y_t ~ iid N(mu, sigma^2).'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: iid_gaussian
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Heteroskedastic Level
+  task_description: Level-dependent (multiplicative-style) heteroskedasticity
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: heteroskedastic_level
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Heteroskedastic Time
+  task_description: 'Time-driven variance growth: y_t = 10 sin(2 pi t/24) + sigma(t)*eps_t,
+    with sigma(t) = sigma0 + (sigma1-sigma0)*(t/T) rising 0.5 -> 2.5.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: heteroskedastic_time
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: GARCH Noise
+  task_description: GARCH(1,1) with zero conditional mean (volatility clustering)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: garch_noise
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Heavy Tailed Noise
+  task_description: Student-t(3) innovations on the reference sinusoid
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: heavy_tailed_noise
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Skewed Noise
+  task_description: Right-skewed innovations (centred, unit-variance log-normal)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: skewed_noise
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Autocorrelated Noise
+  task_description: AR(1) errors around a deterministic sinusoid
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: autocorrelated_noise
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Outlier Contaminated
+  task_description: Additive-outlier contamination of the reference sinusoid
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: outlier_contaminated
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Measurement Error RW
+  task_description: Local-level state-space model (signal + measurement error)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: noise
+  dataset_name: measurement_error_rw
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

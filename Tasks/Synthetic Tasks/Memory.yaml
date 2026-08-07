@@ -1,0 +1,47 @@
+task:
+  task_name: MA(1)
+  task_description: 'Invertible MA(1): y_t = eps_t + theta*eps_{t-1}, eps ~ N(0, sigma^2).'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: memory
+  dataset_name: ma1
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: AR(2) Pseudocyclic
+  task_description: Stationary AR(2) with complex roots (stochastic pseudo-cycles)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: memory
+  dataset_name: ar2_pseudocyclic
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Long Memory fGn
+  task_description: Fractional Gaussian noise with Hurst H=0.9 (long memory).
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: memory
+  dataset_name: long_memory_fgn
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

@@ -1,0 +1,160 @@
+task:
+  task_name: Noise Free Composite
+  task_description: 'Deterministic, noise-free signal: trend + two incommensurate
+    sines.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: noise_free_composite
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Low SNR Seasonal
+  task_description: 'Weak sinusoid buried in noise: y_t = amp*sin(2 pi t/24) + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: low_snr_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Sinusoidal Seasonal
+  task_description: 'Pure stationary cycle: y_t = amp*sin(2 pi t/period) + sigma*eps_t.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: sinusoidal_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Multi Seasonal
+  task_description: Two nested periods (daily-in-weekly analogue)
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: multi_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Nonsinusoidal Seasonal
+  task_description: Sharp, asymmetric periodic shape (exponentiated-sine "spike train")
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: nonsinusoidal_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Trend Seasonal Additive
+  task_description: Non-stationary cyclical, additive composition
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: trend_seasonal_additive
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Trend Seasonal Multiplicative
+  task_description: Non-stationary cyclical, multiplicative composition
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: none
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: trend_seasonal_multiplicative
+  target_type: continuous_positive
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Damped Seasonal
+  task_description: Regressive (decaying-amplitude) cycle
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: damped_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Irregular Period Seasonal
+  task_description: Frequency-modulated cycle with smoothly drifting period.
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: irregular_period_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Evolving Seasonal
+  task_description: Slowly morphing seasonal shape via drifting Fourier coefficients.
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: seasonality
+  dataset_name: evolving_seasonal
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
