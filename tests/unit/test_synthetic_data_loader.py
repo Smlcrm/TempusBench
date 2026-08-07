@@ -32,7 +32,7 @@ def _log_manager():
 def _task(name="random_walk", mode="univariate", targets=("y",), covariates=()):
     return TaskConfig(
         task_name=f"Test {name}",
-        task_path="/nonexistent",
+        task_path=f"trend/Test {name}",
         context_window=64,
         forecast_horizon=16,
         handle_missing="interpolate",
@@ -49,7 +49,7 @@ def _task(name="random_walk", mode="univariate", targets=("y",), covariates=()):
 
 
 def _evaluation():
-    return EvaluationConfig(task_path="Synthetic Tasks/Trend")
+    return EvaluationConfig(task_path="trend/*")
 
 
 def test_generates_dataset_without_touching_disk():
