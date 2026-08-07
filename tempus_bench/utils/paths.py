@@ -289,3 +289,22 @@ def get_available_metrics() -> list[Path]:
         ):
             metric_files.append(file_path.resolve())
     return metric_files
+
+
+def task_dataset_filename(task_name: str, base_seed: int | None) -> str:
+    """
+    Pickle filename for a prepared task dataset.
+
+    Application tasks have no seed and keep the historical unsuffixed name, so
+    their cache paths are unchanged. Generator tasks get one pickle per base seed.
+
+    Args:
+        task_name (str): Logical task name.
+        base_seed (int | None): Base seed for generator tasks, None for application tasks.
+
+    Returns:
+        str: The pickle filename.
+    """
+    if base_seed is None:
+        return f"{task_name}.pkl"
+    return f"{task_name}__seed{base_seed}.pkl"

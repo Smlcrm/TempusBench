@@ -15,7 +15,31 @@ from tempus_bench.pipeline.data_loader import DataLoader
 from tempus_bench.utils.configs import EvaluationConfig
 from tempus_bench.utils.log_manager import LogManager
 from tempus_bench.utils.paths import task_dataset_filename
-from tempus_bench.utils.task_yaml_loader import load_synthetic_task_configs
+import yaml
+
+from tempus_bench.utils.paths import get_project_root
+from tempus_bench.utils.task_yaml_loader import build_task_config_from_raw
+
+
+CATALOG = get_project_root() / "Tasks" / "Synthetic Tasks"
+
+
+def _catalog_configs(category_file: str | None = None):
+    """Load generator task configs straight from the synthetic catalog.
+
+    Reads the files directly rather than through the global catalog loader, so
+    these tests cover the generator taskbed alone.
+    """
+    paths = (
+        [CATALOG / category_file] if category_file else sorted(CATALOG.glob("*.yaml"))
+    )
+    configs = []
+    for path in paths:
+        with path.open(encoding="utf-8") as handle:
+            for doc in yaml.safe_load_all(handle):
+                if doc and "task" in doc:
+                    configs.append(build_task_config_from_raw(doc["task"]))
+    return configs
 
 
 @pytest.fixture(autouse=True)
@@ -52,8 +76,8 @@ def _prepare(task_configs, evaluation_config, out_dir):
 
 
 def test_each_seed_produces_its_own_dataset(tmp_path):
-    configs = load_synthetic_task_configs("Synthetic Tasks/Covariate")
-    evaluation = EvaluationConfig(task_path="Synthetic Tasks/Covariate", seeds=[0, 1, 2])
+    configs = _catalog_configs("Covariate.yaml")
+    evaluation = EvaluationConfig(task_path="covariate/*", seeds=[0, 1, 2])
 
     written = _prepare(configs, evaluation, tmp_path)
 
@@ -62,8 +86,8 @@ def test_each_seed_produces_its_own_dataset(tmp_path):
 
 
 def test_datasets_differ_across_seeds_but_repeat_within_a_seed(tmp_path):
-    configs = [c for c in load_synthetic_task_configs("Synthetic Tasks/Covariate")][:1]
-    evaluation = EvaluationConfig(task_path="Synthetic Tasks/Covariate", seeds=[0, 1])
+    configs = [c for c in _catalog_configs("Covariate.yaml")][:1]
+    evaluation = EvaluationConfig(task_path="covariate/*", seeds=[0, 1])
 
     _prepare(configs, evaluation, tmp_path)
     first = tmp_path / task_dataset_filename(configs[0].task_name, 0)
@@ -83,7 +107,7 @@ def test_datasets_differ_across_seeds_but_repeat_within_a_seed(tmp_path):
     again.mkdir()
     _prepare(
         configs,
-        EvaluationConfig(task_path="Synthetic Tasks/Covariate", seeds=0),
+        EvaluationConfig(task_path="covariate/*", seeds=0),
         again,
     )
     with open(again / task_dataset_filename(configs[0].task_name, 0), "rb") as handle:
@@ -92,8 +116,8 @@ def test_datasets_differ_across_seeds_but_repeat_within_a_seed(tmp_path):
 
 
 def test_the_whole_taskbed_prepares_under_a_single_seed(tmp_path):
-    configs = load_synthetic_task_configs("Synthetic Tasks")
-    evaluation = EvaluationConfig(task_path="Synthetic Tasks", seeds=0)
+    configs = _catalog_configs()
+    evaluation = EvaluationConfig(task_path="*", seeds=0)
 
     written = _prepare(configs, evaluation, tmp_path)
 

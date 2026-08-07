@@ -45,6 +45,7 @@ _import_stage("HyperparameterTuner")
 from tempus_bench.pipeline.hyperparameter_tuner import HyperparameterTuner
 _import_stage("DataLoader")
 from tempus_bench.pipeline.data_loader import DataLoader
+from tempus_bench.utils.paths import task_dataset_filename
 _import_stage("imports_done")
 
 
@@ -151,15 +152,28 @@ class BenchmarkRunner:
         )
         self.temp_task_datasets_dir = Path(self._task_datasets_tmp.name)
 
+        seeds = self.manager.evaluation_config.seed_list()
+
         for task_name, task_config in self.manager.task_configs.items():
 
-            task_path = self.temp_task_datasets_dir / f"{task_name}.pkl"
-            data_loader = DataLoader(task_config, self.manager.evaluation_config)
+            # Application tasks have no seed; generator tasks get one dataset per
+            # base seed so every model in the run sees identical data per seed.
+            base_seeds = seeds if task_config.is_synthetic() else [None]
 
-            dataset = data_loader.dataset
+            for base_seed in base_seeds:
+                task_path = self.temp_task_datasets_dir / task_dataset_filename(
+                    task_name, base_seed
+                )
+                data_loader = DataLoader(
+                    task_config,
+                    self.manager.evaluation_config,
+                    base_seed=base_seed,
+                )
 
-            with open(task_path, "wb") as f:
-                pickle.dump(dataset, f)
+                dataset = data_loader.dataset
+
+                with open(task_path, "wb") as f:
+                    pickle.dump(dataset, f)
 
         return self
 
