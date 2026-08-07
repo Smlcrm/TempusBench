@@ -45,22 +45,30 @@ def build_task_config_from_raw(raw: dict[str, Any]) -> TaskConfig:
     covariates = list(raw.get("covariate_variable_names") or [])
     task_mode = infer_task_mode(targets, covariates)
     logical_path = f"{dataset_category}/{task_name}"
+    task_catalog = raw.get("task_catalog") or "application"
+
+    # Generator tasks produce their data at load time, so there is no CSV to name.
+    # dataset_name is the generator key in tempus_bench/generators/metadata.json.
+    is_synthetic = task_catalog == "synthetic"
 
     return TaskConfig(
         task_name=task_name,
         task_path=logical_path,
         task_description=raw.get("task_description") or "",
-        task_catalog=raw.get("task_catalog") or "application",
+        task_catalog=task_catalog,
         dataset_category=dataset_category,
         dataset_name=dataset_name,
         context_window=raw["context_window"],
         forecast_horizon=raw["forecast_horizon"],
         handle_missing=raw.get("handle_missing", "interpolate"),
         normalization_method=raw.get("normalization_method", "standard"),
-        file_name=f"{dataset_name}.csv",
+        file_name=None if is_synthetic else f"{dataset_name}.csv",
         task_mode=task_mode,
         target_variable_names=targets,
         covariate_variable_names=covariates,
+        target_type=raw.get("target_type"),
+        series_length=raw.get("series_length"),
+        generator_params=raw.get("generator_params") or {},
     )
 
 

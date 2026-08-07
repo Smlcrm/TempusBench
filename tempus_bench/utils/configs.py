@@ -8,7 +8,7 @@ validation, type checking, and documentation of the benchmarking pipeline.
 import yaml
 
 from pathlib import Path
-from typing import Any, Dict, Final, List, Literal, Optional
+from typing import Any, Dict, Final, List, Literal, Optional, Union
 
 # Upper bound for ``evaluation.max_windows`` in YAML/programmatic configs (rolling-window count).
 MAX_EVALUATION_WINDOWS: Final[int] = 5
@@ -118,6 +118,29 @@ class EvaluationConfig(BaseModel):
         default="mean",
         description="Statistic to use for converting stochastic predictions to point forecasts",
     )
+    seeds: Union[int, List[int]] = Field(
+        default=0,
+        description=(
+            "Base seed, or a list of base seeds to evaluate and average over. "
+            "Generator tasks derive their per-generator seed from these; application "
+            "tasks ignore them. Each extra seed multiplies run time."
+        ),
+    )
+
+    @field_validator("seeds")
+    @classmethod
+    def _validate_seeds(cls, value):
+        if isinstance(value, int):
+            return value
+        if len(value) == 0:
+            raise ValueError("seeds must contain at least one seed")
+        if len(set(value)) != len(value):
+            raise ValueError("seeds must not contain duplicate values")
+        return value
+
+    def seed_list(self) -> List[int]:
+        """Base seeds as a list, whether one or many were configured."""
+        return [self.seeds] if isinstance(self.seeds, int) else list(self.seeds)
 
 
 class ModelConfig:
@@ -214,9 +237,12 @@ class TaskConfig(BaseModel):
         default="standard",
         description="Normalization applied to targets during preprocessing",
     )
-    file_name: str = Field(
-        ...,
-        description="Dataset CSV file name ({dataset_name}.csv); kept for legacy call sites",
+    file_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Dataset CSV file name ({dataset_name}.csv); kept for legacy call sites. "
+            "None for generator tasks, whose data has no file."
+        ),
     )
     task_mode: Literal["univariate", "multivariate", "covariate"] = Field(
         ..., description="Evaluation mode for this logical task"
@@ -228,10 +254,48 @@ class TaskConfig(BaseModel):
         default_factory=list,
         description="Active covariate variate names for this logical task/mode",
     )
+    target_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "Support of the marginal, e.g. continuous_real, continuous_positive, "
+            "count_positive, binary. Generator tasks only."
+        ),
+    )
+    series_length: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="T passed to the generator (generator tasks only)",
+    )
+    generator_params: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Extra keyword arguments forwarded to the generator",
+    )
+
+    @model_validator(mode="after")
+    def _check_catalog_requirements(self):
+        """Each catalog has its own required fields; neither borrows the other's."""
+        if self.is_synthetic():
+            if self.file_name:
+                raise ValueError(
+                    f"{self.task_name}: generator tasks must not set file_name; "
+                    "their data is generated, not downloaded"
+                )
+        elif not self.file_name:
+            raise ValueError(f"{self.task_name}: application tasks require file_name")
+        return self
+
+    def is_synthetic(self) -> bool:
+        """True when this task's data comes from a generator rather than a file."""
+        return self.task_catalog == "synthetic"
 
     @property
     def dataset(self) -> DatasetConfig:
         """Legacy adapter exposing nested dataset fields."""
+        if self.is_synthetic():
+            raise AttributeError(
+                f"{self.task_name}: generator tasks have no dataset file; "
+                "use dataset_name to look up the generator"
+            )
         return DatasetConfig(
             handle_missing=self.handle_missing,
             file_name=self.file_name,
