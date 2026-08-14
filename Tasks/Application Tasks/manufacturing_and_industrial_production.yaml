@@ -16,7 +16,7 @@ task:
   covariate_variable_names: []
 ---
 task:
-  task_name: Skoltech Anomaly Benchmark (SKAB)
+  task_name: Skoltech Anomaly Benchmark (SKAB) Covariate
   task_description: A high-frequency physical testbed dataset specifically engineered
     for predictive maintenance and industrial anomaly detection. It tracks continuous
     1-second telemetry from eight distinct sensors—including vibrations, pressure
