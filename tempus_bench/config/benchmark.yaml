@@ -3,6 +3,10 @@
 
 evaluation:
   task_path: 'covariate/covariate_transport_monthly_airline_baggage_complaints'
+  # Base seed(s) for generator tasks. One int, or a list to evaluate every seed
+  # and select hyperparameters on the averaged tuning loss. Application tasks
+  # ignore this. Each extra seed multiplies run time.
+  seeds: [0, 1, 2]
   tuning_loss: mae
   max_windows: 4
   max_num_variates: 10

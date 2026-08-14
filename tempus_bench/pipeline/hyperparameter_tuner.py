@@ -146,14 +146,66 @@ class HyperparameterTuner:
 
         self.model_name = job_config.model_config.model_name
         self.tuning_loss = self.evaluation_config.tuning_loss
-        from tempus_bench.utils.paths import get_dataset_path
+        if self.task_config.is_synthetic():
+            # Generator tasks have no CSV; their data is produced at load time.
+            self.dataset_file_path = None
+            self.dataset_path = Path(self.task_config.task_path)
+        else:
+            from tempus_bench.utils.paths import get_dataset_path
 
-        self.dataset_file_path = get_dataset_path(
-            self.task_config.dataset_category,
-            self.task_config.dataset_name,
-        )
-        self.dataset_path = self.dataset_file_path.parent
+            self.dataset_file_path = get_dataset_path(
+                self.task_config.dataset_category,
+                self.task_config.dataset_name,
+            )
+            self.dataset_path = self.dataset_file_path.parent
         self.visualizer = Visualizer()
+
+    @staticmethod
+    def _mean_metrics_over_windows(windows_eval_outputs: List[dict]) -> dict:
+        """Average each scalar metric across a model's rolling windows.
+
+        Artifacts (``y_true``, ``y_pred``, timestamps) are not scalars and are
+        dropped by the same filter used for the results sink.
+        """
+        per_window = [_metrics_dict_for_bq(outputs) for outputs in windows_eval_outputs]
+        names = {name for window in per_window for name in window}
+        return {
+            name: float(np.mean([w[name] for w in per_window if name in w]))
+            for name in names
+        }
+
+    @staticmethod
+    def _select_best_params(losses: dict, required_seeds: set | None = None) -> tuple:
+        """
+        Pick the hyperparameter configuration with the lowest averaged loss.
+
+        Args:
+            losses: ``{params: {base_seed: loss}}``, one loss per seed.
+            required_seeds: If given, only configurations that produced a loss for
+                every one of these seeds are eligible. A configuration that failed
+                on one seed must not win on the seeds where it survived.
+
+        Returns:
+            tuple: The winning params key.
+
+        Raises:
+            ValueError: If no configuration covers every required seed.
+        """
+        eligible = {}
+        for params, per_seed in losses.items():
+            if required_seeds is not None and not required_seeds.issubset(per_seed):
+                continue
+            values = [value for value in per_seed.values() if value is not None]
+            if not values:
+                continue
+            # Seeds weigh equally: the per-seed losses are already window means.
+            eligible[params] = float(np.mean(values))
+        if not eligible:
+            raise ValueError(
+                "no hyperparameter configuration produced a loss for every required "
+                f"seed {sorted(required_seeds or [])}"
+            )
+        return min(eligible, key=lambda key: eligible[key])
 
     def _generate_hyperparameter_grid(self) -> List[dict]:
         """
@@ -260,6 +312,21 @@ class HyperparameterTuner:
         _force_tqdm = os.environ.get("TEMPUSBENCH_FORCE_TQDM", "").strip() == "1"
         _show_hp_bar = _force_tqdm or sys.stdout.isatty()
         last_trial_error: Optional[BaseException] = None
+
+        # Generator tasks are evaluated once per base seed; application tasks have
+        # no seed dimension and run exactly as before. Models can overfit an
+        # individual seed, so with several seeds the winning hyperparameters are
+        # the ones with the lowest loss averaged across all of them.
+        base_seeds = (
+            self.evaluation_config.seed_list()
+            if self.task_config.is_synthetic()
+            else [None]
+        )
+        primary_seed = base_seeds[0]
+        multiseed = len(base_seeds) > 1
+        seed_losses: dict = {}
+        seed_metrics: dict = {}
+
         for params in tqdm(
             _grid_list,
             desc="Hyperparameter Combinations",
@@ -274,7 +341,42 @@ class HyperparameterTuner:
                     context_steps=context_steps,
                     train_steps=train_steps,
                     validate_steps=validate_steps,
+                    base_seed=primary_seed,
                 )
+
+                if multiseed:
+                    # Snapshot before the window loop below pops the artifacts.
+                    key = tuple(sorted(params.items()))
+                    primary_metrics = self._mean_metrics_over_windows(
+                        windows_eval_outputs
+                    )
+                    seed_metrics.setdefault(key, {})[primary_seed] = primary_metrics
+                    seed_losses.setdefault(key, {})[primary_seed] = primary_metrics.get(
+                        self.tuning_loss
+                    )
+
+                    for extra_seed in base_seeds[1:]:
+                        try:
+                            extra_outputs = model_executor.execute_model(
+                                hyperparameters=params,
+                                context_steps=context_steps,
+                                train_steps=train_steps,
+                                validate_steps=validate_steps,
+                                base_seed=extra_seed,
+                            )
+                        except Exception as seed_error:
+                            last_trial_error = seed_error
+                            LogManager.get_logger().error(
+                                "HyperparameterTuner",
+                                f"Error executing model {self.model_name} with params "
+                                f"{params} on seed {extra_seed}: {seed_error}",
+                            )
+                            continue
+                        extra_metrics = self._mean_metrics_over_windows(extra_outputs)
+                        seed_metrics[key][extra_seed] = extra_metrics
+                        seed_losses[key][extra_seed] = extra_metrics.get(
+                            self.tuning_loss
+                        )
 
             except Exception as e:
                 last_trial_error = e
@@ -382,6 +484,37 @@ class HyperparameterTuner:
             LogManager.get_logger().error("HyperparameterTuner", " ".join(parts))
             return {}, {}
 
+        if multiseed:
+            # Selection on the seed-averaged tuning loss, then report that
+            # configuration's metrics averaged over seeds. Configurations that
+            # failed on any seed are not eligible.
+            best_params = self._select_best_params(
+                seed_losses, required_seeds=set(base_seeds)
+            )
+            per_seed_metrics = seed_metrics[best_params]
+            avg_test_loss = {
+                metric: (
+                    float(
+                        np.mean(
+                            [
+                                metrics[metric]
+                                for metrics in per_seed_metrics.values()
+                                if metric in metrics
+                            ]
+                        )
+                    )
+                    if any(metric in metrics for metrics in per_seed_metrics.values())
+                    else float("nan")
+                )
+                for metric in evaluation_metrics  # type: ignore
+            }
+            LogManager.get_logger().info(
+                "HyperparameterTuner",
+                f"Selected {dict(best_params)} on the mean {self.tuning_loss} across "
+                f"{len(base_seeds)} seeds {base_seeds}",
+            )
+            return self._finalize(avg_test_loss, [best_params])
+
         # Aggregate test loss over windows, for each metric.
         # With 2+ windows: use hyperparams chosen on window j to score metrics on window j+1.
         # With 1 window: there is no next-window holdout — report that window's metrics directly.
@@ -407,6 +540,28 @@ class HyperparameterTuner:
             )
             for metric in evaluation_metrics  # type: ignore
         }
+
+        return self._finalize(avg_test_loss, optimal_hyperparameters)
+
+    def _finalize(
+        self, avg_test_loss: dict, optimal_hyperparameters: list
+    ) -> Tuple[dict, dict]:
+        """
+        Write the evaluations CSV row and package the return value.
+
+        Shared by the single-seed (walk-forward) and multi-seed (seed-averaged)
+        selection paths so both report results identically.
+
+        Args:
+            avg_test_loss: Metric name to averaged value for the selected configuration.
+            optimal_hyperparameters: Selected hyperparameter assignments.
+
+        Returns:
+            Tuple[dict, dict]: Evaluations and best hyperparameters, both keyed by
+                model name then dataset path.
+        """
+        all_evals: dict = {}
+        best_hyperparameters: dict = {}
 
         # Write to evaluations CSV in parent directory
         csv_filename = f"evaluations.csv"

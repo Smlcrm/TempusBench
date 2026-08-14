@@ -27,12 +27,14 @@ Example:
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Final, List, Set
 
 import numpy as np
 import polars as pl
 
+from .. import generators
 from ..utils.configs import EvaluationConfig, TaskConfig
 from .data_types import Dataset
 from .preprocessor import Preprocessor
@@ -125,12 +127,15 @@ class DataLoader:
     artificial column naming for maximum flexibility.
     """
 
+    _SYNTHETIC_EPOCH: Final[datetime] = datetime(2000, 1, 1, tzinfo=timezone.utc)
+
     def __init__(
         self,
         task_config: TaskConfig,
         evaluation_config: EvaluationConfig,
         *,
         force_no_normalize: bool = False,
+        base_seed: int | None = None,
     ):
         """
         Initialize the loader for a specific task and evaluation configuration.
@@ -142,10 +147,19 @@ class DataLoader:
                 benchmark settings for evaluation.
             force_no_normalize: If True, skip ``StandardScaler`` on targets (same missing-value
                 handling as training). Used to export UI display series in raw units.
+            base_seed: Base seed for generator tasks. The per-generator seed is derived
+                from it and the generator's id. Ignored by application tasks.
         """
         self.task_config = task_config
         self.evaluation_config = evaluation_config
         self._force_no_normalize = force_no_normalize
+        self._base_seed = base_seed
+
+        if self.task_config.is_synthetic():
+            self.dataset_path = None
+            self._load_generated_dataset()
+            return
+
         from tempus_bench.utils.paths import get_dataset_path
 
         self.dataset_path = get_dataset_path(
@@ -154,6 +168,121 @@ class DataLoader:
         )
 
         self._load_dataset()
+
+    def _synthetic_timestamps(self, num_steps: int) -> List[str]:
+        """Regular hourly ISO 8601 index; generator series are index-based.
+
+        Calendar frequency is an application-taskbed axis, so the stamps exist only
+        to satisfy the shared timestamp handling downstream.
+        """
+        return [
+            (self._SYNTHETIC_EPOCH + timedelta(hours=step)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            for step in range(num_steps)
+        ]
+
+    def _load_generated_dataset(self) -> None:
+        """
+        Build a Dataset by running a generator instead of reading a CSV.
+
+        Column order follows the generator docstrings: univariate generators return
+        ``(T,)``; multivariate and covariate generators return ``(T, m)`` with the
+        targets first, then the covariates.
+
+        Raises:
+            KeyError: If the task names a generator that is not in the registry.
+            ValueError: If the generator's column count disagrees with the task's
+                declared target and covariate names.
+        """
+        name = self.task_config.dataset_name
+        base_seed = 0 if self._base_seed is None else self._base_seed
+        seed = generators.resolve_seed(base_seed, name)
+
+        raw = np.asarray(
+            generators.generate(
+                name,
+                T=self.task_config.series_length,
+                seed=seed,
+                **self.task_config.generator_params,
+            ),
+            dtype=float,
+        )
+        if raw.ndim == 1:
+            raw = raw[:, None]
+
+        target_names = self.task_config.effective_targets()
+        covariate_names = self.task_config.effective_covariates()
+        expected = len(target_names) + len(covariate_names)
+        if raw.shape[1] != expected:
+            raise ValueError(
+                f"Generator {name!r} returned {raw.shape[1]} column(s) but task "
+                f"{self.task_config.task_name!r} declares {len(target_names)} target(s) "
+                f"and {len(covariate_names)} covariate(s)"
+            )
+
+        timestamps_str = self._synthetic_timestamps(raw.shape[0])
+        target_data = [raw[:, i].tolist() for i in range(len(target_names))]
+        covariate_data = [
+            raw[:, len(target_names) + i].tolist() for i in range(len(covariate_names))
+        ]
+
+        normalize = (
+            False if self._force_no_normalize else self.task_config.is_normalize()
+        )
+        handle_missing = self.task_config.handle_missing
+        preprocessor = Preprocessor(self.task_config, self.evaluation_config)
+
+        timestamps, time_start, time_freq, target, scaler = preprocessor.clean(
+            timestamps_str[0],
+            "h",
+            str(target_data),
+            normalize,
+            handle_missing,
+        )
+
+        if covariate_data:
+            _, _, _, covariate, _ = preprocessor.clean(
+                timestamps_str[0],
+                "h",
+                str(covariate_data),
+                normalize=False,
+                handle_missing=handle_missing,
+            )
+        else:
+            covariate = None
+
+        self.scaler = scaler
+
+        assert target.ndim == 2  # (num_steps, num_targets)
+        assert timestamps.ndim == 1  # (num_steps,)
+        if covariate is not None:
+            assert covariate.ndim == 2  # (num_steps, num_covariates)
+            assert covariate.shape[0] == target.shape[0]
+
+        meta = {
+            "dataset_path": None,
+            "generator_name": name,
+            "generator_seed": seed,
+            "base_seed": base_seed,
+            "time_start": time_start,
+            "time_freq": time_freq,
+            "num_targets": target.shape[1],
+            "num_covariates": covariate.shape[1] if covariate is not None else 0,
+            "task_mode": self.task_config.task_mode,
+            "target_variable_names": target_names,
+            "covariate_variable_names": covariate_names,
+            "target_variable_units": ["unitless"] * len(target_names),
+            "covariate_variable_units": ["unitless"] * len(covariate_names),
+        }
+        if scaler is not None:
+            meta["target_scaler_mean"] = scaler.mean_.tolist()
+            meta["target_scaler_scale"] = scaler.scale_.tolist()
+
+        self.dataset = Dataset(
+            timestamps=timestamps.tolist(),
+            target=target.tolist(),
+            covariate=covariate.tolist() if covariate is not None else None,
+            metadata=meta,
+        )
 
     def _load_dataset(self) -> None:
         """

@@ -1,0 +1,31 @@
+task:
+  task_name: Mean Reverting AR(1)
+  task_description: 'Stationary AR(1), phi=0.8: strongly mean-reverting level.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: stationarity
+  dataset_name: mean_reverting_ar1
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Near Unit Root AR(1)
+  task_description: 'AR(1) with phi=0.995: stationary but nearly integrated.'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: stationarity
+  dataset_name: near_unit_root_ar1
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

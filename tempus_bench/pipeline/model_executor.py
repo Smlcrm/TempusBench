@@ -23,7 +23,11 @@ from typing import Any, Dict, Optional
 
 
 from tempus_bench.utils.envs import CondaEnvManager
-from tempus_bench.utils.paths import get_project_root, get_models_dir
+from tempus_bench.utils.paths import (
+    get_project_root,
+    get_models_dir,
+    task_dataset_filename,
+)
 from tempus_bench.utils.model_settings import (
     get_past_only_covariate_models,
     get_no_covariate_models,
@@ -182,6 +186,7 @@ class ModelExecutor:
         context_steps: int,
         train_steps: int,
         validate_steps: int,
+        base_seed: int | None = None,
     ) -> dict:
         """
         Execute a single model with specific hyperparameters on dataset windows.
@@ -235,12 +240,13 @@ class ModelExecutor:
 
             # Add absolute path to task dataset so subprocess finds it regardless of cwd
             task_name = self.job_config["task_config"]["task_name"]
+            filename = task_dataset_filename(task_name, base_seed)
             tdir = self.job_config.get("task_datasets_dir")
             if tdir:
-                task_dataset_path = str(Path(tdir) / f"{task_name}.pkl")
+                task_dataset_path = str(Path(tdir) / filename)
             else:
                 task_dataset_path = str(
-                    Path(get_project_root()) / "temp_task_datasets" / f"{task_name}.pkl"
+                    Path(get_project_root()) / "temp_task_datasets" / filename
                 )
             job_config_to_write = {
                 **self.job_config,

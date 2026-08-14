@@ -1,0 +1,90 @@
+task:
+  task_name: MV Correlated Noise
+  task_description: m AR(1) series with strongly correlated innovations (returns (T,
+    m))
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: multivariate
+  dataset_name: mv_correlated_noise
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y1
+  - y2
+  - y3
+  covariate_variable_names: []
+---
+task:
+  task_name: MV VAR
+  task_description: Bivariate VAR(1) with genuine cross-dynamics (returns (T, 2))
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: multivariate
+  dataset_name: mv_var
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y1
+  - y2
+  covariate_variable_names: []
+---
+task:
+  task_name: MV Leadlag
+  task_description: 'Leading indicator: x leads y by lag steps (returns (T, 2) = [y,
+    x])'
+  context_window: 512
+  forecast_horizon: 16
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: multivariate
+  dataset_name: mv_leadlag
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y1
+  - y2
+  covariate_variable_names: []
+---
+task:
+  task_name: MV Common Factor
+  task_description: 'Factor structure: m=4 series driven by one latent AR(1) factor
+    (returns (T, 4))'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: multivariate
+  dataset_name: mv_common_factor
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y1
+  - y2
+  - y3
+  - y4
+  covariate_variable_names: []
+---
+task:
+  task_name: MV Cointegrated
+  task_description: Cointegrated pair sharing one stochastic trend (returns (T, 2))
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: multivariate
+  dataset_name: mv_cointegrated
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y1
+  - y2
+  covariate_variable_names: []

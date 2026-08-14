@@ -1,0 +1,49 @@
+task:
+  task_name: Level Shift
+  task_description: One-off mean shift on the reference sinusoid
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: structural_change
+  dataset_name: level_shift
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Variance Shift
+  task_description: 'One-off variance break: sigma jumps 1.0 -> 2.5 at 0.6T on the
+    reference sinusoid (conditional mean unchanged).'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: structural_change
+  dataset_name: variance_shift
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []
+---
+task:
+  task_name: Markov Switching AR
+  task_description: 'Recurring regimes: 2-state Markov chain (stay prob 0.97, mean
+    sojourn ~33 steps) switching the mean and dynamics of an AR(1)'
+  context_window: 512
+  forecast_horizon: 64
+  handle_missing: interpolate
+  normalization_method: standard
+  task_catalog: synthetic
+  dataset_category: structural_change
+  dataset_name: markov_switching_ar
+  target_type: continuous_real
+  series_length: 2048
+  target_variable_names:
+  - y
+  covariate_variable_names: []

@@ -1,0 +1,873 @@
+{
+  "iid_gaussian": {
+    "generator_id": 1,
+    "function": "iid_gaussian",
+    "primary_category": "noise",
+    "categories": [
+      "noise",
+      "stationarity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "White noise: y_t ~ iid N(mu, sigma^2).",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "noise_free_composite": {
+    "generator_id": 2,
+    "function": "noise_free_composite",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Deterministic, noise-free signal: trend + two incommensurate sines.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "low_snr_seasonal": {
+    "generator_id": 3,
+    "function": "low_snr_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Weak sinusoid buried in noise: y_t = amp*sin(2 pi t/24) + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "ma1": {
+    "generator_id": 4,
+    "function": "ma1",
+    "primary_category": "memory",
+    "categories": [
+      "memory",
+      "stationarity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Invertible MA(1): y_t = eps_t + theta*eps_{t-1}, eps ~ N(0, sigma^2).",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "mean_reverting_ar1": {
+    "generator_id": 5,
+    "function": "mean_reverting_ar1",
+    "primary_category": "stationarity",
+    "categories": [
+      "stationarity",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Stationary AR(1), phi=0.8: strongly mean-reverting level.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "near_unit_root_ar1": {
+    "generator_id": 6,
+    "function": "near_unit_root_ar1",
+    "primary_category": "stationarity",
+    "categories": [
+      "stationarity",
+      "memory",
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "AR(1) with phi=0.995: stationary but nearly integrated.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "random_walk": {
+    "generator_id": 7,
+    "function": "random_walk",
+    "primary_category": "trend",
+    "categories": [
+      "trend",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Driftless random walk: y_t = y_{t-1} + sigma*eps_t, y_0 = 0.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "random_walk_drift": {
+    "generator_id": 8,
+    "function": "random_walk_drift",
+    "primary_category": "trend",
+    "categories": [
+      "trend",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Random walk with drift: y_t = drift + y_{t-1} + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "linear_trend": {
+    "generator_id": 9,
+    "function": "linear_trend",
+    "primary_category": "trend",
+    "categories": [
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Trend-stationary linear trend: y_t = a + b*(t/T) + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "exponential_trend": {
+    "generator_id": 10,
+    "function": "exponential_trend",
+    "primary_category": "trend",
+    "categories": [
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Exponential growth: y_t = y0 * growth^(t/T) + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "log_trend": {
+    "generator_id": 11,
+    "function": "log_trend",
+    "primary_category": "trend",
+    "categories": [
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Logarithmic (decelerating) trend: y_t = base + c*ln(1+t) + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "power_trend": {
+    "generator_id": 12,
+    "function": "power_trend",
+    "primary_category": "trend",
+    "categories": [
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Power-law (\"p-root\") trend: y_t = base + scale*(t/T)^p + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "logistic_trend": {
+    "generator_id": 13,
+    "function": "logistic_trend",
+    "primary_category": "trend",
+    "categories": [
+      "trend",
+      "nonlinearity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Sigmoid (saturating) trend: y_t = base + L/(1 + exp(-k(t - t0))) + sigma*eps_t",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "piecewise_linear_trend": {
+    "generator_id": 14,
+    "function": "piecewise_linear_trend",
+    "primary_category": "trend",
+    "categories": [
+      "trend",
+      "structural_change"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Broken trend: slope b1/T before the break at frac_break*T, b2/T after (continuous at the break), plus N(0, sigma^2) noise.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "sinusoidal_seasonal": {
+    "generator_id": 15,
+    "function": "sinusoidal_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "stationarity",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Pure stationary cycle: y_t = amp*sin(2 pi t/period) + sigma*eps_t.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "multi_seasonal": {
+    "generator_id": 16,
+    "function": "multi_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Two nested periods (daily-in-weekly analogue)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "nonsinusoidal_seasonal": {
+    "generator_id": 17,
+    "function": "nonsinusoidal_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Sharp, asymmetric periodic shape (exponentiated-sine \"spike train\")",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "trend_seasonal_additive": {
+    "generator_id": 18,
+    "function": "trend_seasonal_additive",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "trend",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Non-stationary cyclical, additive composition",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "trend_seasonal_multiplicative": {
+    "generator_id": 19,
+    "function": "trend_seasonal_multiplicative",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "trend",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Non-stationary cyclical, multiplicative composition",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "damped_seasonal": {
+    "generator_id": 20,
+    "function": "damped_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Regressive (decaying-amplitude) cycle",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "irregular_period_seasonal": {
+    "generator_id": 21,
+    "function": "irregular_period_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Frequency-modulated cycle with smoothly drifting period.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "evolving_seasonal": {
+    "generator_id": 22,
+    "function": "evolving_seasonal",
+    "primary_category": "seasonality",
+    "categories": [
+      "seasonality",
+      "structural_change"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Slowly morphing seasonal shape via drifting Fourier coefficients.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "heteroskedastic_level": {
+    "generator_id": 23,
+    "function": "heteroskedastic_level",
+    "primary_category": "noise",
+    "categories": [
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Level-dependent (multiplicative-style) heteroskedasticity",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "heteroskedastic_time": {
+    "generator_id": 24,
+    "function": "heteroskedastic_time",
+    "primary_category": "noise",
+    "categories": [
+      "noise",
+      "structural_change"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Time-driven variance growth: y_t = 10 sin(2 pi t/24) + sigma(t)*eps_t, with sigma(t) = sigma0 + (sigma1-sigma0)*(t/T) rising 0.5 -> 2.5.",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "garch_noise": {
+    "generator_id": 25,
+    "function": "garch_noise",
+    "primary_category": "noise",
+    "categories": [
+      "noise",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "GARCH(1,1) with zero conditional mean (volatility clustering)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "heavy_tailed_noise": {
+    "generator_id": 26,
+    "function": "heavy_tailed_noise",
+    "primary_category": "noise",
+    "categories": [
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Student-t(3) innovations on the reference sinusoid",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "skewed_noise": {
+    "generator_id": 27,
+    "function": "skewed_noise",
+    "primary_category": "noise",
+    "categories": [
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Right-skewed innovations (centred, unit-variance log-normal)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "autocorrelated_noise": {
+    "generator_id": 28,
+    "function": "autocorrelated_noise",
+    "primary_category": "noise",
+    "categories": [
+      "noise",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "AR(1) errors around a deterministic sinusoid",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "outlier_contaminated": {
+    "generator_id": 29,
+    "function": "outlier_contaminated",
+    "primary_category": "noise",
+    "categories": [
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Additive-outlier contamination of the reference sinusoid",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "measurement_error_rw": {
+    "generator_id": 30,
+    "function": "measurement_error_rw",
+    "primary_category": "noise",
+    "categories": [
+      "noise",
+      "memory",
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Local-level state-space model (signal + measurement error)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "ar2_pseudocyclic": {
+    "generator_id": 31,
+    "function": "ar2_pseudocyclic",
+    "primary_category": "memory",
+    "categories": [
+      "memory",
+      "seasonality",
+      "stationarity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Stationary AR(2) with complex roots (stochastic pseudo-cycles)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "long_memory_fgn": {
+    "generator_id": 32,
+    "function": "long_memory_fgn",
+    "primary_category": "memory",
+    "categories": [
+      "memory",
+      "stationarity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Fractional Gaussian noise with Hurst H=0.9 (long memory).",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "setar": {
+    "generator_id": 33,
+    "function": "setar",
+    "primary_category": "nonlinearity",
+    "categories": [
+      "nonlinearity",
+      "memory",
+      "structural_change"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Self-exciting threshold AR with asymmetric persistence (threshold 0)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "logistic_map": {
+    "generator_id": 34,
+    "function": "logistic_map",
+    "primary_category": "nonlinearity",
+    "categories": [
+      "nonlinearity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Chaotic logistic map: x_{t+1} = r x_t (1 - x_t), r=3.9, x in (0,1).",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 20,
+    "normalization_method": "none"
+  },
+  "mackey_glass": {
+    "generator_id": 35,
+    "function": "mackey_glass",
+    "primary_category": "nonlinearity",
+    "categories": [
+      "nonlinearity",
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Mackey-Glass delay differential equation (chaotic regime, tau=17)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "level_shift": {
+    "generator_id": 36,
+    "function": "level_shift",
+    "primary_category": "structural_change",
+    "categories": [
+      "structural_change",
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "One-off mean shift on the reference sinusoid",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "variance_shift": {
+    "generator_id": 37,
+    "function": "variance_shift",
+    "primary_category": "structural_change",
+    "categories": [
+      "structural_change",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "One-off variance break: sigma jumps 1.0 -> 2.5 at 0.6T on the reference sinusoid (conditional mean unchanged).",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "markov_switching_ar": {
+    "generator_id": 38,
+    "function": "markov_switching_ar",
+    "primary_category": "structural_change",
+    "categories": [
+      "structural_change",
+      "memory",
+      "nonlinearity"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_real",
+    "description": "Recurring regimes: 2-state Markov chain (stay prob 0.97, mean sojourn ~33 steps) switching the mean and dynamics of an AR(1)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "binary_latent_ar": {
+    "generator_id": 39,
+    "function": "binary_latent_ar",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "seasonality",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "binary",
+    "description": "Binary series from a thresholded latent process",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "ordinal_categorical": {
+    "generator_id": 40,
+    "function": "ordinal_categorical",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "seasonality",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "categorical_ordinal",
+    "description": "Ordered 3-category series: the same latent construction as binary_latent_ar, cut at thresholds (-0.8, +0.8)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "poisson_counts": {
+    "generator_id": 41,
+    "function": "poisson_counts",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "seasonality",
+      "trend"
+    ],
+    "variate": "univariate",
+    "target_type": "count_positive",
+    "description": "Non-negative counts, canonical log-link Poisson",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "negbin_counts": {
+    "generator_id": 42,
+    "function": "negbin_counts",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "count_positive",
+    "description": "Overdispersed counts via a Gamma-Poisson (negative binomial) mixture with the same mean path as poisson_counts",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "skellam_integer": {
+    "generator_id": 43,
+    "function": "skellam_integer",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "count_signed",
+    "description": "Signed integers (difference of two seasonal Poisson flows)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "lognormal_positive": {
+    "generator_id": 44,
+    "function": "lognormal_positive",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "noise",
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_positive",
+    "description": "Strictly positive continuous series, multiplicative on every scale",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "intermittent_demand": {
+    "generator_id": 45,
+    "function": "intermittent_demand",
+    "primary_category": "target_type",
+    "categories": [
+      "target_type",
+      "intermittency",
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "count_positive",
+    "description": "Zero-inflated intermittent demand (Croston setting)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "intermittent_bursty": {
+    "generator_id": 46,
+    "function": "intermittent_bursty",
+    "primary_category": "intermittency",
+    "categories": [
+      "intermittency",
+      "target_type",
+      "memory"
+    ],
+    "variate": "univariate",
+    "target_type": "count_positive",
+    "description": "Intermittent demand with serially dependent occurrence",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "lumpy_demand": {
+    "generator_id": 47,
+    "function": "lumpy_demand",
+    "primary_category": "intermittency",
+    "categories": [
+      "intermittency",
+      "target_type",
+      "noise"
+    ],
+    "variate": "univariate",
+    "target_type": "count_positive",
+    "description": "Lumpy demand (Syntetos-Boylan 'lumpy' quadrant): rare occurrences AND highly variable sizes",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "zero_inflated_continuous": {
+    "generator_id": 48,
+    "function": "zero_inflated_continuous",
+    "primary_category": "intermittency",
+    "categories": [
+      "intermittency",
+      "target_type",
+      "seasonality"
+    ],
+    "variate": "univariate",
+    "target_type": "continuous_zero_inflated",
+    "description": "Zero-inflated *continuous* series (precipitation analogue)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "none"
+  },
+  "mv_correlated_noise": {
+    "generator_id": 49,
+    "function": "mv_correlated_noise",
+    "primary_category": "multivariate",
+    "categories": [
+      "multivariate",
+      "noise"
+    ],
+    "variate": "multivariate",
+    "target_type": "continuous_real",
+    "description": "m AR(1) series with strongly correlated innovations (returns (T, m))",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "mv_var": {
+    "generator_id": 50,
+    "function": "mv_var",
+    "primary_category": "multivariate",
+    "categories": [
+      "multivariate",
+      "memory"
+    ],
+    "variate": "multivariate",
+    "target_type": "continuous_real",
+    "description": "Bivariate VAR(1) with genuine cross-dynamics (returns (T, 2))",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "mv_leadlag": {
+    "generator_id": 51,
+    "function": "mv_leadlag",
+    "primary_category": "multivariate",
+    "categories": [
+      "multivariate",
+      "covariate",
+      "memory"
+    ],
+    "variate": "multivariate",
+    "target_type": "continuous_real",
+    "description": "Leading indicator: x leads y by lag steps (returns (T, 2) = [y, x])",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 16,
+    "normalization_method": "standard"
+  },
+  "mv_common_factor": {
+    "generator_id": 52,
+    "function": "mv_common_factor",
+    "primary_category": "multivariate",
+    "categories": [
+      "multivariate",
+      "memory"
+    ],
+    "variate": "multivariate",
+    "target_type": "continuous_real",
+    "description": "Factor structure: m=4 series driven by one latent AR(1) factor (returns (T, 4))",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "mv_cointegrated": {
+    "generator_id": 53,
+    "function": "mv_cointegrated",
+    "primary_category": "multivariate",
+    "categories": [
+      "multivariate",
+      "trend",
+      "memory"
+    ],
+    "variate": "multivariate",
+    "target_type": "continuous_real",
+    "description": "Cointegrated pair sharing one stochastic trend (returns (T, 2))",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  },
+  "covariate_nonlinear": {
+    "generator_id": 54,
+    "function": "covariate_nonlinear",
+    "primary_category": "covariate",
+    "categories": [
+      "covariate",
+      "nonlinearity",
+      "seasonality"
+    ],
+    "variate": "covariate",
+    "target_type": "continuous_real",
+    "description": "Covariate-driven target with a nonlinear, lagged link (returns (T, 2) = [y, x]; x is the covariate, known over context+horizon per the TempusBench task definition)",
+    "default_series_length": 2048,
+    "context_window": 512,
+    "forecast_horizon": 64,
+    "normalization_method": "standard"
+  }
+}
