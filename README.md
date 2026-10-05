@@ -1,18 +1,100 @@
-![Simulacrum Logo](https://github.com/Smlcrm/smlcrm-brand-assets/blob/main/Asset%201@4x-8.png?raw=true "Simulacrum — TempusBench")
+<!-- smlcrm:begin header -->
+<!-- Logo: Smlcrm/design-system assets/logo/logo-digital-1.svg @ cf980f0. Light fill #2121a5 = token product.logo-ink; dark fill #ffffff = token brand-book.brand-white. -->
+<p align="center">
+  <a href="https://smlcrm.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/smlcrm-logo-dark.svg">
+      <img alt="Simulacrum" src=".github/assets/smlcrm-logo-light.svg" width="300">
+    </picture>
+  </a>
+</p>
 
-# TempusBench
+<h1 align="center">TempusBench</h1>
 
-[![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](https://github.com/Smlcrm/TempusBench/releases)
+<p align="center">A framework that benchmarks statistical, machine-learning and foundation forecasting models on shared tasks.</p>
 
-A comprehensive framework for benchmarking time series forecasting models, including both traditional statistical models and modern foundation models.
+<p align="center"><a href="https://smlcrm.com">smlcrm.com</a></p>
+<!-- smlcrm:end header -->
+
+<!-- smlcrm:begin badges -->
+<!-- Badge colours: 2121a5 = token brand-book.brand-dark-blue (arXiv, license, language); 3483fa = token brand-book.brand-bright-blue (release). -->
+<p align="center">
+  <a href="https://arxiv.org/abs/2604.11529"><img alt="arXiv: 2604.11529" src="https://img.shields.io/badge/arXiv-2604.11529-2121a5"></a>
+  <a href="LICENSE"><img alt="License: CC BY-NC-ND 4.0" src="https://img.shields.io/github/license/Smlcrm/TempusBench?color=2121a5"></a>
+  <a href="https://github.com/Smlcrm/TempusBench/releases"><img alt="Release: latest GitHub release" src="https://img.shields.io/github/v/release/Smlcrm/TempusBench?color=3483fa"></a>
+  <!-- smlcrm:no-ci: the repository has no build or test workflow (web-docs-dev.yml only publishes documentation) -->
+  <a href="pyproject.toml"><img alt="Language: Python 3.11 or later" src="https://img.shields.io/badge/python-%E2%89%A53.11-2121a5"></a>
+</p>
+<!-- smlcrm:end badges -->
+
+<!-- smlcrm:begin overview -->
+## Overview
+
+TempusBench evaluates time-series forecasting models on a shared set of univariate, multivariate and covariate tasks. It runs each model on rolling windows of every task, tunes hyperparameters, scores point forecasts (MAE, RMSE, MAPE, MASE) and probabilistic forecasts (CRPS, quantile score, weighted interval score, energy score), and summarises models across tasks with win rates and skill scores against a baseline. Models range from statistical baselines to foundation models such as Chronos, Moirai and TimesFM, and each runs in its own conda environment so their dependencies do not conflict. Task data downloads from the public Hugging Face dataset [Smlcrm/tempus_bench_tasks](https://huggingface.co/datasets/Smlcrm/tempus_bench_tasks) on first use.
+
+**Who it is for.** Researchers and engineers who compare forecasting models, or add a model and want it scored the same way as the others.
+
+**What it does not do.** It does not train foundation models or ship their weights; it downloads or loads them per model. It is a local Python package and command line, not a hosted service, and it needs conda to run the models. The license (CC BY-NC-ND 4.0) does not permit commercial use or redistribution of modified versions.
+<!-- smlcrm:end overview -->
+
+<!-- smlcrm:begin quickstart -->
+## Quickstart
+
+> **Untested.** The install command was not completed when this README was written: downloads of the dependencies (TensorFlow among them) stalled on the network. The example itself was run on 2026-10-05 against the package source (metrics and aggregators identical to v1.0.0) with Python 3.11.14, numpy 2.4.4 and pandas 3.0.2, and printed the output below.
+
+Requires Python 3.11 or later. Running whole benchmarks also needs conda; the example below does not.
+
+```bash
+pip install "tempus_bench @ https://github.com/Smlcrm/TempusBench/archive/refs/tags/v1.0.0.tar.gz"
+```
+
+Save this as `score.py` and run `python score.py`. It scores two models' forecasts on two tasks with MAE, then aggregates them across tasks the way a benchmark run does.
+
+```python
+import numpy as np
+import pandas as pd
+from tempus_bench.metrics.mae import MAE
+from tempus_bench.aggregators import SkillScore, WinRate
+
+# Two tasks, each with a held-out horizon and two models' point forecasts
+tasks = {
+    "airline": (np.array([[417.0], [391.0], [419.0], [461.0]]),
+                {"seasonal_naive": np.array([[360.0], [342.0], [406.0], [396.0]]),
+                 "my_model":       np.array([[410.0], [395.0], [425.0], [450.0]])}),
+    "births":  (np.array([[44.0], [40.0], [38.0], [43.0]]),
+                {"seasonal_naive": np.array([[37.0], [45.0], [40.0], [35.0]]),
+                 "my_model":       np.array([[41.0], [42.0], [41.0], [40.0]])}),
+}
+
+mae = MAE()
+scores = pd.DataFrame({
+    task: {model: mae(y_true, y_pred, model_type="deterministic") for model, y_pred in preds.items()}
+    for task, (y_true, preds) in tasks.items()
+})  # models as rows, tasks as columns
+
+print(scores.round(2))
+print("skill vs seasonal_naive:", SkillScore(scores, baseline_model="seasonal_naive")().round(3).to_dict())
+print("win rate:", WinRate(scores)().to_dict())
+```
+
+Expected output:
+
+```text
+                airline  births
+seasonal_naive     46.0    5.50
+my_model            7.0    2.75
+skill vs seasonal_naive: {'seasonal_naive': 0.0, 'my_model': 0.724}
+win rate: {'seasonal_naive': 0.0, 'my_model': 1.0}
+```
+
+To run a full benchmark from a clone, `python -m tempus_bench.run_benchmark --config tempus_bench/config/benchmark.yaml`; see [Usage](#usage).
+<!-- smlcrm:end quickstart -->
 
 This repository is the **TempusBench** Python package and its assets (tasks, models, tests, docs). **Cloud/UI, worker, GCP deploy scripts, and Dockerfiles** live in a separate private repo (for example **`inference-tempusbench-cloud`** under your org); clone that repo and place this library at **`tempusbench_open/`** next to `tempusbench_cloud/` and `deployment/` to match its documented layout.
 
-## Overview
+## Supported models and features
 
-This project provides a unified benchmarking framework for evaluating the performance of various time series forecasting models. It supports:
+TempusBench supports:
 
 - **Traditional Models**: ARIMA, LSTM, XGBoost, SVR, Prophet, Random Forest, Theta, DeepAR, Exponential Smoothing, Croston Classic, Seasonal Naive, TabPFN
 - **Foundation Models**: Chronos, LagLlama, Moirai, TimesFM, Tiny Time Mixer, Toto, Moment
@@ -230,7 +312,7 @@ model:
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - Conda
 
 **Note**: All models added to the `tempus_bench/models` directory must be compatible with Python 3.0 or later (Python 3.x series).
@@ -240,8 +322,8 @@ model:
 1. **Clone the repository** and `cd` into the repo root (this directory):
 
    ```bash
-   git clone <repository-url>
-   cd <repo>
+   git clone https://github.com/Smlcrm/TempusBench.git
+   cd TempusBench
    ```
 
 2. **Install the package**:
@@ -496,23 +578,6 @@ pytest tests/e2e/
 pytest --cov=tempus_bench
 ```
 
-## License
-
-[Add your license information here]
-
-## Citation
-
-If you use this framework in your research, please cite:
-
-```bibtex
-@software{tempus_bench,
-  title={Time Series Forecasting Benchmarking Pipeline},
-  author={[Your Name/Organization]},
-  year={2024},
-  url={[Repository URL]}
-}
-```
-
 ## Support
 
 For questions and support:
@@ -529,3 +594,52 @@ For questions and support:
 - [ ] Real-time forecasting pipeline
 - [ ] Model interpretability tools
 - [ ] Automated model selection
+
+<!-- smlcrm:begin links -->
+## Links
+
+- Documentation: [smlcrm.com/docs/tempusbench](https://www.smlcrm.com/docs/tempusbench/) and [docs/README.md](docs/README.md)
+- Paper: [arXiv:2604.11529](https://arxiv.org/abs/2604.11529)
+- Task data: [Smlcrm/tempus_bench_tasks on Hugging Face](https://huggingface.co/datasets/Smlcrm/tempus_bench_tasks)
+- Issues: [Smlcrm/TempusBench/issues](https://github.com/Smlcrm/TempusBench/issues)
+- Releases: [Smlcrm/TempusBench/releases](https://github.com/Smlcrm/TempusBench/releases)
+- Website: [smlcrm.com](https://smlcrm.com)
+- Related repositories: [Smlcrm/Chronax](https://github.com/Smlcrm/Chronax), the JAX forecasting library whose models TempusBench benchmarks
+<!-- smlcrm:end links -->
+
+<!-- smlcrm:begin citation -->
+## Citation
+
+If you use TempusBench in your work, cite the paper, [arXiv:2604.11529](https://arxiv.org/abs/2604.11529), and the software you used. GitHub's "Cite this repository" button reads the same data from [`CITATION.cff`](CITATION.cff) and offers the paper first.
+
+```bibtex
+@misc{smlcrm_tempusbench_paper,
+  title         = {TempusBench: An Evaluation Framework for Time-Series Forecasting},
+  author        = {Goktas, Denizalp and Riaño-Briceño, Gerardo and Abdullah, Alif and Nair, Aryan and Shen, Chenkai and de Lucio, Beatriz and Magnusson, Alexandra and Mashrur, Farhan and Abdulla, Ahmed and Sen, Shawrna and Thippireddy, Mahitha and Schwartz, Gregory and Greenwald, Amy},
+  year          = {2026},
+  eprint        = {2604.11529},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/2604.11529}
+}
+```
+
+The software:
+
+```bibtex
+@software{smlcrm_tempusbench,
+  title   = {TempusBench},
+  author  = {{Simulacrum, Inc.}},
+  year    = {2026},
+  version = {1.0.0},
+  url     = {https://github.com/Smlcrm/TempusBench}
+}
+```
+<!-- smlcrm:end citation -->
+
+<!-- smlcrm:begin license -->
+## License and contact
+
+Released under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International license (CC BY-NC-ND 4.0). See [LICENSE](LICENSE).
+
+Contact: [support@smlcrm.com](mailto:support@smlcrm.com) · [smlcrm.com](https://smlcrm.com) · [github.com/Smlcrm](https://github.com/Smlcrm)
+<!-- smlcrm:end license -->

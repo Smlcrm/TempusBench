@@ -1,0 +1,59 @@
+# Keep title, version and
+# repository-code identical to the @software BibTeX entry in README.md.
+# Never add `doi` unless a DOI has actually been minted.
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper (preferred-citation) and the software, using the metadata from this file."
+type: software
+title: "TempusBench"
+abstract: "A framework that benchmarks statistical, machine-learning and foundation forecasting models on shared tasks."
+authors:
+  - name: "Simulacrum, Inc."
+    website: "https://smlcrm.com"
+version: "1.0.0"
+date-released: "2026-04-16"
+repository-code: "https://github.com/Smlcrm/TempusBench"
+url: "https://smlcrm.com"
+license: "CC-BY-NC-ND-4.0"
+keywords:
+  - "simulacrum"
+  - "python"
+  - "time-series"
+  - "forecasting"
+  - "benchmark"
+  - "foundation-models"
+preferred-citation:
+  type: article
+  title: "TempusBench: An Evaluation Framework for Time-Series Forecasting"
+  authors:
+    - family-names: "Goktas"
+      given-names: "Denizalp"
+    - family-names: "Riaño-Briceño"
+      given-names: "Gerardo"
+    - family-names: "Abdullah"
+      given-names: "Alif"
+    - family-names: "Nair"
+      given-names: "Aryan"
+    - family-names: "Shen"
+      given-names: "Chenkai"
+    - family-names: "de Lucio"
+      given-names: "Beatriz"
+    - family-names: "Magnusson"
+      given-names: "Alexandra"
+    - family-names: "Mashrur"
+      given-names: "Farhan"
+    - family-names: "Abdulla"
+      given-names: "Ahmed"
+    - family-names: "Sen"
+      given-names: "Shawrna"
+    - family-names: "Thippireddy"
+      given-names: "Mahitha"
+    - family-names: "Schwartz"
+      given-names: "Gregory"
+    - family-names: "Greenwald"
+      given-names: "Amy"
+  year: 2026
+  url: "https://arxiv.org/abs/2604.11529"
+  identifiers:
+    - type: other
+      value: "arXiv:2604.11529"
+      description: "The arXiv identifier of the paper"
